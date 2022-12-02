@@ -1,0 +1,43 @@
+name: 'Validate version labels'
+description: 'Checks that a PR has a valid version bump label'
+inputs:
+  LABELS:
+    description: 'The labels from the PR, or provided by the user in a manual run. Only the version bump label is required, but if you choose to provide others, the format is "LABEL1,LABEL2,LABEL3""'
+    required: true
+outputs:
+  VERSION_INSTRUCTION:
+    description: "Which of 'patch', 'minor', or 'major' to pass to npm version, or if we should run npm version at all ('none')."
+    value: ${{ steps.get-version-instruction.outputs.VERSION_INSTRUCTION }}
+  MESSAGE:
+    description: 'The message to pass to the PR comment if this job fails. If this job succeeds, this output is empty.'
+    value: ${{ steps.get-version-instruction.outputs.MESSAGE }}
+  JOB_ID:
+    description: 'The ID of the job calling this action. Used to print a link in the PR comment.'
+    value: ${{ steps.get-version-instruction.outputs.JOB_ID }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: get-version-instruction
+      run: |
+        shopt -s nocasematch
+        echo "::set-output name=JOB_ID::${{ github.job }}"
+        LABELS=${{ inputs.LABELS }}
+
+        # Do a regex search for version bump labels. This loads the BASH_REMATCH array with the matches so we can ensure there is only one.
+        echo "Searching labels for version bump: $LABELS"
+        if !  [[ $LABELS =~ (major|minor|patch|none|version-bump) ]]; then
+          MESSAGE="No labels present on the PR, expected version bump label (one of 'major', 'minor', 'patch', or 'none')"
+          echo "::set-output name=MESSAGE::$MESSAGE"        
+          exit 1
+        elif [[ ${#BASH_REMATCH[@]} > 2 ]]; then #BASH_REMATCH[0] is the full match, BASH_REMATCH[1] is the first capture group, so >2 means there were more than one capture groups
+          MESSAGE="Multiple version bump labels present on the PR, expected only one of 'major', 'minor', 'patch', or 'none'"
+          echo "::set-output name=MESSAGE::$MESSAGE"
+          exit 1
+        fi
+
+        LABEL=${BASH_REMATCH[1]}
+        echo "Version bump label found: $LABEL"
+        echo "::set-output name=VERSION_INSTRUCTION::$LABEL"
+        echo "::set-output name=JOB_ID::${{ github.job}}"
+      shell: bash

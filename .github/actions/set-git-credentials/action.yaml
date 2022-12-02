@@ -1,0 +1,11 @@
+name: 'Set git credentials'
+description: 'Sets config for git, used when we need to run raw git commands'
+runs:
+  using: 'composite'
+  steps:
+    - run: |
+        # Below are credentials for the built-in GitHub Actions bot: https://github.com/orgs/community/discussions/26560
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --global push.followTags true
+      shell: bash

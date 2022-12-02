@@ -1,0 +1,9 @@
+node_modules/
+dist/
+srcdocs/
+.DS_Store
+coverage/
+.clinic/
+.idea/
+yarn-error.log
+package-lock.json

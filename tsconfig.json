@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "target": "es2020",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "module": "CommonJS",
+    "resolveJsonModule": true,
+    "declaration": true, // Generate .d.ts files
+    "sourceMap": true, // Keep map of ts contents behind transpiled js
+
+    // Type checking
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": false,
+    "noImplicitThis": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUnusedLocals": true,
+    "strict": true
+  },
+  "exclude": ["src/**/test/**/*"],
+  "include": ["./src/**/*"]
+}

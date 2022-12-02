@@ -1,0 +1,35 @@
+# Very basic stack to demonstrate horizontal scaling
+services:
+  redis:
+    image: redis
+    container_name: redis
+
+  coingecko-reader:
+    image: node:alpine
+    ports:
+      - 8080
+    deploy:
+      mode: replicated
+      replicas: 2
+    environment:
+      - DISABLE_BACKGROUND_EXECUTOR=true
+    volumes:
+      - ./:/home/node/app
+    command: node /home/node/app/dist/test.js
+
+  coingecko-writer:
+    image: node:alpine
+    volumes:
+      - ./:/home/node/app
+    environment:
+      - DISABLE_REST_API=true
+    command: node /home/node/app/dist/test.js
+
+  lb:
+    image: dockercloud/haproxy
+    links:
+      - coingecko-reader
+    ports:
+      - '80:80'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

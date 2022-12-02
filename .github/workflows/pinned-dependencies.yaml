@@ -1,0 +1,29 @@
+name: 'Pinned dependencies'
+on: push
+
+jobs:
+  check-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Extract all versions from package.json
+        uses: sergeysova/jq-action@v2
+        id: versions
+        with:
+          cmd: "jq '[getpath([\"dependencies\"],[\"devDependencies\"],[\"optionalDependencies\"])] | del(..|nulls) | map(.[]) | .[]' package.json -r"
+          multiline: true
+      - name: Check for un-pinned versions
+        run: |
+          versions="${{ steps.versions.outputs.value }}"
+          # Simple regex that does what we need it for
+          regex="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-\w+)?(\+\w+)?$"
+          exitCode=0
+          for version in $versions; do
+            if echo "$version" | grep -Ev "$regex" > /dev/null; then
+              lineNumber=$(grep -F -n -m 1 "$version" "package.json" | sed  's/\([0-9]*\).*/\1/')
+              MESSAGE="Dependency version is not pinned: $version"
+              echo "::error file=package.json,line=$lineNumber,endLine=$lineNumber,title=Dependency::$MESSAGE"
+              exitCode=1
+            fi
+          done
+          exit "$exitCode"

@@ -1,0 +1,13 @@
+name: 'Setup'
+description: 'Sets up the project, installs dependencies, caches results'
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 16.x
+        registry-url: https://registry.npmjs.org
+        always-auth: true
+        cache: yarn
+    - run: yarn install --frozen-lockfile
+      shell: bash

@@ -1,0 +1,51 @@
+# This is the entry point for CI. It will setup the application, then run lint, test, and eventually publish if not the main branch
+name: 'Main'
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    concurrency: build-${{ github.ref}}
+    if: ${{ !startsWith(github.head_ref, 'version-bump') }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup
+      - run: yarn build
+  lint:
+    runs-on: ubuntu-latest
+    concurrency: lint-${{ github.ref }}
+    if: ${{ !startsWith(github.head_ref, 'version-bump') }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup
+      - run: yarn lint
+      - run: yarn prettier --check **/*.{ts,md}
+  test:
+    concurrency: test-${{ github.ref }}
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.head_ref, 'version-bump') }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup
+      - run: yarn test
+      - uses: actions/upload-artifact@v3
+        with:
+          name: coverage-reports
+          path: ./**/coverage/tmp/*.json
+  # Only run if tests have run and completed successfully
+  code-coverage:
+    needs: test
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.head_ref, 'version-bump') }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@v3
+        with:
+          name: coverage-reports
+      - run: yarn code-coverage

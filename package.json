@@ -1,0 +1,75 @@
+{
+  "name": "@chainlink/external-adapter-framework",
+  "version": "0.13.2",
+  "main": "dist/index.js",
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "8.11.0",
+    "axios": "0.27.2",
+    "eventsource": "2.0.2",
+    "fastify": "4.9.2",
+    "ioredis": "5.2.3",
+    "pino": "8.6.1",
+    "pino-pretty": "9.1.0",
+    "prom-client": "13.2.0",
+    "ws": "8.9.0"
+  },
+  "scripts": {
+    "build": "mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc",
+    "dev": "DEBUG=true tsnd --respawn --transpile-only --project tsconfig.json './src/test.ts'",
+    "generate-docs": "typedoc src/**/*.ts",
+    "lint-fix": "eslint --max-warnings=0 --fix ./src && prettier --write ./src/**/*.ts ./*.{json,js,yaml}",
+    "lint": "eslint --max-warnings=0 ./src && prettier --check ./src/**/*.ts ./*.{json,js,yaml}",
+    "start": "ts-node -e 'import(`./src/examples/${process.argv[1]}/src/index`).then(ea => ea.server())'",
+    "test-debug": "EA_HOST=localhost SKIP_METRICS_CLEAR=true LOG_LEVEL=trace DEBUG=true EA_PORT=0 c8 ava --verbose",
+    "test": "EA_HOST=localhost SKIP_METRICS_CLEAR=true LOG_LEVEL=error EA_PORT=0 c8 ava",
+    "verify": "yarn lint && yarn build && yarn build -p ./test/tsconfig.json && yarn test",
+    "code-coverage": "c8 check-coverage --statements 95 --lines 95 --functions 95 --branches 90"
+  },
+  "devDependencies": {
+    "@sinonjs/fake-timers": "9.1.2",
+    "@types/eventsource": "1.1.9",
+    "@types/node": "18.8.2",
+    "@types/sinonjs__fake-timers": "8.1.2",
+    "@types/ws": "8.5.3",
+    "@typescript-eslint/eslint-plugin": "5.39.0",
+    "@typescript-eslint/parser": "5.39.0",
+    "ava": "4.3.3",
+    "c8": "7.12.0",
+    "eslint": "8.24.0",
+    "eslint-config-prettier": "8.5.0",
+    "eslint-plugin-tsdoc": "0.2.17",
+    "mock-socket": "9.1.5",
+    "mocksse": "1.0.4",
+    "nock": "13.2.9",
+    "prettier": "2.7.1",
+    "ts-node": "10.9.1",
+    "ts-node-dev": "2.0.0",
+    "typedoc": "0.23.15",
+    "typescript": "4.8.4"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 100,
+    "endOfLine": "auto",
+    "trailingComma": "all",
+    "arrowParens": "always"
+  },
+  "ava": {
+    "files": [
+      "test/**/*.test.ts"
+    ],
+    "extensions": [
+      "ts"
+    ],
+    "require": [
+      "ts-node/register"
+    ],
+    "workerThreads": false,
+    "environmentVariables": {
+      "METRICS_ENABLED": "false"
+    },
+    "timeout": "20s"
+  }
+}
