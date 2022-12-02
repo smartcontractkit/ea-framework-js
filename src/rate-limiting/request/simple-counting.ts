@@ -35,15 +35,17 @@ export class SimpleCountingRateLimiter implements RateLimiter {
     return this
   }
 
-  isUnderLimits() {
+  msUntilNextExecution(): number {
     // If the limit is set to infinity, there was no tier limit specified
     if (this.perSecondLimit === Infinity && this.perMinuteLimit === Infinity) {
-      return true
+      return 0
     }
 
     const now = Date.now()
     const nearestSecondInterval = Math.floor(now / 1000)
     const nearestMinuteInterval = Math.floor(now / (1000 * 60))
+    const nextSecondInterval = (nearestSecondInterval + 1) * 1000
+    const nextMinuteInterval = (nearestMinuteInterval + 1) * 1000 * 60
 
     // This should always run to completion, even if it doesn't look atomic; therefore the
     // Ops should be "thread safe". Thank JS and its infinite single threaded dumbness.
@@ -63,17 +65,20 @@ export class SimpleCountingRateLimiter implements RateLimiter {
       this.requestsThisMinute = 0
     }
 
-    if (
-      this.requestsThisSecond < this.perSecondLimit &&
-      this.requestsThisMinute < this.perMinuteLimit
-    ) {
+    const timeToWaitForNextSecond =
+      this.requestsThisSecond < this.perSecondLimit ? 0 : nextSecondInterval - now
+    const timeToWaitForNextMinute =
+      this.requestsThisMinute < this.perMinuteLimit ? 0 : nextMinuteInterval - now
+    const timeToWait = Math.max(timeToWaitForNextSecond, timeToWaitForNextMinute)
+
+    if (timeToWait === 0) {
       logger.trace('Request under limits, counting +1')
       this.requestsThisSecond++
       this.requestsThisMinute++
-      return true
+      return 0
     } else {
-      logger.trace('Requests seen this interval are above limits')
-      return false
+      logger.trace(`Requests seen this interval are above limits, need to wait ${timeToWait}ms`)
+      return timeToWait
     }
   }
 }

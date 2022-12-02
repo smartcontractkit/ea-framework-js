@@ -5,15 +5,14 @@ import { AdapterConfig } from '../config'
 import * as rateLimitMetrics from '../rate-limiting/metrics'
 import { makeLogger } from '../util'
 import {
-  AdapterRequest,
   PartialSuccessfulResponse,
   ProviderResult,
   TimestampedProviderResult,
 } from '../util/request'
-import { AdapterDataProviderError, AdapterError } from '../validation/error'
-import { TransportGenerics } from './'
+import { Requester } from '../util/requester'
+import { AdapterDataProviderError } from '../validation/error'
+import { TransportDependencies, TransportGenerics } from './'
 import { SubscriptionTransport } from './abstract/subscription'
-import { axiosRequest } from './util'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
 
@@ -23,7 +22,7 @@ const logger = makeLogger('BatchWarmingTransport')
  * Helper struct type that will be used to pass types to the generic parameters of a Transport.
  * Extends the common TransportGenerics, adding Provider specific types for this Batch endpoint.
  */
-type BatchWarmingTransportGenerics = TransportGenerics & {
+type HttpTransportGenerics = TransportGenerics & {
   /**
    * Type details for any provider specific interfaces.
    */
@@ -41,13 +40,25 @@ type BatchWarmingTransportGenerics = TransportGenerics & {
 }
 
 /**
+ * Structure containing the association between EA params and a provider request.
+ */
+type ProviderRequestConfig<T extends HttpTransportGenerics> = {
+  /** The input paramters for requests that will get responses from the request in this struct */
+  params: T['Request']['Params'][]
+
+  /** The request that will be sent to the data provider to fetch values for the params in this struct */
+  request: AxiosRequestConfig<T['Provider']['RequestBody']>
+}
+
+/**
  * Config object that is provided to the BatchWarmingTransport constructor.
  */
-export interface BatchWarmingTransportConfig<T extends BatchWarmingTransportGenerics> {
-  prepareRequest: (
+export interface HttpTransportConfig<T extends HttpTransportGenerics> {
+  prepareRequests: (
     params: T['Request']['Params'][],
     config: AdapterConfig<T['CustomSettings']>,
-  ) => AxiosRequestConfig<T['Provider']['RequestBody']>
+  ) => ProviderRequestConfig<T> | ProviderRequestConfig<T>[]
+
   parseResponse: (
     params: T['Request']['Params'][],
     res: AxiosResponse<T['Provider']['ResponseBody']>,
@@ -65,40 +76,27 @@ export interface BatchWarmingTransportConfig<T extends BatchWarmingTransportGene
  *
  * @typeParam T - all types related to the [[Transport]]
  */
-export class BatchWarmingTransport<
-  T extends BatchWarmingTransportGenerics,
-> extends SubscriptionTransport<T> {
+export class HttpTransport<T extends HttpTransportGenerics> extends SubscriptionTransport<T> {
   // Flag used to track whether the warmer has moved from having no entries to having some and vice versa
   // Used for recording the cache warmer active metrics accurately
   WARMER_ACTIVE = false
+  requester!: Requester
 
-  constructor(private config: BatchWarmingTransportConfig<T>) {
+  constructor(private config: HttpTransportConfig<T>) {
     super()
+  }
+
+  override async initialize(
+    dependencies: TransportDependencies<T>,
+    config: AdapterConfig<T['CustomSettings']>,
+    endpointName: string,
+  ): Promise<void> {
+    await super.initialize(dependencies, config, endpointName)
+    this.requester = new Requester(dependencies.requestRateLimiter, config as AdapterConfig)
   }
 
   getSubscriptionTtlFromConfig(config: AdapterConfig<T['CustomSettings']>): number {
     return config.WARMUP_SUBSCRIPTION_TTL
-  }
-
-  override async registerRequest(
-    req: AdapterRequest<T['Request']>,
-    config: AdapterConfig<T['CustomSettings']>,
-  ): Promise<void> {
-    if (config.BATCH_TRANSPORT_SETUP_VALIDATION) {
-      const response = await this.makeRequest([req.requestContext.data], config)
-
-      if (!response.results.length) {
-        throw new AdapterError({
-          statusCode: 200,
-          providerStatusCode: response.providerResponse.status,
-          message:
-            (response.providerResponse as unknown as Error).message ||
-            'There was an error while validating the incoming request before adding to the batch subscription set',
-        })
-      }
-    }
-
-    return super.registerRequest(req, config)
   }
 
   async backgroundHandler(
@@ -119,84 +117,79 @@ export class BatchWarmingTransport<
       this.WARMER_ACTIVE = true
     }
 
-    const response = await this.makeRequest(entries, context.adapterConfig)
+    logger.trace(`Have ${entries.length} entries in batch, preparing request...`)
+    const rawRequests = this.config.prepareRequests(entries, context.adapterConfig)
+    const requests = Array.isArray(rawRequests) ? rawRequests : [rawRequests]
 
-    if (!response.results?.length) {
-      return
-    }
-
-    logger.debug('Setting adapter responses in cache')
-    await this.responseCache.write(response.results)
-
-    // Record cost of data provider call
-    const cost = rateLimitMetrics.retrieveCost(response.providerResponse.data)
-    rateLimitMetrics.rateLimitCreditsSpentTotal
-      .labels({
-        feed_id: 'N/A',
-        participant_id: WARMUP_BATCH_REQUEST_ID,
-      })
-      .inc(cost)
+    logger.trace(`Queueing ${requests.length} requests`)
+    await Promise.all(requests.map((r) => this.handleRequest(r, context.adapterConfig)))
 
     return
   }
 
-  private async makeRequest(
-    entries: T['Request']['Params'][],
-    config: AdapterConfig<T['CustomSettings']>,
-  ): Promise<{
-    results: TimestampedProviderResult<T>[]
-    providerResponse: AxiosResponse<T['Provider']['ResponseBody']>
-  }> {
-    logger.trace(`Have ${entries.length} entries in batch, preparing request...`)
-    const request = this.config.prepareRequest(entries, config)
+  private async handleRequest(
+    requestConfig: ProviderRequestConfig<T>,
+    adapterConfig: AdapterConfig<T['CustomSettings']>,
+  ): Promise<void> {
+    const results = await this.makeRequest(requestConfig, adapterConfig)
 
-    logger.trace(`Sending request to data provider: ${JSON.stringify(request)}`)
-    const providerDataRequested = Date.now()
-    let providerResponse
+    if (!results.length) {
+      return
+    }
+
+    logger.debug('Setting adapter responses in cache')
+    await this.responseCache.write(results)
+  }
+
+  private async makeRequest(
+    requestConfig: ProviderRequestConfig<T>,
+    adapterConfig: AdapterConfig<T['CustomSettings']>,
+  ): Promise<TimestampedProviderResult<T>[]> {
     try {
-      providerResponse = await axiosRequest<
-        T['Provider']['RequestBody'],
-        T['Provider']['ResponseBody'],
-        T['CustomSettings']
-      >(request, config)
+      const requesterResult = await this.requester.request<T['Provider']['ResponseBody']>(
+        requestConfig.params.map((p) => JSON.stringify(p)).join('|'),
+        requestConfig.request,
+      )
+
+      // Parse responses and apply timestamps
+      const results = this.config
+        .parseResponse(requestConfig.params, requesterResult.response, adapterConfig)
+        .map((r) => {
+          const result = r as TimestampedProviderResult<T>
+          const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
+          result.response.timestamps = {
+            ...requesterResult.timestamps,
+            providerIndicatedTime: partialResponse.timestamps?.providerIndicatedTime,
+          }
+          return result
+        })
+
+      // Record cost of data provider call
+      const cost = rateLimitMetrics.retrieveCost(requesterResult.response.data)
+      rateLimitMetrics.rateLimitCreditsSpentTotal
+        .labels({
+          feed_id: 'N/A',
+          participant_id: WARMUP_BATCH_REQUEST_ID,
+        })
+        .inc(cost)
+
+      return results
     } catch (e) {
-      const err = (e as AdapterDataProviderError).cause as AxiosError | undefined
-      const providerDataReceived = Date.now()
-      logger.warn(`There was an error while performing the batch request: ${e}`)
-      return {
-        results: entries.map((entry) => ({
+      if (e instanceof AdapterDataProviderError && e.cause instanceof AxiosError) {
+        const err = e as AdapterDataProviderError
+        const cause = err.cause as AxiosError
+        return requestConfig.params.map((entry) => ({
           params: entry,
           response: {
-            errorMessage: `Provider request failed with status ${err?.status}: "${err?.response?.data}"`,
+            errorMessage: `Provider request failed with status ${cause.status}: "${cause.response?.data}"`,
             statusCode: 502,
-            timestamps: {
-              providerDataRequested,
-              providerDataReceived,
-              providerIndicatedTime: undefined,
-            },
+            timestamps: err.timestamps,
           },
-        })),
-        providerResponse: e as AxiosResponse,
+        }))
+      } else {
+        logger.error(e)
+        return []
       }
-    }
-    const providerDataReceived = Date.now()
-
-    // Parse responses and apply timestamps
-    const results = this.config.parseResponse(entries, providerResponse, config).map((r) => {
-      const result = r as TimestampedProviderResult<T>
-      const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
-      result.response.timestamps = {
-        providerDataRequested,
-        providerDataReceived,
-        providerIndicatedTime: partialResponse.timestamps?.providerIndicatedTime,
-      }
-      return result
-    })
-
-    logger.debug(`Got response from provider, parsing (raw body: ${providerResponse.data})`)
-    return {
-      results,
-      providerResponse,
     }
   }
 }

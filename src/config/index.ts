@@ -21,11 +21,6 @@ export const BaseSettings = {
     type: 'string',
     default: '/',
   },
-  BATCH_TRANSPORT_SETUP_VALIDATION: {
-    description: 'Flag to toggle batch transport setup validation',
-    type: 'boolean',
-    default: false,
-  },
   CACHE_MAX_AGE: {
     description: 'Maximum amount of time (in ms) that a response will stay cached',
     type: 'number',
@@ -160,33 +155,6 @@ export const BaseSettings = {
     description: 'Used as rate limit capacity per second and ignores tier settings if defined',
     type: 'number',
   },
-  REQUEST_COALESCING_ENABLED: {
-    description: 'Enable request coalescing',
-    type: 'boolean',
-    default: false,
-  },
-  REQUEST_COALESCING_ENTROPY_MAX: {
-    description:
-      'Amount of random delay (entropy) in milliseconds that will be added to requests. Avoids issue where the request coalescing key will not be set before multiple other instances in a burst try to access the same key',
-    type: 'number',
-    default: 0,
-  },
-  // REQUEST_COALESCING_INTERVAL: {
-  //   type: 'number',
-  //   default: 100,
-  // },
-  // REQUEST_COALESCING_INTERVAL_COEFFICIENT: {
-  //   type: 'number',
-  //   default: 2,
-  // },
-  // REQUEST_COALESCING_INTERVAL_MAX: {
-  //   type: 'number',
-  //   default: 1000,
-  // },
-  // REQUEST_COALESCING_MAX_RETRIES: {
-  //   type: 'number',
-  //   default: 5,
-  // },
   RETRY: {
     type: 'number',
     description: 'Retry count for failed HTTP requests',
@@ -312,6 +280,12 @@ export const BaseSettings = {
     description: 'Bytes size of body request',
     type: 'number',
     default: 1024 * 1024,
+  },
+  MAX_HTTP_REQUEST_QUEUE_LENGTH: {
+    description:
+      'The maximum amount of queued requests for Http transports before new ones push oldest ones out of the queue',
+    type: 'number',
+    default: 200,
   },
 } as const
 

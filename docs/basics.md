@@ -5,7 +5,7 @@ This document covers some basic knowledge around External Adapters, what they ar
 ## What's the purpose of EAs?
 
 - Abstract provider specific details, specifically:
-  - Transport (REST, WebSockets, RPC, SSE, etc.)
+  - Transport (HTTP, WebSockets, RPC, SSE, etc.)
   - Authentication (login flows, keys)
   - Accept normalized request payloads and translate into the provider's interface (this also includes things like symbols/tickers)
   - Parse provider responses into the desired data points (e.g. price from crypto endpoint)

@@ -1,13 +1,13 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { AxiosError, AxiosResponse } from 'axios'
 import { AddressInfo } from 'net'
 import nock from 'nock'
 import { expose } from '../../src'
-import { Adapter, EndpointContext, AdapterEndpoint } from '../../src/adapter'
+import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import { DEFAULT_SHARED_MS_BETWEEN_REQUESTS } from '../../src/rate-limiting'
-import { BatchWarmingTransport } from '../../src/transports'
+import { HttpTransport } from '../../src/transports'
 import { AdapterResponse, ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
 
@@ -61,23 +61,26 @@ type BatchTransportTypes = {
   Response: SingleNumberResultResponse
   CustomSettings: SettingsMap
   Provider: {
-    RequestBody: unknown
+    RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
   }
 }
 
-class MockBatchWarmingTransport extends BatchWarmingTransport<BatchTransportTypes> {
+class MockBatchWarmingTransport extends HttpTransport<BatchTransportTypes> {
   backgroundExecuteCalls = 0
 
   constructor(private callSuper = false) {
     super({
-      prepareRequest: (params: AdapterRequestParams[]): AxiosRequestConfig<ProviderRequestBody> => {
+      prepareRequests: (params) => {
         return {
-          baseURL: URL,
-          url: '/price',
-          method: 'POST',
-          data: {
-            pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+          params,
+          request: {
+            baseURL: URL,
+            url: '/price',
+            method: 'POST',
+            data: {
+              pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+            },
           },
         }
       },
@@ -113,6 +116,7 @@ class MockBatchWarmingTransport extends BatchWarmingTransport<BatchTransportType
 
 // Disable retries to make the testing flow easier
 process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
+process.env['RETRY'] = '0'
 
 const from = 'ETH'
 const to = 'USD'
@@ -490,104 +494,7 @@ test.serial(
   },
 )
 
-test.serial('batch request validation', async (t) => {
-  nock(URL)
-    .post(endpoint, {
-      pairs: [
-        {
-          base: 'BTC',
-          quote: 'USD',
-        },
-      ],
-    })
-    .reply()
-    .persist()
-  const adapter = new Adapter({
-    name: 'TEST',
-    defaultEndpoint: 'test',
-    endpoints: [
-      new AdapterEndpoint({
-        name: 'test',
-        inputParameters,
-        transport: new MockBatchWarmingTransport(true),
-      }),
-    ],
-    envDefaultOverrides: {
-      BATCH_TRANSPORT_SETUP_VALIDATION: true,
-    },
-  })
-
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache()
-
-  // Start the adapter
-  const api = await expose(adapter, { cache: mockCache })
-  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
-
-  const makeBadRequest = () =>
-    axios.post(
-      address,
-      {
-        data: {
-          from: 'BTC',
-          to: 'USD',
-        },
-      },
-      {
-        headers: {
-          'x-correlation-id': 'Bad-Test-Request',
-        },
-      },
-    )
-  const makeGoodRequest = () =>
-    axios.post(
-      address,
-      {
-        data: {
-          from,
-          to,
-        },
-      },
-      {
-        headers: {
-          'x-correlation-id': 'Good-Test-Request',
-        },
-      },
-    )
-
-  // Start good request:
-  const errorPromise = t.throwsAsync(makeGoodRequest)
-  await errorPromise
-
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  const cacheValueSetPromise = mockCache.waitForNextSet()
-  await runAllUntilTime(t.context.clock, DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 10)
-  await cacheValueSetPromise
-
-  // Cache should be populated with the good request
-  const response = await makeGoodRequest()
-
-  t.is(response.status, 200)
-  assertEqualResponses(t, response.data, {
-    data: {
-      result: price,
-    },
-    result: price,
-    statusCode: 200,
-  })
-
-  // Cache should not have a value for the bad request even after background execute cycle
-  // Request would not have been added to the subscription set due to validation failure
-  const badRequestResponse = await makeBadRequest()
-  t.is(badRequestResponse.status, 200)
-  t.is(
-    badRequestResponse.data.error.message,
-    'There was an error while validating the incoming request before adding to the batch subscription set',
-  )
-})
-
-test.serial('DP request fails, EA returns 502 cached error', async (t) => {
+test.only('DP request fails, EA returns 502 cached error', async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
@@ -630,7 +537,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
   const cacheValueSetPromise = mockCache.waitForNextSet()
-  await runAllUntilTime(t.context.clock, DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 100)
+  await runAllUntilTime(t.context.clock, DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 200)
   await cacheValueSetPromise
 
   // Second request should find the response in the cache

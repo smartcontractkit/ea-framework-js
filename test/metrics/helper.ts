@@ -1,7 +1,7 @@
-import { AxiosRequestConfig, AxiosResponse } from 'axios'
+import { AxiosResponse } from 'axios'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { BatchWarmingTransport } from '../../src/transports'
+import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 
 // Parse metrics scrape into object to use for tests
@@ -66,16 +66,19 @@ type BatchEndpointTypes = {
   }
 }
 
-class MockBatchWarmingTransport extends BatchWarmingTransport<BatchEndpointTypes> {
+class MockBatchWarmingTransport extends HttpTransport<BatchEndpointTypes> {
   constructor() {
     super({
-      prepareRequest: (params: AdapterRequestParams[]): AxiosRequestConfig<ProviderRequestBody> => {
+      prepareRequests: (params: AdapterRequestParams[]) => {
         return {
-          baseURL: URL,
-          url: '/price',
-          method: 'POST',
-          data: {
-            pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+          params,
+          request: {
+            baseURL: URL,
+            url: '/price',
+            method: 'POST',
+            data: {
+              pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+            },
           },
         }
       },

@@ -4,7 +4,6 @@ import { AdapterConfig, SettingsMap } from '../config'
 import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/request'
 
 export * from './batch-warming'
-export * from './rest'
 export * from './sse'
 export * from './websocket'
 

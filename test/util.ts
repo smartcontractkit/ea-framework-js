@@ -87,7 +87,7 @@ export async function runPeriodicAsyncBackgroundExecution(
   }
 }
 
-async function runAllUntil(clock: InstalledClock, isComplete: () => boolean): Promise<void> {
+export async function runAllUntil(clock: InstalledClock, isComplete: () => boolean): Promise<void> {
   while (!isComplete()) {
     await clock.nextAsync()
   }

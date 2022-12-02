@@ -1,13 +1,13 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { AxiosError, AxiosResponse } from 'axios'
 import Redis, { ScanStream } from 'ioredis'
 import nock from 'nock'
 import { AddressInfo } from 'ws'
 import { expose } from '../../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { BatchWarmingTransport } from '../../src/transports'
+import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
 
@@ -83,14 +83,17 @@ type BatchEndpointTypes = {
 }
 
 const buildAdapter = () => {
-  const batchTransport = new BatchWarmingTransport<BatchEndpointTypes>({
-    prepareRequest: (params: AdapterRequestParams[]): AxiosRequestConfig<ProviderRequestBody> => {
+  const batchTransport = new HttpTransport<BatchEndpointTypes>({
+    prepareRequests: (params) => {
       return {
-        baseURL: URL,
-        url: '/price',
-        method: 'POST',
-        data: {
-          pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+        params,
+        request: {
+          baseURL: URL,
+          url: '/price',
+          method: 'POST',
+          data: {
+            pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+          },
         },
       }
     },

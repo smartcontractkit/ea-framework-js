@@ -3,7 +3,7 @@ import axios, { AxiosError } from 'axios'
 import { AddressInfo } from 'net'
 import { expose } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
-import { AdapterResponse } from '../src/util'
+import { AdapterResponse, ResponseTimestamps } from '../src/util'
 import {
   AdapterConnectionError,
   AdapterCustomError,
@@ -151,8 +151,8 @@ test('Special adapter errors have status 500', async (t) => {
     new AdapterInputError({}),
     new AdapterRateLimitError({}),
     new AdapterTimeoutError({}),
-    new AdapterDataProviderError({}),
-    new AdapterConnectionError({}),
+    new AdapterDataProviderError({}, {} as ResponseTimestamps),
+    new AdapterConnectionError({}, {} as ResponseTimestamps),
     new AdapterCustomError({}),
   ]
 

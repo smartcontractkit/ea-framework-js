@@ -35,7 +35,7 @@ export interface RequestRateLimiter extends RateLimiter {
    * This method will check using whatever strategy is implemented to determine if
    * this request can be processed. If so, it returns true; if not, returns false.
    */
-  isUnderLimits(): boolean
+  msUntilNextExecution(): number
 }
 
 /**
