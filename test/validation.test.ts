@@ -536,7 +536,7 @@ test.serial('custom input validation', async (t) => {
   }
   const customInputValidation = (input: any, _: AdapterConfig) => {
     if (input.base === input.quote) {
-      throw new AdapterInputError({ statusCode: 400 })
+      return new AdapterInputError({ statusCode: 400 })
     }
   }
 
