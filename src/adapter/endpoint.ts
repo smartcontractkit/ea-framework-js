@@ -24,6 +24,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   rateLimiting?: EndpointRateLimitingConfig | undefined
   validator: InputValidator
   cacheKeyGenerator?: (data: Record<string, unknown>) => string
+  customInputValidation?: (input: T['Request']['Params'], config: AdapterConfig) => void
 
   constructor(params: AdapterEndpointParams<T>) {
     this.name = params.name
@@ -33,6 +34,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.rateLimiting = params.rateLimiting
     this.validator = new InputValidator(this.inputParameters)
     this.cacheKeyGenerator = params.cacheKeyGenerator
+    this.customInputValidation = params.customInputValidation
   }
 
   /**

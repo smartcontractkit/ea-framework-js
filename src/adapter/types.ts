@@ -159,4 +159,7 @@ export interface AdapterEndpointParams<T extends EndpointGenerics> {
 
   /** Custom function that generates cache keys */
   cacheKeyGenerator?: (data: Record<string, unknown>) => string
+
+  /** Custom input validation. Void function that should throw AdapterInputError on validation errors */
+  customInputValidation?: (input: T['Request']['Params'], config: AdapterConfig) => void
 }

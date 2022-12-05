@@ -54,6 +54,9 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     const validatedData = endpoint.validator.validateInput(requestBody.data)
 
+    // Custom input validation defined in the EA
+    endpoint.customInputValidation && endpoint.customInputValidation(validatedData, adapter.config)
+
     req.requestContext = {
       cacheKey: '',
       data: validatedData,
