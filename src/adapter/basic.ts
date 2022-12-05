@@ -235,6 +235,11 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
         `METRICS_ENABLED has been set to false. Metrics should not be disabled in a production environment.`,
       )
     }
+    if (this.config.MAX_PAYLOAD_SIZE_LIMIT !== BaseSettings.MAX_PAYLOAD_SIZE_LIMIT.default) {
+      logger.warn(
+        `MAX_PAYLOAD_SIZE_LIMIT has been set to ${this.config.MAX_PAYLOAD_SIZE_LIMIT}. This setting should only be set when absolutely necessary.`,
+      )
+    }
   }
 
   /**

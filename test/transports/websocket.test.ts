@@ -284,7 +284,7 @@ test.serial('reconnects when url changed', async (t) => {
     defaultEndpoint: 'test',
     endpoints: [webSocketEndpoint],
     envDefaultOverrides: {
-      WS_SUBSCRIPTION_TTL: 100000000,
+      WS_SUBSCRIPTION_TTL: 120000,
     },
   })
 

@@ -23,7 +23,7 @@
     "start": "ts-node -e 'import(`./src/examples/${process.argv[1]}/src/index`).then(ea => ea.server())'",
     "test-debug": "EA_HOST=localhost SKIP_METRICS_CLEAR=true LOG_LEVEL=trace DEBUG=true EA_PORT=0 c8 ava --verbose",
     "test": "EA_HOST=localhost SKIP_METRICS_CLEAR=true LOG_LEVEL=error EA_PORT=0 c8 ava",
-    "verify": "yarn lint && yarn build && yarn build -p ./test/tsconfig.json && yarn test",
+    "verify": "yarn lint && yarn build && yarn build -p ./test/tsconfig.json && yarn test && yarn code-coverage",
     "code-coverage": "c8 check-coverage --statements 95 --lines 95 --functions 95 --branches 90"
   },
   "devDependencies": {

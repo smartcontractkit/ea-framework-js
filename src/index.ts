@@ -131,7 +131,7 @@ async function buildRestApi(adapter: Adapter) {
   const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(adapter.config)
   const app = fastify({
     ...mTLSOptions,
-    bodyLimit: adapter.config.BODY_LIMIT_SIZE,
+    bodyLimit: adapter.config.MAX_PAYLOAD_SIZE_LIMIT,
   })
 
   // Add healthcheck endpoint before middlewares to bypass them
