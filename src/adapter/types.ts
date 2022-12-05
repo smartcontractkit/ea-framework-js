@@ -138,6 +138,11 @@ export interface EndpointRateLimitingConfig {
  */
 export type EndpointGenerics = TransportGenerics
 
+export type CustomInputValidator<T extends EndpointGenerics> = (
+  input: T['Request']['Params'],
+  config: AdapterConfig<T['CustomSettings']>,
+) => void
+
 /**
  * Structure to describe a specific endpoint in an [[Adapter]]
  */
@@ -161,5 +166,5 @@ export interface AdapterEndpointParams<T extends EndpointGenerics> {
   cacheKeyGenerator?: (data: Record<string, unknown>) => string
 
   /** Custom input validation. Void function that should throw AdapterInputError on validation errors */
-  customInputValidation?: (input: T['Request']['Params'], config: AdapterConfig) => void
+  customInputValidation?: CustomInputValidator<T>
 }

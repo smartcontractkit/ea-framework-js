@@ -341,7 +341,7 @@ export const BaseSettings = {
     description: 'CA certificate to use for authenticating client certificates',
     type: 'string',
   },
-} as const
+} as const satisfies SettingsMap
 
 export const buildAdapterConfig = <
   CustomSettings extends CustomSettingsType<CustomSettings> = EmptySettings,
