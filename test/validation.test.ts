@@ -8,6 +8,7 @@ import { AdapterResponse } from '../src/util'
 import { AdapterInputError } from '../src/validation/error'
 import { InputValidator } from '../src/validation/input-validator'
 import { NopTransport, NopTransportTypes } from './util'
+import { validator } from '../src/validation/utils'
 
 const test = untypedTest as TestFn<{
   serverAddress: string
@@ -471,6 +472,57 @@ test.serial('missing input depends on param (error)', async (t) => {
   t.is(error?.message, "Input dependency/exclusive 'quote' is missing in input schema")
 })
 
+test.serial('Test port validator', async (t) => {
+  const portValidator = validator.port()
+  let value = 8080
+  let error = portValidator(value)
+  t.is(error, undefined)
+  value = 1000000
+  error = portValidator(value)
+  t.is(error, 'Maximum allowed value is 65535. Received 1000000')
+})
+
+test.serial('Test url validator', async (t) => {
+  const urlValidator = validator.url()
+  let value = 'redis://:authpassword@127.0.0.1:6380/4'
+  let error = urlValidator(value)
+  t.is(error, undefined)
+  value = 'unknown_url'
+  error = urlValidator(value)
+  t.is(error, 'Value should be valid URL. Received unknown_url')
+})
+
+test.serial('Test host validator', async (t) => {
+  const hostValidator = validator.host()
+  let value = '127.0.0.1'
+  let error = hostValidator(value)
+  t.is(error, undefined)
+  value = '23124.32.42.24'
+  error = hostValidator(value)
+  t.is(error, 'Value is not valid IP address. Received 23124.32.42.24')
+})
+
+test.serial('Test integer validator', async (t) => {
+  const integerValidator = validator.integer({ min: 10, max: 20 })
+  let value: string | number = 11
+  let error = integerValidator(value)
+  t.is(error, undefined)
+  value = '3'
+  error = integerValidator(value)
+  t.is(error, 'Value should be an integer (no floating point)., Received string 3')
+  value = 3.141
+  error = integerValidator(value)
+  t.is(error, 'Value should be an integer (no floating point)., Received number 3.141')
+
+  value = 4
+  error = integerValidator(value)
+  t.is(error, 'Minimum allowed value is 10. Received 4')
+
+  value = 24
+  error = integerValidator(value)
+  t.is(error, 'Maximum allowed value is 20. Received 24')
+})
+
 test.serial('custom input validation', async (t) => {
   t.context.adapterEndpoint.inputParameters = {
     base: {
@@ -516,7 +568,7 @@ test.serial('custom input validation', async (t) => {
 })
 
 test.serial('limit size of input parameters', async (t) => {
-  process.env['BODY_LIMIT_SIZE'] = '1'
+  process.env['MAX_PAYLOAD_SIZE_LIMIT'] = '1048576'
 
   const adapter = new Adapter({
     name: 'TEST',
@@ -548,8 +600,8 @@ test.serial('limit size of input parameters', async (t) => {
   t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
 
   t.context.adapterEndpoint.inputParameters = {
-    base: {
-      type: 'string',
+    addresses: {
+      type: 'array',
       required: true,
     },
   }
@@ -557,13 +609,20 @@ test.serial('limit size of input parameters', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
+  const request = {
+    data: {
+      addresses: [
+        '0x933ad9491b62059dd065b560d256d8957a8c402cc6e8d8ee7290ae11e8f7329267a8811c397529dac52ae1342ba58c95',
+      ],
+    },
+  }
+
+  for (let i = 0; i < 14; i++) {
+    request.data.addresses = request.data.addresses.concat(request.data.addresses)
+  }
+
   const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: 123,
-      },
-      endpoint: 'test',
-    }),
+    axios.post(`${t.context.serverAddress}`, request),
   )
   t.is(error?.response?.status, 413)
   t.is(error?.response?.data, 'Request body is too large')

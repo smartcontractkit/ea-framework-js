@@ -1,5 +1,6 @@
 import test from 'ava'
 import { buildAdapterConfig, SettingsMap, validateAdapterConfig } from '../src/config'
+import { validator } from '../src/validation/utils'
 
 test.afterEach(async (t) => {
   process.env = {}
@@ -86,4 +87,22 @@ test.serial('Test prefix settings', async (t) => {
   const envVarsPrefix = 'TEST_PREFIX'
   const config = buildAdapterConfig({ envVarsPrefix })
   t.is(config['BASE_URL'], 'TEST_BASE_URL')
+})
+
+test.serial('Test validate function', async (t) => {
+  process.env['CUSTOM_KEY'] = '11'
+  const customSettings: SettingsMap = {
+    CUSTOM_KEY: {
+      description: 'Test custom env var',
+      type: 'number',
+      validate: validator.integer({ min: 1, max: 10 }),
+    },
+  }
+  const config = buildAdapterConfig({ customSettings })
+  try {
+    validateAdapterConfig(config, customSettings)
+    t.fail()
+  } catch (e: any) {
+    t.pass()
+  }
 })

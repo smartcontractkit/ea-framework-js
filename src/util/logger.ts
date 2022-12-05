@@ -26,6 +26,11 @@ const debugTransport = {
 // Base logger, shouldn't be used because we want layers to be specified
 const baseLogger = pino({
   level: process.env['LOG_LEVEL']?.toLowerCase() || BaseSettings.LOG_LEVEL.default,
+  formatters: {
+    level(label) {
+      return { level: label }
+    },
+  },
   hooks: {
     logMethod(inputArgs, method) {
       // Censor each argument of logger
