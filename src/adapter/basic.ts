@@ -509,7 +509,8 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
 
     logger.debug('Ran out of polling attempts, returning timeout')
     throw new AdapterTimeoutError({
-      message: 'Timed out waiting for provider result.',
+      message:
+        'The EA has not received any values from the Data Provider for the requested data yet. Retry after a short delay, and if the problem persists raise this issue in the relevant channels.',
       statusCode: 504,
     })
   }

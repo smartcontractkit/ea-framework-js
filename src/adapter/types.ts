@@ -10,6 +10,7 @@ import {
 import { Transport, TransportGenerics } from '../transports'
 import { AdapterRequest, RequestGenerics, SubscriptionSetFactory } from '../util'
 import { InputParameters } from '../validation'
+import { AdapterError } from '../validation/error'
 import { Adapter } from './basic'
 import { AdapterEndpoint } from './endpoint'
 
@@ -141,7 +142,7 @@ export type EndpointGenerics = TransportGenerics
 export type CustomInputValidator<T extends EndpointGenerics> = (
   input: T['Request']['Params'],
   config: AdapterConfig<T['CustomSettings']>,
-) => void
+) => AdapterError | undefined
 
 /**
  * Structure to describe a specific endpoint in an [[Adapter]]
