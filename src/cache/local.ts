@@ -53,20 +53,6 @@ class DoubleLinkedList {
     return node
   }
 
-  insertAtHead(node: LinkedListNode) {
-    if (!this.head) {
-      this.tail = node
-      this.head = node
-    } else {
-      node.next = this.head
-      this.head.prev = node
-      this.head = node
-    }
-
-    this.size++
-    return node
-  }
-
   remove(node: LinkedListNode | null): LinkedListNode | undefined {
     if (!node) {
       return
@@ -93,10 +79,6 @@ class DoubleLinkedList {
 
   removeHead(): LinkedListNode | undefined {
     return this.remove(this.head)
-  }
-
-  removeTail(): LinkedListNode | undefined {
-    return this.remove(this.tail)
   }
 }
 
