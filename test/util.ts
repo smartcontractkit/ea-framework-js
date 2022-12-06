@@ -50,7 +50,6 @@ export const deferredPromise = <T>(): [Promise<T>, Resolve<T>] => {
 }
 
 export class MockCache extends LocalCache {
-
   constructor(maxItems: number) {
     super(maxItems)
   }
