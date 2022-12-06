@@ -50,6 +50,10 @@ export const deferredPromise = <T>(): [Promise<T>, Resolve<T>] => {
 }
 
 export class MockCache extends LocalCache {
+
+  constructor(maxItems: number) {
+    super(maxItems)
+  }
   private awaitingPromiseResolve?: (value: unknown) => void
 
   waitForNextSet() {
@@ -101,7 +105,7 @@ export async function runAllUntilTime(clock: InstalledClock, time: number): Prom
 }
 
 export class RedisMock {
-  store = new LocalCache<string>()
+  store = new LocalCache<string>(100)
 
   get(key: string) {
     return this.store.get(key)

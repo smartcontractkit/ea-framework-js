@@ -35,14 +35,12 @@ export const BaseSettings = {
     default: 90000,
     validate: validator.integer({ min: 1000, max: 180000 }),
   },
-  // CACHE_MAX_ITEMS: {
-  //   type: 'number',
-  //   default: 1000,
-  // },
-  // CACHE_MIN_AGE: {
-  //   type: 'number',
-  //   default: 30000,
-  // },
+  CACHE_MAX_ITEMS: {
+    type: 'number',
+    description: 'The maximum number of items that remain in the cache',
+    default: 10000,
+    validate: validator.integer({ min: 1000, max: 10000 }),
+  },
   CACHE_REDIS_CONNECTION_TIMEOUT: {
     description: 'Connection timeout for redis client',
     type: 'number',

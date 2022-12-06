@@ -120,7 +120,7 @@ test('connects to EventSource, subscribes, gets message, unsubscribes and handle
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
   // Also use the mock event source provided by mocksee
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(100)
   // Start up adapter
   const api = await expose(adapter, {
     cache: mockCache,

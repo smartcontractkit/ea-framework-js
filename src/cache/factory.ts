@@ -5,11 +5,14 @@ import { RedisCache } from './redis'
 
 const logger = makeLogger('CacheFactory')
 export class CacheFactory {
-  static buildCache(cacheType: string, redisClient?: Redis) {
+  static buildCache(
+    { cacheType, maxSizeForLocalCache }: { cacheType: string; maxSizeForLocalCache: number },
+    redisClient?: Redis,
+  ) {
     logger.info(`Using "${cacheType}" cache.`)
     switch (cacheType) {
       case 'local':
-        return new LocalCache()
+        return new LocalCache(maxSizeForLocalCache)
       case 'redis': {
         if (!redisClient) {
           throw new Error('Redis client undefined. Cannot create Redis cache')

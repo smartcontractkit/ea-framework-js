@@ -156,7 +156,7 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
   })
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(100)
 
   const adapter = createAdapter()
 
@@ -238,7 +238,7 @@ test.serial('reconnects when url changed', async (t) => {
     })
   })
 
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(100)
 
   const transport = new WebSocketTransport<WebSocketTypes>({
     url: (context, desiredSubs) => {
@@ -353,7 +353,7 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
     })
   })
 
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(100)
 
   const adapter = createAdapter({
     envDefaultOverrides: {
@@ -415,7 +415,7 @@ test.serial(
       )
     })
 
-    const mockCache = new MockCache()
+    const mockCache = new MockCache(100)
 
     const transport = new WebSocketTransport<WebSocketTypes>({
       url: () => URL,

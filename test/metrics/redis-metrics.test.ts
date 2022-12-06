@@ -16,7 +16,7 @@ export const test = untypedTest as TestFn<{
 }>
 
 class RedisMock {
-  store = new LocalCache<string>()
+  store = new LocalCache<string>(100)
 
   get(key: string) {
     return this.store.get(key)
