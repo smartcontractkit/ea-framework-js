@@ -74,3 +74,12 @@ test('Test color factory', async (t) => {
   // Test that the colors cycle back
   t.is(nextColor(), COLORS[0])
 })
+
+test('properly handle circular references', async (t) => {
+  const a = {
+    b: {},
+  }
+  a.b = a
+  const log = censor(a, CensorList.getAll())
+  t.is(log, '[Unknown]')
+})
