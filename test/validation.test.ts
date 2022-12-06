@@ -3,6 +3,7 @@ import axios, { AxiosError } from 'axios'
 import { AddressInfo } from 'net'
 import { expose } from '../src'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../src/adapter'
+import { AdapterConfig } from '../src/config'
 import { AdapterResponse } from '../src/util'
 import { AdapterInputError } from '../src/validation/error'
 import { InputValidator } from '../src/validation/input-validator'
@@ -400,7 +401,7 @@ test.serial('omitted optional param returns 200', async (t) => {
   t.is(response.status, 200)
 })
 
-test.serial('duplicate  params throws 400', async (t) => {
+test.serial('duplicate params throws 400', async (t) => {
   t.context.adapterEndpoint.inputParameters = {
     base: {
       required: true,
@@ -521,6 +522,51 @@ test.serial('Test integer validator', async (t) => {
   error = integerValidator(value)
   t.is(error, 'Maximum allowed value is 20. Received 24')
 })
+
+test.serial('custom input validation', async (t) => {
+  t.context.adapterEndpoint.inputParameters = {
+    base: {
+      type: 'string',
+      required: true,
+    },
+    quote: {
+      type: 'string',
+      required: true,
+    },
+  }
+  const customInputValidation = (input: any, _: AdapterConfig) => {
+    if (input.base === input.quote) {
+      return new AdapterInputError({ statusCode: 400 })
+    }
+  }
+
+  t.context.adapterEndpoint.customInputValidation = customInputValidation
+
+  t.context.adapterEndpoint.validator = new InputValidator(
+    t.context.adapterEndpoint.inputParameters,
+  )
+
+  const response = await axios.post(`${t.context.serverAddress}`, {
+    data: {
+      base: 'BTC',
+      quote: 'USD',
+    },
+    endpoint: 'test',
+  })
+  t.is(response.status, 200)
+
+  const error: AxiosError | undefined = await t.throwsAsync(() =>
+    axios.post(`${t.context.serverAddress}`, {
+      data: {
+        base: 'BTC',
+        quote: 'BTC',
+      },
+      endpoint: 'test',
+    }),
+  )
+  t.is(error?.response?.status, 400)
+})
+
 test.serial('limit size of input parameters', async (t) => {
   process.env['MAX_PAYLOAD_SIZE_LIMIT'] = '1048576'
 

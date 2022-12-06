@@ -143,11 +143,7 @@ export const BaseSettings = {
     description: 'Max payload size limit for the Fastify server',
     type: 'number',
     default: 1048576,
-    validate: (value?: number) => {
-      if (!(value && value >= 1048576 && value <= 1073741824)) {
-        return 'MAX_PAYLOAD_SIZE_LIMIT must be a number between 1048576 (1MB) and 1073741824 (1GB), inclusive'
-      }
-    },
+    validate: validator.integer({ min: 1048576, max: 1073741824 }),
   },
   METRICS_ENABLED: {
     description: 'Flag to specify whether or not to startup the metrics server',
@@ -341,7 +337,7 @@ export const BaseSettings = {
     description: 'CA certificate to use for authenticating client certificates',
     type: 'string',
   },
-} as const
+} as const satisfies SettingsMap
 
 export const buildAdapterConfig = <
   CustomSettings extends CustomSettingsType<CustomSettings> = EmptySettings,
