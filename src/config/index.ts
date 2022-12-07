@@ -11,7 +11,7 @@ export const BaseSettings = {
       'The number of milliseconds a request can be pending before returning a timeout error for data provider request',
     type: 'number',
     default: 30000,
-    validate: validator.integer({ min: 0, max: 50000 }),
+    validate: validator.integer({ min: 0, max: 60000 }),
   },
   API_VERBOSE: {
     description:
@@ -53,7 +53,6 @@ export const BaseSettings = {
     description: 'Hostname for the Redis instance to be used',
     type: 'string',
     default: '127.0.0.1',
-    validate: validator.host(),
   },
   // CACHE_REDIS_MAX_QUEUED_ITEMS: {
   //   description: 'Maximum length of the client internal command queue',
@@ -85,7 +84,7 @@ export const BaseSettings = {
     description: 'Timeout to fail a Redis server request if no response (ms)',
     type: 'number',
     default: 500,
-    validate: validator.integer({ min: 500, max: 2000 }),
+    validate: validator.integer({ min: 500, max: 10000 }),
   },
   CACHE_REDIS_URL: {
     description:
