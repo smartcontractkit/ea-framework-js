@@ -36,7 +36,7 @@ test.beforeEach(async (t) => {
     },
   })
 
-  const cache = new LocalCache(100)
+  const cache = new LocalCache(adapter.config.CACHE_MAX_ITEMS)
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }
@@ -53,7 +53,7 @@ cacheTests()
 
 test.serial('Test cache factory success (redis)', async (t) => {
   try {
-    CacheFactory.buildCache({ cacheType: 'local', maxSizeForLocalCache: 100 })
+    CacheFactory.buildCache({ cacheType: 'local', maxSizeForLocalCache: 10000 })
     t.pass()
   } catch (e: unknown) {
     t.fail()

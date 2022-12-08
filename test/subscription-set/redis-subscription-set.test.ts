@@ -172,7 +172,7 @@ test.before(async (t) => {
 
   const adapter = buildAdapter()
 
-  const mockCache = new MockCache(100)
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
   const dependencies: Partial<AdapterDependencies> = {
     redisClient: new RedisMock() as unknown as Redis,
     cache: mockCache,

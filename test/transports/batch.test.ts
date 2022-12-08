@@ -173,7 +173,7 @@ test.serial('sends request to DP and returns response', async (t) => {
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(100)
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
   const api = await expose(adapter, {
@@ -519,7 +519,7 @@ test.serial('batch request validation', async (t) => {
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(100)
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
   const api = await expose(adapter, { cache: mockCache })
@@ -602,7 +602,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(100)
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
   const api = await expose(adapter, {
