@@ -343,6 +343,70 @@ test.serial('presented exclusive params throws 400', async (t) => {
   t.is(error?.response?.status, 400)
 })
 
+test.serial('invalid overrides object throws 400', async (t) => {
+  t.context.adapterEndpoint.inputParameters = {
+    base: {
+      type: 'string',
+      required: false,
+    },
+    quote: {
+      type: 'string',
+      required: false,
+    },
+  }
+  t.context.adapterEndpoint.validator = new InputValidator(
+    t.context.adapterEndpoint.inputParameters,
+  )
+
+  const error: AxiosError | undefined = await t.throwsAsync(() =>
+    axios.post(`${t.context.serverAddress}`, {
+      data: {
+        base: 'OVER2',
+        quote: 'USD',
+        overrides: 'test',
+      },
+      endpoint: 'test',
+    }),
+  )
+
+  t.is(error?.response?.status, 400)
+})
+
+test.serial('invalid overrides key throws 400', async (t) => {
+  t.context.adapterEndpoint.inputParameters = {
+    base: {
+      type: 'string',
+      required: false,
+    },
+    quote: {
+      type: 'string',
+      required: false,
+    },
+  }
+  t.context.adapterEndpoint.validator = new InputValidator(
+    t.context.adapterEndpoint.inputParameters,
+  )
+
+  const error: AxiosError | undefined = await t.throwsAsync(() =>
+    axios.post(`${t.context.serverAddress}`, {
+      data: {
+        base: 'OVER2',
+        quote: 'USD',
+        overrides: {
+          test: {
+            OVER2: {
+              'json': '123'
+            },
+          },
+        },
+      },
+      endpoint: 'test',
+    }),
+  )
+
+  t.is(error?.response?.status, 400)
+})
+
 test.serial('correctly typed param returns 200', async (t) => {
   t.context.adapterEndpoint.inputParameters = {
     string: {
