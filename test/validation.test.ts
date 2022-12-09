@@ -395,7 +395,7 @@ test.serial('invalid overrides key throws 400', async (t) => {
         overrides: {
           test: {
             OVER2: {
-              'json': '123'
+              json: '123',
             },
           },
         },
