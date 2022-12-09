@@ -112,8 +112,6 @@ export class LocalCache<T = unknown> implements Cache<T> {
         return undefined
       } else {
         logger.debug('Found valid entry in local cache, returning value')
-        // When key is accessed we move it to end of the list as we keep recently used entries there
-        this.moveToTail(node)
         return node.data.value
       }
     } else {
@@ -140,10 +138,10 @@ export class LocalCache<T = unknown> implements Cache<T> {
         value,
         expirationTimestamp: Date.now() + ttl,
       }
-      // When existing key is updated we move it to the end of the list as we keep recently used entries there
+      // When existing key is updated we move it to the end of the list as we keep recently updated entries there
       this.moveToTail(node)
     } else {
-      // For new cache entries check if we reached maximum size to delete least recently used entries and free up space
+      // For new cache entries check if we reached maximum size to delete least recently updated entry and free up space
       this.evictIfNeeded()
       const data = {
         value,
@@ -165,6 +163,7 @@ export class LocalCache<T = unknown> implements Cache<T> {
 
   private evictIfNeeded() {
     if (this.list.size >= this.capacity) {
+      logger.warn(`Cache list reached maximum capacity, evicting least recently updated entry`)
       const node = this.list.removeHead()
       if (node) {
         this.cache.delete(node.key)
