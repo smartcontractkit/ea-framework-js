@@ -5,7 +5,7 @@ import { validator } from './utils'
 
 export type NormalizedInput = Record<string, unknown>
 
-const isNotObject = validator.object();
+const isNotObject = validator.object()
 
 export class InputValidator {
   private aliases: { [key: string]: string[] } = {}
@@ -15,9 +15,8 @@ export class InputValidator {
   }
 
   validateInput(input: Record<string, unknown>) {
-
     const normalized = this.initializeInputs(input)
-    this.validateOverrides(input?.['overrides'] as Record<string, Record<string, string>>);
+    this.validateOverrides(input?.['overrides'] as Record<string, Record<string, string>>)
 
     for (const configKey in this.inputConfig) {
       this.validateRequiredConfig(configKey, normalized)
@@ -31,7 +30,7 @@ export class InputValidator {
     return normalized
   }
 
-  private validateOverrides(overrides: Record<string, Record<string, string>> ) {
+  private validateOverrides(overrides: Record<string, Record<string, string>>) {
     if (!overrides) {
       return
     }
@@ -44,7 +43,7 @@ export class InputValidator {
     }
 
     for (const endpointName in overrides) {
-      if (isNotObject(overrides[endpointName]) ) {
+      if (isNotObject(overrides[endpointName])) {
         throw new AdapterInputError({
           statusCode: 400,
           message: `overrides.${endpointName} should be an object.`,
@@ -61,7 +60,6 @@ export class InputValidator {
       }
     }
   }
-
 
   private initializeInputs(input: Record<string, unknown>) {
     const normalized: NormalizedInput = {}
