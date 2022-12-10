@@ -7,7 +7,7 @@ import {
   AdapterDataProviderError,
   AdapterTimeoutError,
 } from '../validation/error'
-import * as transportMetrics from '../transports/metrics'
+import * as metrics from './metrics'
 
 const logger = makeLogger('Requester')
 
@@ -36,6 +36,11 @@ class UniqueLinkedList<T> {
       return this.map[key].value
     }
 
+    if (this.length === this.maxLength) {
+      // If this new item would put us over max length, remove the first one (i.e. oldest one)
+      throw new OverflowException(this.remove())
+    }
+
     const node: ListNode<T> = {
       key,
       value,
@@ -52,11 +57,7 @@ class UniqueLinkedList<T> {
     this.map[key] = node
     this.last = node
     this.length++
-
-    if (this.length === this.maxLength) {
-      // If this new item would put us over max length, remove the first one (i.e. oldest one)
-      throw new OverflowException(this.remove())
-    }
+    metrics.dataProviderRequestsQueued.inc()
   }
 
   get(key: string) {
@@ -73,6 +74,7 @@ class UniqueLinkedList<T> {
     this.first = node.next
     delete this.map[node.key]
     this.length--
+    metrics.dataProviderRequestsQueued.dec()
     return node.value
   }
 }
@@ -181,7 +183,7 @@ export class Requester {
   private async executeRequest(req: QueuedRequest) {
     const { key, config, resolve, reject, retries } = req
     const providerDataRequested = Date.now()
-    const responseTimer = transportMetrics.dataProviderRequestDurationSeconds.startTimer()
+    const responseTimer = metrics.dataProviderRequestDurationSeconds.startTimer()
 
     // Set configured timeout for all requests unless manually specified
     config.timeout = config.timeout || this.timeout
@@ -198,8 +200,8 @@ export class Requester {
       })
 
       // Record count of successful data provider requests
-      transportMetrics.dataProviderRequests
-        .labels(transportMetrics.dataProviderMetricsLabel(response.status, config.method))
+      metrics.dataProviderRequests
+        .labels(metrics.dataProviderMetricsLabel(response.status, config.method))
         .inc()
     } catch (e) {
       if (retries >= this.maxRetries) {
@@ -208,10 +210,8 @@ export class Requester {
         const ErrorClass = err.response?.status ? AdapterDataProviderError : AdapterConnectionError
 
         // Record count of failed data provider request
-        transportMetrics.dataProviderRequests
-          .labels(
-            transportMetrics.dataProviderMetricsLabel(err.response?.status || 0, config.method),
-          )
+        metrics.dataProviderRequests
+          .labels(metrics.dataProviderMetricsLabel(err.response?.status || 0, config.method))
           .inc()
 
         reject(
