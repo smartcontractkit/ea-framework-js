@@ -3,7 +3,7 @@ import { ResponseCache } from '../cache/response'
 import { AdapterConfig, SettingsMap } from '../config'
 import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/request'
 
-export * from './batch-warming'
+export * from './http'
 export * from './sse'
 export * from './websocket'
 

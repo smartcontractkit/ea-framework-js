@@ -60,7 +60,7 @@ class UniqueLinkedList<T> {
   }
 
   get(key: string) {
-    return this.map[key].value
+    return this.map[key]?.value
   }
 
   remove() {

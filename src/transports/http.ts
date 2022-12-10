@@ -11,7 +11,7 @@ import {
 } from '../util/request'
 import { Requester } from '../util/requester'
 import { AdapterDataProviderError } from '../validation/error'
-import { TransportDependencies, TransportGenerics } from './'
+import { TransportDependencies, TransportGenerics } from '.'
 import { SubscriptionTransport } from './abstract/subscription'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
