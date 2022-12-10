@@ -19,7 +19,12 @@ export const dataProviderRequestDurationSeconds = new client.Histogram({
   buckets: requestDurationBuckets,
 })
 
-export const dataProviderRequestsQueued = new client.Gauge({
-  name: 'data_provider_requests_queued',
+export const requesterQueueSize = new client.Gauge({
+  name: 'requester_queue_size',
   help: 'The number of provider http requests currently queued to be executed',
+})
+
+export const requesterQueueOverflow = new client.Counter({
+  name: 'requester_queue_overflow',
+  help: 'Total times the requester queue replaced the oldest item to avoid an overflow',
 })

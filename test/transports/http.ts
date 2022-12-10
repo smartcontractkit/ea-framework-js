@@ -54,7 +54,7 @@ test.afterEach((t) => {
   t.context.clock.uninstall()
 })
 
-type BatchTransportTypes = {
+type HttpTransportTypes = {
   Request: {
     Params: AdapterRequestParams
   }
@@ -66,47 +66,42 @@ type BatchTransportTypes = {
   }
 }
 
-class MockBatchWarmingTransport extends HttpTransport<BatchTransportTypes> {
+class MockBatchWarmingTransport extends HttpTransport<HttpTransportTypes> {
   backgroundExecuteCalls = 0
 
   constructor(private callSuper = false) {
     super({
-      prepareRequests: (params) => {
-        return {
-          params,
-          request: {
-            baseURL: URL,
-            url: '/price',
-            method: 'POST',
-            data: {
-              pairs: params.map((p) => ({ base: p.from, quote: p.to })),
-            },
+      prepareRequests: (params) => ({
+        params,
+        request: {
+          baseURL: URL,
+          url: '/price',
+          method: 'POST',
+          data: {
+            pairs: params.map((p) => ({ base: p.from, quote: p.to })),
           },
-        }
-      },
+        },
+      }),
       parseResponse: (
         params: AdapterRequestParams[],
         res: AxiosResponse<ProviderResponseBody>,
-      ): ProviderResult<BatchTransportTypes>[] => {
-        return (
-          res.data.prices?.map((p) => {
-            const [from, to] = p.pair.split('/')
-            return {
-              params: { from, to },
-              response: {
-                data: {
-                  result: p.price,
-                },
+      ): ProviderResult<HttpTransportTypes>[] =>
+        res.data.prices?.map((p) => {
+          const [from, to] = p.pair.split('/')
+          return {
+            params: { from, to },
+            response: {
+              data: {
                 result: p.price,
               },
-            }
-          }) || []
-        )
-      },
+              result: p.price,
+            },
+          }
+        }) || [],
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<BatchTransportTypes>): Promise<void> {
+  override async backgroundExecute(context: EndpointContext<HttpTransportTypes>): Promise<void> {
     this.backgroundExecuteCalls++
     if (this.callSuper) {
       super.backgroundExecute(context)
@@ -494,7 +489,7 @@ test.serial(
   },
 )
 
-test.only('DP request fails, EA returns 502 cached error', async (t) => {
+test.serial('DP request fails, EA returns 502 cached error', async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
@@ -548,4 +543,74 @@ test.only('DP request fails, EA returns 502 cached error', async (t) => {
     errorMessage: 'Provider request failed with status undefined: "There was an unexpected issue"',
     statusCode: 502,
   })
+})
+
+test.only('requests from different transports are coalesced', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'a',
+        inputParameters,
+        transport: new MockBatchWarmingTransport(true),
+      }),
+      new AdapterEndpoint({
+        name: 'b',
+        inputParameters,
+        transport: new MockBatchWarmingTransport(true),
+      }),
+    ],
+  })
+
+  nock(URL)
+    .post(endpoint, {
+      pairs: [
+        {
+          base: 'COALESCE',
+          quote: to,
+        },
+      ],
+    })
+    .delay(100)
+    .reply(200, {
+      prices: [
+        {
+          pair: `${from}/${to}`,
+          price,
+        },
+      ],
+    })
+
+  // Start the adapter
+  const api = await expose(adapter)
+  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+  const makeRequest = (inputEndpoint: string) => () =>
+    axios.post(address, {
+      data: {
+        from: 'COALESCE',
+        to,
+        endpoint: inputEndpoint,
+      },
+    })
+
+  const errorPromiseA: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest('a'))
+  const errorPromiseB: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest('b'))
+  // Advance enough time for the initial request async flow
+  t.context.clock.tickAsync(10)
+  // Wait for the failed cache get -> instant 504s
+  const [errorA, errorB] = await Promise.all([errorPromiseA, errorPromiseB])
+  t.is(errorA?.response?.status, 504)
+  t.is(errorB?.response?.status, 504)
+
+  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
+  // const cacheValueSetPromise = mockCache.waitForNextSet()
+  await t.context.clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS * 2 + 10)
+  // Await cacheValueSetPromise
+
+  // Second requests should find the response in the cache
+  const responseA = await makeRequest('a')()
+  const responseB = await makeRequest('b')()
+
+  t.is(responseA.status, 200)
+  t.is(responseB.status, 200)
 })

@@ -57,7 +57,7 @@ class UniqueLinkedList<T> {
     this.map[key] = node
     this.last = node
     this.length++
-    metrics.dataProviderRequestsQueued.inc()
+    metrics.requesterQueueSize.inc()
   }
 
   get(key: string) {
@@ -74,7 +74,7 @@ class UniqueLinkedList<T> {
     this.first = node.next
     delete this.map[node.key]
     this.length--
-    metrics.dataProviderRequestsQueued.dec()
+    metrics.requesterQueueSize.dec()
     return node.value
   }
 }
@@ -142,6 +142,7 @@ export class Requester {
       } catch (e) {
         if (e instanceof OverflowException<QueuedRequest>) {
           // If we have overflow, it means the oldest request needs to be rejected because the queue is at its limits
+          metrics.requesterQueueOverflow.inc()
           e.item.reject(
             new AdapterTimeoutError({
               message: 'Timed out waiting for queued request to execute.',
