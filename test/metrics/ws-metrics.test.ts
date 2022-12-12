@@ -6,7 +6,6 @@ import { AddressInfo } from 'net'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { DEFAULT_SHARED_MS_BETWEEN_REQUESTS } from '../../src/rate-limiting'
 import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
 import { MockCache } from '../util'
@@ -56,6 +55,7 @@ type WebSocketEndpointTypes = {
   }
 }
 
+const BACKGROUND_EXECUTE_MS_WS = 5000
 const URL = 'wss://test-ws.com/asd'
 const version = process.env['npm_package_version']
 
@@ -140,6 +140,7 @@ const adapter = new Adapter({
   endpoints: [webSocketEndpoint],
   envDefaultOverrides: {
     CACHE_MAX_AGE,
+    BACKGROUND_EXECUTE_MS_WS,
   },
 })
 
@@ -202,7 +203,7 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
   const cacheValueSetPromise = t.context.cache.waitForNextSet()
-  await clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 10)
+  await clock.tickAsync(BACKGROUND_EXECUTE_MS_WS + 10)
   await cacheValueSetPromise
 
   // Second request should find the response in the cache

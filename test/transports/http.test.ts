@@ -6,7 +6,6 @@ import nock from 'nock'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { DEFAULT_SHARED_MS_BETWEEN_REQUESTS } from '../../src/rate-limiting'
 import { HttpTransport } from '../../src/transports'
 import { AdapterResponse, ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
@@ -66,6 +65,8 @@ type HttpTransportTypes = {
   }
 }
 
+const BACKGROUND_EXECUTE_MS_HTTP = 5000
+
 class MockBatchWarmingTransport extends HttpTransport<HttpTransportTypes> {
   backgroundExecuteCalls = 0
 
@@ -112,6 +113,7 @@ class MockBatchWarmingTransport extends HttpTransport<HttpTransportTypes> {
 // Disable retries to make the testing flow easier
 process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 process.env['RETRY'] = '0'
+process.env['BACKGROUND_EXECUTE_MS_HTTP'] = BACKGROUND_EXECUTE_MS_HTTP.toString()
 
 const from = 'ETH'
 const to = 'USD'
@@ -200,7 +202,7 @@ test.serial('sends request to DP and returns response', async (t) => {
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
   const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 10)
+  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_HTTP + 10)
   await cacheValueSetPromise
 
   // Second request should find the response in the cache
@@ -532,7 +534,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
   const cacheValueSetPromise = mockCache.waitForNextSet()
-  await runAllUntilTime(t.context.clock, DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 200)
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_HTTP + 200)
   await cacheValueSetPromise
 
   // Second request should find the response in the cache
@@ -610,7 +612,7 @@ test.serial('requests from different transports are coalesced', async (t) => {
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
   const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS * 2 + 200)
+  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_HTTP * 2 + 200)
   await cacheValueSetPromise
 
   // Second requests should find the response in the cache
@@ -644,7 +646,7 @@ test.serial('requests for the same transport are coalesced', async (t) => {
       ],
     })
     .once() // Ensure that this request happens only once
-    .delay(DEFAULT_SHARED_MS_BETWEEN_REQUESTS)
+    .delay(BACKGROUND_EXECUTE_MS_HTTP)
     .reply(200, {
       prices: [
         {
@@ -680,7 +682,7 @@ test.serial('requests for the same transport are coalesced', async (t) => {
 
   // Advance clock so that the batch warmer executes twice again and wait for the cache to be set
   const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS * 2 + 200)
+  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_HTTP * 2 + 200)
   await cacheValueSetPromise
 
   // Second requests should find the response in the cache
@@ -730,7 +732,7 @@ test.serial(
             },
           ],
         })
-        .delay(DEFAULT_SHARED_MS_BETWEEN_REQUESTS)
+        .delay(BACKGROUND_EXECUTE_MS_HTTP)
         .reply(200, {
           prices: [
             {

@@ -9,7 +9,7 @@ import { SettingsMap } from '../../src/config'
 import {
   HttpTransport,
   SSEConfig,
-  SSETransport,
+  SseTransport,
   Transport,
   WebSocketClassProvider,
   WebSocketTransport,
@@ -185,7 +185,7 @@ type SSETypes = BaseEndpointTypes & {
     ResponseBody: ProviderResponseBody
   }
 }
-class MockSSETransport extends SSETransport<SSETypes> {
+class MockSseTransport extends SseTransport<SSETypes> {
   public backgroundExecuteCalls = 0
 
   constructor() {
@@ -244,7 +244,7 @@ const transports: {
 } = {
   WEBSOCKET: new MockWebSocketTransport(),
   BATCH: new MockBatchWarmingTransport(),
-  SSE: new MockSSETransport(),
+  SSE: new MockSseTransport(),
 }
 
 // Route function is used to select an adapter based on the supplied string, routeToTransport
@@ -456,6 +456,6 @@ test.serial('RoutingTransport can route to SSE transport', async (t) => {
   const earlyError = await earlyErrorPromise
   t.is(earlyError?.response?.status, 504)
 
-  const internalTransport = transports['SSE'] as MockSSETransport
+  const internalTransport = transports['SSE'] as MockSseTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })

@@ -6,7 +6,6 @@ import { AddressInfo } from 'net'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint, AdapterParams } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { DEFAULT_SHARED_MS_BETWEEN_REQUESTS } from '../../src/rate-limiting'
 import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
@@ -78,6 +77,8 @@ type WebSocketTypes = {
   }
 }
 
+const BACKGROUND_EXECUTE_MS_WS = 5000
+
 const createAdapter = (adapterParams?: Partial<AdapterParams<SettingsMap>>): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => URL,
@@ -120,6 +121,9 @@ const createAdapter = (adapterParams?: Partial<AdapterParams<SettingsMap>>): Ada
     defaultEndpoint: 'test',
     endpoints: [webSocketEndpoint],
     ...adapterParams,
+    envDefaultOverrides: {
+      BACKGROUND_EXECUTE_MS_WS,
+    },
   })
 
   return adapter
@@ -184,9 +188,9 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
   const error = await errorPromise
   t.is(error?.response?.status, 504)
 
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
+  // Advance clock so that the background execute is called once again and wait for the cache to be set
   const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 10)
+  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_WS + 10)
   await cacheValueSetPromise
 
   // Second request should find the response in the cache
@@ -308,7 +312,7 @@ test.serial('reconnects when url changed', async (t) => {
 
     // Advance clock so that the background execute is called once again and wait for the cache to be set
     const cacheValueSetPromise = mockCache.waitForNextSet()
-    await runAllUntilTime(t.context.clock, DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 10)
+    await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS + 10)
     await cacheValueSetPromise
 
     // Second request should find the response in the cache
@@ -385,7 +389,7 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
 
   // The WS connection should not send any messages to the EA, so we dvance the clock until
   // we reach the point where the EA will consider it unhealthy and reconnect.
-  await runAllUntilTime(t.context.clock, DEFAULT_SHARED_MS_BETWEEN_REQUESTS * 2 + 100)
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
 
   // The connection was opened twice
   t.is(connectionCounter, 2)
@@ -421,7 +425,9 @@ test.serial(
       url: () => URL,
       handlers: {
         async open() {
-          return new Promise((res, rej) => rej('Error from open handler'))
+          return new Promise((res, rej) => {
+            rej(new Error('Error from open handler'))
+          })
         },
 
         message(message) {
@@ -489,7 +495,7 @@ test.serial(
 
     // Advance clock so that the batch warmer executes once again and wait for the cache to be set
     const cacheValueSetPromise = mockCache.waitForNextSet()
-    await t.context.clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 10)
+    await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_WS + 10)
     await cacheValueSetPromise
 
     // Second request should find the response in the cache

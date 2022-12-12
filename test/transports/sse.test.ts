@@ -5,11 +5,10 @@ import { SettingsMap } from '../../src/config'
 import { AddressInfo } from 'net'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { SSETransport, SSEConfig } from '../../src/transports'
+import { SseTransport, SSEConfig } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
-import { DEFAULT_SHARED_MS_BETWEEN_REQUESTS } from '../../src/rate-limiting'
 import nock from 'nock'
 const { MockEvent, EventSource } = require('mocksse') // eslint-disable-line
 const URL = 'http://test.com'
@@ -41,7 +40,7 @@ type StreamEndpointTypes = {
   }
 }
 
-export const sseTransport: SSETransport<StreamEndpointTypes> = new SSETransport({
+export const sseTransport: SseTransport<StreamEndpointTypes> = new SseTransport({
   prepareSSEConnectionConfig: (): SSEConfig => {
     return { url: URL }
   },
@@ -93,6 +92,7 @@ export const sseEndpoint = new AdapterEndpoint({
 })
 
 const CACHE_MAX_AGE = 4000
+const BACKGROUND_EXECUTE_MS_SSE = 5000
 
 // Disable retries to make the testing flow easier
 process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
@@ -103,6 +103,7 @@ const adapter = new Adapter({
   endpoints: [sseEndpoint],
   envDefaultOverrides: {
     CACHE_MAX_AGE,
+    BACKGROUND_EXECUTE_MS_SSE,
   },
 })
 
@@ -148,7 +149,7 @@ test('connects to EventSource, subscribes, gets message, unsubscribes and handle
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
   const cacheValueSetPromise = mockCache.waitForNextSet()
-  await runAllUntilTime(clock, DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 10)
+  await runAllUntilTime(clock, BACKGROUND_EXECUTE_MS_SSE + 10)
   await cacheValueSetPromise
 
   // Second request should find the response in the cache
@@ -172,7 +173,7 @@ test('connects to EventSource, subscribes, gets message, unsubscribes and handle
       },
     })
 
-  await clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 10)
+  await clock.tickAsync(BACKGROUND_EXECUTE_MS_SSE + 10)
 
   // Expect the request to fail since the token is invalid
   const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeBadRequest)
