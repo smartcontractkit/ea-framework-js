@@ -9,6 +9,7 @@ import {
 } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
 import { AdapterRequest, RequestGenerics, SubscriptionSetFactory } from '../util'
+import { Requester } from '../util/requester'
 import { InputParameters } from '../validation'
 import { Adapter } from './basic'
 import { AdapterEndpoint } from './endpoint'
@@ -39,6 +40,9 @@ export interface AdapterDependencies {
 
   /** EventSource to use for listening to server sent events.  A mock EventSource can be provided as a dependency for testing */
   eventSource: typeof EventSource
+
+  /** Shared instance to handle sending http requests in a centralized fashion */
+  requester: Requester
 }
 
 /**

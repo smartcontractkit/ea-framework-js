@@ -12,37 +12,24 @@ import * as metrics from './metrics'
 const logger = makeLogger('Requester')
 
 interface ListNode<T> {
-  key: string
   value: T
   next: ListNode<T> | undefined
-}
-
-class OverflowException<T> extends Error {
-  constructor(public item: T) {
-    super()
-  }
 }
 
 class UniqueLinkedList<T> {
   first: ListNode<T> | undefined
   last: ListNode<T> | undefined
   length = 0
-  map = {} as Record<string, ListNode<T>>
 
   constructor(private maxLength: number) {}
 
-  add(key: string, value: T): T | undefined {
-    if (this.map[key]) {
-      return this.map[key].value
-    }
-
+  add(value: T): T | undefined {
     if (this.length === this.maxLength) {
       // If this new item would put us over max length, remove the first one (i.e. oldest one)
-      throw new OverflowException(this.remove())
+      return this.remove()
     }
 
     const node: ListNode<T> = {
-      key,
       value,
       next: undefined,
     }
@@ -54,14 +41,9 @@ class UniqueLinkedList<T> {
       this.last.next = node
     }
 
-    this.map[key] = node
     this.last = node
     this.length++
     metrics.requesterQueueSize.inc()
-  }
-
-  get(key: string) {
-    return this.map[key]?.value
   }
 
   remove() {
@@ -72,7 +54,6 @@ class UniqueLinkedList<T> {
     }
 
     this.first = node.next
-    delete this.map[node.key]
     this.length--
     metrics.requesterQueueSize.dec()
     return node.value
@@ -111,6 +92,7 @@ interface RequesterResult<T> {
 export class Requester {
   private processing = false
   private queue: UniqueLinkedList<QueuedRequest<unknown>>
+  private map = {} as Record<string, QueuedRequest<unknown>>
   private maxRetries: number
   private timeout: number
 
@@ -120,47 +102,60 @@ export class Requester {
     this.queue = new UniqueLinkedList<QueuedRequest>(config.MAX_HTTP_REQUEST_QUEUE_LENGTH)
   }
 
-  request<T>(key: string, req: AxiosRequestConfig): Promise<RequesterResult<T>> {
+  async request<T>(key: string, req: AxiosRequestConfig): Promise<RequesterResult<T>> {
     // If there's already a queued request, reuse it's existing promise
-    const existingQueuedRequest = this.queue.get(key) as QueuedRequest<T>
+    const existingQueuedRequest = this.map[key]
     if (existingQueuedRequest) {
-      return existingQueuedRequest.promise
+      logger.trace(`Request already exists, returning queued promise (Key: ${key})`)
+      return existingQueuedRequest.promise as Promise<RequesterResult<T>>
     }
 
-    return new Promise((resolve, reject) => {
-      const queuedRequest = {
-        key,
-        config: req,
-        retries: 0,
-        resolve,
-        reject,
-      }
+    const queuedRequest = {
+      key,
+      config: req,
+      retries: 0,
+    } as QueuedRequest<T>
 
-      logger.trace(`Adding request to the queue (Key: ${key}, Retry #: ${0})`)
-      try {
-        this.queue.add(key, queuedRequest as QueuedRequest)
-      } catch (e) {
-        if (e instanceof OverflowException<QueuedRequest>) {
-          // If we have overflow, it means the oldest request needs to be rejected because the queue is at its limits
-          metrics.requesterQueueOverflow.inc()
-          e.item.reject(
-            new AdapterTimeoutError({
-              message: 'Timed out waiting for queued request to execute.',
-              statusCode: 504,
-            }),
-          )
-        }
-      }
-
-      if (!this.processing) {
-        logger.debug(`Starting requester queue processing`)
-        this.processNext()
-      }
+    // This dual promise layer is built so the queuedRequest can hold both the resolve and reject handlers,
+    // and the promise itself so we can return it for request coalescing without creating new ones
+    await new Promise((unblock) => {
+      queuedRequest.promise = new Promise<RequesterResult<T>>((success, failure) => {
+        queuedRequest.resolve = success
+        queuedRequest.reject = failure
+        unblock(0)
+      })
     })
+
+    // By the time we're here, we know that queuedRequest has both the unresolved promise, and the resolve and reject handlers within
+    // It's really, REALLY important for thread safety that from this point until this function returns, there are no async breaks
+    logger.trace(`Adding request to the queue (Key: ${key}, Retry #: ${0})`)
+    const overflowedRequest = this.queue.add(queuedRequest as QueuedRequest)
+    if (overflowedRequest) {
+      // If we have overflow, it means the oldest request needs to be rejected because the queue is at its limits
+      metrics.requesterQueueOverflow.inc()
+      overflowedRequest.reject(
+        new AdapterTimeoutError({
+          message: 'Timed out waiting for queued request to execute.',
+          statusCode: 504,
+        }),
+      )
+    }
+
+    // The item was successfully added to the queue, so we can also add it to our map
+    this.map[key] = queuedRequest as QueuedRequest
+
+    // Finally, we start the queue processing
+    if (!this.processing) {
+      logger.debug(`Starting requester queue processing`)
+      this.processNext()
+    }
+
+    return queuedRequest.promise
   }
 
   // Will grab from queue sequentially, and sleep just before hitting rate limits
   private async processNext(): Promise<void> {
+    // This will remove from the list, but not the map; that way coalescing is still functional for in-flight reqs
     const next = this.queue.remove()
 
     if (!next) {
@@ -190,8 +185,9 @@ export class Requester {
     config.timeout = config.timeout || this.timeout
 
     try {
-      logger.trace(`Sending requests to data provider: ${JSON.stringify(config.data)}`)
+      logger.trace(`Sending request (Key: ${key}) to data provider`)
       const response = await axios.request(config)
+      logger.trace(`Request (Key: ${key}) was successful `)
       resolve({
         response,
         timestamps: {
@@ -239,9 +235,11 @@ export class Requester {
         await sleep(timeToSleep)
 
         logger.trace(`Adding request to the queue (Key: ${key}, Retry #: ${retries})`)
-        this.queue.add(key, req)
+        this.queue.add(req)
       }
     } finally {
+      // Remove the request from our map
+      delete this.map[key]
       // Record time taken for data provider request for success or failure
       responseTimer()
     }

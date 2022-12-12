@@ -92,7 +92,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     endpointName: string,
   ): Promise<void> {
     await super.initialize(dependencies, config, endpointName)
-    this.requester = new Requester(dependencies.requestRateLimiter, config as AdapterConfig)
+    this.requester = dependencies.requester
   }
 
   getSubscriptionTtlFromConfig(config: AdapterConfig<T['CustomSettings']>): number {
@@ -121,8 +121,11 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     const rawRequests = this.config.prepareRequests(entries, context.adapterConfig)
     const requests = Array.isArray(rawRequests) ? rawRequests : [rawRequests]
 
+    // Here we're not awaiting these promises, because since we have request coalescing it's better to come back
+    // to this background handler even if the requests haven't finished yet since new entries could be added to
+    // the subscription set since the last time we processed it
     logger.trace(`Queueing ${requests.length} requests`)
-    await Promise.all(requests.map((r) => this.handleRequest(r, context.adapterConfig)))
+    requests.map((r) => this.handleRequest(r, context.adapterConfig))
 
     return
   }

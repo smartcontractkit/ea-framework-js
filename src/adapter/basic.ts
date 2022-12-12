@@ -30,6 +30,7 @@ import {
   RequestTransform,
 } from './types'
 import { AdapterTimeoutError } from '../validation/error'
+import { Requester } from '../util/requester'
 
 const logger = makeLogger('Adapter')
 
@@ -323,6 +324,12 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
         this.config as AdapterConfig,
         this.name,
         dependencies.redisClient,
+      )
+    }
+    if (!dependencies.requester) {
+      dependencies.requester = new Requester(
+        dependencies.requestRateLimiter,
+        this.config as AdapterConfig,
       )
     }
 

@@ -545,7 +545,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
   })
 })
 
-test.only('requests from different transports are coalesced', async (t) => {
+test.serial('requests from different transports are coalesced', async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     endpoints: [
@@ -571,18 +571,24 @@ test.only('requests from different transports are coalesced', async (t) => {
         },
       ],
     })
-    .delay(100)
+    .once() // Ensure that this request happens only once, but should satisfy both transports
     .reply(200, {
       prices: [
         {
-          pair: `${from}/${to}`,
+          pair: `coalesce/${to}`,
           price,
         },
       ],
     })
 
+  // Create mocked cache so we can listen when values are set
+  // This is a more reliable method than expecting precise clock timings
+  const mockCache = new MockCache()
+
   // Start the adapter
-  const api = await expose(adapter)
+  const api = await expose(adapter, {
+    cache: mockCache,
+  })
   const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
   const makeRequest = (inputEndpoint: string) => () =>
     axios.post(address, {
@@ -603,9 +609,9 @@ test.only('requests from different transports are coalesced', async (t) => {
   t.is(errorB?.response?.status, 504)
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  // const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS * 2 + 10)
-  // Await cacheValueSetPromise
+  const cacheValueSetPromise = mockCache.waitForNextSet()
+  await t.context.clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS * 2 + 200)
+  await cacheValueSetPromise
 
   // Second requests should find the response in the cache
   const responseA = await makeRequest('a')()
@@ -613,4 +619,72 @@ test.only('requests from different transports are coalesced', async (t) => {
 
   t.is(responseA.status, 200)
   t.is(responseB.status, 200)
+})
+
+test.serial('requests for the same transport are coalesced', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters,
+        transport: new MockBatchWarmingTransport(true),
+      }),
+    ],
+  })
+
+  nock(URL)
+    .post(endpoint, {
+      pairs: [
+        {
+          base: 'COALESCE2',
+          quote: to,
+        },
+      ],
+    })
+    .once() // Ensure that this request happens only once
+    .delay(DEFAULT_SHARED_MS_BETWEEN_REQUESTS)
+    .reply(200, {
+      prices: [
+        {
+          pair: `coalesce2/${to}`,
+          price,
+        },
+      ],
+    })
+
+  // Create mocked cache so we can listen when values are set
+  // This is a more reliable method than expecting precise clock timings
+  const mockCache = new MockCache()
+
+  // Start the adapter
+  const api = await expose(adapter, {
+    cache: mockCache,
+  })
+  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+  const makeRequest = () =>
+    axios.post(address, {
+      data: {
+        from: 'COALESCE2',
+        to,
+      },
+    })
+
+  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
+  // Advance enough time for the initial request async flow
+  t.context.clock.tickAsync(10)
+  // Wait for the failed cache get -> instant 504s
+  const error = await errorPromise
+  t.is(error?.response?.status, 504)
+
+  // Advance clock so that the batch warmer executes twice again and wait for the cache to be set
+  const cacheValueSetPromise = mockCache.waitForNextSet()
+  await t.context.clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS * 2 + 200)
+  await cacheValueSetPromise
+
+  // Second requests should find the response in the cache
+  const response = await makeRequest()
+
+  t.is(response.status, 200)
 })
