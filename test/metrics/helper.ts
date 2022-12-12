@@ -19,7 +19,7 @@ export const parsePromMetrics = (data: string): Map<string, number> => {
   return metricsMap
 }
 
-export const buildBatchAdapter = (): Adapter => {
+export const buildHttpAdapter = (): Adapter => {
   return new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
@@ -27,7 +27,7 @@ export const buildBatchAdapter = (): Adapter => {
       new AdapterEndpoint({
         name: 'test',
         inputParameters,
-        transport: new MockBatchWarmingTransport(),
+        transport: new MockHttpTransport(),
       }),
     ],
   })
@@ -54,7 +54,7 @@ interface ProviderResponseBody {
   }>
 }
 
-type BatchEndpointTypes = {
+type HttpEndpointTypes = {
   Request: {
     Params: AdapterRequestParams
   }
@@ -66,7 +66,7 @@ type BatchEndpointTypes = {
   }
 }
 
-class MockBatchWarmingTransport extends HttpTransport<BatchEndpointTypes> {
+class MockHttpTransport extends HttpTransport<HttpEndpointTypes> {
   constructor() {
     super({
       prepareRequests: (params: AdapterRequestParams[]) => {

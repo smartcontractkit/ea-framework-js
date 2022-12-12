@@ -20,7 +20,7 @@ export interface SSEConfig {
 
 /**
  * Helper struct type that will be used to pass types to the generic parameters of a Transport.
- * Extends the common TransportGenerics, adding Provider specific types for this Batch endpoint.
+ * Extends the common TransportGenerics, adding Provider specific types for this SSE endpoint.
  */
 type SSETransportGenerics = TransportGenerics & {
   /**

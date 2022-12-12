@@ -93,7 +93,7 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
 
 /**
  * Helper struct type that will be used to pass types to the generic parameters of a Transport.
- * Extends the common TransportGenerics, adding Provider specific types for this Batch endpoint.
+ * Extends the common TransportGenerics, adding Provider specific types for this WS endpoint.
  */
 type WebsocketTransportGenerics = TransportGenerics & {
   /**

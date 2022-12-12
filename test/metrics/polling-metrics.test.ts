@@ -5,7 +5,7 @@ import { AddressInfo } from 'net'
 import nock from 'nock'
 import { expose } from '../../src'
 import { MockCache } from '../util'
-import { buildBatchAdapter, parsePromMetrics } from './helper'
+import { buildHttpAdapter, parsePromMetrics } from './helper'
 
 const test = untypedTest as TestFn<{
   serverAddress: string
@@ -27,7 +27,7 @@ test.before(async (t) => {
   // Set higher retries for polling metrics testing
   process.env['CACHE_POLLING_MAX_RETRIES'] = '5'
 
-  const adapter = buildBatchAdapter()
+  const adapter = buildHttpAdapter()
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings

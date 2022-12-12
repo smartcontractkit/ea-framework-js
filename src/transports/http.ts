@@ -10,13 +10,13 @@ import {
   TimestampedProviderResult,
 } from '../util/request'
 import { Requester } from '../util/requester'
-import { AdapterDataProviderError } from '../validation/error'
+import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
 import { TransportDependencies, TransportGenerics } from '.'
 import { SubscriptionTransport } from './abstract/subscription'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
 
-const logger = makeLogger('BatchWarmingTransport')
+const logger = makeLogger('HttpTransport')
 
 /**
  * Helper struct type that will be used to pass types to the generic parameters of a Transport.
@@ -104,7 +104,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     entries: T['Request']['Params'][],
   ): Promise<void> {
     if (!entries.length) {
-      logger.debug('No entries in batch warming set, skipping')
+      logger.debug('No entries in subscription set, skipping')
       if (this.WARMER_ACTIVE) {
         // Decrement count when warmer changed from having entries to having none
         cacheMetrics.cacheWarmerCount.labels({ isBatched: 'true' }).dec()
@@ -117,15 +117,16 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
       this.WARMER_ACTIVE = true
     }
 
-    logger.trace(`Have ${entries.length} entries in batch, preparing request...`)
+    logger.trace(`Have ${entries.length} entries in batch, preparing requests...`)
     const rawRequests = this.config.prepareRequests(entries, context.adapterConfig)
     const requests = Array.isArray(rawRequests) ? rawRequests : [rawRequests]
 
-    // Here we're not awaiting these promises, because since we have request coalescing it's better to come back
-    // to this background handler even if the requests haven't finished yet since new entries could be added to
-    // the subscription set since the last time we processed it
+    // We're awaiting these promises because although we have request coalescing, new entries
+    // could be added to the subscription set if not blocking this operation, so the next time the
+    // background execute is triggered if the request is for a fully batched endpoint, we could end up
+    // with the full combination of possible params within the request queue
     logger.trace(`Queueing ${requests.length} requests`)
-    requests.map((r) => this.handleRequest(r, context.adapterConfig))
+    await Promise.all(requests.map((r) => this.handleRequest(r, context.adapterConfig)))
 
     return
   }
@@ -187,6 +188,20 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
             errorMessage: `Provider request failed with status ${cause.status}: "${cause.response?.data}"`,
             statusCode: 502,
             timestamps: err.timestamps,
+          },
+        }))
+      } else if (e instanceof AdapterRateLimitError) {
+        const err = e as AdapterRateLimitError
+        return requestConfig.params.map((entry) => ({
+          params: entry,
+          response: {
+            errorMessage: err.message,
+            statusCode: 429,
+            timestamps: {
+              providerDataReceived: 0,
+              providerDataRequested: 0,
+              providerIndicatedTime: undefined,
+            },
           },
         }))
       } else {

@@ -688,3 +688,103 @@ test.serial('requests for the same transport are coalesced', async (t) => {
 
   t.is(response.status, 200)
 })
+
+test.serial(
+  'requester queue rejects oldest in the queue and adds new if capacity is reached',
+  async (t) => {
+    // This test will cover requests in all states:
+    //   - In flight
+    //   - Next in line to be executed, sleeping to avoid rate limiting
+    //   - Rejected because of queue overflow
+    //   - Queued
+    const numbers = [1, 2, 3, 4]
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      endpoints: numbers.map(
+        (n) =>
+          new AdapterEndpoint({
+            name: `${n}`,
+            inputParameters,
+            transport: new MockBatchWarmingTransport(true),
+          }),
+      ),
+
+      envDefaultOverrides: {
+        // These mean the first request will be queued and immediately fired,
+        // the second will be queued, and the third will replace the second in the queue.
+        MAX_HTTP_REQUEST_QUEUE_LENGTH: 1,
+        RATE_LIMIT_CAPACITY_MINUTE: 1,
+      },
+    })
+
+    // Mock valid responses for the requests we'll send
+    for (const number of numbers) {
+      nock(URL)
+        .post(endpoint, {
+          pairs: [
+            {
+              base: `symbol${number}`,
+              quote: to,
+            },
+          ],
+        })
+        .delay(DEFAULT_SHARED_MS_BETWEEN_REQUESTS)
+        .reply(200, {
+          prices: [
+            {
+              pair: `symbol${number}/${to}`,
+              price,
+            },
+          ],
+        })
+    }
+
+    // Create mocked cache so we can listen when values are set
+    // This is a more reliable method than expecting precise clock timings
+    const mockCache = new MockCache()
+
+    // Advance the clock for a second so we can do all this logic and the interval break doesn't occur right in the middle
+    t.context.clock.tick(1000)
+
+    // Start the adapter
+    const api = await expose(adapter, {
+      cache: mockCache,
+    })
+    const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+    const makeRequest = (number: number) => () =>
+      axios.post(address, {
+        data: {
+          from: `symbol${number}`,
+          to,
+          endpoint: `${number}`,
+        },
+      })
+
+    // Send an initial request for all our numbers to ensure they're part of the subscription set
+    for (const number of numbers) {
+      const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest(number))
+      // Advance enough time for the initial request async flow
+      t.context.clock.tickAsync(10)
+      // Wait for the failed cache get -> instant 504s
+      const error = await errorPromise
+      t.is(error?.response?.status, 504)
+    }
+
+    // Advance clock so that the batch warmer executes once
+    // const cacheValueSetPromise = mockCache.waitForNextSet()
+    await t.context.clock.tickAsync(60_000 * 4 + 200)
+    // Await cacheValueSetPromise
+
+    // Request for the last 2 requests should be fulfilled, since the first one will have been kicked off the queue
+    const error3 = (await t.throwsAsync(makeRequest(3))) as AxiosError
+
+    t.is(error3?.response?.status, 429)
+    assertEqualResponses(t, error3?.response?.data as AdapterResponse, {
+      errorMessage:
+        'The EA was unable to execute the request to fetch the requested data from the DP because the request queue overflowed. This likely indicates that a higher API tier is needed.',
+      statusCode: 429,
+    })
+  },
+)

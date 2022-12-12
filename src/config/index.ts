@@ -176,10 +176,6 @@ export const BaseSettings = {
     description: 'TTL for batch warmer subscriptions',
     default: 300000,
   },
-  // WARMUP_UNHEALTHY_THRESHOLD: {
-  //   type: 'number',
-  //   default: 3,
-  // },
   WS_SUBSCRIPTION_TTL: {
     description: 'The time in ms a request will live in the subscription set before becoming stale',
     type: 'number',

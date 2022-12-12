@@ -72,12 +72,16 @@ export class SimpleCountingRateLimiter implements RateLimiter {
     const timeToWait = Math.max(timeToWaitForNextSecond, timeToWaitForNextMinute)
 
     if (timeToWait === 0) {
-      logger.trace('Request under limits, counting +1')
       this.requestsThisSecond++
       this.requestsThisMinute++
+      logger.trace(
+        `Request under limits, counted +1 (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute})`,
+      )
       return 0
     } else {
-      logger.trace(`Requests seen this interval are above limits, need to wait ${timeToWait}ms`)
+      logger.trace(
+        `Capacity for provider requests has been reached this interval (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute}), need to wait ${timeToWait}ms`,
+      )
       return timeToWait
     }
   }

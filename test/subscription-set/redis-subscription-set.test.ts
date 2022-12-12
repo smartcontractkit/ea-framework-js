@@ -233,7 +233,7 @@ test.serial('Test redis subscription set (add and getAll)', async (t) => {
   })
 
   // Wait until the cache expires, and the subscription is out
-  await runAllUntilTime(t.context.clock, 10000)
+  await runAllUntilTime(t.context.clock, 20000)
 
   // Now that the cache is out and the subscription no longer there, this should time out
   const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)

@@ -5,7 +5,7 @@ import { RequestRateLimiter } from '../rate-limiting'
 import {
   AdapterConnectionError,
   AdapterDataProviderError,
-  AdapterTimeoutError,
+  AdapterRateLimitError,
 } from '../validation/error'
 import * as metrics from './metrics'
 
@@ -24,9 +24,10 @@ class UniqueLinkedList<T> {
   constructor(private maxLength: number) {}
 
   add(value: T): T | undefined {
+    let overflow
     if (this.length === this.maxLength) {
       // If this new item would put us over max length, remove the first one (i.e. oldest one)
-      return this.remove()
+      overflow = this.remove()
     }
 
     const node: ListNode<T> = {
@@ -44,6 +45,7 @@ class UniqueLinkedList<T> {
     this.last = node
     this.length++
     metrics.requesterQueueSize.inc()
+    return overflow
   }
 
   remove() {
@@ -128,24 +130,33 @@ export class Requester {
 
     // By the time we're here, we know that queuedRequest has both the unresolved promise, and the resolve and reject handlers within
     // It's really, REALLY important for thread safety that from this point until this function returns, there are no async breaks
-    logger.trace(`Adding request to the queue (Key: ${key}, Retry #: ${0})`)
     const overflowedRequest = this.queue.add(queuedRequest as QueuedRequest)
     if (overflowedRequest) {
       // If we have overflow, it means the oldest request needs to be rejected because the queue is at its limits
+      logger.debug(
+        `Request (Key: ${key}, Retry #: ${0}) was removed from the queue to make room for a newer one (Size: ${
+          this.queue.length
+        })`,
+      )
       metrics.requesterQueueOverflow.inc()
       overflowedRequest.reject(
-        new AdapterTimeoutError({
-          message: 'Timed out waiting for queued request to execute.',
-          statusCode: 504,
+        new AdapterRateLimitError({
+          message:
+            'The EA was unable to execute the request to fetch the requested data from the DP because the request queue overflowed. This likely indicates that a higher API tier is needed.',
+          statusCode: 429,
         }),
       )
     }
 
     // The item was successfully added to the queue, so we can also add it to our map
+    logger.trace(
+      `Added request (Key: ${key}, Retry #: ${0}) to the queue (Size: ${this.queue.length})`,
+    )
     this.map[key] = queuedRequest as QueuedRequest
 
     // Finally, we start the queue processing
     if (!this.processing) {
+      this.processing = true
       logger.debug(`Starting requester queue processing`)
       this.processNext()
     }
@@ -159,18 +170,28 @@ export class Requester {
     const next = this.queue.remove()
 
     if (!next) {
-      logger.debug(`No requests present in the queue, stopping processing until new one comes in`)
+      logger.debug(
+        `No more requests present in the queue, stopping processing until new one comes in`,
+      )
       this.processing = false
       return
     }
 
-    // Fire off to complete in the background
-    this.executeRequest.bind(this)(next)
+    logger.trace(
+      `Popped next request (Key: ${next.key}, Retry #: ${next.retries}) from the queue (Size: ${this.queue.length})`,
+    )
 
+    // Check if we can execute it now, or we have to wait
     const timeToWait = this.rateLimiter.msUntilNextExecution()
     if (timeToWait) {
+      logger.trace(
+        `Ran into request limits, sleeping ${timeToWait}ms before executing (Key: ${next.key}, Retry #: ${next.retries})`,
+      )
       await sleep(timeToWait)
     }
+
+    // Fire off to complete in the background
+    this.executeRequest.bind(this)(next)
 
     return this.processNext()
   }
