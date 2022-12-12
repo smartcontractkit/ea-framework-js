@@ -1,8 +1,14 @@
 import { InputParameters } from './input-params'
 import { AdapterInputError } from './error'
 import { isEmpty } from '../util'
+import { validator } from './utils'
 
 export type NormalizedInput = Record<string, unknown>
+
+export type Override = Record<string, string>
+export type OverridesMap = Record<string, Override>
+
+const isNotObject = validator.object()
 
 export class InputValidator {
   private aliases: { [key: string]: string[] } = {}
@@ -13,6 +19,7 @@ export class InputValidator {
 
   validateInput(input: Record<string, unknown>) {
     const normalized = this.initializeInputs(input)
+    this.validateOverrides(input?.['overrides'] as OverridesMap)
 
     for (const configKey in this.inputConfig) {
       this.validateRequiredConfig(configKey, normalized)
@@ -24,6 +31,37 @@ export class InputValidator {
     }
 
     return normalized
+  }
+
+  private validateOverrides(overrides: OverridesMap) {
+    if (!overrides) {
+      return
+    }
+
+    if (isNotObject(overrides)) {
+      throw new AdapterInputError({
+        statusCode: 400,
+        message: `'overrides' should be an object.`,
+      })
+    }
+
+    for (const endpointName in overrides) {
+      if (isNotObject(overrides[endpointName])) {
+        throw new AdapterInputError({
+          statusCode: 400,
+          message: `overrides.${endpointName} should be an object.`,
+        })
+      }
+
+      for (const overrideKey in overrides[endpointName]) {
+        if (typeof overrides[endpointName][overrideKey] !== 'string') {
+          throw new AdapterInputError({
+            statusCode: 400,
+            message: `overrides.${endpointName}.${overrideKey} should be string.`,
+          })
+        }
+      }
+    }
   }
 
   private initializeInputs(input: Record<string, unknown>) {
@@ -111,8 +149,8 @@ export class InputValidator {
       if (
         type === 'object' &&
         normalized[key] &&
-        (Object.getPrototypeOf(normalized[key]) !== Object.prototype ||
-          Object.keys(normalized[key] as object).length === 0)
+        (isNotObject(normalized[key] as Record<string, unknown>) ||
+          Object.keys(normalized[key] as Record<string, unknown>).length === 0)
       ) {
         this.throwInvalid(`${key} parameter must be an object with at least one property`)
       }
