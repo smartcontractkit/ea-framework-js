@@ -166,7 +166,7 @@ test.before(async (t) => {
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start up adapter
   const api = await expose(adapter, {

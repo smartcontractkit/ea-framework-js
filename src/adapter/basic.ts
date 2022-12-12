@@ -283,7 +283,10 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     }
 
     if (!dependencies.cache) {
-      dependencies.cache = CacheFactory.buildCache(this.config.CACHE_TYPE, dependencies.redisClient)
+      dependencies.cache = CacheFactory.buildCache(
+        { cacheType: this.config.CACHE_TYPE, maxSizeForLocalCache: this.config.CACHE_MAX_ITEMS },
+        dependencies.redisClient,
+      )
     }
 
     const rateLimitingTier = getRateLimitingTier(

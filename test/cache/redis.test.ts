@@ -67,7 +67,10 @@ test.serial('running adapter throws on cache error', async (t) => {
 
 test.serial('Test cache factory success (redis)', async (t) => {
   try {
-    CacheFactory.buildCache('redis', new RedisMock() as unknown as Redis)
+    CacheFactory.buildCache(
+      { cacheType: 'redis', maxSizeForLocalCache: 10000 },
+      new RedisMock() as unknown as Redis,
+    )
     t.is(true, true)
   } catch (e: unknown) {
     t.is(true, false)
@@ -76,7 +79,7 @@ test.serial('Test cache factory success (redis)', async (t) => {
 
 test.serial('Test cache factory failure (redis)', async (t) => {
   try {
-    CacheFactory.buildCache('redis')
+    CacheFactory.buildCache({ cacheType: 'redis', maxSizeForLocalCache: 10000 })
     t.fail()
   } catch (e: unknown) {
     t.pass()
