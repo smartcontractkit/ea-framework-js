@@ -66,9 +66,9 @@ export class SimpleCountingRateLimiter implements RateLimiter {
     }
 
     const timeToWaitForNextSecond =
-      this.requestsThisSecond < this.perSecondLimit ? 0 : nextSecondInterval - now
+      this.requestsThisSecond + 1 < this.perSecondLimit ? 0 : nextSecondInterval - now
     const timeToWaitForNextMinute =
-      this.requestsThisMinute < this.perMinuteLimit ? 0 : nextMinuteInterval - now
+      this.requestsThisMinute + 1 < this.perMinuteLimit ? 0 : nextMinuteInterval - now
     const timeToWait = Math.max(timeToWaitForNextSecond, timeToWaitForNextMinute)
 
     if (timeToWait === 0) {

@@ -65,7 +65,7 @@ type HttpTransportTypes = {
   }
 }
 
-const BACKGROUND_EXECUTE_MS_HTTP = 5000
+const BACKGROUND_EXECUTE_MS_HTTP = 1000
 
 class MockBatchWarmingTransport extends HttpTransport<HttpTransportTypes> {
   backgroundExecuteCalls = 0
@@ -103,9 +103,12 @@ class MockBatchWarmingTransport extends HttpTransport<HttpTransportTypes> {
   }
 
   override async backgroundExecute(context: EndpointContext<HttpTransportTypes>): Promise<void> {
-    this.backgroundExecuteCalls++
+    const entries = await this.subscriptionSet.getAll()
+    if (entries.length) {
+      this.backgroundExecuteCalls++
+    }
     if (this.callSuper) {
-      super.backgroundExecute(context)
+      return super.backgroundExecute(context)
     }
   }
 }
@@ -114,6 +117,7 @@ class MockBatchWarmingTransport extends HttpTransport<HttpTransportTypes> {
 process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 process.env['RETRY'] = '0'
 process.env['BACKGROUND_EXECUTE_MS_HTTP'] = BACKGROUND_EXECUTE_MS_HTTP.toString()
+process.env['API_TIMEOUT'] = '0'
 
 const from = 'ETH'
 const to = 'USD'
@@ -218,63 +222,60 @@ test.serial('sends request to DP and returns response', async (t) => {
   })
 })
 
-test.serial(
-  'per minute rate limit of 4 with one batch transport results in a call every 15s',
-  async (t) => {
-    const rateLimit1m = 4
-    const transport = new MockBatchWarmingTransport()
+test.only('per minute rate limit of 4 with one batch transport results in a call every 15s', async (t) => {
+  const rateLimit1m = 4
+  const transport = new MockBatchWarmingTransport(true)
 
-    const adapter = new Adapter({
-      name: 'TEST',
-      defaultEndpoint: 'test',
-      endpoints: [
-        new AdapterEndpoint({
-          name: 'test',
-          inputParameters,
-          transport: transport,
-        }),
-      ],
-      rateLimiting: {
-        tiers: {
-          default: {
-            rateLimit1m,
-          },
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters,
+        transport: transport,
+      }),
+    ],
+    rateLimiting: {
+      tiers: {
+        default: {
+          rateLimit1m,
         },
+      },
+    },
+    envDefaultOverrides: {
+      WARMUP_SUBSCRIPTION_TTL: 100_000, // Over 1 minute, below 2 minutes
+    },
+  })
+
+  // Start the adapter
+  const api = await expose(adapter)
+  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+
+  const makeRequest = () =>
+    axios.post(address, {
+      data: {
+        from,
+        to,
       },
     })
 
-    // Start the adapter
-    const api = await expose(adapter)
-    const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+  // Expect the first response to time out
+  // The polling behavior is tested in the cache tests, so this is easier here.
+  // Start the request:
+  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
+  // Advance enough time for the initial request async flow
+  t.context.clock.tickAsync(10)
+  // Wait for the failed cache get -> instant 504
+  const error = await errorPromise
+  t.is(error?.response?.status, 504)
 
-    const makeRequest = () =>
-      axios.post(address, {
-        data: {
-          from,
-          to,
-        },
-      })
-
-    // Expect the first response to time out
-    // The polling behavior is tested in the cache tests, so this is easier here.
-    // Start the request:
-    const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-    // Advance enough time for the initial request async flow
-    t.context.clock.tickAsync(10)
-    // Wait for the failed cache get -> instant 504
-    const error = await errorPromise
-    t.is(error?.response?.status, 504)
-
-    // Wait for the first background execute and check that it's been called
-    await t.context.clock.tickAsync(10)
-    t.is(transport.backgroundExecuteCalls, 1)
-
-    // Advance the clock a few minutes and check that the amount of calls is as expected
-    // +1 because of the previous first
-    await t.context.clock.tickAsync(5 * 60 * 1000) // 5m
-    t.is(transport.backgroundExecuteCalls, 5 * rateLimit1m + 1)
-  },
-)
+  // Advance the clock a few minutes and check that the amount of calls is as expected
+  //
+  await runAllUntilTime(t.context.clock, 3 * 60 * 1000) // 4m
+  const expected = rateLimit1m * Math.ceil(adapter.config.WARMUP_SUBSCRIPTION_TTL / 60_000)
+  t.is(transport.backgroundExecuteCalls, expected)
+})
 
 test.serial(
   'per second limit of 1 with one batch transport results in a call every 1000ms',

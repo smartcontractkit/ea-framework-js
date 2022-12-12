@@ -56,8 +56,6 @@ export type TransportDependencies<T extends TransportGenerics> = AdapterDependen
  * @typeParam T - Helper struct type that will be used to pass types to the generic parameters (check [[TransportGenerics]])
  */
 export interface Transport<T extends TransportGenerics> {
-  /** Short form for the transport name */
-  shortName?: Lowercase<string>
   responseCache: ResponseCache<{
     Request: T['Request']
     Response: T['Response']

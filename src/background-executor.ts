@@ -1,13 +1,6 @@
-import { Adapter, EndpointContext, AdapterEndpoint, EndpointGenerics } from './adapter'
+import { Adapter, AdapterEndpoint, EndpointContext, EndpointGenerics } from './adapter'
 import * as metrics from './metrics'
-import {
-  HttpTransport,
-  MetaTransport,
-  SseTransport,
-  Transport,
-  TransportGenerics,
-  WebSocketTransport,
-} from './transports'
+import { MetaTransport, Transport, TransportGenerics } from './transports'
 import { makeLogger } from './util'
 
 const logger = makeLogger('BackgroundExecutor')
@@ -27,14 +20,6 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
   const timeoutsMap: {
     [endpointName: string]: NodeJS.Timeout
   } = {}
-
-  const timeToWaitPerTransport: {
-    [shortName: string]: number | undefined
-  } = {
-    [WebSocketTransport.shortName]: adapter.config.BACKGROUND_EXECUTE_MS_WS,
-    [HttpTransport.shortName]: adapter.config.BACKGROUND_EXECUTE_MS_HTTP,
-    [SseTransport.shortName]: adapter.config.BACKGROUND_EXECUTE_MS_SSE,
-  }
 
   apiShutdownPromise?.then(() => {
     serverClosed = true
@@ -83,15 +68,12 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
         logger.error(error)
       }
 
-      const timeToWait =
-        (endpoint.transport.shortName && timeToWaitPerTransport[endpoint.transport.shortName]) ||
-        adapter.config.BACKGROUND_EXECUTE_MS
       logger.debug(
-        `Finished background execute for endpoint "${endpoint.name}", sleeping for ${timeToWait}ms`,
+        `Finished background execute for endpoint "${endpoint.name}", calling it again in 10ms...`,
       )
 
       metricsTimer()
-      timeoutsMap[endpoint.name] = setTimeout(handler, timeToWait)
+      timeoutsMap[endpoint.name] = setTimeout(handler, 1)
     }
 
     // Start recursive async calls

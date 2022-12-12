@@ -271,27 +271,21 @@ export const BaseSettings = {
     type: 'number',
     default: 200,
   },
-
-  // Background execute times
-  BACKGROUND_EXECUTE_MS: {
-    description:
-      "Time in milliseconds to sleep between a transport's background execute calls, if no time is specified for the specific transport type",
-    type: 'number',
-    default: 1000,
-  },
-  BACKGROUND_EXECUTE_MS_HTTP: {
-    description: "Time in milliseconds to sleep between HTTP transports' background execute calls",
-    type: 'number',
-    // This default is 0 because the actual rate limiting will be done by the Requester
-    default: 0,
-  },
   BACKGROUND_EXECUTE_MS_SSE: {
     description: "Time in milliseconds to sleep between SSE transports' background execute calls",
     type: 'number',
+    default: 1000,
   },
   BACKGROUND_EXECUTE_MS_WS: {
     description: "Time in milliseconds to sleep between WS transports' background execute calls",
     type: 'number',
+    default: 1000,
+  },
+  BACKGROUND_EXECUTE_MS_HTTP: {
+    description:
+      "Time in milliseconds to sleep between HTTP transports' background execute calls, when there are no requests to send",
+    type: 'number',
+    default: 1000,
   },
 } as const
 

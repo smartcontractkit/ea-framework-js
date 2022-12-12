@@ -3,7 +3,7 @@ import { EndpointContext } from '../adapter'
 import * as cacheMetrics from '../cache/metrics'
 import { AdapterConfig } from '../config'
 import * as rateLimitMetrics from '../rate-limiting/metrics'
-import { makeLogger } from '../util'
+import { makeLogger, sleep } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { Requester } from '../util/requester'
 import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
@@ -73,8 +73,6 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
  * @typeParam T - all types related to the [[Transport]]
  */
 export class HttpTransport<T extends HttpTransportGenerics> extends SubscriptionTransport<T> {
-  static shortName = 'http'
-
   // Flag used to track whether the warmer has moved from having no entries to having some and vice versa
   // Used for recording the cache warmer active metrics accurately
   WARMER_ACTIVE = false
@@ -102,12 +100,15 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     entries: T['Request']['Params'][],
   ): Promise<void> {
     if (!entries.length) {
-      logger.debug('No entries in subscription set, skipping')
+      logger.debug(
+        `No entries in subscription set, sleeping for ${context.adapterConfig.BACKGROUND_EXECUTE_MS_HTTP}ms...`,
+      )
       if (this.WARMER_ACTIVE) {
         // Decrement count when warmer changed from having entries to having none
         cacheMetrics.cacheWarmerCount.labels({ isBatched: 'true' }).dec()
         this.WARMER_ACTIVE = false
       }
+      await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_HTTP)
       return
     } else if (this.WARMER_ACTIVE === false) {
       // Increment count when warmer changed from having no entries to having some
@@ -156,6 +157,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     const results = await this.makeRequest(requestConfig, adapterConfig)
 
     if (!results.length) {
+      logger.trace('Got no results from the request.')
       return
     }
 

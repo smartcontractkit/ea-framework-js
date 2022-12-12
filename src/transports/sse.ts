@@ -2,7 +2,7 @@ import axios, { AxiosRequestConfig } from 'axios'
 import EventSource from 'eventsource'
 import { EndpointContext } from '../adapter'
 import { AdapterConfig } from '../config'
-import { makeLogger } from '../util'
+import { makeLogger, sleep } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportDependencies, TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
@@ -36,7 +36,6 @@ type SSETransportGenerics = TransportGenerics & {
  * @typeParam T - Helper struct type that will be used to pass types to the generic parameters (check [[SSETransportGenerics]])
  */
 export class SseTransport<T extends SSETransportGenerics> extends StreamingTransport<T> {
-  static shortName = 'sse'
   EventSource: typeof EventSource = EventSource
   eventListeners!: {
     type: string
@@ -152,6 +151,9 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
       const prepareKeepAliveRequest = this.config.prepareKeepAliveRequest(context)
       makeRequest(prepareKeepAliveRequest)
     }
+
+    // The background execute loop no longer sleeps between executions, so we have to do it here
+    await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_SSE)
 
     return
   }

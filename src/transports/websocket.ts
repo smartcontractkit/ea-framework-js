@@ -1,7 +1,7 @@
 import WebSocket, { ClientOptions, RawData } from 'ws'
 import { EndpointContext } from '../adapter'
 import { AdapterConfig } from '../config'
-import { makeLogger } from '../util'
+import { makeLogger, sleep } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportGenerics } from './'
 import * as transportMetrics from './metrics'
@@ -112,7 +112,6 @@ type WebsocketTransportGenerics = TransportGenerics & {
 export class WebSocketTransport<
   T extends WebsocketTransportGenerics,
 > extends StreamingTransport<T> {
-  static shortName = 'ws'
   wsConnection!: WebSocket
   currentUrl = ''
   lastMessageReceivedAt = 0
@@ -315,6 +314,9 @@ export class WebSocketTransport<
 
     // Record WS message and subscription metrics
     transportMetrics.recordWsMessageMetrics(context, subscriptions.new, subscriptions.stale)
+
+    // The background execute loop no longer sleeps between executions, so we have to do it here
+    await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_SSE)
 
     return
   }
