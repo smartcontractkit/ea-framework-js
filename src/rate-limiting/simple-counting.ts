@@ -1,6 +1,6 @@
-import { AdapterRateLimitTier, RateLimiter } from '..'
-import { AdapterEndpoint, EndpointGenerics } from '../../adapter'
-import { makeLogger } from '../../util'
+import { AdapterRateLimitTier, RateLimiter } from '.'
+import { AdapterEndpoint, EndpointGenerics } from './../adapter'
+import { makeLogger } from './../util'
 
 const logger = makeLogger('SimpleCountingRateLimiter')
 

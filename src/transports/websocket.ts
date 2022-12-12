@@ -2,11 +2,7 @@ import WebSocket, { ClientOptions, RawData } from 'ws'
 import { EndpointContext } from '../adapter'
 import { AdapterConfig } from '../config'
 import { makeLogger } from '../util'
-import {
-  PartialSuccessfulResponse,
-  ProviderResult,
-  TimestampedProviderResult,
-} from '../util/request'
+import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportGenerics } from './'
 import * as transportMetrics from './metrics'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
@@ -116,6 +112,7 @@ type WebsocketTransportGenerics = TransportGenerics & {
 export class WebSocketTransport<
   T extends WebsocketTransportGenerics,
 > extends StreamingTransport<T> {
+  static shortName = 'ws'
   wsConnection!: WebSocket
   currentUrl = ''
   lastMessageReceivedAt = 0

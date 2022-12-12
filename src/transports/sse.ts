@@ -3,11 +3,7 @@ import EventSource from 'eventsource'
 import { EndpointContext } from '../adapter'
 import { AdapterConfig } from '../config'
 import { makeLogger } from '../util'
-import {
-  PartialSuccessfulResponse,
-  ProviderResult,
-  TimestampedProviderResult,
-} from '../util/request'
+import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportDependencies, TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
 
@@ -39,7 +35,8 @@ type SSETransportGenerics = TransportGenerics & {
  *
  * @typeParam T - Helper struct type that will be used to pass types to the generic parameters (check [[SSETransportGenerics]])
  */
-export class SSETransport<T extends SSETransportGenerics> extends StreamingTransport<T> {
+export class SseTransport<T extends SSETransportGenerics> extends StreamingTransport<T> {
+  static shortName = 'sse'
   EventSource: typeof EventSource = EventSource
   eventListeners!: {
     type: string

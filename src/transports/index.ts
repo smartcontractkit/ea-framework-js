@@ -1,7 +1,7 @@
 import { AdapterDependencies, EndpointContext } from '../adapter'
 import { ResponseCache } from '../cache/response'
 import { AdapterConfig, SettingsMap } from '../config'
-import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/request'
+import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/types'
 
 export * from './http'
 export * from './sse'
@@ -56,6 +56,8 @@ export type TransportDependencies<T extends TransportGenerics> = AdapterDependen
  * @typeParam T - Helper struct type that will be used to pass types to the generic parameters (check [[TransportGenerics]])
  */
 export interface Transport<T extends TransportGenerics> {
+  /** Short form for the transport name */
+  shortName?: Lowercase<string>
   responseCache: ResponseCache<{
     Request: T['Request']
     Response: T['Response']

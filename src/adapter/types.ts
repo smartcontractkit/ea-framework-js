@@ -2,11 +2,7 @@ import type EventSource from 'eventsource'
 import Redis from 'ioredis'
 import { Cache } from '../cache'
 import { AdapterConfig, BaseAdapterConfig, SettingsMap } from '../config'
-import {
-  AdapterRateLimitTier,
-  BackgroundExecuteRateLimiter,
-  RequestRateLimiter,
-} from '../rate-limiting'
+import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
 import { AdapterRequest, RequestGenerics, SubscriptionSetFactory } from '../util'
 import { Requester } from '../util/requester'
@@ -27,10 +23,7 @@ export interface AdapterDependencies {
   cache: Cache
 
   /** Shared instance of the request rate limiter */
-  requestRateLimiter: RequestRateLimiter
-
-  /** Shared instance of the background execute rate limiter */
-  backgroundExecuteRateLimiter: BackgroundExecuteRateLimiter
+  rateLimiter: RateLimiter
 
   /** Factory to create subscription sets based on the specified cache type */
   subscriptionSetFactory: SubscriptionSetFactory

@@ -234,18 +234,6 @@ export const BaseSettings = {
       }
     },
   },
-  REST_TRANSPORT_MAX_RATE_LIMIT_RETRIES: {
-    description:
-      'Maximum amount of times the Rest Transport will attempt to set up a request when blocked by the rate limiter',
-    type: 'number',
-    default: 3,
-  },
-  REST_TRANSPORT_MS_BETWEEN_RATE_LIMIT_RETRIES: {
-    description:
-      'Time that the Rest Transport will wait between retries when blocked by the rate limiter',
-    type: 'number',
-    default: 400,
-  },
   SMOKE_TEST_PAYLOAD_FILE_NAME: {
     description: 'Name of the test payload file used for the smoke endpoint',
     type: 'string',
@@ -282,6 +270,28 @@ export const BaseSettings = {
       'The maximum amount of queued requests for Http transports before new ones push oldest ones out of the queue',
     type: 'number',
     default: 200,
+  },
+
+  // Background execute times
+  BACKGROUND_EXECUTE_MS: {
+    description:
+      "Time in milliseconds to sleep between a transport's background execute calls, if no time is specified for the specific transport type",
+    type: 'number',
+    default: 1000,
+  },
+  BACKGROUND_EXECUTE_MS_HTTP: {
+    description: "Time in milliseconds to sleep between HTTP transports' background execute calls",
+    type: 'number',
+    // This default is 0 because the actual rate limiting will be done by the Requester
+    default: 0,
+  },
+  BACKGROUND_EXECUTE_MS_SSE: {
+    description: "Time in milliseconds to sleep between SSE transports' background execute calls",
+    type: 'number',
+  },
+  BACKGROUND_EXECUTE_MS_WS: {
+    description: "Time in milliseconds to sleep between WS transports' background execute calls",
+    type: 'number',
   },
 } as const
 

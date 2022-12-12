@@ -1,6 +1,13 @@
 import { Adapter, EndpointContext, AdapterEndpoint, EndpointGenerics } from './adapter'
 import * as metrics from './metrics'
-import { MetaTransport, Transport, TransportGenerics } from './transports'
+import {
+  HttpTransport,
+  MetaTransport,
+  SseTransport,
+  Transport,
+  TransportGenerics,
+  WebSocketTransport,
+} from './transports'
 import { makeLogger } from './util'
 
 const logger = makeLogger('BackgroundExecutor')
@@ -17,11 +24,17 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
   // If no server is provided, the listener won't be set and serverClosed will always be false
   let serverClosed = false
 
-  const rateLimiter = adapter.dependencies.backgroundExecuteRateLimiter
-
   const timeoutsMap: {
     [endpointName: string]: NodeJS.Timeout
   } = {}
+
+  const timeToWaitPerTransport: {
+    [shortName: string]: number | undefined
+  } = {
+    [WebSocketTransport.shortName]: adapter.config.BACKGROUND_EXECUTE_MS_WS,
+    [HttpTransport.shortName]: adapter.config.BACKGROUND_EXECUTE_MS_HTTP,
+    [SseTransport.shortName]: adapter.config.BACKGROUND_EXECUTE_MS_SSE,
+  }
 
   apiShutdownPromise?.then(() => {
     serverClosed = true
@@ -69,7 +82,10 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       } catch (error) {
         logger.error(error)
       }
-      const timeToWait = rateLimiter.msUntilNextExecution(endpoint.name)
+
+      const timeToWait =
+        (endpoint.transport.shortName && timeToWaitPerTransport[endpoint.transport.shortName]) ||
+        adapter.config.BACKGROUND_EXECUTE_MS
       logger.debug(
         `Finished background execute for endpoint "${endpoint.name}", sleeping for ${timeToWait}ms`,
       )

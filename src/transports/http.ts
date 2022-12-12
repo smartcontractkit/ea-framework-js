@@ -4,11 +4,7 @@ import * as cacheMetrics from '../cache/metrics'
 import { AdapterConfig } from '../config'
 import * as rateLimitMetrics from '../rate-limiting/metrics'
 import { makeLogger } from '../util'
-import {
-  PartialSuccessfulResponse,
-  ProviderResult,
-  TimestampedProviderResult,
-} from '../util/request'
+import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { Requester } from '../util/requester'
 import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
 import { TransportDependencies, TransportGenerics } from '.'
@@ -77,6 +73,8 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
  * @typeParam T - all types related to the [[Transport]]
  */
 export class HttpTransport<T extends HttpTransportGenerics> extends SubscriptionTransport<T> {
+  static shortName = 'http'
+
   // Flag used to track whether the warmer has moved from having no entries to having some and vice versa
   // Used for recording the cache warmer active metrics accurately
   WARMER_ACTIVE = false
@@ -125,8 +123,28 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     // could be added to the subscription set if not blocking this operation, so the next time the
     // background execute is triggered if the request is for a fully batched endpoint, we could end up
     // with the full combination of possible params within the request queue
-    logger.trace(`Queueing ${requests.length} requests`)
+    logger.trace(`Sending ${requests.length} requests...`)
+    const start = Date.now()
     await Promise.all(requests.map((r) => this.handleRequest(r, context.adapterConfig)))
+    const duration = Date.now() - start
+    logger.trace(`All requests in the background execute were completed`)
+
+    // These logs will surface warnings that operators should take action on, in case the execution of all
+    // requests is taking too long so that entries could have expired within this timeframe
+    if (duration > context.adapterConfig.WARMUP_SUBSCRIPTION_TTL) {
+      logger.warn(
+        `Background execution of all HTTP requests in a batch took ${duration},\
+         which is longer than the subscription TTL (${context.adapterConfig.WARMUP_SUBSCRIPTION_TTL}).\
+         This might be due to insufficient speed on the selected API tier, please check metrics and logs to confirm and consider moving to a faster tier.`,
+      )
+    }
+    if (duration > context.adapterConfig.CACHE_MAX_AGE) {
+      logger.warn(
+        `Background execution of all HTTP requests in a batch took ${duration},\
+         which is longer than the max cache age (${context.adapterConfig.CACHE_MAX_AGE}).\
+         This might be due to insufficient speed on the selected API tier, please check metrics and logs to confirm and consider moving to a faster tier.`,
+      )
+    }
 
     return
   }
