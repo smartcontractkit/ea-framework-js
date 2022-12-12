@@ -5,6 +5,9 @@ import { validator } from './utils'
 
 export type NormalizedInput = Record<string, unknown>
 
+export type Override = Record<string, string>
+export type OverridesMap = Record<string, Override>
+
 const isNotObject = validator.object()
 
 export class InputValidator {
@@ -16,7 +19,7 @@ export class InputValidator {
 
   validateInput(input: Record<string, unknown>) {
     const normalized = this.initializeInputs(input)
-    this.validateOverrides(input?.['overrides'] as Record<string, Record<string, string>>)
+    this.validateOverrides(input?.['overrides'] as OverridesMap)
 
     for (const configKey in this.inputConfig) {
       this.validateRequiredConfig(configKey, normalized)
@@ -30,7 +33,7 @@ export class InputValidator {
     return normalized
   }
 
-  private validateOverrides(overrides: Record<string, Record<string, string>>) {
+  private validateOverrides(overrides: OverridesMap) {
     if (!overrides) {
       return
     }
