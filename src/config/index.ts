@@ -209,7 +209,7 @@ export const BaseSettings = {
       'The maximum acceptable time (in milliseconds) since the last message received on a WebSocket connection before it is considered unresponsive, causing the adapter to close and attempt to reopen it.',
     type: 'number',
     default: 120000,
-    validate: validator.integer({ min: 1000, max: 120000 }),
+    validate: validator.integer({ min: 1000, max: 180000 }),
   },
   // WS_TIME_UNTIL_HANDLE_NEXT_MESSAGE_OVERRIDE: {
   //   description: 'Time to wait until adapter should handle next WS message',
@@ -293,22 +293,26 @@ export const BaseSettings = {
       'The maximum amount of queued requests for Http transports before new ones push oldest ones out of the queue',
     type: 'number',
     default: 200,
+    validate: validator.integer({ min: 1, max: 2000 }),
   },
   BACKGROUND_EXECUTE_MS_SSE: {
     description: "Time in milliseconds to sleep between SSE transports' background execute calls",
     type: 'number',
     default: 1000,
+    validate: validator.integer({ min: 1, max: 10000 }),
   },
   BACKGROUND_EXECUTE_MS_WS: {
     description: "Time in milliseconds to sleep between WS transports' background execute calls",
     type: 'number',
     default: 1000,
+    validate: validator.integer({ min: 1, max: 10000 }),
   },
   BACKGROUND_EXECUTE_MS_HTTP: {
     description:
       "Time in milliseconds to sleep between HTTP transports' background execute calls, when there are no requests to send",
     type: 'number',
     default: 1000,
+    validate: validator.integer({ min: 1, max: 10000 }),
   },
 } as const satisfies SettingsMap
 
