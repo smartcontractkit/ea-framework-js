@@ -394,7 +394,7 @@ test.serial('RoutingTransport can route to WebSocket transport', async (t) => {
     }
     socket.on('message', parseMessage)
   })
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
   const api = await expose(adapter, { cache: mockCache })
   const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
   const price = 1500

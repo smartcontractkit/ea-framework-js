@@ -186,7 +186,7 @@ test.afterEach((t) => {
 test.serial('Test redis subscription set (add and getAll)', async (t) => {
   const adapter = buildAdapter()
 
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
   const dependencies: Partial<AdapterDependencies> = {
     redisClient: new RedisMock() as unknown as Redis,
     cache: mockCache,

@@ -181,7 +181,7 @@ test.serial('sends request to DP and returns response', async (t) => {
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
   t.context.api = await expose(adapter, {
@@ -527,7 +527,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
   t.context.api = await expose(adapter, {
@@ -606,7 +606,7 @@ test.serial('requests from different transports are coalesced', async (t) => {
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
   t.context.api = await expose(adapter, {
@@ -679,7 +679,7 @@ test.serial('requests for the same transport are coalesced', async (t) => {
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache()
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
   t.context.api = await expose(adapter, {
@@ -766,7 +766,7 @@ test.serial(
 
     // Create mocked cache so we can listen when values are set
     // This is a more reliable method than expecting precise clock timings
-    const mockCache = new MockCache()
+    const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
     // Advance the clock for a second so we can do all this logic and the interval break doesn't occur right in the middle
     t.context.clock.tick(1000)

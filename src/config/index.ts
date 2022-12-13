@@ -1,3 +1,5 @@
+import { validator } from '../validation/utils'
+
 export const BaseSettings = {
   // V2 compat
   // ADAPTER_URL: {
@@ -9,6 +11,7 @@ export const BaseSettings = {
       'The number of milliseconds a request can be pending before returning a timeout error for data provider request',
     type: 'number',
     default: 30000,
+    validate: validator.integer({ min: 0, max: 60000 }),
   },
   API_VERBOSE: {
     description:
@@ -25,19 +28,19 @@ export const BaseSettings = {
     description: 'Maximum amount of time (in ms) that a response will stay cached',
     type: 'number',
     default: 90000,
+    validate: validator.integer({ min: 1000, max: 180000 }),
   },
-  // CACHE_MAX_ITEMS: {
-  //   type: 'number',
-  //   default: 1000,
-  // },
-  // CACHE_MIN_AGE: {
-  //   type: 'number',
-  //   default: 30000,
-  // },
+  CACHE_MAX_ITEMS: {
+    type: 'number',
+    description: 'The maximum number of items that remain in the cache',
+    default: 10000,
+    validate: validator.integer({ min: 1000, max: 10000 }),
+  },
   CACHE_REDIS_CONNECTION_TIMEOUT: {
     description: 'Connection timeout for redis client',
     type: 'number',
     default: 15000,
+    validate: validator.integer({ min: 3000, max: 60000 }),
   },
   CACHE_REDIS_HOST: {
     description: 'Hostname for the Redis instance to be used',
@@ -53,6 +56,7 @@ export const BaseSettings = {
     description: 'Max cooldown (in ms) before attempting redis reconnection',
     type: 'number',
     default: 3000,
+    validate: validator.integer({ min: 3000, max: 10000 }),
   },
   CACHE_REDIS_PASSWORD: {
     description: 'The password required for redis auth',
@@ -67,16 +71,19 @@ export const BaseSettings = {
     description: 'Port for the Redis instance to be used',
     type: 'number',
     default: 6379,
+    validate: validator.port(),
   },
   CACHE_REDIS_TIMEOUT: {
     description: 'Timeout to fail a Redis server request if no response (ms)',
     type: 'number',
     default: 500,
+    validate: validator.integer({ min: 500, max: 10000 }),
   },
   CACHE_REDIS_URL: {
     description:
       'The URL of the Redis server. Format: [redis[s]:]//[[user][:password@]][host][:port][/db-number][?db=db-number[&password=bar[&option=value]]]',
     type: 'string',
+    validate: validator.url(),
   },
   CACHE_TYPE: {
     description: 'The type of cache to use throughout the EA',
@@ -108,6 +115,7 @@ export const BaseSettings = {
       'Port through which the EA will listen for REST requests (if mode is set to "reader" or "reader-writer")',
     type: 'number',
     default: 8080,
+    validate: validator.port(),
   },
   // ERROR_CAPACITY: {
   //   type: 'number',
@@ -123,6 +131,12 @@ export const BaseSettings = {
     type: 'string',
     default: 'info',
   },
+  MAX_PAYLOAD_SIZE_LIMIT: {
+    description: 'Max payload size limit for the Fastify server',
+    type: 'number',
+    default: 1048576,
+    validate: validator.integer({ min: 1048576, max: 1073741824 }),
+  },
   METRICS_ENABLED: {
     description: 'Flag to specify whether or not to startup the metrics server',
     type: 'boolean',
@@ -132,6 +146,7 @@ export const BaseSettings = {
     description: 'Port metrics will be exposed to',
     type: 'number',
     default: 9080,
+    validate: validator.port(),
   },
   METRICS_USE_BASE_URL: {
     description: 'Flag to specify whether or not to prepend the BASE_URL to the metrics endpoint',
@@ -145,47 +160,56 @@ export const BaseSettings = {
   RATE_LIMIT_CAPACITY: {
     description: 'Used as rate limit capacity per minute and ignores tier settings if defined',
     type: 'number',
+    validate: validator.integer({ min: 0 }),
   },
   RATE_LIMIT_CAPACITY_MINUTE: {
     description:
       'Used as rate limit capacity per minute and ignores tier settings if defined. Supercedes RATE_LIMIT_CAPACITY if both vars are set',
     type: 'number',
+    validate: validator.integer({ min: 0 }),
   },
   RATE_LIMIT_CAPACITY_SECOND: {
     description: 'Used as rate limit capacity per second and ignores tier settings if defined',
     type: 'number',
+    validate: validator.integer({ min: 0 }),
   },
   RETRY: {
     type: 'number',
     description: 'Retry count for failed HTTP requests',
     default: 1,
+    validate: validator.integer({ min: 1, max: 10 }),
   },
   SSE_KEEPALIVE_SLEEP: {
     description: 'Maximum amount of time (in ms) between each SSE keepalive request',
     type: 'number',
     default: 60000,
+    validate: validator.integer({ min: 0, max: 120000 }),
   },
   SSE_SUBSCRIPTION_TTL: {
     description:
       'Maximum amount of time (in ms) an SSE subscription will be cached before being unsubscribed',
     type: 'number',
     default: 300000,
+    validate: validator.integer({ min: 0, max: 300000 }),
   },
   WARMUP_SUBSCRIPTION_TTL: {
     type: 'number',
     description: 'TTL for batch warmer subscriptions',
     default: 300000,
+    validate: validator.integer({ min: 0, max: 300000 }),
   },
   WS_SUBSCRIPTION_TTL: {
     description: 'The time in ms a request will live in the subscription set before becoming stale',
     type: 'number',
     default: 120000,
+    validate: validator.integer({ min: 0, max: 120000 }),
   },
   WS_SUBSCRIPTION_UNRESPONSIVE_TTL: {
     description:
       'The maximum acceptable time (in milliseconds) since the last message received on a WebSocket connection before it is considered unresponsive, causing the adapter to close and attempt to reopen it.',
     type: 'number',
     default: 120000,
+    validate: validator.integer({ min: 1000, max: 120000 }),
   },
   // WS_TIME_UNTIL_HANDLE_NEXT_MESSAGE_OVERRIDE: {
   //   description: 'Time to wait until adapter should handle next WS message',
@@ -198,12 +222,14 @@ export const BaseSettings = {
       'Max amount of times to attempt to find EA response in the cache after the Transport has been set up',
     type: 'number',
     default: 10,
+    validate: validator.integer({ min: 0, max: 20 }),
   },
   CACHE_POLLING_SLEEP_MS: {
     description:
       'The number of ms to sleep between each retry to fetch the EA response in the cache',
     type: 'number',
     default: 200,
+    validate: validator.integer({ min: 10, max: 1000 }),
   },
   DEFAULT_CACHE_KEY: {
     description: 'Default key to be used when one cannot be determined from request parameters',
@@ -215,6 +241,7 @@ export const BaseSettings = {
       'Host this EA will listen for REST requests on (if mode is set to "reader" or "reader-writer")',
     type: 'string',
     default: '::',
+    validate: validator.host(),
   },
   EA_MODE: {
     description:
@@ -228,11 +255,7 @@ export const BaseSettings = {
       'Maximum amount of characters that the common part of the cache key or feed ID can have',
     type: 'number',
     default: 300,
-    validate: (value?: number) => {
-      if (!(value && value >= 150 && value <= 500)) {
-        return 'MAX_COMMON_KEY_SIZE must be a number between 150 and 500'
-      }
-    },
+    validate: validator.integer({ min: 150, max: 500 }),
   },
   SMOKE_TEST_PAYLOAD_FILE_NAME: {
     description: 'Name of the test payload file used for the smoke endpoint',
@@ -287,7 +310,7 @@ export const BaseSettings = {
     type: 'number',
     default: 1000,
   },
-} as const
+} as const satisfies SettingsMap
 
 export const buildAdapterConfig = <
   CustomSettings extends CustomSettingsType<CustomSettings> = EmptySettings,
@@ -349,7 +372,7 @@ const validateSetting = (
   // Check if a required setting has been provided
   if (config.required && (value === null || value === undefined)) {
     validationErrors.push(`${key}: Value is required, but none was provided`)
-  } else if (config.validate) {
+  } else if (value && config.validate) {
     // Cast validate to unknown because TS can't select one of multiple variants of the validate function signature
     const validationRes = (
       config.validate as unknown as (value?: SettingValueType) => ValidationErrorMessage

@@ -159,15 +159,16 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
     }
     socket.on('message', parseMessage)
   })
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache()
 
   const adapter = createAdapter({
     envDefaultOverrides: {
       WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
     },
   })
+
+  // Create mocked cache so we can listen when values are set
+  // This is a more reliable method than expecting precise clock timings
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start up adapter
   const api = await expose(adapter, {
@@ -247,8 +248,6 @@ test.serial('reconnects when url changed', async (t) => {
     })
   })
 
-  const mockCache = new MockCache()
-
   const transport = new WebSocketTransport<WebSocketTypes>({
     url: (context, desiredSubs) => {
       const gen = `wss://test-ws.com/asd?test=${desiredSubs.map((sub) => sub.base).join(',')}`
@@ -293,9 +292,11 @@ test.serial('reconnects when url changed', async (t) => {
     defaultEndpoint: 'test',
     endpoints: [webSocketEndpoint],
     envDefaultOverrides: {
-      WS_SUBSCRIPTION_TTL: 100000000,
+      WS_SUBSCRIPTION_TTL: 120000,
     },
   })
+
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   const api = await expose(adapter, { cache: mockCache })
 
@@ -362,14 +363,14 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
     })
   })
 
-  const mockCache = new MockCache()
-
   const adapter = createAdapter({
     envDefaultOverrides: {
       WS_SUBSCRIPTION_TTL: 30000,
       WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
     },
   })
+
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   const api = await expose(adapter, { cache: mockCache })
 
@@ -424,8 +425,6 @@ test.serial(
       )
     })
 
-    const mockCache = new MockCache()
-
     const transport = new WebSocketTransport<WebSocketTypes>({
       url: () => URL,
       handlers: {
@@ -477,6 +476,8 @@ test.serial(
         WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
       },
     })
+
+    const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
     // Start up adapter
     const api = await expose(adapter, {

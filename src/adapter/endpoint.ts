@@ -7,6 +7,7 @@ import { InputValidator } from '../validation/input-validator'
 import {
   AdapterDependencies,
   AdapterEndpointParams,
+  CustomInputValidator,
   EndpointGenerics,
   EndpointRateLimitingConfig,
 } from './types'
@@ -24,6 +25,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   rateLimiting?: EndpointRateLimitingConfig | undefined
   validator: InputValidator
   cacheKeyGenerator?: (data: Record<string, unknown>) => string
+  customInputValidation?: CustomInputValidator<T>
 
   constructor(params: AdapterEndpointParams<T>) {
     this.name = params.name
@@ -33,6 +35,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.rateLimiting = params.rateLimiting
     this.validator = new InputValidator(this.inputParameters)
     this.cacheKeyGenerator = params.cacheKeyGenerator
+    this.customInputValidation = params.customInputValidation
   }
 
   /**

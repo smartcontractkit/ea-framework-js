@@ -235,6 +235,11 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
         `METRICS_ENABLED has been set to false. Metrics should not be disabled in a production environment.`,
       )
     }
+    if (this.config.MAX_PAYLOAD_SIZE_LIMIT !== BaseSettings.MAX_PAYLOAD_SIZE_LIMIT.default) {
+      logger.warn(
+        `MAX_PAYLOAD_SIZE_LIMIT has been set to ${this.config.MAX_PAYLOAD_SIZE_LIMIT}. This setting should only be set when absolutely necessary.`,
+      )
+    }
   }
 
   /**
@@ -278,7 +283,10 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     }
 
     if (!dependencies.cache) {
-      dependencies.cache = CacheFactory.buildCache(this.config.CACHE_TYPE, dependencies.redisClient)
+      dependencies.cache = CacheFactory.buildCache(
+        { cacheType: this.config.CACHE_TYPE, maxSizeForLocalCache: this.config.CACHE_MAX_ITEMS },
+        dependencies.redisClient,
+      )
     }
 
     const rateLimitingTier = getRateLimitingTier(
@@ -501,7 +509,8 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
 
     logger.debug('Ran out of polling attempts, returning timeout')
     throw new AdapterTimeoutError({
-      message: 'Timed out waiting for provider result.',
+      message:
+        'The EA has not received any values from the Data Provider for the requested data yet. Retry after a short delay, and if the problem persists raise this issue in the relevant channels.',
       statusCode: 504,
     })
   }

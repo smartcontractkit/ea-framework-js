@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/external-adapter-framework",
-  "version": "0.13.2",
+  "version": "0.14.6",
   "main": "dist/index.js",
   "license": "MIT",
   "dependencies": {
@@ -23,13 +23,13 @@
     "start": "ts-node -e 'import(`./src/examples/${process.argv[1]}/src/index`).then(ea => ea.server())'",
     "test-debug": "EA_HOST=localhost SKIP_METRICS_CLEAR=true LOG_LEVEL=trace DEBUG=true EA_PORT=0 c8 ava --verbose",
     "test": "EA_HOST=localhost SKIP_METRICS_CLEAR=true LOG_LEVEL=error EA_PORT=0 c8 ava",
-    "verify": "yarn lint && yarn build && yarn build -p ./test/tsconfig.json && yarn test",
+    "verify": "yarn lint && yarn build && yarn build -p ./test/tsconfig.json && yarn test && yarn code-coverage",
     "code-coverage": "c8 check-coverage --statements 95 --lines 95 --functions 95 --branches 90"
   },
   "devDependencies": {
     "@sinonjs/fake-timers": "9.1.2",
     "@types/eventsource": "1.1.9",
-    "@types/node": "18.8.2",
+    "@types/node": "18.11.11",
     "@types/sinonjs__fake-timers": "8.1.2",
     "@types/ws": "8.5.3",
     "@typescript-eslint/eslint-plugin": "5.46.0",
@@ -42,11 +42,11 @@
     "mock-socket": "9.1.5",
     "mocksse": "1.0.4",
     "nock": "13.2.9",
-    "prettier": "2.7.1",
+    "prettier": "2.8.0",
     "ts-node": "10.9.1",
     "ts-node-dev": "2.0.0",
-    "typedoc": "0.23.15",
-    "typescript": "4.8.4"
+    "typedoc": "0.23.21",
+    "typescript": "4.9.3"
   },
   "prettier": {
     "semi": false,

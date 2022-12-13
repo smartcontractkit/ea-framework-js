@@ -4,7 +4,7 @@ import { calculateCacheKey, recordRedisCommandMetric } from '../cache'
 import { getMetricsMeta } from '../metrics/util'
 import { makeLogger } from '../util'
 import { AdapterMiddlewareBuilder, AdapterRequest, AdapterRequestBody } from '../util/types'
-import { AdapterError, AdapterInputError } from './error'
+import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
 import { CMD_SENT_STATUS } from '../cache/metrics'
 import { ReplyError as RedisError } from 'ioredis'
 export { InputParameters } from './input-params'
@@ -53,6 +53,15 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     }
 
     const validatedData = endpoint.validator.validateInput(requestBody.data)
+
+    // Custom input validation defined in the EA
+    const error =
+      endpoint.customInputValidation &&
+      endpoint.customInputValidation(validatedData, adapter.config)
+
+    if (error) {
+      throw error
+    }
 
     req.requestContext = {
       cacheKey: '',
@@ -115,7 +124,12 @@ export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: Fa
     ...err,
   }
 
-  if (err instanceof AdapterError) {
+  if (err instanceof AdapterTimeoutError) {
+    // AdapterTimeoutError are somewhat expected when the adapter doesn't find a response in the cache within the specified polling interval
+    // This is common on startup so logging these errors as debug to help alleviate logs getting flooded in the beginning
+    errorCatcherLogger.debug(errorWithContext)
+    res.status(err.statusCode).send(err.toJSONResponse())
+  } else if (err instanceof AdapterError) {
     // We want to log these as warn, because although they are to be expected, NOPs should
     // Only use "correct" job specs and therefore not hit adapters with invalid requests.
     errorCatcherLogger.warn(errorWithContext)

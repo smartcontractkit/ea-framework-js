@@ -26,6 +26,11 @@ const debugTransport = {
 // Base logger, shouldn't be used because we want layers to be specified
 const baseLogger = pino({
   level: process.env['LOG_LEVEL']?.toLowerCase() || BaseSettings.LOG_LEVEL.default,
+  formatters: {
+    level(label) {
+      return { level: label }
+    },
+  },
   hooks: {
     logMethod(inputArgs, method) {
       // Censor each argument of logger
@@ -123,7 +128,14 @@ export const loggingContextMiddleware = (
 // Obj is typed as "any" because it could be a variety of structures in the logger
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function censor(obj: any, censorList: CensorKeyValue[]) {
-  let stringified = JSON.stringify(obj)
+  let stringified = ''
+  try {
+    // JSON.stringify(obj) will fail if obj contains a circular reference.
+    // If it fails, we fall back to replacing it with "[Unknown]".
+    stringified = JSON.stringify(obj)
+  } catch (e) {
+    return '[Unknown]'
+  }
   censorList.forEach((entry) => {
     stringified = stringified.replace(entry.value, `[${entry.key} REDACTED]`)
   })
