@@ -89,7 +89,7 @@ test.serial('Test prefix settings', async (t) => {
   t.is(config['BASE_URL'], 'TEST_BASE_URL')
 })
 
-test.serial('Test validate function', async (t) => {
+test.serial('Test validate function (out of bounds)', async (t) => {
   process.env['CUSTOM_KEY'] = '11'
   const customSettings: SettingsMap = {
     CUSTOM_KEY: {
@@ -104,5 +104,41 @@ test.serial('Test validate function', async (t) => {
     t.fail()
   } catch (e: any) {
     t.pass()
+  }
+})
+
+test.serial('Test validate function (decimal)', async (t) => {
+  process.env['CUSTOM_KEY'] = '5.1'
+  const customSettings: SettingsMap = {
+    CUSTOM_KEY: {
+      description: 'Test custom env var',
+      type: 'number',
+      validate: validator.integer({ min: 1, max: 10 }),
+    },
+  }
+  const config = buildAdapterConfig({ customSettings })
+  try {
+    validateAdapterConfig(config, customSettings)
+    t.fail()
+  } catch (e: any) {
+    t.pass()
+  }
+})
+
+test.serial('Test validate function (scientific notation)', async (t) => {
+  process.env['CUSTOM_KEY'] = '3.5e+6'
+  const customSettings: SettingsMap = {
+    CUSTOM_KEY: {
+      description: 'Test custom env var',
+      type: 'number',
+      validate: validator.integer({ min: 2_000_000, max: 5_000_000 }),
+    },
+  }
+  const config = buildAdapterConfig({ customSettings })
+  try {
+    validateAdapterConfig(config, customSettings)
+    t.pass()
+  } catch (e: any) {
+    t.fail()
   }
 })

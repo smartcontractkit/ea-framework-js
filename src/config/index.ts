@@ -190,19 +190,19 @@ export const BaseSettings = {
       'Maximum amount of time (in ms) an SSE subscription will be cached before being unsubscribed',
     type: 'number',
     default: 300000,
-    validate: validator.integer({ min: 0, max: 300000 }),
+    validate: validator.integer({ min: 0, max: 3600000 }),
   },
   WARMUP_SUBSCRIPTION_TTL: {
     type: 'number',
     description: 'TTL for batch warmer subscriptions',
     default: 300000,
-    validate: validator.integer({ min: 0, max: 300000 }),
+    validate: validator.integer({ min: 0, max: 3600000 }),
   },
   WS_SUBSCRIPTION_TTL: {
     description: 'The time in ms a request will live in the subscription set before becoming stale',
     type: 'number',
     default: 120000,
-    validate: validator.integer({ min: 0, max: 120000 }),
+    validate: validator.integer({ min: 0, max: 3600000 }),
   },
   WS_SUBSCRIPTION_UNRESPONSIVE_TTL: {
     description:
@@ -405,7 +405,7 @@ export const getEnv = (name: string, config: Setting, prefix = ''): SettingValue
     case 'string':
       return value
     case 'number':
-      return parseInt(value)
+      return Number(value)
     case 'boolean':
       return value === 'true'
     case 'enum':
