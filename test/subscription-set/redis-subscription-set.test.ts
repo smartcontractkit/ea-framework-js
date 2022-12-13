@@ -172,7 +172,18 @@ test.before(async (t) => {
   process.env['API_TIMEOUT'] = '0'
   process.env['RATE_LIMIT_CAPACITY_SECOND'] = '1'
   process.env['CACHE_MAX_AGE'] = '2000'
+  process.env['BACKGROUND_EXECUTE_MS_HTTP'] = '1000'
+})
 
+test.beforeEach((t) => {
+  t.context.clock = FakeTimers.install()
+})
+
+test.afterEach((t) => {
+  t.context.clock.uninstall()
+})
+
+test.serial('Test redis subscription set (add and getAll)', async (t) => {
   const adapter = buildAdapter()
 
   const mockCache = new MockCache()
@@ -187,17 +198,7 @@ test.before(async (t) => {
   }
   t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
   t.context.cache = mockCache
-})
 
-test.beforeEach((t) => {
-  t.context.clock = FakeTimers.install()
-})
-
-test.afterEach((t) => {
-  t.context.clock.uninstall()
-})
-
-test.serial('Test redis subscription set (add and getAll)', async (t) => {
   const makeRequest = () =>
     axios.post(t.context.serverAddress, {
       data: {
@@ -217,12 +218,10 @@ test.serial('Test redis subscription set (add and getAll)', async (t) => {
   t.is(error?.response?.status, 504)
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  const cacheValueSetPromise = t.context.cache.waitForNextSet()
-  await cacheValueSetPromise
+  await runAllUntilTime(t.context.clock, 5000)
 
   // Second request should find the response in the cache
   const response = await makeRequest()
-
   t.is(response.status, 200)
   assertEqualResponses(t, response.data, {
     data: {
