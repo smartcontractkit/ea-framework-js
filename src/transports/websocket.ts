@@ -316,7 +316,10 @@ export class WebSocketTransport<
     transportMetrics.recordWsMessageMetrics(context, subscriptions.new, subscriptions.stale)
 
     // The background execute loop no longer sleeps between executions, so we have to do it here
-    await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_SSE)
+    logger.trace(
+      `Websocket handler complete, sleeping for ${context.adapterConfig.BACKGROUND_EXECUTE_MS_WS}ms...`,
+    )
+    await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_WS)
 
     return
   }

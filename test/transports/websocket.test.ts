@@ -123,6 +123,7 @@ const createAdapter = (adapterParams?: Partial<AdapterParams<SettingsMap>>): Ada
     ...adapterParams,
     envDefaultOverrides: {
       BACKGROUND_EXECUTE_MS_WS,
+      ...adapterParams?.envDefaultOverrides,
     },
   })
 
@@ -162,7 +163,11 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
   // This is a more reliable method than expecting precise clock timings
   const mockCache = new MockCache()
 
-  const adapter = createAdapter()
+  const adapter = createAdapter({
+    envDefaultOverrides: {
+      WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+    },
+  })
 
   // Start up adapter
   const api = await expose(adapter, {
@@ -206,11 +211,11 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
   })
 
   // Wait until the cache expires, and the subscription is out
-  await t.context.clock.tickAsync(
+  const duration =
     Math.ceil(CACHE_MAX_AGE / adapter.config.WS_SUBSCRIPTION_TTL) *
       adapter.config.WS_SUBSCRIPTION_TTL +
-      1,
-  )
+    1
+  await runAllUntilTime(t.context.clock, duration)
 
   // Now that the cache is out and the subscription no longer there, this should time out
   const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)
@@ -389,7 +394,7 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
 
   // The WS connection should not send any messages to the EA, so we dvance the clock until
   // we reach the point where the EA will consider it unhealthy and reconnect.
-  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 - 100)
 
   // The connection was opened twice
   t.is(connectionCounter, 2)
@@ -467,6 +472,10 @@ test.serial(
       name: 'TEST',
       defaultEndpoint: 'test',
       endpoints: [webSocketEndpoint],
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
+        WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+      },
     })
 
     // Start up adapter
@@ -511,11 +520,11 @@ test.serial(
     })
 
     // Wait until the cache expires, and the subscription is out
-    await t.context.clock.tickAsync(
+    const duration =
       Math.ceil(CACHE_MAX_AGE / adapter.config.WS_SUBSCRIPTION_TTL) *
         adapter.config.WS_SUBSCRIPTION_TTL +
-        1,
-    )
+      1
+    await runAllUntilTime(t.context.clock, duration)
 
     // Now that the cache is out and the subscription no longer there, this should time out
     const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)

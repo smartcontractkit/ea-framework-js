@@ -153,6 +153,9 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
     }
 
     // The background execute loop no longer sleeps between executions, so we have to do it here
+    logger.trace(
+      `SSE handler complete, sleeping for ${context.adapterConfig.BACKGROUND_EXECUTE_MS_WS}ms...`,
+    )
     await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_SSE)
 
     return
