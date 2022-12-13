@@ -138,7 +138,7 @@ test.serial('Test cache warmer active metric', async (t) => {
   t.is(metricsMap.get(`cache_warmer_get_count${expectedLabel}`), 0)
 
   expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 17)
+  t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 18)
 
   expectedLabel = `{endpoint="test",transport_type="MockHttpTransport",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`bg_execute_subscription_set_count${expectedLabel}`), 0)
