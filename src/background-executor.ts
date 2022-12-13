@@ -70,7 +70,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
 
       // This background execute loop is no longer the one to determine the sleep between bg execute calls.
       // That is now instead responsibility of each transport, to allow for custom ones to implement their own timings.
-      logger.debug(
+      logger.trace(
         `Finished background execute for endpoint "${endpoint.name}", calling it again in 1ms...`,
       )
       metricsTimer()

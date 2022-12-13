@@ -82,7 +82,7 @@ interface RequesterResult<T> {
 /**
  * Centralized management of outbound http requests.
  * Enforces rate limiting on a single instance (complying with the N Readers - 1 Writer arch for EA scaling)
- * by adding requests into a a queue, processing them sequentially and sleeping when it reaches its limit.
+ * by adding requests into a queue, processing them sequentially and sleeping when it reaches its limit.
  * The queue will throw an error if the Requester attempts to add more items than the max configured.
  * It additionally serves to coalesce requests by utilizing a more complex queue structure:
  *   - ignores duplicate items via a provided key
@@ -93,8 +93,8 @@ interface RequesterResult<T> {
  */
 export class Requester {
   private processing = false
-  private queue: UniqueLinkedList<QueuedRequest<unknown>>
-  private map = {} as Record<string, QueuedRequest<unknown>>
+  private queue: UniqueLinkedList<QueuedRequest>
+  private map = {} as Record<string, QueuedRequest>
   private maxRetries: number
   private timeout: number
 
@@ -136,7 +136,10 @@ export class Requester {
     })
 
     // By the time we're here, we know that queuedRequest has both the unresolved promise, and the resolve and reject handlers within
-    // It's really, REALLY important for thread safety that from this point until this function returns, there are no async breaks
+    // It's really, REALLY important for thread safety that from this point until this function returns, there are no async breaks.
+    // Node will stay within a "thread" until it gets a chance to switch context, like an "await" statement. This section of code depends
+    // on it executing from start to finish without any other actions to avoid race conditions, so if we had an "await" here we could run into problems.
+    // For example, two separate queue processing "threads" could be spawned by mistake, or the queue could overflow.
     const overflowedRequest = this.queue.add(queuedRequest as QueuedRequest)
     if (overflowedRequest) {
       // If we have overflow, it means the oldest request needs to be rejected because the queue is at its limits
@@ -165,6 +168,8 @@ export class Requester {
     if (!this.processing) {
       this.processing = true
       logger.debug(`Starting requester queue processing`)
+      // We don't want to wait for the queue to finish processing here; this will just spawn a "thread"
+      // and the promise we'll return from this method is the one for the request when it resolves
       this.processNext()
     }
 
@@ -197,7 +202,7 @@ export class Requester {
       await sleep(timeToWait)
     }
 
-    // Fire off to complete in the background
+    // Fire off to complete in the background. We don't wait here to be able to fire off multiple requests concurrently
     this.executeRequest.bind(this)(next)
 
     return this.processNext()
@@ -262,7 +267,8 @@ export class Requester {
         logger.trace(`Request failed, sleeping for ${timeToSleep}ms...`)
         await sleep(timeToSleep)
 
-        logger.trace(`Adding request to the queue (Key: ${key}, Retry #: ${retries})`)
+        req.retries++
+        logger.trace(`Adding request to the queue (Key: ${key}, Retry #: ${req.retries})`)
         this.queue.add(req)
       }
     } finally {

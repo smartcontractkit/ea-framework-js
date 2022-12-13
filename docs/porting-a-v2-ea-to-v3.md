@@ -78,7 +78,7 @@ export type EndpointTypes = {
 
 These types will also be shared with the Endpoint that’s referencing this transport.
 
-## Building an Http Transport
+## Building an HTTP Transport
 
 Building an HTTP transport mainly consists of defining types (above), and defining how to build the request and parse the response
 to and from the DP. An example that sends request to a non-batch endpoint:
@@ -86,12 +86,12 @@ to and from the DP. An example that sends request to a non-batch endpoint:
 ```typescript
 const httpTransport = new HttpTransport<EndpointTypes>({
   prepareRequests: (params, config) => {
-    // The `params` param contains the all the requests made to the EA that need data fetched from the DP.
+    // The `params` param contains all the requests made to the EA that need data fetched from the DP.
     // Using this, return the request config to the DP.
     return params.map(req => ({
       params: req,
       request: {
-        baseURL: config.API_ENDPOINT || DEFAULT_API_ENDPOINT,
+        baseURL: config.API_ENDPOINT, // Default endpoint defined in configs
         url: '/price',
         method: 'GET',
         params: {
@@ -125,7 +125,7 @@ const httpTransport = new HttpTransport<EndpointTypes>({
     return {
       params,
       request: {
-        baseURL: config.API_ENDPOINT || DEFAULT_API_ENDPOINT,
+        baseURL: config.API_ENDPOINT, // Default endpoint defined in configs
         url: '/price',
         method: 'GET',
         params: {

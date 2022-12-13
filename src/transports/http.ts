@@ -47,7 +47,7 @@ type ProviderRequestConfig<T extends HttpTransportGenerics> = {
 }
 
 /**
- * Config object that is provided to the BatchWarmingTransport constructor.
+ * Config object that is provided to the HttpTransport constructor.
  */
 export interface HttpTransportConfig<T extends HttpTransportGenerics> {
   /**
@@ -89,11 +89,11 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
 }
 
 /**
- * Transport implementation that takes incoming batches requests and keeps a warm cache of values.
- * Within the setup function, adapter params are added to an set that also keeps track and expires values.
+ * Transport implementation that takes incoming batches of requests and keeps a warm cache of values.
+ * Within the setup function, adapter params are added to a set that also keeps track and expires values.
  * In the background execute, the list of non-expired items in the set is fetched.
  * Then, the list is passed through the `prepareRequest` function, that returns an AxiosRequestConfig.
- * The Data Provider response is, they are passed through the `parseResponse` function to create a [[CacheEntry]] list.
+ * The Data Provider response is then passed through the `parseResponse` function to create a [[CacheEntry]] list.
  * Finally, the items in that [[CacheEntry]] list are set in the Cache so the Adapter can fetch values from there.
  *
  * @typeParam T - all types related to the [[Transport]]

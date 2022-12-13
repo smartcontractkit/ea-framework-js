@@ -130,7 +130,7 @@ const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): void =>
   provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
-type BatchWarmingTypes = BaseEndpointTypes & {
+type HttpTypes = BaseEndpointTypes & {
   Provider: {
     RequestBody: {
       pairs: ProviderRequestBody[]
@@ -139,7 +139,7 @@ type BatchWarmingTypes = BaseEndpointTypes & {
   }
 }
 
-class MockBatchWarmingTransport extends HttpTransport<BatchWarmingTypes> {
+class MockHttpTransport extends HttpTransport<HttpTypes> {
   backgroundExecuteCalls = 0
 
   constructor(private callSuper = false) {
@@ -243,7 +243,7 @@ const transports: {
   [key: string]: Transport<BaseEndpointTypes>
 } = {
   WEBSOCKET: new MockWebSocketTransport(),
-  BATCH: new MockBatchWarmingTransport(),
+  BATCH: new MockHttpTransport(),
   SSE: new MockSseTransport(),
 }
 
@@ -333,7 +333,7 @@ test.serial('routing transport errors on invalid transport', async (t) => {
   t.is(error?.response?.status, 400)
 })
 
-test.serial('RoutingTransport can route to BatchWarmingTransport', async (t) => {
+test.serial('RoutingTransport can route to HttpTransport', async (t) => {
   const { adapter, from, to } = t.context
   const api = await expose(adapter)
 
@@ -371,7 +371,7 @@ test.serial('RoutingTransport can route to BatchWarmingTransport', async (t) => 
   const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
 
   t.is(error?.response?.status, 504)
-  const internalTransport = transports['BATCH'] as MockBatchWarmingTransport
+  const internalTransport = transports['BATCH'] as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 

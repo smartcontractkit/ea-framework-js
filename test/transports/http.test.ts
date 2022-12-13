@@ -70,7 +70,7 @@ type HttpTransportTypes = {
 
 const BACKGROUND_EXECUTE_MS_HTTP = 1000
 
-class MockBatchWarmingTransport extends HttpTransport<HttpTransportTypes> {
+class MockHttpTransport extends HttpTransport<HttpTransportTypes> {
   backgroundExecuteCalls = 0
 
   constructor(private callSuper = false) {
@@ -174,7 +174,7 @@ test.serial('sends request to DP and returns response', async (t) => {
       new AdapterEndpoint({
         name: 'test',
         inputParameters,
-        transport: new MockBatchWarmingTransport(true),
+        transport: new MockHttpTransport(true),
       }),
     ],
   })
@@ -229,7 +229,7 @@ test.serial(
   'per minute rate limit of 4 with one batch transport results in a call every 15s',
   async (t) => {
     const rateLimit1m = 4
-    const transport = new MockBatchWarmingTransport(true)
+    const transport = new MockHttpTransport(true)
 
     const adapter = new Adapter({
       name: 'TEST',
@@ -287,7 +287,7 @@ test.serial(
   'per second limit of 1 with one batch transport results in a call every 1000ms',
   async (t) => {
     const rateLimit1s = 1
-    const transport = new MockBatchWarmingTransport(true)
+    const transport = new MockHttpTransport(true)
 
     const adapter = new Adapter({
       name: 'TEST',
@@ -343,8 +343,8 @@ test.serial(
   'per second limit of 1 with two batch transports that make the same request results in a call every 1000ms for each, since the requests will coalesce',
   async (t) => {
     const rateLimit1s = 1
-    const transportA = new MockBatchWarmingTransport(true)
-    const transportB = new MockBatchWarmingTransport(true)
+    const transportA = new MockHttpTransport(true)
+    const transportB = new MockHttpTransport(true)
 
     const adapter = new Adapter({
       name: 'TEST',
@@ -411,8 +411,8 @@ test.serial(
   'per second limit of 1 with two batch transports results in a call every 2000ms for each',
   async (t) => {
     const rateLimit1s = 1
-    const transportA = new MockBatchWarmingTransport(true)
-    const transportB = new MockBatchWarmingTransport(true)
+    const transportA = new MockHttpTransport(true)
+    const transportB = new MockHttpTransport(true)
 
     nock(URL)
       .post(endpoint, {
@@ -520,7 +520,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
       new AdapterEndpoint({
         name: 'test',
         inputParameters,
-        transport: new MockBatchWarmingTransport(true),
+        transport: new MockHttpTransport(true),
       }),
     ],
   })
@@ -575,12 +575,12 @@ test.serial('requests from different transports are coalesced', async (t) => {
       new AdapterEndpoint({
         name: 'a',
         inputParameters,
-        transport: new MockBatchWarmingTransport(true),
+        transport: new MockHttpTransport(true),
       }),
       new AdapterEndpoint({
         name: 'b',
         inputParameters,
-        transport: new MockBatchWarmingTransport(true),
+        transport: new MockHttpTransport(true),
       }),
     ],
   })
@@ -652,7 +652,7 @@ test.serial('requests for the same transport are coalesced', async (t) => {
       new AdapterEndpoint({
         name: 'test',
         inputParameters,
-        transport: new MockBatchWarmingTransport(true),
+        transport: new MockHttpTransport(true),
       }),
     ],
   })
@@ -730,7 +730,7 @@ test.serial(
           new AdapterEndpoint({
             name: `${n}`,
             inputParameters,
-            transport: new MockBatchWarmingTransport(true),
+            transport: new MockHttpTransport(true),
           }),
       ),
 
