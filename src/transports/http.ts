@@ -50,11 +50,37 @@ type ProviderRequestConfig<T extends HttpTransportGenerics> = {
  * Config object that is provided to the BatchWarmingTransport constructor.
  */
 export interface HttpTransportConfig<T extends HttpTransportGenerics> {
+  /**
+   * This method should take the list of currently valid input parameters in the subscription set,
+   * and build however many requests to the data provider are necessary to fullfill all the information.
+   * Some constranints:
+   *   - Each request should be tied to at least one input parameter
+   *   - Input parameters should be tied to only one request. You can technically avoid this, but there will be no way
+   *     to consolidate many of them since the parseResponse method is called independently for each of them.
+   *
+   * @param params - the list of non-expired input parameters sent to this Adapter
+   * @param config - the config for this Adapter
+   * @returns one or multiple request configs
+   */
   prepareRequests: (
     params: T['Request']['Params'][],
     config: AdapterConfig<T['CustomSettings']>,
   ) => ProviderRequestConfig<T> | ProviderRequestConfig<T>[]
 
+  /**
+   * This method should take the incoming response from the data provider, and using that and the params, build a
+   * list of ProviderResults that will be stored in the response cache for this endpoint.
+   * Some notes:
+   *   - The results don't technically need to be related to the requested params; you could use the response
+   *     and store more items in the cache than what was requested from the EA (be mindful and do this conservatively if at all)
+   *   - If no useful information was received, you can return an empty list
+   *   - Alternatively, do make use of the fact that a ProviderResult is not necessarily a successful one, and you can store errors too
+   *
+   * @param params - the list of input parameters that should be fulfilled by this incoming provider response
+   * @param res - the response from the data provider
+   * @param config - the config for this Adapter
+   * @returns a list of ProviderResults
+   */
   parseResponse: (
     params: T['Request']['Params'][],
     res: AxiosResponse<T['Provider']['ResponseBody']>,

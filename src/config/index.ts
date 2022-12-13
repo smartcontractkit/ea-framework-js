@@ -283,11 +283,6 @@ export const BaseSettings = {
     description: 'CA certificate to use for authenticating client certificates',
     type: 'string',
   },
-  BODY_LIMIT_SIZE: {
-    description: 'Bytes size of body request',
-    type: 'number',
-    default: 1024 * 1024,
-  },
   MAX_HTTP_REQUEST_QUEUE_LENGTH: {
     description:
       'The maximum amount of queued requests for Http transports before new ones push oldest ones out of the queue',

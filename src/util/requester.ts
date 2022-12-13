@@ -104,6 +104,13 @@ export class Requester {
     this.queue = new UniqueLinkedList<QueuedRequest>(config.MAX_HTTP_REQUEST_QUEUE_LENGTH)
   }
 
+  /**
+   * Queues the provided request, and returns a promise that will resolve whenever it's executed.
+   *
+   * @param key - a key to uniquely identify this request, and coalesce new ones that match
+   * @param req - a request to send to a data provider
+   * @returns a promise that will resolve whenever the request is popped from the queue, sent, and a response is received
+   */
   async request<T>(key: string, req: AxiosRequestConfig): Promise<RequesterResult<T>> {
     // If there's already a queued request, reuse it's existing promise
     const existingQueuedRequest = this.map[key]
