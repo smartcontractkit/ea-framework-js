@@ -14,7 +14,7 @@ export interface LocalCacheEntry<T> {
   value: T
 }
 
-class LinkedListNode<T = unknown> {
+export class LinkedListNode<T = unknown> {
   data: T
   next: LinkedListNode | null
   prev: LinkedListNode | null
@@ -27,7 +27,7 @@ class LinkedListNode<T = unknown> {
   }
 }
 
-class DoubleLinkedList {
+export class DoubleLinkedList {
   head: LinkedListNode | null
   tail: LinkedListNode | null
   size: number

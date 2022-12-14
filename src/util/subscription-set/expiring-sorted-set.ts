@@ -1,5 +1,6 @@
 import { SubscriptionSet } from './subscription-set'
-
+import { DoubleLinkedList, LinkedListNode } from '../../cache'
+import { PromiseOrValue } from '..'
 /**
  * An object describing an entry in the expiring sorted set.
  * @typeParam T - the type of the entry's value
@@ -16,28 +17,80 @@ interface ExpiringSortedSetEntry<T> {
  * @typeParam T - the type of the set entries' values
  */
 export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
-  map = new Map<string, ExpiringSortedSetEntry<T>>()
+  capacity: number
+  map: Map<string, LinkedListNode<ExpiringSortedSetEntry<T>>>
+  list: DoubleLinkedList
 
-  add(key: string, value: T, ttl: number) {
-    this.map.set(key, {
-      value,
-      expirationTimestamp: Date.now() + ttl,
-    })
+  constructor(capacity: number) {
+    this.capacity = capacity
+    this.map = new Map<string, LinkedListNode<ExpiringSortedSetEntry<T>>>()
+    this.list = new DoubleLinkedList()
   }
 
-  getAll(): T[] {
-    const results: T[] = []
-    const now = Date.now()
+  add(key: string, value: T, ttl: number) {
+    if (this.map.has(key)) {
+      const node = this.map.get(key) as LinkedListNode<ExpiringSortedSetEntry<T>>
 
-    // Since we're iterating, might as well prune here
-    for (const [key, entry] of this.map.entries()) {
-      if (entry.expirationTimestamp < now) {
-        this.map.delete(key) // In theory, this shouldn't happen frequently for feeds
+      node.data = {
+        value,
+        expirationTimestamp: Date.now() + ttl,
+      }
+      this.moveToTail(node)
+    } else {
+      this.evictIfNeeded()
+      const data = {
+        value,
+        expirationTimestamp: Date.now() + ttl,
+      }
+      const node = new LinkedListNode(key, data)
+      this.list.insertAtTail(node)
+      this.map.set(key, node)
+    }
+  }
+
+  getAll(): PromiseOrValue<T[]> {
+    const results: T[] = []
+    for (const [key] of this.map.entries()) {
+      const value = this.get(key) as T
+      results.push(value)
+    }
+    return results
+  }
+
+  get(key: string): T | undefined {
+    if (this.map.has(key)) {
+      const node = this.map.get(key) as LinkedListNode<ExpiringSortedSetEntry<T>>
+      const expired = node.data.expirationTimestamp <= Date.now()
+      if (expired) {
+        this.delete(key)
+        return undefined
       } else {
-        results.push(entry.value)
+        return node.data.value
+      }
+    } else {
+      return undefined
+    }
+  }
+
+  delete(key: string): void {
+    if (this.map.has(key)) {
+      const node = this.map.get(key) as LinkedListNode<ExpiringSortedSetEntry<T>>
+      this.list.remove(node)
+      this.map.delete(key)
+    }
+  }
+
+  private moveToTail(node: LinkedListNode) {
+    this.list.remove(node)
+    this.list.insertAtTail(node)
+  }
+
+  private evictIfNeeded() {
+    if (this.list.size >= this.capacity) {
+      const node = this.list.removeHead()
+      if (node) {
+        this.map.delete(node.key)
       }
     }
-
-    return results
   }
 }
