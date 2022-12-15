@@ -1,4 +1,4 @@
-import { makeLogger } from '../util'
+import { DoubleLinkedList, LinkedListNode, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
 import { CacheTypes } from './metrics'
 
@@ -12,74 +12,6 @@ const logger = makeLogger('LocalCache')
 export interface LocalCacheEntry<T> {
   expirationTimestamp: number
   value: T
-}
-
-export class LinkedListNode<T = unknown> {
-  data: T
-  next: LinkedListNode | null
-  prev: LinkedListNode | null
-  key: string
-  constructor(key: string, data: T) {
-    this.data = data
-    this.next = null
-    this.prev = null
-    this.key = key
-  }
-}
-
-export class DoubleLinkedList {
-  head: LinkedListNode | null
-  tail: LinkedListNode | null
-  size: number
-  constructor() {
-    this.head = null
-    this.tail = null
-    this.size = 0
-  }
-
-  insertAtTail(node: LinkedListNode) {
-    if (!this.tail) {
-      this.tail = node
-      this.head = node
-      node.next = null
-    } else {
-      this.tail.next = node
-      node.prev = this.tail
-      this.tail = node
-      node.next = null
-    }
-
-    this.size++
-    return node
-  }
-
-  remove(node: LinkedListNode | null): LinkedListNode | undefined {
-    if (!node) {
-      return
-    }
-
-    if (node.prev !== null) {
-      node.prev.next = node.next
-    }
-
-    if (node.next !== null) {
-      node.next.prev = node.prev
-    }
-
-    if (node === this.head) {
-      this.head = this.head.next
-    }
-
-    if (node === this.tail) {
-      this.tail = this.tail.prev
-    }
-    this.size--
-    return node
-  }
-
-  removeHead(): LinkedListNode | undefined {
-    return this.remove(this.head)
-  }
 }
 
 /**

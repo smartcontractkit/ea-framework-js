@@ -1,6 +1,8 @@
 import { SubscriptionSet } from './subscription-set'
-import { DoubleLinkedList, LinkedListNode } from '../../cache'
-import { PromiseOrValue } from '..'
+import { DoubleLinkedList, LinkedListNode, makeLogger, PromiseOrValue } from '..'
+
+const logger = makeLogger('ExpiringSortedSet')
+
 /**
  * An object describing an entry in the expiring sorted set.
  * @typeParam T - the type of the entry's value
@@ -52,7 +54,9 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
     const results: T[] = []
     for (const [key] of this.map.entries()) {
       const value = this.get(key) as T
-      results.push(value)
+      if (value) {
+        results.push(value)
+      }
     }
     return results
   }
@@ -87,6 +91,7 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
 
   private evictIfNeeded() {
     if (this.list.size >= this.capacity) {
+      logger.warn(`List reached maximum capacity, evicting least recently updated entry`)
       const node = this.list.removeHead()
       if (node) {
         this.map.delete(node.key)

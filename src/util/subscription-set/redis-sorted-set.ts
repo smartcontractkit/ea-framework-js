@@ -8,12 +8,10 @@ export class RedisSubscriptionSet<T> implements SubscriptionSet<T> {
   private redisClient: Redis
   // Key for Redis sorted set containing all subscriptions
   private subscriptionSetKey: string
-  capacity: number
 
-  constructor(redisClient: Redis, subscriptionSetKey: string, capacity: number) {
+  constructor(redisClient: Redis, subscriptionSetKey: string) {
     this.redisClient = redisClient
     this.subscriptionSetKey = subscriptionSetKey
-    this.capacity = capacity
   }
 
   async add(key: string, value: T, ttl: number): Promise<undefined> {
@@ -34,7 +32,7 @@ export class RedisSubscriptionSet<T> implements SubscriptionSet<T> {
     return parsedRequests
   }
 
-  get(key: string): T | undefined {
+  get(): T | undefined {
     return undefined
   }
 }

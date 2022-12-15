@@ -96,9 +96,9 @@ export const BaseSettings = {
     default: 'local',
     options: ['local', 'redis'],
   },
-  CACHE_MAX_SUBSCRIPTIONS: {
+  SUBSCRIPTION_SET_MAX_ITEMS: {
     type: 'number',
-    description: 'The maximum number of subscriptions in the cache',
+    description: 'The maximum number of subscriptions set',
     default: 10000,
     validate: validator.integer({ min: 1000, max: 10000 }),
   },

@@ -36,10 +36,10 @@ test('subscription set factory (redis cache missing client)', async (t) => {
 
 test('subscription set factory (local cache) max capacity', async (t) => {
   process.env['CACHE_TYPE'] = 'local'
-  process.env['CACHE_MAX_SUBSCRIPTIONS'] = '3'
+  process.env['SUBSCRIPTION_SET_MAX_ITEMS'] = '3'
   const config = buildAdapterConfig({})
   const factory = new SubscriptionSetFactory(config, 'test')
-  const subscriptionSet = factory.buildSet('hola')
+  const subscriptionSet = factory.buildSet('test')
 
   await subscriptionSet.add('1', 1, 10000)
   await subscriptionSet.add('2', 2, 10000)
