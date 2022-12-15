@@ -196,6 +196,10 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     adapterConfig: AdapterConfig<T['CustomSettings']>,
   ): Promise<TimestampedProviderResult<T>[]> {
     try {
+      // The key generated here that we pass to the requester is potentially very long, but we're not considering it an issue given that:
+      //   - the requester will store values in memory, so we're not sending the string anywhere
+      //   - there's no problems using very large strings as object keys
+      //   - there should be a limit on the amount of subscriptions in the set
       const requesterResult = await this.requester.request<T['Provider']['ResponseBody']>(
         requestConfig.params.map((p) => JSON.stringify(p)).join('|'),
         requestConfig.request,

@@ -132,39 +132,23 @@ const httpTransport = new HttpTransport<EndpointTypes>({
           from: params.map((req) => req.base).join(','),
           to: params.map((req) => req.quote).join(','),
         },
-      }
+      },
     }
   },
   parseResponse: (params, res) => {
     // The `params` param contains an array of the request made to the EA.
     // The `res` param contains the response from the DP.
     // Using this, return an array of each combination request-response combination:
-    return [
-      {
-        params: { base: "ETH", quote: "USD" }
-        response: {
-          result: data.price,
-          data: {
-            result: data.price
-          },
-          timestamps: {
-            providerIndicatedTime: data.timestamp
-          }
-        }
+    return params.map((req) => ({
+      params: req,
+      response: {
+        data: res.data,
+        result: res.data.price,
+        timestamps: {
+          providerIndicatedTime: res.data.ts,
+        },
       },
-      {
-        params: { base: "BTC", quote: "USD" }
-        response: {
-          result: data.price,
-          data: {
-            result: data.price
-          },
-          timestamps: {
-            providerIndicatedTime: data.timestamp
-          }
-        }
-      }
-    ]
+    }))
   },
 })
 ```
