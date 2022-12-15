@@ -229,6 +229,9 @@ export class Requester {
         },
       })
 
+      // Remove the request from our map
+      delete this.map[key]
+
       // Record count of successful data provider requests
       metrics.dataProviderRequests
         .labels(metrics.dataProviderMetricsLabel(response.status, config.method))
@@ -262,6 +265,9 @@ export class Requester {
             },
           ),
         )
+
+        // Remove the request from our map
+        delete this.map[key]
       } else {
         const timeToSleep = (2 ** retries + Math.random()) * 1000
         logger.trace(`Request failed, sleeping for ${timeToSleep}ms...`)
@@ -272,8 +278,6 @@ export class Requester {
         this.queue.add(req)
       }
     } finally {
-      // Remove the request from our map
-      delete this.map[key]
       // Record time taken for data provider request for success or failure
       responseTimer()
     }
