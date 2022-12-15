@@ -2,13 +2,10 @@ import type EventSource from 'eventsource'
 import Redis from 'ioredis'
 import { Cache } from '../cache'
 import { AdapterConfig, BaseAdapterConfig, SettingsMap } from '../config'
-import {
-  AdapterRateLimitTier,
-  BackgroundExecuteRateLimiter,
-  RequestRateLimiter,
-} from '../rate-limiting'
+import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
 import { AdapterRequest, RequestGenerics, SubscriptionSetFactory } from '../util'
+import { Requester } from '../util/requester'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { Adapter } from './basic'
@@ -27,10 +24,7 @@ export interface AdapterDependencies {
   cache: Cache
 
   /** Shared instance of the request rate limiter */
-  requestRateLimiter: RequestRateLimiter
-
-  /** Shared instance of the background execute rate limiter */
-  backgroundExecuteRateLimiter: BackgroundExecuteRateLimiter
+  rateLimiter: RateLimiter
 
   /** Factory to create subscription sets based on the specified cache type */
   subscriptionSetFactory: SubscriptionSetFactory
@@ -40,6 +34,9 @@ export interface AdapterDependencies {
 
   /** EventSource to use for listening to server sent events.  A mock EventSource can be provided as a dependency for testing */
   eventSource: typeof EventSource
+
+  /** Shared instance to handle sending http requests in a centralized fashion */
+  requester: Requester
 }
 
 /**

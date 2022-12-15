@@ -1,13 +1,13 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { AxiosError, AxiosResponse } from 'axios'
 import Redis, { ScanStream } from 'ioredis'
 import nock from 'nock'
 import { AddressInfo } from 'ws'
 import { expose } from '../../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { BatchWarmingTransport } from '../../src/transports'
+import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
 
@@ -83,14 +83,17 @@ type BatchEndpointTypes = {
 }
 
 const buildAdapter = () => {
-  const batchTransport = new BatchWarmingTransport<BatchEndpointTypes>({
-    prepareRequest: (params: AdapterRequestParams[]): AxiosRequestConfig<ProviderRequestBody> => {
+  const batchTransport = new HttpTransport<BatchEndpointTypes>({
+    prepareRequests: (params) => {
       return {
-        baseURL: URL,
-        url: '/price',
-        method: 'POST',
-        data: {
-          pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+        params,
+        request: {
+          baseURL: URL,
+          url: '/price',
+          method: 'POST',
+          data: {
+            pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+          },
         },
       }
     },
@@ -169,7 +172,18 @@ test.before(async (t) => {
   process.env['API_TIMEOUT'] = '0'
   process.env['RATE_LIMIT_CAPACITY_SECOND'] = '1'
   process.env['CACHE_MAX_AGE'] = '2000'
+  process.env['BACKGROUND_EXECUTE_MS_HTTP'] = '1000'
+})
 
+test.beforeEach((t) => {
+  t.context.clock = FakeTimers.install()
+})
+
+test.afterEach((t) => {
+  t.context.clock.uninstall()
+})
+
+test.serial('Test redis subscription set (add and getAll)', async (t) => {
   const adapter = buildAdapter()
 
   const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
@@ -184,17 +198,7 @@ test.before(async (t) => {
   }
   t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
   t.context.cache = mockCache
-})
 
-test.beforeEach((t) => {
-  t.context.clock = FakeTimers.install()
-})
-
-test.afterEach((t) => {
-  t.context.clock.uninstall()
-})
-
-test.serial('Test redis subscription set (add and getAll)', async (t) => {
   const makeRequest = () =>
     axios.post(t.context.serverAddress, {
       data: {
@@ -214,12 +218,10 @@ test.serial('Test redis subscription set (add and getAll)', async (t) => {
   t.is(error?.response?.status, 504)
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  const cacheValueSetPromise = t.context.cache.waitForNextSet()
-  await cacheValueSetPromise
+  await runAllUntilTime(t.context.clock, 5000)
 
   // Second request should find the response in the cache
   const response = await makeRequest()
-
   t.is(response.status, 200)
   assertEqualResponses(t, response.data, {
     data: {
@@ -230,7 +232,7 @@ test.serial('Test redis subscription set (add and getAll)', async (t) => {
   })
 
   // Wait until the cache expires, and the subscription is out
-  await runAllUntilTime(t.context.clock, 10000)
+  await runAllUntilTime(t.context.clock, 20000)
 
   // Now that the cache is out and the subscription no longer there, this should time out
   const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)

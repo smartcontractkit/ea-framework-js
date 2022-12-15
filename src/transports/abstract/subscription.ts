@@ -1,9 +1,8 @@
 import { EndpointContext } from '../../adapter'
 import { ResponseCache } from '../../cache/response'
 import { AdapterConfig } from '../../config'
-import { BackgroundExecuteRateLimiter } from '../../rate-limiting'
 import { makeLogger, SubscriptionSet } from '../../util'
-import { AdapterRequest } from '../../util/request'
+import { AdapterRequest } from '../../util/types'
 import { Transport, TransportDependencies, TransportGenerics } from '..'
 import * as transportMetrics from '../metrics'
 
@@ -20,7 +19,6 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     Request: T['Request']
     Response: T['Response']
   }>
-  rateLimiter!: BackgroundExecuteRateLimiter
   subscriptionSet!: SubscriptionSet<T['Request']['Params']>
   subscriptionTtl!: number
 
@@ -30,7 +28,6 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     endpointName: string,
   ): Promise<void> {
     this.responseCache = dependencies.responseCache
-    this.rateLimiter = dependencies.backgroundExecuteRateLimiter
     this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName)
     this.subscriptionTtl = this.getSubscriptionTtlFromConfig(config) // Will be implemented by subclasses
   }

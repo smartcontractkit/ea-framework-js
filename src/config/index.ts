@@ -24,11 +24,6 @@ export const BaseSettings = {
     type: 'string',
     default: '/',
   },
-  BATCH_TRANSPORT_SETUP_VALIDATION: {
-    description: 'Flag to toggle batch transport setup validation',
-    type: 'boolean',
-    default: false,
-  },
   CACHE_MAX_AGE: {
     description: 'Maximum amount of time (in ms) that a response will stay cached',
     type: 'number',
@@ -178,34 +173,6 @@ export const BaseSettings = {
     type: 'number',
     validate: validator.integer({ min: 0 }),
   },
-  REQUEST_COALESCING_ENABLED: {
-    description: 'Enable request coalescing',
-    type: 'boolean',
-    default: false,
-  },
-  REQUEST_COALESCING_ENTROPY_MAX: {
-    description:
-      'Amount of random delay (entropy) in milliseconds that will be added to requests. Avoids issue where the request coalescing key will not be set before multiple other instances in a burst try to access the same key',
-    type: 'number',
-    default: 0,
-    validate: validator.integer({ min: 0, max: 10 }),
-  },
-  // REQUEST_COALESCING_INTERVAL: {
-  //   type: 'number',
-  //   default: 100,
-  // },
-  // REQUEST_COALESCING_INTERVAL_COEFFICIENT: {
-  //   type: 'number',
-  //   default: 2,
-  // },
-  // REQUEST_COALESCING_INTERVAL_MAX: {
-  //   type: 'number',
-  //   default: 1000,
-  // },
-  // REQUEST_COALESCING_MAX_RETRIES: {
-  //   type: 'number',
-  //   default: 5,
-  // },
   RETRY: {
     type: 'number',
     description: 'Retry count for failed HTTP requests',
@@ -231,10 +198,6 @@ export const BaseSettings = {
     default: 300000,
     validate: validator.integer({ min: 0, max: 3600000 }),
   },
-  // WARMUP_UNHEALTHY_THRESHOLD: {
-  //   type: 'number',
-  //   default: 3,
-  // },
   WS_SUBSCRIPTION_TTL: {
     description: 'The time in ms a request will live in the subscription set before becoming stale',
     type: 'number',
@@ -246,7 +209,7 @@ export const BaseSettings = {
       'The maximum acceptable time (in milliseconds) since the last message received on a WebSocket connection before it is considered unresponsive, causing the adapter to close and attempt to reopen it.',
     type: 'number',
     default: 120000,
-    validate: validator.integer({ min: 1000, max: 120000 }),
+    validate: validator.integer({ min: 1000, max: 180000 }),
   },
   // WS_TIME_UNTIL_HANDLE_NEXT_MESSAGE_OVERRIDE: {
   //   description: 'Time to wait until adapter should handle next WS message',
@@ -294,20 +257,6 @@ export const BaseSettings = {
     default: 300,
     validate: validator.integer({ min: 150, max: 500 }),
   },
-  REST_TRANSPORT_MAX_RATE_LIMIT_RETRIES: {
-    description:
-      'Maximum amount of times the Rest Transport will attempt to set up a request when blocked by the rate limiter',
-    type: 'number',
-    default: 3,
-    validate: validator.integer({ min: 1, max: 5 }),
-  },
-  REST_TRANSPORT_MS_BETWEEN_RATE_LIMIT_RETRIES: {
-    description:
-      'Time that the Rest Transport will wait between retries when blocked by the rate limiter',
-    type: 'number',
-    default: 400,
-    validate: validator.integer({ min: 200, max: 3000 }),
-  },
   SMOKE_TEST_PAYLOAD_FILE_NAME: {
     description: 'Name of the test payload file used for the smoke endpoint',
     type: 'string',
@@ -333,6 +282,32 @@ export const BaseSettings = {
   TLS_CA: {
     description: 'CA certificate to use for authenticating client certificates',
     type: 'string',
+  },
+  MAX_HTTP_REQUEST_QUEUE_LENGTH: {
+    description:
+      'The maximum amount of queued requests for Http transports before new ones push oldest ones out of the queue',
+    type: 'number',
+    default: 200,
+    validate: validator.integer({ min: 1, max: 2000 }),
+  },
+  BACKGROUND_EXECUTE_MS_SSE: {
+    description: "Time in milliseconds to sleep between SSE transports' background execute calls",
+    type: 'number',
+    default: 1000,
+    validate: validator.integer({ min: 1, max: 10000 }),
+  },
+  BACKGROUND_EXECUTE_MS_WS: {
+    description: "Time in milliseconds to sleep between WS transports' background execute calls",
+    type: 'number',
+    default: 1000,
+    validate: validator.integer({ min: 1, max: 10000 }),
+  },
+  BACKGROUND_EXECUTE_MS_HTTP: {
+    description:
+      "Time in milliseconds to sleep between HTTP transports' background execute calls, when there are no requests to send",
+    type: 'number',
+    default: 1000,
+    validate: validator.integer({ min: 1, max: 10000 }),
   },
 } as const satisfies SettingsMap
 

@@ -12,23 +12,15 @@ Checklist when moving an EA from v2 to v3:
 
 Each endpoint you port over will have its own Transport. Transports are what the EA uses to connect to the DP (you can read more about how they work [here](../basics.md#ea-v3-design)). In v2, it
 was commonly Endpoints that connected to the DP, however in v3 this has been pushed one level down with the Endpoint
-only being responsible to route to the transport. An EA that supports both WS and HTTP will have both a
-**RestTransport**/**BatchWarmingTransport** and a **WebSocketTransport**.
+only being responsible to route to the transport. An EA that supports both WS and HTTP will have both an
+**HttpTransport** and a **WebSocketTransport**.
 
 **Select the right Transport to use:**
 
 - **WebSocketTransport**
   Use for WS connections to the DP
-- **BatchWarmingTransport**
-  Use this transport when the DP endpoint allows multiple EA requests to be served in a single HTTP request to the DP.
-  Example: a price API that allows you to query: `/price?from=ETH,BTC,LINK&to=USD`
-- **RestTransport**
-  Use this transport when the endpoint only allows a single EA request to be served for each HTTP request to the DP.
-  Example: a price API with the query: `/price/ETH/USD`
-  > **Warning**
-  > The RestTransport in its current form will be deprecated. If the DP supports batching, use the
-  > BatchWarmingTransport instead. You can proceed with the RestTransport if the EA is expected to have very low
-  > throughput (i.e. one request a day/hour). If not, **you should not migrate the EA to v3 at this time**.
+- **HttpTransport**
+  Use for sending HTTP requests to the DP
 
 If a single endpoint supports multiple transports, these transports should be wrapped in a **RoutingTransport**. An
 example implementation:
@@ -36,7 +28,7 @@ example implementation:
 ```typescript
 export const routingTransport = new RoutingTransport<CryptoEndpointTypes>(
   {
-    HTTP: restTransport,
+    HTTP: httpTransport,
     WS: wsTransport,
   },
   (req) => {
@@ -60,10 +52,10 @@ adapter
 │  │  └─ RoutingTransport // A single routing transport that wraps multiple
 │  │     │                // underlying transports to ensure types and
 │  │     │                // input params stay consistent.
-│  │     ├─ BatchWarmingTransport
+│  │     ├─ HttpTransport
 │  │     └─ WebSocketTransport
 │  └─ volume // Input: {"endpoint": "volume"}
-│     └─ RestTransport
+│     └─ HttpTransport
 └─ index // References endpoints, rate limit tiers, custom settings, etc.
 ```
 
@@ -81,36 +73,39 @@ export type EndpointTypes = {
   Provider: {
     ... // Provider specific details, these differ and are defined by each Transport implementation
   }
-  }
 }
 ```
 
 These types will also be shared with the Endpoint that’s referencing this transport.
 
-## Building a REST/Batch transport
+## Building an HTTP Transport
 
-Building a REST mainly consists of defining types (above), and defining how to build the request and parse the response
-to and from the DP.
+Building an HTTP transport mainly consists of defining types (above), and defining how to build the request and parse the response
+to and from the DP. An example that sends request to a non-batch endpoint:
 
 ```typescript
-const restTransport = new RestTransport<EndpointTypes>({
-  prepareRequest: (req, config) => {
-    // The `req` param contains the request made to the EA.
+const httpTransport = new HttpTransport<EndpointTypes>({
+  prepareRequests: (params, config) => {
+    // The `params` param contains all the requests made to the EA that need data fetched from the DP.
     // Using this, return the request config to the DP.
-    return {
-      baseURL: config.API_ENDPOINT || DEFAULT_API_ENDPOINT,
-      url: '/price',
-      method: 'GET',
-      params: {
-        from: req.base,
-        to: req.quote,
-      },
-    }
+    return params.map(req => ({
+      params: req,
+      request: {
+        baseURL: config.API_ENDPOINT, // Default endpoint defined in configs
+        url: '/price',
+        method: 'GET',
+        params: {
+          from: req.base,
+          to: req.quote,
+        },
+      }
+    })
   },
-  parseResponse: (req, res) => {
-    // The `req` param contains the request made to the EA.
+  parseResponse: (params, res) => {
+    // The `params` param contains the requests made to the EA that correspond to this DP response.
     // The `res` param contains the response from the DP.
     // Using this, parse the resulting value we want to return.
+    const req = params[0] // Since this endpoint only covers one pair at a time
     return {
       data: res,
       // Assuming res = { [base]: { [quote]: { price: number } } }
@@ -120,45 +115,63 @@ const restTransport = new RestTransport<EndpointTypes>({
 })
 ```
 
-A batch warming transport is not much different. Instead of receiving a single `req` in `prepareRequest()` and
-`parseResponse()`, you now receive an array of requests in `params`:
+An example to a batch endpoint is not much different:
 
 ```typescript
-const batchTransport = new BatchWarmingTransport<EndpointTypes>({
+const httpTransport = new HttpTransport<EndpointTypes>({
   prepareRequest: (params, config) => {
     // The `params` param contains an array of the request made to the EA.
     // Using this, return the request config to the DP.
     return {
-      baseURL: config.API_ENDPOINT || DEFAULT_API_ENDPOINT,
-      url: '/price',
-      method: 'GET',
-      params: {
-        from: params.map((req) => req.base).join(','),
-        to: params.map((req) => req.quote).join(','),
-      },
+      params,
+      request: {
+        baseURL: config.API_ENDPOINT, // Default endpoint defined in configs
+        url: '/price',
+        method: 'GET',
+        params: {
+          from: params.map((req) => req.base).join(','),
+          to: params.map((req) => req.quote).join(','),
+        },
+      }
     }
   },
   parseResponse: (params, res) => {
     // The `params` param contains an array of the request made to the EA.
     // The `res` param contains the response from the DP.
     // Using this, return an array of each combination request-response combination:
-    // return [
-    //   {
-    //     params: { base: "ETH", quote: "USD" }
-    //     value: 123.45
-    //   },
-    //   {
-    //     params: { base: "BTC", quote: "USD" }
-    //     value: 123.45
-    //   }
-    // ]
+    return [
+      {
+        params: { base: "ETH", quote: "USD" }
+        response: {
+          result: data.price,
+          data: {
+            result: data.price
+          },
+          timestamps: {
+            providerIndicatedTime: data.timestamp
+          }
+        }
+      },
+      {
+        params: { base: "BTC", quote: "USD" }
+        response: {
+          result: data.price,
+          data: {
+            result: data.price
+          },
+          timestamps: {
+            providerIndicatedTime: data.timestamp
+          }
+        }
+      }
+    ]
   },
 })
 ```
 
 ## Building a WebSocket Transport
 
-A WebSocket transport is a bit different from REST/Batch transports, but also boils down to two things: forming a
+A WebSocket transport is a bit different from the HttpTransport, but also boils down to two things: forming a
 request to the DP and parsing messages to results to be stored in cache.
 
 ```typescript

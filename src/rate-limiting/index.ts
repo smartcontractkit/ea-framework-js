@@ -1,8 +1,7 @@
 import { AdapterEndpoint, EndpointGenerics } from '../adapter'
 import { AdapterConfig } from '../config'
 
-export * from './background/fixed-frequency'
-export * from './request/simple-counting'
+export * from './simple-counting'
 
 export interface AdapterRateLimitTier {
   rateLimit1s?: number
@@ -25,25 +24,12 @@ export interface RateLimiter {
     endpoints: AdapterEndpoint<T>[],
     limits: AdapterRateLimitTier,
   ): this
-}
 
-/**
- * RequestRateLimiters perform checks agains imminent outbound requests for any transport.
- */
-export interface RequestRateLimiter extends RateLimiter {
   /**
    * This method will check using whatever strategy is implemented to determine if
    * this request can be processed. If so, it returns true; if not, returns false.
    */
-  isUnderLimits(): boolean
-}
-
-/**
- * BackgroundExecuteFrequencyRateLimiters will implement custom logic to calculate
- * the period of time to wait between background executions for a transport.
- */
-export interface BackgroundExecuteRateLimiter extends RateLimiter {
-  msUntilNextExecution(endpointName: string): number
+  msUntilNextExecution(): number
 }
 
 /**
