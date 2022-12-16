@@ -22,7 +22,7 @@ export class RoutingTransport<T extends TransportGenerics>
     // Route should return to a string key that corresponds to a transport in the transports object
     private route: (
       req: AdapterRequest<T['Request']>,
-      adapterConfig?: AdapterConfig<T['CustomSettings']>,
+      adapterConfig: AdapterConfig<T['CustomSettings']>,
     ) => string,
   ) {}
   responseCache!: ResponseCache<{
@@ -61,10 +61,10 @@ export class RoutingTransport<T extends TransportGenerics>
 
   private resolveTransport(
     req: AdapterRequest<T['Request']>,
-    adapterConfig?: AdapterConfig<T['CustomSettings']>,
+    adapterConfig: AdapterConfig<T['CustomSettings']>,
   ): Transport<T> {
     logger.debug(`routing request using `, req.requestContext.data)
-    const key = this.route(req, adapterConfig || undefined)
+    const key = this.route(req, adapterConfig)
     if (!this.transports[key]) {
       logger.error(`No transport found for key ${key}`)
       throw new AdapterError({ statusCode: 400, message: `No transport found for ${key}` })
