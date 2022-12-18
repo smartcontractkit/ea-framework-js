@@ -2,7 +2,7 @@ import Ajv from 'ajv'
 import fs from 'fs'
 import path from 'path'
 import { makeLogger } from './logger'
-import { AdapterRequestData } from './request'
+import { AdapterRequestData } from './types'
 
 const logger = makeLogger('TestPayloadLoader')
 

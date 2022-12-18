@@ -2,12 +2,8 @@ import axios, { AxiosRequestConfig } from 'axios'
 import EventSource from 'eventsource'
 import { EndpointContext } from '../adapter'
 import { AdapterConfig } from '../config'
-import { makeLogger } from '../util'
-import {
-  PartialSuccessfulResponse,
-  ProviderResult,
-  TimestampedProviderResult,
-} from '../util/request'
+import { makeLogger, sleep } from '../util'
+import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportDependencies, TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
 
@@ -20,7 +16,7 @@ export interface SSEConfig {
 
 /**
  * Helper struct type that will be used to pass types to the generic parameters of a Transport.
- * Extends the common TransportGenerics, adding Provider specific types for this Batch endpoint.
+ * Extends the common TransportGenerics, adding Provider specific types for this SSE endpoint.
  */
 type SSETransportGenerics = TransportGenerics & {
   /**
@@ -39,7 +35,7 @@ type SSETransportGenerics = TransportGenerics & {
  *
  * @typeParam T - Helper struct type that will be used to pass types to the generic parameters (check [[SSETransportGenerics]])
  */
-export class SSETransport<T extends SSETransportGenerics> extends StreamingTransport<T> {
+export class SseTransport<T extends SSETransportGenerics> extends StreamingTransport<T> {
   EventSource: typeof EventSource = EventSource
   eventListeners!: {
     type: string
@@ -155,6 +151,12 @@ export class SSETransport<T extends SSETransportGenerics> extends StreamingTrans
       const prepareKeepAliveRequest = this.config.prepareKeepAliveRequest(context)
       makeRequest(prepareKeepAliveRequest)
     }
+
+    // The background execute loop no longer sleeps between executions, so we have to do it here
+    logger.trace(
+      `SSE handler complete, sleeping for ${context.adapterConfig.BACKGROUND_EXECUTE_MS_WS}ms...`,
+    )
+    await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_SSE)
 
     return
   }

@@ -3,10 +3,10 @@ import { Adapter } from '../adapter'
 import { calculateCacheKey, recordRedisCommandMetric } from '../cache'
 import { getMetricsMeta } from '../metrics/util'
 import { makeLogger } from '../util'
-import { AdapterMiddlewareBuilder, AdapterRequest, AdapterRequestBody } from '../util/request'
+import { AdapterMiddlewareBuilder, AdapterRequest, AdapterRequestBody } from '../util/types'
 import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
 import { CMD_SENT_STATUS } from '../cache/metrics'
-import { ReplyError } from 'ioredis'
+import { ReplyError as RedisError } from 'ioredis'
 export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
@@ -134,10 +134,10 @@ export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: Fa
     // Only use "correct" job specs and therefore not hit adapters with invalid requests.
     errorCatcherLogger.warn(errorWithContext)
     res.status(err.statusCode).send(err.toJSONResponse())
-  } else if (err instanceof ReplyError) {
+  } else if (err instanceof RedisError) {
     // Native ioredis error
     errorCatcherLogger.warn(errorWithContext)
-    const replyError = err as typeof ReplyError
+    const replyError = err as typeof RedisError
     if (process.env['METRICS_ENABLED']) {
       recordRedisCommandMetric(CMD_SENT_STATUS.FAIL, replyError.command?.name)
     }

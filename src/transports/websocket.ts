@@ -1,12 +1,8 @@
 import WebSocket, { ClientOptions, RawData } from 'ws'
 import { EndpointContext } from '../adapter'
 import { AdapterConfig } from '../config'
-import { makeLogger } from '../util'
-import {
-  PartialSuccessfulResponse,
-  ProviderResult,
-  TimestampedProviderResult,
-} from '../util/request'
+import { makeLogger, sleep } from '../util'
+import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportGenerics } from './'
 import * as transportMetrics from './metrics'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
@@ -93,7 +89,7 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
 
 /**
  * Helper struct type that will be used to pass types to the generic parameters of a Transport.
- * Extends the common TransportGenerics, adding Provider specific types for this Batch endpoint.
+ * Extends the common TransportGenerics, adding Provider specific types for this WS endpoint.
  */
 type WebsocketTransportGenerics = TransportGenerics & {
   /**
@@ -318,6 +314,12 @@ export class WebSocketTransport<
 
     // Record WS message and subscription metrics
     transportMetrics.recordWsMessageMetrics(context, subscriptions.new, subscriptions.stale)
+
+    // The background execute loop no longer sleeps between executions, so we have to do it here
+    logger.trace(
+      `Websocket handler complete, sleeping for ${context.adapterConfig.BACKGROUND_EXECUTE_MS_WS}ms...`,
+    )
+    await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_WS)
 
     return
   }

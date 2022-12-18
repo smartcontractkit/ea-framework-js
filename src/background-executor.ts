@@ -1,4 +1,4 @@
-import { Adapter, EndpointContext, AdapterEndpoint, EndpointGenerics } from './adapter'
+import { Adapter, AdapterEndpoint, EndpointContext, EndpointGenerics } from './adapter'
 import * as metrics from './metrics'
 import { MetaTransport, Transport, TransportGenerics } from './transports'
 import { makeLogger } from './util'
@@ -16,8 +16,6 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
   // Set up variable to check later on to see if we need to stop this background "thread"
   // If no server is provided, the listener won't be set and serverClosed will always be false
   let serverClosed = false
-
-  const rateLimiter = adapter.dependencies.backgroundExecuteRateLimiter
 
   const timeoutsMap: {
     [endpointName: string]: NodeJS.Timeout
@@ -69,13 +67,14 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       } catch (error) {
         logger.error(error)
       }
-      const timeToWait = rateLimiter.msUntilNextExecution(endpoint.name)
-      logger.debug(
-        `Finished background execute for endpoint "${endpoint.name}", sleeping for ${timeToWait}ms`,
-      )
 
+      // This background execute loop is no longer the one to determine the sleep between bg execute calls.
+      // That is now instead responsibility of each transport, to allow for custom ones to implement their own timings.
+      logger.trace(
+        `Finished background execute for endpoint "${endpoint.name}", calling it again in 1ms...`,
+      )
       metricsTimer()
-      timeoutsMap[endpoint.name] = setTimeout(handler, timeToWait)
+      timeoutsMap[endpoint.name] = setTimeout(handler, 1)
     }
 
     // Start recursive async calls

@@ -5,7 +5,7 @@ import { AddressInfo } from 'net'
 import nock from 'nock'
 import { expose } from '../../src'
 import { MockCache, runAllUntilTime } from '../util'
-import { buildBatchAdapter, parsePromMetrics } from './helper'
+import { buildHttpAdapter, parsePromMetrics } from './helper'
 
 const test = untypedTest as TestFn<{
   serverAddress: string
@@ -33,7 +33,7 @@ test.before(async (t) => {
   process.env['RATE_LIMIT_CAPACITY_SECOND'] = '1'
   process.env['CACHE_MAX_AGE'] = '2000'
 
-  const adapter = buildBatchAdapter()
+  const adapter = buildHttpAdapter()
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
@@ -112,7 +112,7 @@ test.serial('Test cache warmer active metric', async (t) => {
   expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 2)
 
-  expectedLabel = `{endpoint="test",transport_type="MockBatchWarmingTransport",app_name="TEST",app_version="${version}"}`
+  expectedLabel = `{endpoint="test",transport_type="MockHttpTransport",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`bg_execute_subscription_set_count${expectedLabel}`), 1)
 
   expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
@@ -125,7 +125,7 @@ test.serial('Test cache warmer active metric', async (t) => {
   }
 
   // Wait until the cache expires, and the subscription is out
-  await runAllUntilTime(clock, 10000) // The provider response is slower
+  await runAllUntilTime(clock, 15000) // The provider response is slower
 
   // Now that the cache is out and the subscription no longer there, this should time out
   const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)
@@ -138,8 +138,8 @@ test.serial('Test cache warmer active metric', async (t) => {
   t.is(metricsMap.get(`cache_warmer_get_count${expectedLabel}`), 0)
 
   expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 12)
+  t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 18)
 
-  expectedLabel = `{endpoint="test",transport_type="MockBatchWarmingTransport",app_name="TEST",app_version="${version}"}`
+  expectedLabel = `{endpoint="test",transport_type="MockHttpTransport",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`bg_execute_subscription_set_count${expectedLabel}`), 0)
 })

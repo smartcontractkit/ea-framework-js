@@ -152,11 +152,9 @@ test('uses most restrictive tier if none is specified in settings', async (t) =>
         inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
-            t.true(dependencies.requestRateLimiter instanceof SimpleCountingRateLimiter)
+            t.true(dependencies.rateLimiter instanceof SimpleCountingRateLimiter)
             t.is(
-              (dependencies.requestRateLimiter as unknown as Record<string, number>)[
-                'perSecondLimit'
-              ],
+              (dependencies.rateLimiter as unknown as Record<string, number>)['perSecondLimit'],
               123,
             )
           }
@@ -192,11 +190,9 @@ test('uses unlimited tier if none is specified in settings', async (t) => {
         inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
-            t.true(dependencies.requestRateLimiter instanceof SimpleCountingRateLimiter)
+            t.true(dependencies.rateLimiter instanceof SimpleCountingRateLimiter)
             t.is(
-              (dependencies.requestRateLimiter as unknown as Record<string, number>)[
-                'perSecondLimit'
-              ],
+              (dependencies.rateLimiter as unknown as Record<string, number>)['perSecondLimit'],
               Infinity,
             )
           }
@@ -217,11 +213,9 @@ test('uses specified tier if present in settings', async (t) => {
         inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
-            t.true(dependencies.requestRateLimiter instanceof SimpleCountingRateLimiter)
+            t.true(dependencies.rateLimiter instanceof SimpleCountingRateLimiter)
             t.is(
-              (dependencies.requestRateLimiter as unknown as Record<string, number>)[
-                'perSecondLimit'
-              ],
+              (dependencies.rateLimiter as unknown as Record<string, number>)['perSecondLimit'],
               1234,
             )
           }

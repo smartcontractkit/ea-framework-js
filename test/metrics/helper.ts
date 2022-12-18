@@ -1,7 +1,7 @@
-import { AxiosRequestConfig, AxiosResponse } from 'axios'
+import { AxiosResponse } from 'axios'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { BatchWarmingTransport } from '../../src/transports'
+import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 
 // Parse metrics scrape into object to use for tests
@@ -19,7 +19,7 @@ export const parsePromMetrics = (data: string): Map<string, number> => {
   return metricsMap
 }
 
-export const buildBatchAdapter = (): Adapter => {
+export const buildHttpAdapter = (): Adapter => {
   return new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
@@ -27,7 +27,7 @@ export const buildBatchAdapter = (): Adapter => {
       new AdapterEndpoint({
         name: 'test',
         inputParameters,
-        transport: new MockBatchWarmingTransport(),
+        transport: new MockHttpTransport(),
       }),
     ],
   })
@@ -54,7 +54,7 @@ interface ProviderResponseBody {
   }>
 }
 
-type BatchEndpointTypes = {
+type HttpEndpointTypes = {
   Request: {
     Params: AdapterRequestParams
   }
@@ -66,16 +66,19 @@ type BatchEndpointTypes = {
   }
 }
 
-class MockBatchWarmingTransport extends BatchWarmingTransport<BatchEndpointTypes> {
+class MockHttpTransport extends HttpTransport<HttpEndpointTypes> {
   constructor() {
     super({
-      prepareRequest: (params: AdapterRequestParams[]): AxiosRequestConfig<ProviderRequestBody> => {
+      prepareRequests: (params: AdapterRequestParams[]) => {
         return {
-          baseURL: URL,
-          url: '/price',
-          method: 'POST',
-          data: {
-            pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+          params,
+          request: {
+            baseURL: URL,
+            url: '/price',
+            method: 'POST',
+            data: {
+              pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+            },
           },
         }
       },

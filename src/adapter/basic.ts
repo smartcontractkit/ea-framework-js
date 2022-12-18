@@ -12,7 +12,6 @@ import {
 import * as transportMetrics from '../transports/metrics'
 import {
   buildRateLimitTiersFromConfig,
-  FixedFrequencyRateLimiter,
   getRateLimitingTier,
   highestRateLimitTiers,
   SimpleCountingRateLimiter,
@@ -30,6 +29,7 @@ import {
   RequestTransform,
 } from './types'
 import { AdapterTimeoutError } from '../validation/error'
+import { Requester } from '../util/requester'
 
 const logger = makeLogger('Adapter')
 
@@ -314,14 +314,8 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
       value is higher than the highest tier value from limits.json ${highestTierValue}`)
     }
 
-    if (!dependencies.requestRateLimiter) {
-      dependencies.requestRateLimiter = new SimpleCountingRateLimiter().initialize(
-        this.endpoints,
-        rateLimitingTier,
-      )
-    }
-    if (!dependencies.backgroundExecuteRateLimiter) {
-      dependencies.backgroundExecuteRateLimiter = new FixedFrequencyRateLimiter().initialize(
+    if (!dependencies.rateLimiter) {
+      dependencies.rateLimiter = new SimpleCountingRateLimiter().initialize(
         this.endpoints,
         rateLimitingTier,
       )
@@ -332,6 +326,9 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
         this.name,
         dependencies.redisClient,
       )
+    }
+    if (!dependencies.requester) {
+      dependencies.requester = new Requester(dependencies.rateLimiter, this.config as AdapterConfig)
     }
 
     return dependencies as AdapterDependencies
