@@ -30,9 +30,8 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
   }
 
   add(key: string, value: T, ttl: number) {
-    if (this.map.has(key)) {
-      const node = this.map.get(key) as LinkedListNode<ExpiringSortedSetEntry<T>>
-
+    let node = this.map.get(key)
+    if (node) {
       node.data = {
         value,
         expirationTimestamp: Date.now() + ttl,
@@ -44,7 +43,7 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
         value,
         expirationTimestamp: Date.now() + ttl,
       }
-      const node = new LinkedListNode(key, data)
+      node = new LinkedListNode(key, data)
       this.list.insertAtTail(node)
       this.map.set(key, node)
     }
@@ -62,8 +61,8 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
   }
 
   get(key: string): T | undefined {
-    if (this.map.has(key)) {
-      const node = this.map.get(key) as LinkedListNode<ExpiringSortedSetEntry<T>>
+    const node = this.map.get(key)
+    if (node) {
       const expired = node.data.expirationTimestamp <= Date.now()
       if (expired) {
         this.delete(key)
@@ -77,8 +76,8 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
   }
 
   delete(key: string): void {
-    if (this.map.has(key)) {
-      const node = this.map.get(key) as LinkedListNode<ExpiringSortedSetEntry<T>>
+    const node = this.map.get(key)
+    if (node) {
       this.list.remove(node)
       this.map.delete(key)
     }
@@ -91,9 +90,10 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
 
   private evictIfNeeded() {
     if (this.list.size >= this.capacity) {
-      logger.warn(`List reached maximum capacity, evicting least recently updated entry`)
+      logger.warn(`List reached maximum capacity, evicting least recently updated entry.`)
       const node = this.list.removeHead()
       if (node) {
+        logger.warn(`The node with key ${node.key} was removed`)
         this.map.delete(node.key)
       }
     }
