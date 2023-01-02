@@ -65,7 +65,7 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
     message: (
       message: T['Provider']['WsMessage'],
       context: EndpointContext<T>,
-      params: T['Request']['Params'][]
+      params: T['Request']['Params'][],
     ) => ProviderResult<T>[] | undefined
   }
 
@@ -161,16 +161,18 @@ export class WebSocketTransport<
         const parsed = this.deserializeMessage(event.data)
         logger.trace(`Got ws message: ${event.data}`)
         const providerDataReceived = Date.now()
-        const results = this.config.handlers.message(parsed, context, this.desiredSubscriptions)?.map((r) => {
-          const result = r as TimestampedProviderResult<T>
-          const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
-          result.response.timestamps = {
-            providerDataStreamEstablished: this.providerDataStreamEstablished,
-            providerDataReceived,
-            providerIndicatedTime: partialResponse.timestamps?.providerIndicatedTime,
-          }
-          return result
-        })
+        const results = this.config.handlers
+          .message(parsed, context, this.desiredSubscriptions)
+          ?.map((r) => {
+            const result = r as TimestampedProviderResult<T>
+            const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
+            result.response.timestamps = {
+              providerDataStreamEstablished: this.providerDataStreamEstablished,
+              providerDataReceived,
+              providerIndicatedTime: partialResponse.timestamps?.providerIndicatedTime,
+            }
+            return result
+          })
         if (Array.isArray(results)) {
           // Updating the last message received time here, to only care about messages we use
           this.lastMessageReceivedAt = Date.now()
@@ -285,7 +287,7 @@ export class WebSocketTransport<
       connectionClosed = true
 
       // If the connection was closed, the new subscriptions should be the desired ones
-      subscriptions.new = this.desiredSubscriptions
+      subscriptions.new = subscriptions.desired
       if (subscriptions.new.length) {
         logger.trace(
           `Connection will be reopened and will subscribe to new and resubscribe to existing: ${JSON.stringify(
