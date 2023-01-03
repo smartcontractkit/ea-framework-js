@@ -1,12 +1,12 @@
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosRequestConfig } from 'axios'
+import axios from 'axios'
 import { AddressInfo } from 'net'
 import nock from 'nock'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import { retrieveCost } from '../../src/rate-limiting/metrics'
-import { RestTransport } from '../../src/transports'
+import { HttpTransport } from '../../src/transports'
 import { parsePromMetrics } from './helper'
 
 const test = untypedTest as TestFn<{
@@ -49,33 +49,35 @@ type RestEndpointTypes = {
 const endpoint = '/price'
 
 const createAdapterEndpoint = (): AdapterEndpoint<RestEndpointTypes> => {
-  const restEndpointTransport = new RestTransport<RestEndpointTypes>({
-    prepareRequest: (req): AxiosRequestConfig<ProviderRequestBody> => {
-      return {
-        baseURL: URL,
-        url: endpoint,
-        method: 'GET',
-        params: {
-          base: req.requestContext.data.from,
-          quote: req.requestContext.data.to,
+  const restEndpointTransport = new HttpTransport<RestEndpointTypes>({
+    prepareRequests: (params) => {
+      return params.map((req) => ({
+        params: [req],
+        request: {
+          baseURL: URL,
+          url: endpoint,
+          method: 'GET',
+          params: {
+            base: req.from,
+            quote: req.to,
+          },
         },
-      }
+      }))
     },
-    parseResponse: (req, res) => {
-      return {
-        data: res.data,
-        statusCode: 200,
-        result: res.data.price,
-        timestamps: {
-          providerIndicatedTime: Date.now() - 100,
+    parseResponse: (params, res) => {
+      return [
+        {
+          params: params[0],
+          response: {
+            data: res.data,
+            statusCode: 200,
+            result: res.data.price,
+            timestamps: {
+              providerIndicatedTime: Date.now() - 100,
+            },
+          },
         },
-      }
-    },
-    options: {
-      requestCoalescing: {
-        enabled: true,
-        entropyMax: 0,
-      },
+      ]
     },
   })
 
@@ -108,6 +110,9 @@ test.before(async (t) => {
     name: 'TEST',
     defaultEndpoint: 'test',
     endpoints: [createAdapterEndpoint()],
+    envDefaultOverrides: {
+      RATE_LIMIT_CAPACITY_SECOND: 10,
+    },
   })
 
   const api = await expose(adapter)
@@ -220,7 +225,7 @@ test.serial('Test credit spent metrics', async (t) => {
   const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",participant_id="test-{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{feed_id="N/A",participant_id="9002",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`rate_limit_credits_spent_total${expectedLabel}`), 1)
 })
 

@@ -6,10 +6,9 @@ import { AddressInfo } from 'net'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { DEFAULT_SHARED_MS_BETWEEN_REQUESTS } from '../../src/rate-limiting'
 import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { MockCache } from '../util'
+import { MockCache, runAllUntilTime } from '../util'
 import { parsePromMetrics } from './helper'
 
 export const test = untypedTest as TestFn<{
@@ -56,6 +55,7 @@ type WebSocketEndpointTypes = {
   }
 }
 
+const BACKGROUND_EXECUTE_MS_WS = 5000
 const URL = 'wss://test-ws.com/asd'
 const version = process.env['npm_package_version']
 
@@ -124,7 +124,7 @@ export const webSocketEndpoint = new AdapterEndpoint({
   inputParameters,
 })
 
-const CACHE_MAX_AGE = 1000
+const CACHE_MAX_AGE = 10000
 
 process.env['METRICS_ENABLED'] = 'true'
 // Set unique port between metrics tests to avoid conflicts in metrics servers
@@ -140,6 +140,7 @@ const adapter = new Adapter({
   endpoints: [webSocketEndpoint],
   envDefaultOverrides: {
     CACHE_MAX_AGE,
+    BACKGROUND_EXECUTE_MS_WS,
   },
 })
 
@@ -191,23 +192,14 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
     })
 
   // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-  // Advance enough time for the initial request async flow
-  clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504
-  const error = await errorPromise
+  const error = (await t.throwsAsync(makeRequest)) as AxiosError | undefined
   t.is(error?.response?.status, 504)
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  const cacheValueSetPromise = t.context.cache.waitForNextSet()
-  await clock.tickAsync(DEFAULT_SHARED_MS_BETWEEN_REQUESTS + 10)
-  await cacheValueSetPromise
+  await runAllUntilTime(clock, BACKGROUND_EXECUTE_MS_WS + 10)
 
   // Second request should find the response in the cache
   let response = await makeRequest()
-
   t.is(response.status, 200)
 
   // Check connection, subscription active, subscription total, and message total metrics when subscribed to feed
@@ -225,7 +217,7 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   t.is(metricsMap.get(`ws_subscription_total{${feed},${basic}}`), 1)
   t.is(metricsMap.get(`ws_message_total{${feed},direction="sent",${basic}}`), 1)
   t.is(metricsMap.get(`ws_message_total{direction="received",${basic}}`), 1)
-  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 2)
+  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 3)
   t.is(metricsMap.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 1)
 
   const responseTime = metricsMap.get(`bg_execute_duration_seconds{${endpoint},${basic}}`)
@@ -265,6 +257,6 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   metricsMap = parsePromMetrics(response.data)
 
   t.is(metricsMap.get(`ws_connection_active{${basic}}`), 0)
-  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 6)
+  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 7)
   t.is(metricsMap.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 0)
 })

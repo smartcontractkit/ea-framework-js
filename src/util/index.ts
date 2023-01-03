@@ -1,4 +1,4 @@
-export * from './request'
+export * from './types'
 export * from './logger'
 export * from './subscription-set/subscription-set'
 

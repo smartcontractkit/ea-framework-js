@@ -1,11 +1,11 @@
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { AxiosError, AxiosResponse } from 'axios'
 import { AddressInfo } from 'net'
 import nock from 'nock'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { RestTransport } from '../../src/transports'
+import { HttpTransport } from '../../src/transports'
 import { loadTestPayload, resolvePayload } from '../../src/util/test-payload-loader'
 
 const test = untypedTest as TestFn
@@ -45,30 +45,30 @@ type RestEndpointTypes = {
 }
 
 const createAdapterEndpoint = (): AdapterEndpoint<RestEndpointTypes> => {
-  const restEndpointTransport = new RestTransport<RestEndpointTypes>({
-    prepareRequest: (req): AxiosRequestConfig<ProviderRequestBody> => {
-      return {
-        baseURL: URL,
-        url: endpoint,
-        method: 'GET',
-        params: {
-          base: req.requestContext.data.from,
-          quote: req.requestContext.data.to,
+  const restEndpointTransport = new HttpTransport<RestEndpointTypes>({
+    prepareRequests: (params) => {
+      return params.map((req) => ({
+        params: [req],
+        request: {
+          baseURL: URL,
+          url: endpoint,
+          method: 'GET',
+          params: {
+            base: req.from,
+            quote: req.to,
+          },
         },
-      }
+      }))
     },
-    parseResponse: (req, res) => {
-      return {
-        data: res.data,
-        statusCode: 200,
-        result: res.data.price,
-      }
-    },
-    options: {
-      requestCoalescing: {
-        enabled: true,
-        entropyMax: 0,
-      },
+    parseResponse: (params, res) => {
+      return params.map((req) => ({
+        params: req,
+        response: {
+          data: res.data,
+          statusCode: 200,
+          result: res.data.price,
+        },
+      }))
     },
   })
 
@@ -106,6 +106,9 @@ const startAdapter = async (): Promise<string> => {
     name: 'TEST',
     defaultEndpoint: 'test',
     endpoints: [createAdapterEndpoint()],
+    envDefaultOverrides: {
+      RATE_LIMIT_CAPACITY_SECOND: 10,
+    },
   })
 
   const api = await expose(adapter)

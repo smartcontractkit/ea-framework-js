@@ -155,7 +155,7 @@ export type ResponseGenerics = {
 /**
  * Details for timestamps to be included in the response
  */
-type ResponseTimestamps = {
+export type ResponseTimestamps = {
   /** Time at which data was received from the provider */
   providerDataReceived: number
 

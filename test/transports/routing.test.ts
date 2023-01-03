@@ -7,16 +7,15 @@ import { expose } from '../../src'
 import { Adapter, EndpointContext, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import {
-  BatchWarmingTransport,
-  RestTransport,
+  HttpTransport,
   SSEConfig,
-  SSETransport,
+  SseTransport,
   Transport,
   WebSocketClassProvider,
   WebSocketTransport,
 } from '../../src/transports'
 import { RoutingTransport } from '../../src/transports/meta'
-import { assertEqualResponses, MockCache } from '../util'
+import { MockCache } from '../util'
 
 const test = untypedTest as TestFn<{
   endpoint: AdapterEndpoint<BaseEndpointTypes>
@@ -69,43 +68,6 @@ type BaseEndpointTypes = {
     Result: number
   }
   CustomSettings: SettingsMap
-}
-
-const restTransport = () => {
-  const urlEndpoint = `price`
-  return new RestTransport<
-    BaseEndpointTypes & {
-      Provider: {
-        RequestBody: ProviderRequestBody
-        ResponseBody: ProviderResponseBody
-      }
-    }
-  >({
-    prepareRequest: (req): AxiosRequestConfig<ProviderRequestBody> => {
-      return {
-        baseURL: restUrl,
-        url: urlEndpoint,
-        method: 'GET',
-        params: {
-          base: req.requestContext.data.from,
-          quote: req.requestContext.data.to,
-        },
-      }
-    },
-    parseResponse: (req, res) => {
-      return {
-        data: { price: res.data.price },
-        statusCode: 200,
-        result: res.data.price,
-      }
-    },
-    options: {
-      requestCoalescing: {
-        enabled: true,
-        entropyMax: 0,
-      },
-    },
-  })
 }
 
 type WebSocketTypes = BaseEndpointTypes & {
@@ -168,7 +130,7 @@ const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): void =>
   provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
-type BatchWarmingTypes = BaseEndpointTypes & {
+type HttpTypes = BaseEndpointTypes & {
   Provider: {
     RequestBody: {
       pairs: ProviderRequestBody[]
@@ -177,18 +139,21 @@ type BatchWarmingTypes = BaseEndpointTypes & {
   }
 }
 
-class MockBatchWarmingTransport extends BatchWarmingTransport<BatchWarmingTypes> {
+class MockHttpTransport extends HttpTransport<HttpTypes> {
   backgroundExecuteCalls = 0
 
   constructor(private callSuper = false) {
     super({
-      prepareRequest: (params: AdapterRequestParams[]) => {
+      prepareRequests: (params: AdapterRequestParams[]) => {
         return {
-          baseURL: restUrl,
-          url: '/price',
-          method: 'POST',
-          data: {
-            pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+          params,
+          request: {
+            baseURL: restUrl,
+            url: '/price',
+            method: 'POST',
+            data: {
+              pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+            },
           },
         }
       },
@@ -220,7 +185,7 @@ type SSETypes = BaseEndpointTypes & {
     ResponseBody: ProviderResponseBody
   }
 }
-class MockSSETransport extends SSETransport<SSETypes> {
+class MockSseTransport extends SseTransport<SSETypes> {
   public backgroundExecuteCalls = 0
 
   constructor() {
@@ -277,10 +242,9 @@ class MockSSETransport extends SSETransport<SSETypes> {
 const transports: {
   [key: string]: Transport<BaseEndpointTypes>
 } = {
-  REST: restTransport(),
   WEBSOCKET: new MockWebSocketTransport(),
-  BATCH: new MockBatchWarmingTransport(),
-  SSE: new MockSSETransport(),
+  BATCH: new MockHttpTransport(),
+  SSE: new MockSseTransport(),
 }
 
 // Route function is used to select an adapter based on the supplied string, routeToTransport
@@ -369,39 +333,7 @@ test.serial('routing transport errors on invalid transport', async (t) => {
   t.is(error?.response?.status, 400)
 })
 
-test.serial('RoutingTransport can route to RestTransport', async (t) => {
-  const { adapter, from, to } = t.context
-  const api = await expose(adapter)
-  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
-  const price = 1500
-  nock(restUrl)
-    .get('/price')
-    .query({
-      base: from,
-      quote: to,
-    })
-    .reply(200, {
-      price,
-      verbose: 'DP data',
-    })
-
-  const response = await axios.post(address, {
-    data: {
-      from,
-      to,
-      routeToTransport: 'REST',
-    },
-  })
-
-  t.is(response.status, 200)
-  assertEqualResponses(t, response.data, {
-    data: { price },
-    result: price,
-    statusCode: 200,
-  })
-})
-
-test.serial('RoutingTransport can route to BatchWarmingTransport', async (t) => {
+test.serial('RoutingTransport can route to HttpTransport', async (t) => {
   const { adapter, from, to } = t.context
   const api = await expose(adapter)
 
@@ -439,7 +371,7 @@ test.serial('RoutingTransport can route to BatchWarmingTransport', async (t) => 
   const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
 
   t.is(error?.response?.status, 504)
-  const internalTransport = transports['BATCH'] as MockBatchWarmingTransport
+  const internalTransport = transports['BATCH'] as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -524,6 +456,6 @@ test.serial('RoutingTransport can route to SSE transport', async (t) => {
   const earlyError = await earlyErrorPromise
   t.is(earlyError?.response?.status, 504)
 
-  const internalTransport = transports['SSE'] as MockSSETransport
+  const internalTransport = transports['SSE'] as MockSseTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })

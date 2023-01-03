@@ -1,10 +1,9 @@
 import { AdapterDependencies, EndpointContext } from '../adapter'
 import { ResponseCache } from '../cache/response'
 import { AdapterConfig, SettingsMap } from '../config'
-import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/request'
+import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/types'
 
-export * from './batch-warming'
-export * from './rest'
+export * from './http'
 export * from './sse'
 export * from './websocket'
 

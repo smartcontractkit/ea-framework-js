@@ -1,6 +1,6 @@
 import pino from 'pino'
 import { BaseSettings } from '../config'
-import { AdapterRequest } from './request'
+import { AdapterRequest } from './types'
 import { FastifyReply, HookHandlerDoneFunction } from 'fastify'
 import { randomUUID } from 'crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'

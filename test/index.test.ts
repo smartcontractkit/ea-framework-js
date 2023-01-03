@@ -58,15 +58,6 @@ test('MTLS_ENABLED with no TLS params should error', async (t) => {
       'TLS_PRIVATE_KEY , TLS_PUBLIC_KEY and  TLS_CA environment variables are required when MTLS_ENABLED is set to true.',
     )
   }
-  // const api = await expose(adapter)
-  // const serverAddress = `https://localhost:${(api?.server?.address() as AddressInfo).port}`
-  // t.is(api?.initialConfig?.https, true)
-  //
-  // const error = await t.throwsAsync(async () => {
-  //   return await axios.get(`${serverAddress}/health`)
-  // });
-  // console.log(error)
-  // t.pass()
 })
 
 test('MTLS_ENABLED connection with incorrect params should error', async (t) => {
