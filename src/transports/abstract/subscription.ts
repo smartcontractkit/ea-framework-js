@@ -44,11 +44,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     )
 
     // This might need coalescing to avoid too frequent ttl updates
-    await this.subscriptionSet.add(
-      req.requestContext.cacheKey,
-      req.requestContext.data,
-      this.subscriptionTtl,
-    )
+    await this.subscriptionSet.add(req.requestContext.data, this.subscriptionTtl)
   }
 
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {

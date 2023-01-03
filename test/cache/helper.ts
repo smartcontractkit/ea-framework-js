@@ -47,7 +47,7 @@ export const cacheTests = () => {
       factor: 111,
     }
 
-    const cacheKey = 'test-|base:qweqwe|factor:111'
+    const cacheKey = 'test-{"base":"qweqwe","factor":111}'
 
     // Inject values directly into the cache
     const injectedEntry = {
@@ -68,7 +68,7 @@ export const cacheTests = () => {
       factor: 24637,
     }
 
-    const cacheKey = 'test-|base:sdfghj|factor:24637'
+    const cacheKey = 'test-{"base":"sdfghj","factor":24637}'
 
     // Inject values directly into the cache
     const injectedEntry = {

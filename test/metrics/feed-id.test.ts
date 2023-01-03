@@ -31,5 +31,5 @@ feedIdTest.serial('builds feed ID correctly from input params', async (t) => {
     },
   }
   const data = { base: 'ETH', quote: 'BTC' }
-  t.is(calculateFeedId(t.context, data), '|base:eth|quote:btc')
+  t.is(calculateFeedId(t.context, data), '{"base":"ETH","quote":"BTC"}')
 })

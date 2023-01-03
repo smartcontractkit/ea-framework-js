@@ -75,12 +75,11 @@ export const calculateCacheKey = <T extends EndpointGenerics>(
   },
   data: unknown,
 ): string => {
-  const paramNames = Object.keys(inputParameters)
-  if (paramNames.length === 0) {
+  if (Object.keys(inputParameters).length === 0) {
     logger.trace(`Using default cache key ${adapterConfig.DEFAULT_CACHE_KEY}`)
     return adapterConfig.DEFAULT_CACHE_KEY
   }
-  const cacheKey = `${endpointName}-${calculateKey(data, paramNames, adapterConfig)}`
+  const cacheKey = `${endpointName}-${calculateKey(data, adapterConfig)}`
   logger.trace(`Generated cache key for request: "${cacheKey}"`)
   return cacheKey
 }
@@ -95,12 +94,11 @@ export const calculateFeedId = <T extends EndpointGenerics>(
   },
   data: unknown,
 ): string => {
-  const paramNames = Object.keys(inputParameters)
-  if (paramNames.length === 0) {
+  if (Object.keys(inputParameters).length === 0) {
     logger.trace(`Cannot generate Feed ID without input parameters`)
     return 'N/A'
   }
-  return calculateKey(data, paramNames, adapterConfig)
+  return calculateKey(data, adapterConfig)
 }
 
 /**
@@ -118,39 +116,13 @@ export const calculateFeedId = <T extends EndpointGenerics>(
  */
 export const calculateKey = <CustomSettings extends SettingsMap>(
   data: unknown,
-  paramNames: string[],
   adapterConfig: AdapterConfig<CustomSettings>,
 ): string => {
   if (data && typeof data !== 'object') {
     throw new Error('Data to calculate cache key should be an object')
   }
 
-  const params = data as Record<string, unknown>
-
-  let cacheKey = ''
-  for (const paramName of paramNames) {
-    const param = params[paramName]
-    if (param === undefined) {
-      continue
-    }
-
-    cacheKey += `|${paramName}:`
-    switch (typeof param) {
-      case 'string':
-        cacheKey += param.toLowerCase()
-        break
-      case 'number':
-      case 'boolean':
-        cacheKey += param.toString()
-        break
-      case 'object':
-        // Force cache keys to only use performant properties of the input params.
-        // If the object were to be used, we'd have to sort its properties.
-        logger.debug(
-          `Property "${paramName}" in request parameters is of type object, and won't be used in the cacheKey`,
-        )
-    }
-  }
+  let cacheKey = JSON.stringify(data)
 
   if (cacheKey.length > adapterConfig.MAX_COMMON_KEY_SIZE) {
     logger.warn(

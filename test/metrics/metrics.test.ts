@@ -138,7 +138,7 @@ test.serial('Test http requests total metrics (data provider hit)', async (t) =>
 
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{method="POST",feed_id="|from:eth|to:usd",status_code="200",type="dataProviderHit",provider_status_code="200",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{method="POST",feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",status_code="200",type="dataProviderHit",provider_status_code="200",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`http_requests_total${expectedLabel}`), 1)
 })
 
@@ -182,7 +182,7 @@ test.serial('Test cache set count metrics', async (t) => {
   const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{participant_id="test-|from:eth|to:usd",feed_id="|from:eth|to:usd",cache_type="local",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{participant_id="test-{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_set_count${expectedLabel}`), 1)
 })
 
@@ -190,7 +190,7 @@ test.serial('Test cache max age metrics', async (t) => {
   const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{participant_id="test-|from:eth|to:usd",feed_id="|from:eth|to:usd",cache_type="local",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{participant_id="test-{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_max_age${expectedLabel}`), 90000)
 })
 
@@ -198,7 +198,7 @@ test.serial('Test cache set staleness metrics', async (t) => {
   const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{participant_id="test-|from:eth|to:usd",feed_id="|from:eth|to:usd",cache_type="local",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{participant_id="test-{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   const staleness = metricsMap.get(`cache_data_staleness_seconds${expectedLabel}`)
   if (staleness !== undefined) {
     t.is(typeof staleness === 'number', true)
@@ -212,7 +212,7 @@ test.serial('Test provider time delta metric', async (t) => {
   const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{participant_id="test-|from:eth|to:usd",feed_id="|from:eth|to:usd",cache_type="local",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{participant_id="test-{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_max_age${expectedLabel}`), 90000)
 })
 
@@ -220,7 +220,7 @@ test.serial('Test credit spent metrics', async (t) => {
   const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{feed_id="|from:eth|to:usd",participant_id="test-|from:eth|to:usd",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",participant_id="test-{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`rate_limit_credits_spent_total${expectedLabel}`), 1)
 })
 
@@ -245,7 +245,7 @@ test.serial('Test http requests total metrics (cache hit)', async (t) => {
 
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{method="POST",feed_id="|from:eth|to:usd",status_code="200",type="cacheHit",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{method="POST",feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",status_code="200",type="cacheHit",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`http_requests_total${expectedLabel}`), 1)
 })
 
@@ -253,7 +253,7 @@ test.serial('Test cache get count metrics', async (t) => {
   const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{participant_id="test-|from:eth|to:usd",feed_id="|from:eth|to:usd",cache_type="local",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{participant_id="test-{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_get_count${expectedLabel}`), 1)
 })
 
@@ -261,7 +261,7 @@ test.serial('Test cache get value metrics', async (t) => {
   const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{participant_id="test-|from:eth|to:usd",feed_id="|from:eth|to:usd",cache_type="local",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{participant_id="test-{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_get_values${expectedLabel}`), 1234)
 })
 
@@ -269,7 +269,7 @@ test.serial('Test cache get staleness metrics', async (t) => {
   const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   const response = await axios.get(metricsAddress)
   const metricsMap = parsePromMetrics(response.data)
-  const expectedLabel = `{participant_id="test-|from:eth|to:usd",feed_id="|from:eth|to:usd",cache_type="local",app_name="TEST",app_version="${version}"}`
+  const expectedLabel = `{participant_id="test-{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",feed_id="{\\"from\\":\\"ETH\\",\\"to\\":\\"USD\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   const staleness = metricsMap.get(`cache_data_staleness_seconds${expectedLabel}`)
   if (staleness !== undefined) {
     t.is(typeof staleness === 'number', true)
