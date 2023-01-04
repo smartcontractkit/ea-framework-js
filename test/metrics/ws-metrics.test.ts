@@ -208,7 +208,7 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   let metricsMap = parsePromMetrics(response.data)
 
   const basic = `app_name="TEST",app_version="${version}"`
-  const feed = `feed_id="{\\"base\\":\\"ETH\\",\\"quote\\":\\"USD\\"}",subscription_key="test-{\\"base\\":\\"ETH\\",\\"quote\\":\\"USD\\"}"`
+  const feed = `feed_id="{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}",subscription_key="test-{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}"`
   const endpoint = `endpoint="test"`
   const transport = `transport_type="WebSocketTransport"`
 

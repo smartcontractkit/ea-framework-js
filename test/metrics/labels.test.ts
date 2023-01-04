@@ -9,19 +9,19 @@ import { AdapterError } from '../../src/validation/error'
 
 test('Generate cache label test', (t) => {
   const result = {
-    participant_id: 'test-{"base":"ETH","quote":"BTC"}',
-    feed_id: '{"base":"ETH","quote":"BTC"}',
+    participant_id: 'test-{"base":"eth","quote":"btc"}',
+    feed_id: '{"base":"eth","quote":"btc"}',
     cache_type: 'local',
   }
   t.deepEqual(
-    cacheMetricsLabel('test-{"base":"ETH","quote":"BTC"}', '{"base":"ETH","quote":"BTC"}', 'local'),
+    cacheMetricsLabel('test-{"base":"eth","quote":"btc"}', '{"base":"eth","quote":"btc"}', 'local'),
     result,
   )
 })
 
 test('Generate http request metrics label test (adapter error)', (t) => {
   const label = buildHttpRequestMetricsLabel(
-    'test-{"base":"ETH","quote":"BTC"}',
+    'test-{"base":"eth","quote":"btc"}',
     new AdapterError({
       metricsLabel: HttpRequestType.DP_ERROR,
       providerStatusCode: 500,
@@ -29,7 +29,7 @@ test('Generate http request metrics label test (adapter error)', (t) => {
     }),
   )
   const result = {
-    feed_id: 'test-{"base":"ETH","quote":"BTC"}',
+    feed_id: 'test-{"base":"eth","quote":"btc"}',
     method: 'POST',
     status_code: 200,
     type: HttpRequestType.DP_ERROR,
@@ -40,9 +40,9 @@ test('Generate http request metrics label test (adapter error)', (t) => {
 })
 
 test('Generate http request metrics label test (generic error)', (t) => {
-  const label = buildHttpRequestMetricsLabel('test-{"base":"ETH","quote":"BTC"}', new Error('Test'))
+  const label = buildHttpRequestMetricsLabel('test-{"base":"eth","quote":"btc"}', new Error('Test'))
   const result = {
-    feed_id: 'test-{"base":"ETH","quote":"BTC"}',
+    feed_id: 'test-{"base":"eth","quote":"btc"}',
     method: 'POST',
     status_code: 500,
     type: HttpRequestType.ADAPTER_ERROR,
@@ -53,12 +53,12 @@ test('Generate http request metrics label test (generic error)', (t) => {
 
 test('Generate data provider metrics label test', (t) => {
   const result = {
-    participant_id: 'test-{"base":"ETH","quote":"BTC"}',
-    feed_id: '{"base":"ETH","quote":"BTC"}',
+    participant_id: 'test-{"base":"eth","quote":"btc"}',
+    feed_id: '{"base":"eth","quote":"btc"}',
     cache_type: 'local',
   }
   t.deepEqual(
-    cacheMetricsLabel('test-{"base":"ETH","quote":"BTC"}', '{"base":"ETH","quote":"BTC"}', 'local'),
+    cacheMetricsLabel('test-{"base":"eth","quote":"btc"}', '{"base":"eth","quote":"btc"}', 'local'),
     result,
   )
 })
@@ -72,8 +72,8 @@ test('Generate WS connection error label test', (t) => {
 
 test('Generate WS message and subscription label test', (t) => {
   const result = {
-    feed_id: '{"base":"ETH","quote":"BTC"}',
-    subscription_key: 'test-{"base":"ETH","quote":"BTC"}',
+    feed_id: '{"base":"eth","quote":"btc"}',
+    subscription_key: 'test-{"base":"eth","quote":"btc"}',
   }
   t.deepEqual(
     messageSubsLabels(

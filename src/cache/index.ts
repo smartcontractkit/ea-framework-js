@@ -110,8 +110,8 @@ export const calculateFeedId = <T extends EndpointGenerics>(
  *
  * @example
  * ```
- * calculateKey({ base: 'ETH', quote: 'BTC' }, ['base','quote'])
- * // equals `|base:eth|quote:btc`
+ * calculateKey({ base: 'ETH', quote: 'BTC' })
+ * // equals `{"base":"eth","quote":"btc"}`
  * ```
  */
 export const calculateKey = <CustomSettings extends SettingsMap>(
@@ -122,7 +122,12 @@ export const calculateKey = <CustomSettings extends SettingsMap>(
     throw new Error('Data to calculate cache key should be an object')
   }
 
-  let cacheKey = JSON.stringify(data)
+  let cacheKey = JSON.stringify(data, (_, value) => {
+    if (value && typeof value === 'string') {
+      return value.toLowerCase()
+    }
+    return value
+  })
 
   if (cacheKey.length > adapterConfig.MAX_COMMON_KEY_SIZE) {
     logger.warn(
