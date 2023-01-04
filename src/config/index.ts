@@ -397,7 +397,7 @@ const isEnvNameValid = (name: string) => /^[_a-z0-9]+$/i.test(name)
 export const getEnv = (name: string, config: Setting, prefix = ''): SettingValueType | null => {
   const value = process.env[getEnvName(name, prefix)]
 
-  if (!value) {
+  if (!value || value === '' || value === '""') {
     return null
   }
 
