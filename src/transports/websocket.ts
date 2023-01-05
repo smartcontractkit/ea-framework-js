@@ -59,11 +59,13 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
      *
      * @param message - the message received by the WS
      * @param context - the background context for the Adapter
+     * @param params - current params in the subscription set
      * @returns a list of cache entries of adapter responses to set in the cache
      */
     message: (
       message: T['Provider']['WsMessage'],
       context: EndpointContext<T>,
+      params: T['Request']['Params'][],
     ) => ProviderResult<T>[] | undefined
   }
 
@@ -116,6 +118,7 @@ export class WebSocketTransport<
   currentUrl = ''
   lastMessageReceivedAt = 0
   connectionOpenedAt = 0
+  desiredSubscriptions: T['Request']['Params'][] = []
 
   constructor(private config: WebSocketTransportConfig<T>) {
     super()
@@ -158,16 +161,18 @@ export class WebSocketTransport<
         const parsed = this.deserializeMessage(event.data)
         logger.trace(`Got ws message: ${event.data}`)
         const providerDataReceived = Date.now()
-        const results = this.config.handlers.message(parsed, context)?.map((r) => {
-          const result = r as TimestampedProviderResult<T>
-          const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
-          result.response.timestamps = {
-            providerDataStreamEstablished: this.providerDataStreamEstablished,
-            providerDataReceived,
-            providerIndicatedTime: partialResponse.timestamps?.providerIndicatedTime,
-          }
-          return result
-        })
+        const results = this.config.handlers
+          .message(parsed, context, this.desiredSubscriptions)
+          ?.map((r) => {
+            const result = r as TimestampedProviderResult<T>
+            const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
+            result.response.timestamps = {
+              providerDataStreamEstablished: this.providerDataStreamEstablished,
+              providerDataReceived,
+              providerIndicatedTime: partialResponse.timestamps?.providerIndicatedTime,
+            }
+            return result
+          })
         if (Array.isArray(results)) {
           // Updating the last message received time here, to only care about messages we use
           this.lastMessageReceivedAt = Date.now()
@@ -246,6 +251,7 @@ export class WebSocketTransport<
     context: EndpointContext<T>,
     subscriptions: SubscriptionDeltas<T['Request']['Params']>,
   ): Promise<void> {
+    this.desiredSubscriptions = subscriptions.desired
     // New subs && no connection -> connect -> add subs
     // No new subs && no connection -> skip
     // New subs && connection -> add subs
@@ -257,7 +263,7 @@ export class WebSocketTransport<
 
     // We want to check if the URL we calculate is different from the one currently connected.
     // This is because some providers handle subscriptions on the URLs and not through messages.
-    const urlFromConfig = await this.config.url(context, subscriptions.desired)
+    const urlFromConfig = await this.config.url(context, this.desiredSubscriptions)
     const urlChanged = this.currentUrl !== urlFromConfig
 
     // We want to check that if we have a connection, it hasn't gone stale. That is,
@@ -292,7 +298,7 @@ export class WebSocketTransport<
     }
 
     // Check if we need to open a new connection
-    if (connectionClosed && subscriptions.desired.length) {
+    if (connectionClosed && this.desiredSubscriptions.length) {
       logger.debug('No established connection and new subscriptions available, connecting to WS')
       const options = this.config.options && (await this.config.options(context))
       this.currentUrl = urlFromConfig
