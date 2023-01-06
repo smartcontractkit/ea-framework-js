@@ -105,7 +105,7 @@ export const calculateFeedId = <T extends EndpointGenerics>(
  * Calculates a unique key from the provided data.
  *
  * @param data - the request data/body, i.e. the adapter input params
- * @param paramNames - the keys from adapter endpoint input parameters
+ * @param adapterConfig - the config for this Adapter
  * @returns the calculated unique key
  *
  * @example
