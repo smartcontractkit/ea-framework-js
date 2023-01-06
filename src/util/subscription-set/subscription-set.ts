@@ -9,7 +9,7 @@ import { RedisSubscriptionSet } from './redis-sorted-set'
  */
 export interface SubscriptionSet<T> {
   /** Add a new subscription to the set */
-  add(key: string, value: T, ttl: number): PromiseOrValue<void>
+  add(value: T, ttl: number, key?: string): PromiseOrValue<void>
 
   /** Get all subscriptions from the set as a list */
   getAll(): PromiseOrValue<T[]>

@@ -29,7 +29,7 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
     this.list = new DoubleLinkedList()
   }
 
-  add(key: string, value: T, ttl: number) {
+  add(value: T, ttl: number, key: string) {
     let node = this.map.get(key)
     if (node) {
       node.data = {
@@ -90,10 +90,11 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
 
   private evictIfNeeded() {
     if (this.list.size >= this.capacity) {
-      logger.warn(`List reached maximum capacity, evicting least recently updated entry.`)
       const node = this.list.removeHead()
       if (node) {
-        logger.warn(`The node with key ${node.key} was removed`)
+        logger.warn(
+          `List reached maximum capacity, evicting least recently updated entry. The subscription with key ${node.key} was removed.`,
+        )
         this.map.delete(node.key)
       }
     }

@@ -41,10 +41,10 @@ test('subscription set factory (local cache) max capacity', async (t) => {
   const factory = new SubscriptionSetFactory(config, 'test')
   const subscriptionSet = factory.buildSet('test')
 
-  await subscriptionSet.add('1', 1, 10000)
-  await subscriptionSet.add('2', 2, 10000)
-  await subscriptionSet.add('3', 3, 10000)
-  await subscriptionSet.add('4', 4, 10000)
+  await subscriptionSet.add(1, 10000, '1')
+  await subscriptionSet.add(2, 10000, '2')
+  await subscriptionSet.add(3, 10000, '3')
+  await subscriptionSet.add(4, 10000, '4')
 
   const value1 = await subscriptionSet.get('1')
   const value2 = await subscriptionSet.get('2')

@@ -23,7 +23,7 @@ test.beforeEach(async (t) => {
       {
         name: 'test',
         inputParameters: {},
-        initialize: async (dependencies, config) => {
+        initialize: async () => {
           return
         },
         transport: new (class extends NopTransport {
@@ -45,7 +45,7 @@ test.beforeEach(async (t) => {
       {
         name: 'test-custom-cache-key',
         inputParameters: {},
-        initialize: async (dependencies, config) => {
+        initialize: async () => {
           return
         },
         cacheKeyGenerator: (_) => {
@@ -123,7 +123,10 @@ test.serial('builds cache key correctly from input params', async (t) => {
       nullable: null,
     },
   })
-  t.is(response.data.result, 'test-|base:eth|factor:123|proper:true|details:')
+  t.is(
+    response.data.result,
+    'test-{"base":"eth","factor":123,"proper":true,"details":{"asd":"qwe","zxc":432}}',
+  )
 })
 
 test.serial('cache key is truncated if over max size', async (t) => {
