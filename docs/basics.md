@@ -22,7 +22,7 @@ By providing a framework that gives users easy access to those features, we redu
 
 ## EA v3 Design
 
-The EA v3 design is built to provide all the features describe above in an efficient and effective manner. The approach is best designed by showing the flow diagram for an incoming request into the EA:
+The EA v3 design is built to provide all the features described above in an efficient and effective manner. The approach is best designed by showing the flow diagram for an incoming request into the EA:
 
 ```mermaid
 flowchart TD
@@ -92,7 +92,7 @@ The second mechanism of note in that diagram is the **Transport** class. This is
 
 ## REST API
 
-The EA REST API has only one endpoint, in the root of the the used port (modified with the `EA_PORT` environment variable, `8080` by default).
+The EA REST API has only one endpoint, in the root of the used port (modified with the `EA_PORT` environment variable, `8080` by default).
 
 It expects to receive an HTTP POST request, the body of which should carry the following format:
 
