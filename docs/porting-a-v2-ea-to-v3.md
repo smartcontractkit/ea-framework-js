@@ -170,7 +170,7 @@ export const wsTransport = new WebSocketTransport<EndpointTypes>({
     },
     message(message): ProviderResult<EndpointTypes>[] | undefined {
       // Parse the message from the WS stream. If it's a price update, return
-      // the request params and it's result in an array:
+      // the request params and its result in an array:
       // return [
       //   {
       //     params: { base: 'ETH', quote: 'USD', endpoint: 'crypto-ws' },
