@@ -4,7 +4,12 @@ import { Cache } from '../cache'
 import { AdapterConfig, BaseAdapterConfig, SettingsMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
-import { AdapterRequest, RequestGenerics, SingleNumberResultResponse, SubscriptionSetFactory } from '../util'
+import {
+  AdapterRequest,
+  RequestGenerics,
+  SingleNumberResultResponse,
+  SubscriptionSetFactory,
+} from '../util'
 import { Requester } from '../util/requester'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'

@@ -1,10 +1,5 @@
 import { SettingsMap } from '../config'
-import {
-  AdapterRequest,
-  AdapterRequestContext,
-  AdapterResponse,
-  RequestGenerics,
-} from '../util'
+import { AdapterRequest, AdapterRequestContext, AdapterResponse, RequestGenerics } from '../util'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams, PriceEndpointGenerics } from './index'
 
