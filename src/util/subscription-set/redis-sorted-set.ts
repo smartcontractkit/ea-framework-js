@@ -28,4 +28,8 @@ export class RedisSubscriptionSet<T> implements SubscriptionSet<T> {
     })
     return parsedRequests
   }
+
+  get(): T | undefined {
+    return undefined
+  }
 }

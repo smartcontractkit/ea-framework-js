@@ -33,3 +33,29 @@ test('subscription set factory (redis cache missing client)', async (t) => {
     t.pass()
   }
 })
+
+test('subscription set factory (local cache) max capacity', async (t) => {
+  process.env['CACHE_TYPE'] = 'local'
+  process.env['SUBSCRIPTION_SET_MAX_ITEMS'] = '3'
+  const config = buildAdapterConfig({})
+  const factory = new SubscriptionSetFactory(config, 'test')
+  const subscriptionSet = factory.buildSet('test')
+
+  await subscriptionSet.add(1, 10000, '1')
+  await subscriptionSet.add(2, 10000, '2')
+  await subscriptionSet.add(3, 10000, '3')
+  await subscriptionSet.add(4, 10000, '4')
+
+  const value1 = await subscriptionSet.get('1')
+  const value2 = await subscriptionSet.get('2')
+  const value3 = await subscriptionSet.get('3')
+  const value4 = await subscriptionSet.get('4')
+
+  t.is(value1, undefined)
+  t.is(value2, 2)
+  t.is(value3, 3)
+  t.is(value4, 4)
+
+  const allValues = await subscriptionSet.getAll()
+  t.deepEqual(allValues, [2, 3, 4])
+})
