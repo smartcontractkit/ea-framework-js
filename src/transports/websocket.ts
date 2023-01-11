@@ -6,6 +6,7 @@ import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } 
 import { TransportGenerics } from './'
 import * as transportMetrics from './metrics'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
+import { Metrics } from '../metrics'
 
 // Aliasing type for use at adapter level
 export { WebSocket, RawData as WebSocketRawData }
@@ -149,7 +150,7 @@ export class WebSocketTransport<
           logger.debug('Successfully executed connection opened handler')
         }
         // Record active ws connections by incrementing count on open
-        transportMetrics.wsConnectionActive.inc()
+        Metrics.wsConnectionActive && Metrics.wsConnectionActive.inc()
         connectionReadyResolve(true)
       },
 
@@ -179,11 +180,12 @@ export class WebSocketTransport<
         // Do this after writing so we get the values to the cache ASAP
         // We're not calculating feedId or subscription because this is only a single message,
         // and it could in theory contain more than one value to set to the cache
-        transportMetrics.wsMessageTotal
-          .labels({
-            direction: 'received',
-          })
-          .inc()
+        Metrics.wsMessageTotal &&
+          Metrics.wsMessageTotal
+            .labels({
+              direction: 'received',
+            })
+            .inc()
       },
 
       // Called when an error is thrown by the connection
@@ -192,9 +194,10 @@ export class WebSocketTransport<
           `Error occurred in web socket connection. Error: ${event.error} ; Message: ${event.message}`,
         )
         // Record connection error count
-        transportMetrics.wsConnectionErrors
-          .labels(transportMetrics.connectionErrorLabels(event.message))
-          .inc()
+        Metrics.wsConnectionErrors &&
+          Metrics.wsConnectionErrors
+            .labels(transportMetrics.connectionErrorLabels(event.message))
+            .inc()
       },
 
       // Called when the WS connection closes for any reason
@@ -204,7 +207,7 @@ export class WebSocketTransport<
         )
         // Record active ws connections by decrementing count on close
         // Using URL in label since connection_key is removed from v3
-        transportMetrics.wsConnectionActive.dec()
+        Metrics.wsConnectionActive && Metrics.wsConnectionActive.dec()
       },
     }
   }

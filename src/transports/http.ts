@@ -1,14 +1,13 @@
 import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { EndpointContext } from '../adapter'
-import * as cacheMetrics from '../cache/metrics'
 import { AdapterConfig } from '../config'
-import * as rateLimitMetrics from '../rate-limiting/metrics'
 import { makeLogger, sleep } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { Requester } from '../util/requester'
 import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
 import { TransportDependencies, TransportGenerics } from '.'
 import { SubscriptionTransport } from './abstract/subscription'
+import { Metrics, retrieveCost } from '../metrics'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
 
@@ -131,14 +130,14 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
       )
       if (this.WARMER_ACTIVE) {
         // Decrement count when warmer changed from having entries to having none
-        cacheMetrics.cacheWarmerCount.labels({ isBatched: 'true' }).dec()
+        Metrics.cacheWarmerCount && Metrics.cacheWarmerCount.labels({ isBatched: 'true' }).dec()
         this.WARMER_ACTIVE = false
       }
       await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_HTTP)
       return
     } else if (this.WARMER_ACTIVE === false) {
       // Increment count when warmer changed from having no entries to having some
-      cacheMetrics.cacheWarmerCount.labels({ isBatched: 'true' }).inc()
+      Metrics.cacheWarmerCount && Metrics.cacheWarmerCount.labels({ isBatched: 'true' }).inc()
       this.WARMER_ACTIVE = true
     }
 
@@ -219,13 +218,14 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
         })
 
       // Record cost of data provider call
-      const cost = rateLimitMetrics.retrieveCost(requesterResult.response.data)
-      rateLimitMetrics.rateLimitCreditsSpentTotal
-        .labels({
-          feed_id: 'N/A',
-          participant_id: WARMUP_BATCH_REQUEST_ID,
-        })
-        .inc(cost)
+      const cost = retrieveCost(requesterResult.response.data)
+      Metrics.rateLimitCreditsSpentTotal &&
+        Metrics.rateLimitCreditsSpentTotal
+          .labels({
+            feed_id: 'N/A',
+            participant_id: WARMUP_BATCH_REQUEST_ID,
+          })
+          .inc(cost)
 
       return results
     } catch (e) {

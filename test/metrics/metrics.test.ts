@@ -5,7 +5,7 @@ import nock from 'nock'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { retrieveCost } from '../../src/rate-limiting/metrics'
+import { retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { parsePromMetrics } from './helper'
 

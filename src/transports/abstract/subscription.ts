@@ -4,7 +4,7 @@ import { AdapterConfig } from '../../config'
 import { makeLogger, SubscriptionSet } from '../../util'
 import { AdapterRequest } from '../../util/types'
 import { Transport, TransportDependencies, TransportGenerics } from '..'
-import * as transportMetrics from '../metrics'
+import { Metrics } from '../../metrics'
 
 const logger = makeLogger('SubscriptionTransport')
 
@@ -55,9 +55,10 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     // Keep track of active subscriptions for background execute
     // Note: for those coming from reasonable OOP languages, don't fret; this is JS:
     // this.constructor.name will resolve to the instance name, not the class one (i.e., will use the implementing class' name)
-    transportMetrics.bgExecuteSubscriptionSetCount
-      .labels({ endpoint: context.endpointName, transport_type: this.constructor.name })
-      .set(entries.length)
+    Metrics.bgExecuteSubscriptionSetCount &&
+      Metrics.bgExecuteSubscriptionSetCount
+        .labels({ endpoint: context.endpointName, transport_type: this.constructor.name })
+        .set(entries.length)
 
     await this.backgroundHandler(context, entries)
   }
