@@ -1,5 +1,5 @@
 import { Adapter, AdapterEndpoint, EndpointContext, EndpointGenerics } from './adapter'
-import * as metrics from './metrics'
+import { Metrics } from './metrics'
 import { MetaTransport, Transport, TransportGenerics } from './transports'
 import { makeLogger } from './util'
 
@@ -53,12 +53,12 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
         return
       }
       // Count number of background executions per endpoint
-      metrics.bgExecuteTotal.labels({ endpoint: endpoint.name }).inc()
+      Metrics.bgExecuteTotal && Metrics.bgExecuteTotal.labels({ endpoint: endpoint.name }).inc()
 
       // Time the duration of the background execute process excluding sleep time
-      const metricsTimer = metrics.bgExecuteDurationSeconds
-        .labels({ endpoint: endpoint.name })
-        .startTimer()
+      const metricsTimer =
+        Metrics.bgExecuteDurationSeconds &&
+        Metrics.bgExecuteDurationSeconds.labels({ endpoint: endpoint.name }).startTimer()
 
       logger.debug(`Calling background execute for endpoint "${endpoint.name}"`)
 
@@ -73,7 +73,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       logger.trace(
         `Finished background execute for endpoint "${endpoint.name}", calling it again in 1ms...`,
       )
-      metricsTimer()
+      metricsTimer && metricsTimer()
       timeoutsMap[endpoint.name] = setTimeout(handler, 1)
     }
 

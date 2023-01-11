@@ -1,4 +1,5 @@
 import Redis from 'ioredis'
+import { Metrics } from '../metrics'
 import { AdapterResponse, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
 import * as cacheMetrics from './metrics'
@@ -10,9 +11,10 @@ export const recordRedisCommandMetric = (
   status: cacheMetrics.CMD_SENT_STATUS,
   functionName: string,
 ): void => {
-  cacheMetrics.redisCommandsSentCount
-    .labels({ status: cacheMetrics.CMD_SENT_STATUS[status], function_name: functionName })
-    .inc()
+  Metrics.redisCommandsSentCount &&
+    Metrics.redisCommandsSentCount
+      .labels({ status: cacheMetrics.CMD_SENT_STATUS[status], function_name: functionName })
+      .inc()
 }
 /**
  * Redis implementation of a Cache. It uses a simple js Object, storing entries with both

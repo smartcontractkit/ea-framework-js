@@ -16,7 +16,7 @@ import { join } from 'path'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
 import { AdapterConfig, SettingsMap } from './config'
-import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
+import { buildMetricsMiddleware, Metrics, setupMetricsServer } from './metrics'
 import { AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
 import { loadTestPayload } from './util/test-payload-loader'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
@@ -83,6 +83,7 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
   let api: FastifyInstance | undefined = undefined
 
   if (adapter.config.METRICS_ENABLED && adapter.config.EXPERIMENTAL_METRICS_ENABLED) {
+    Metrics.intialize()
     setupMetricsServer(adapter.name, adapter.config as AdapterConfig)
   }
 
