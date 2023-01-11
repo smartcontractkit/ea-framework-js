@@ -1,7 +1,7 @@
 import { SettingsMap } from '../config'
 import { AdapterRequest, AdapterRequestContext, AdapterResponse, RequestGenerics } from '../util'
 import { AdapterEndpoint } from './endpoint'
-import { Adapter, AdapterEndpointParams, AdapterParams, EndpointGenerics } from './index'
+import { Adapter, AdapterEndpointParams, AdapterParams, PriceEndpointGenerics } from './index'
 
 /**
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
@@ -68,7 +68,7 @@ type IncludesMap = Record<string, Record<string, IncludeDetails>>
  * A PriceEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its InputParameters must extend the basic ones (base/quote).
  */
-export class PriceEndpoint<T extends EndpointGenerics> extends AdapterEndpoint<T> {
+export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {
   constructor(
     params: AdapterEndpointParams<T> & {
       inputParameters: PriceEndpointInputParameters

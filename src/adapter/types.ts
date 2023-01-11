@@ -4,7 +4,12 @@ import { Cache } from '../cache'
 import { AdapterConfig, BaseAdapterConfig, SettingsMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
-import { AdapterRequest, RequestGenerics, SubscriptionSetFactory } from '../util'
+import {
+  AdapterRequest,
+  RequestGenerics,
+  SingleNumberResultResponse,
+  SubscriptionSetFactory,
+} from '../util'
 import { Requester } from '../util/requester'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
@@ -135,6 +140,11 @@ export interface EndpointRateLimitingConfig {
  * Helper type structure that contains the different types passed to the generic parameters of an AdapterEndpoint
  */
 export type EndpointGenerics = TransportGenerics
+
+/**
+ * Helper type structure that contains the different types passed to the generic parameters of a PriceEndpoint
+ */
+export type PriceEndpointGenerics = TransportGenerics & { Response: SingleNumberResultResponse }
 
 export type CustomInputValidator<T extends EndpointGenerics> = (
   input: T['Request']['Params'],
