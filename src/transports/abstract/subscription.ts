@@ -55,10 +55,11 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     // Keep track of active subscriptions for background execute
     // Note: for those coming from reasonable OOP languages, don't fret; this is JS:
     // this.constructor.name will resolve to the instance name, not the class one (i.e., will use the implementing class' name)
-    Metrics.bgExecuteSubscriptionSetCount &&
-      Metrics.bgExecuteSubscriptionSetCount
-        .labels({ endpoint: context.endpointName, transport_type: this.constructor.name })
-        .set(entries.length)
+    Metrics.setBgExecuteSubscriptionSetCount(
+      context.endpointName,
+      this.constructor.name,
+      entries.length,
+    )
 
     await this.backgroundHandler(context, entries)
   }

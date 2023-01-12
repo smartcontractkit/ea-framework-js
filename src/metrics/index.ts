@@ -6,6 +6,8 @@ import fastify, { FastifyReply, HookHandlerDoneFunction } from 'fastify'
 import { join } from 'path'
 import { AdapterError } from '../validation/error'
 import { getMTLSOptions, httpsOptions } from '../index'
+import { CacheMetricsLabels, CMD_SENT_STATUS } from '../cache/metrics'
+import { connectionErrorLabels } from '../transports/metrics'
 
 const logger = makeLogger('Metrics')
 
@@ -61,11 +63,10 @@ export const buildMetricsMiddleware = (
   )
 
   // Record number of requests sent to EA
-  Metrics.httpRequestsTotal && Metrics.httpRequestsTotal.labels(labels).inc()
+  Metrics.setHttpRequestsTotal(labels)
 
   // Record response time of request through entire EA
-  Metrics.httpRequestDurationSeconds &&
-    Metrics.httpRequestDurationSeconds.observe(res.getResponseTime() / 1000)
+  Metrics.setHttpRequestDurationSeconds(res.getResponseTime() / 1000)
   logger.debug(`Response time for ${feedId}: ${res.getResponseTime()}ms`)
   done()
 }
@@ -279,6 +280,155 @@ export class Metrics {
       help: 'A histogram bucket of the distribution of transport polling idle time durations',
       labelNames: ['endpoint', 'succeeded'] as const,
     })
+  }
+
+  static setHttpRequestsTotal(labels: Record<string, string | number | undefined>) {
+    Metrics.httpRequestsTotal && Metrics.httpRequestsTotal.labels(labels).inc()
+  }
+  static setHttpRequestDurationSeconds(responseTime: number) {
+    Metrics.httpRequestDurationSeconds &&
+      Metrics.httpRequestDurationSeconds.observe(responseTime / 1000)
+  }
+  static setDataProviderRequests(status: number, method?: string) {
+    Metrics.dataProviderRequests &&
+      Metrics.dataProviderRequests.labels(dataProviderMetricsLabel(status, method)).inc()
+  }
+  static setDataProviderRequestDurationSeconds(): (
+    labels?: Partial<Record<'', string | number>> | undefined,
+  ) => void {
+    return Metrics.dataProviderRequestDurationSeconds
+      ? Metrics.dataProviderRequestDurationSeconds.startTimer()
+      : () => {
+          return
+        }
+  }
+  static setRequesterQueueSize(inc: boolean) {
+    if (inc) {
+      Metrics.requesterQueueSize && Metrics.requesterQueueSize.inc()
+    } else {
+      Metrics.requesterQueueSize && Metrics.requesterQueueSize.dec()
+    }
+  }
+  static setRequesterQueueOverflow() {
+    Metrics.requesterQueueOverflow && Metrics.requesterQueueOverflow.inc()
+  }
+
+  // Cache Metrics
+  static setCacheDataGetCount(label: CacheMetricsLabels) {
+    Metrics.cacheDataGetCount && Metrics.cacheDataGetCount.labels(label).inc()
+  }
+  static setCacheDataGetValues(label: CacheMetricsLabels, parsedValue: number) {
+    Metrics.cacheDataGetValues && Metrics.cacheDataGetValues.labels(label).set(parsedValue)
+  }
+  static setCacheDataMaxAge(label: CacheMetricsLabels, maxAge: number) {
+    Metrics.cacheDataMaxAge && Metrics.cacheDataMaxAge.labels(label).set(maxAge)
+  }
+  static setCacheDataSetCount(label: CacheMetricsLabels) {
+    Metrics.cacheDataSetCount && Metrics.cacheDataSetCount.labels(label).inc()
+  }
+  static setCacheDataStalenessSeconds(label: CacheMetricsLabels, staleness: number) {
+    Metrics.cacheDataStalenessSeconds &&
+      Metrics.cacheDataStalenessSeconds.labels(label).set(staleness)
+  }
+  static setTotalDataStalenessSeconds(label: CacheMetricsLabels, staleness: number) {
+    Metrics.totalDataStalenessSeconds &&
+      Metrics.totalDataStalenessSeconds.labels(label).set(staleness)
+  }
+  static setProviderTimeDelta(feed_id: string, timeDelta: number) {
+    Metrics.providerTimeDelta && Metrics.providerTimeDelta.labels({ feed_id }).set(timeDelta)
+  }
+
+  // Redis Metrics
+  static setRedisConnectionsOpen() {
+    Metrics.redisConnectionsOpen && Metrics.redisConnectionsOpen.inc()
+  }
+  static setRedisRetriesCount() {
+    Metrics.redisRetriesCount && Metrics.redisRetriesCount.inc()
+  }
+  static setRedisCommandsSentCount(status: CMD_SENT_STATUS, function_name: string) {
+    Metrics.redisCommandsSentCount &&
+      Metrics.redisCommandsSentCount
+        .labels({ status: CMD_SENT_STATUS[status], function_name })
+        .inc()
+  }
+
+  // Cache Warmer Metrics
+  static setCacheWarmerCount(inc: boolean, isBatched: string) {
+    if (inc) {
+      Metrics.cacheWarmerCount && Metrics.cacheWarmerCount.labels({ isBatched }).inc()
+    } else {
+      Metrics.cacheWarmerCount && Metrics.cacheWarmerCount.labels({ isBatched }).dec()
+    }
+  }
+
+  // Rate Limit Metrics
+  static setRateLimitCreditsSpentTotal(feed_id: string, participant_id: string, cost: number) {
+    Metrics.rateLimitCreditsSpentTotal &&
+      Metrics.rateLimitCreditsSpentTotal.labels({ feed_id, participant_id }).inc(cost)
+  }
+
+  // WS Metrics
+  static setWsConnectionActive(inc: boolean) {
+    if (inc) {
+      Metrics.wsConnectionActive && Metrics.wsConnectionActive.inc()
+    } else {
+      Metrics.wsConnectionActive && Metrics.wsConnectionActive.dec()
+    }
+  }
+  static setWsConnectionErrors(message: string) {
+    Metrics.wsConnectionErrors &&
+      Metrics.wsConnectionErrors.labels(connectionErrorLabels(message)).inc()
+  }
+  static setWsSubscriptionActive(
+    inc: boolean,
+    label: { feed_id: string; subscription_key: string },
+  ) {
+    if (inc) {
+      Metrics.wsSubscriptionActive && Metrics.wsSubscriptionActive.labels(label).inc()
+    } else {
+      Metrics.wsSubscriptionActive && Metrics.wsSubscriptionActive.labels(label).dec()
+    }
+  }
+  static setWsSubscriptionTotal(label: { feed_id: string; subscription_key: string }) {
+    Metrics.wsSubscriptionTotal && Metrics.wsSubscriptionTotal.labels(label).inc()
+  }
+  static setWsMessageTotal(label: {
+    feed_id?: string
+    subscription_key?: string
+    direction: string
+  }) {
+    Metrics.wsMessageTotal && Metrics.wsMessageTotal.labels(label).inc()
+  }
+
+  // V3 specific metrics
+  static setBgExecuteTotal(endpoint: string) {
+    Metrics.bgExecuteTotal && Metrics.bgExecuteTotal.labels({ endpoint }).inc()
+  }
+  static setBgExecuteDurationSeconds(
+    endpoint: string,
+  ): (labels?: Partial<Record<'endpoint', string | number>> | undefined) => void {
+    return Metrics.bgExecuteDurationSeconds
+      ? Metrics.bgExecuteDurationSeconds.labels({ endpoint }).startTimer()
+      : () => {
+          return
+        }
+  }
+  static setBgExecuteSubscriptionSetCount(endpoint: string, transport_type: string, size: number) {
+    Metrics.bgExecuteSubscriptionSetCount &&
+      Metrics.bgExecuteSubscriptionSetCount.labels({ endpoint, transport_type }).set(size)
+  }
+  static setTransportPollingFailureCount(endpoint: string) {
+    Metrics.transportPollingFailureCount &&
+      Metrics.transportPollingFailureCount.labels({ endpoint }).inc()
+  }
+  static setTransportPollingDurationSeconds(
+    endpoint: string,
+  ): (labels?: Partial<Record<'endpoint' | 'succeeded', string | number>> | undefined) => void {
+    return Metrics.transportPollingDurationSeconds
+      ? Metrics.transportPollingDurationSeconds.labels({ endpoint }).startTimer()
+      : () => {
+          return
+        }
   }
 }
 

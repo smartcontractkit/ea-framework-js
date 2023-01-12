@@ -10,12 +10,8 @@ const logger = makeLogger('RedisCache')
 export const recordRedisCommandMetric = (
   status: cacheMetrics.CMD_SENT_STATUS,
   functionName: string,
-): void => {
-  Metrics.redisCommandsSentCount &&
-    Metrics.redisCommandsSentCount
-      .labels({ status: cacheMetrics.CMD_SENT_STATUS[status], function_name: functionName })
-      .inc()
-}
+): void => Metrics.setRedisCommandsSentCount(status, functionName)
+
 /**
  * Redis implementation of a Cache. It uses a simple js Object, storing entries with both
  * a value and an expiration timestamp. Expired entries are deleted on reads (i.e. no background gc/upkeep).

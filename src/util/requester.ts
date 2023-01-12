@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { makeLogger, sleep } from '.'
 import { AdapterConfig } from '../config'
-import { dataProviderMetricsLabel, Metrics } from '../metrics'
+import { Metrics } from '../metrics'
 import { RateLimiter } from '../rate-limiting'
 import {
   AdapterConnectionError,
@@ -44,7 +44,7 @@ class UniqueLinkedList<T> {
 
     this.last = node
     this.length++
-    Metrics.requesterQueueSize && Metrics.requesterQueueSize.inc()
+    Metrics.setRequesterQueueSize(true)
     return overflow
   }
 
@@ -57,7 +57,7 @@ class UniqueLinkedList<T> {
 
     this.first = node.next
     this.length--
-    Metrics.requesterQueueSize && Metrics.requesterQueueSize.dec()
+    Metrics.setRequesterQueueSize(false)
     return node.value
   }
 }
@@ -148,7 +148,7 @@ export class Requester {
           this.queue.length
         })`,
       )
-      Metrics.requesterQueueOverflow && Metrics.requesterQueueOverflow.inc()
+      Metrics.setRequesterQueueOverflow()
       overflowedRequest.reject(
         new AdapterRateLimitError({
           message:
@@ -212,9 +212,7 @@ export class Requester {
   private async executeRequest(req: QueuedRequest) {
     const { key, config, resolve, reject, retries } = req
     const providerDataRequested = Date.now()
-    const responseTimer =
-      Metrics.dataProviderRequestDurationSeconds &&
-      Metrics.dataProviderRequestDurationSeconds.startTimer()
+    const responseTimer = Metrics.setDataProviderRequestDurationSeconds()
 
     // Set configured timeout for all requests unless manually specified
     config.timeout = config.timeout || this.timeout
@@ -235,10 +233,7 @@ export class Requester {
       delete this.map[key]
 
       // Record count of successful data provider requests
-      Metrics.dataProviderRequests &&
-        Metrics.dataProviderRequests
-          .labels(dataProviderMetricsLabel(response.status, config.method))
-          .inc()
+      Metrics.setDataProviderRequests(response.status, config.method)
     } catch (e) {
       if (retries >= this.maxRetries) {
         logger.trace(`Request failed and no more retries remaining, rejecting promise...`)
@@ -246,10 +241,7 @@ export class Requester {
         const ErrorClass = err.response?.status ? AdapterDataProviderError : AdapterConnectionError
 
         // Record count of failed data provider request
-        Metrics.dataProviderRequests &&
-          Metrics.dataProviderRequests
-            .labels(dataProviderMetricsLabel(err.response?.status || 0, config.method))
-            .inc()
+        Metrics.setDataProviderRequests(err.response?.status || 0, config.method)
 
         reject(
           new ErrorClass(
@@ -283,7 +275,7 @@ export class Requester {
       }
     } finally {
       // Record time taken for data provider request for success or failure
-      responseTimer && responseTimer()
+      responseTimer()
     }
   }
 }

@@ -1,6 +1,6 @@
 import { Metrics } from '../metrics'
 
-interface CacheMetricsLabels {
+export interface CacheMetricsLabels {
   participant_id: string
   feed_id: string
   cache_type: string
@@ -18,15 +18,13 @@ export const cacheGet = (
   if (typeof value === 'number' || typeof value === 'string') {
     const parsedValue = Number(value)
     if (!Number.isNaN(parsedValue) && Number.isFinite(parsedValue)) {
-      Metrics.cacheDataGetValues && Metrics.cacheDataGetValues.labels(label).set(parsedValue)
+      Metrics.setCacheDataGetValues(label, parsedValue)
     }
   }
-  Metrics.cacheDataGetCount && Metrics.cacheDataGetCount.labels(label).inc()
-  Metrics.cacheDataStalenessSeconds &&
-    Metrics.cacheDataStalenessSeconds.labels(label).set(staleness.cache)
+  Metrics.setCacheDataGetCount(label)
+  Metrics.setCacheDataStalenessSeconds(label, staleness.cache)
   if (staleness.total) {
-    Metrics.totalDataStalenessSeconds &&
-      Metrics.totalDataStalenessSeconds.labels(label).set(staleness.total)
+    Metrics.setTotalDataStalenessSeconds(label, staleness.total)
   }
 }
 
@@ -35,12 +33,11 @@ export const cacheSet = (
   maxAge: number,
   timeDelta: number | undefined,
 ) => {
-  Metrics.cacheDataSetCount && Metrics.cacheDataSetCount.labels(label).inc()
-  Metrics.cacheDataMaxAge && Metrics.cacheDataMaxAge.labels(label).set(maxAge)
-  Metrics.cacheDataStalenessSeconds && Metrics.cacheDataStalenessSeconds.labels(label).set(0)
+  Metrics.setCacheDataSetCount(label)
+  Metrics.setCacheDataMaxAge(label, maxAge)
+  Metrics.setCacheDataStalenessSeconds(label, 0)
   if (timeDelta) {
-    Metrics.providerTimeDelta &&
-      Metrics.providerTimeDelta.labels({ feed_id: label.feed_id }).set(timeDelta)
+    Metrics.setProviderTimeDelta(label.feed_id, timeDelta)
   }
 }
 

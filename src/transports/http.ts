@@ -130,14 +130,14 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
       )
       if (this.WARMER_ACTIVE) {
         // Decrement count when warmer changed from having entries to having none
-        Metrics.cacheWarmerCount && Metrics.cacheWarmerCount.labels({ isBatched: 'true' }).dec()
+        Metrics.setCacheWarmerCount(false, 'true')
         this.WARMER_ACTIVE = false
       }
       await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_HTTP)
       return
     } else if (this.WARMER_ACTIVE === false) {
       // Increment count when warmer changed from having no entries to having some
-      Metrics.cacheWarmerCount && Metrics.cacheWarmerCount.labels({ isBatched: 'true' }).inc()
+      Metrics.setCacheWarmerCount(true, 'true')
       this.WARMER_ACTIVE = true
     }
 
@@ -219,13 +219,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
       // Record cost of data provider call
       const cost = retrieveCost(requesterResult.response.data)
-      Metrics.rateLimitCreditsSpentTotal &&
-        Metrics.rateLimitCreditsSpentTotal
-          .labels({
-            feed_id: 'N/A',
-            participant_id: WARMUP_BATCH_REQUEST_ID,
-          })
-          .inc(cost)
+      Metrics.setRateLimitCreditsSpentTotal('N/A', WARMUP_BATCH_REQUEST_ID, cost)
 
       return results
     } catch (e) {

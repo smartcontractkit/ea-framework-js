@@ -263,7 +263,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
           path: this.config.CACHE_REDIS_PATH, // If set, port and host are ignored
           timeout: this.config.CACHE_REDIS_TIMEOUT,
           retryStrategy(times: number): number {
-            Metrics.redisRetriesCount && Metrics.redisRetriesCount.inc()
+            Metrics.setRedisRetriesCount()
             logger.warn(`Redis reconnect attempt #${times}`)
             return Math.min(times * 100, maxCooldown) // Next reconnect attempt time
           },
@@ -277,7 +277,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
         }
 
         dependencies.redisClient.on('connect', () => {
-          Metrics.redisConnectionsOpen && Metrics.redisConnectionsOpen.inc()
+          Metrics.setRedisConnectionsOpen()
         })
       }
     }
@@ -481,11 +481,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     }
 
     // Observe the idle time taken for polling response
-    const metricsTimer =
-      Metrics.transportPollingDurationSeconds &&
-      Metrics.transportPollingDurationSeconds
-        .labels({ endpoint: req.requestContext.endpointName })
-        .startTimer()
+    const metricsTimer = Metrics.setTransportPollingDurationSeconds(req.requestContext.endpointName)
 
     logger.debug('Transport is set up, polling cache for response...')
     const response = await pollResponseFromCache(
@@ -497,7 +493,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
       },
     )
 
-    metricsTimer && metricsTimer({ succeeded: String(!!response) })
+    metricsTimer({ succeeded: String(!!response) })
 
     if (response) {
       logger.debug('Got a response from polling the cache, sending that back')
@@ -505,10 +501,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     }
 
     // Record polling mechanism failure to return response
-    Metrics.transportPollingFailureCount &&
-      Metrics.transportPollingFailureCount
-        .labels({ endpoint: req.requestContext.endpointName })
-        .inc()
+    Metrics.setTransportPollingFailureCount(req.requestContext.endpointName)
 
     logger.debug('Ran out of polling attempts, returning timeout')
     throw new AdapterTimeoutError({

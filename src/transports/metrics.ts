@@ -42,20 +42,17 @@ export const recordWsMessageMetrics = <T extends TransportGenerics>(
     const baseLabels = messageSubsLabels(context, params)
 
     // Record total number of ws messages sent
-    Metrics.wsMessageTotal &&
-      Metrics.wsMessageTotal
-        .labels({
-          ...baseLabels,
-          direction: 'sent',
-        })
-        .inc()
+    Metrics.setWsMessageTotal({
+      ...baseLabels,
+      direction: 'sent',
+    })
 
     // Record total number of subscriptions made
     if (type === 'sub') {
-      Metrics.wsSubscriptionTotal && Metrics.wsSubscriptionTotal.labels(baseLabels).inc()
-      Metrics.wsSubscriptionActive && Metrics.wsSubscriptionActive.labels(baseLabels).inc()
+      Metrics.setWsSubscriptionTotal(baseLabels)
+      Metrics.setWsSubscriptionActive(true, baseLabels)
     } else {
-      Metrics.wsSubscriptionActive && Metrics.wsSubscriptionActive.labels(baseLabels).dec()
+      Metrics.setWsSubscriptionActive(false, baseLabels)
     }
   }
 
