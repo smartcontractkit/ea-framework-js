@@ -1,22 +1,10 @@
-/**
- * `prom-client` is shared between v2 and v3 when both are dependencies, resulting in metric collision errors
- * Clearing metrics on import will wipe v2's existing register so we can replace them with v3's metrics
- * METRICS_ENABLED=false is used to trigger this behavior because generators in the monorepo (where v2 and v3 are dependencies) tend to set it to false.
- */
-
-import * as client from 'prom-client'
-// , so when it's false, we can clear any metrics before reg
-if (process.env['METRICS_ENABLED'] === 'false') {
-  client.register.clear()
-}
-
 import fastify, { FastifyInstance } from 'fastify'
 import { AddressInfo } from 'net'
 import { join } from 'path'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
 import { AdapterConfig, SettingsMap } from './config'
-import { buildMetricsMiddleware, Metrics, setupMetricsServer } from './metrics'
+import { buildMetricsMiddleware, metrics, setupMetricsServer } from './metrics'
 import { AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
 import { loadTestPayload } from './util/test-payload-loader'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
@@ -82,8 +70,10 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
 
   let api: FastifyInstance | undefined = undefined
 
+  // Initialize metrics to register them with the prom-client
+  metrics.initialize()
+
   if (adapter.config.METRICS_ENABLED && adapter.config.EXPERIMENTAL_METRICS_ENABLED) {
-    Metrics.intialize()
     setupMetricsServer(adapter.name, adapter.config as AdapterConfig)
   }
 

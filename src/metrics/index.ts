@@ -6,8 +6,6 @@ import fastify, { FastifyReply, HookHandlerDoneFunction } from 'fastify'
 import { join } from 'path'
 import { AdapterError } from '../validation/error'
 import { getMTLSOptions, httpsOptions } from '../index'
-import { CacheMetricsLabels, CMD_SENT_STATUS } from '../cache/metrics'
-import { connectionErrorLabels } from '../transports/metrics'
 
 const logger = makeLogger('Metrics')
 
@@ -63,21 +61,39 @@ export const buildMetricsMiddleware = (
   )
 
   // Record number of requests sent to EA
-  Metrics.setHttpRequestsTotal(labels)
+  metrics.get('httpRequestsTotal').labels(labels).inc()
 
   // Record response time of request through entire EA
-  Metrics.setHttpRequestDurationSeconds(res.getResponseTime() / 1000)
+  metrics.get('httpRequestDurationSeconds').observe(res.getResponseTime() / 1000)
   logger.debug(`Response time for ${feedId}: ${res.getResponseTime()}ms`)
   done()
 }
 
-const cacheMetricsLabels = [
-  'feed_id',
-  'participant_id',
-  'cache_type',
-  'is_from_ws',
-  'experimental',
-] as const
+export class Metrics<T extends Record<string, unknown>> {
+  // Stores the method to register metrics to be used later on initialization
+  private metricsDefinition: () => T
+  private metrics?: T
+
+  constructor(metricsDefinition: () => T) {
+    this.metricsDefinition = metricsDefinition
+  }
+
+  // Register metrics and set the metrics map for use during runtime
+  // Ideally called on adapter startup to avoid metrics conflicts
+  initialize() {
+    if (!this.metrics) {
+      this.metrics = this.metricsDefinition()
+    }
+  }
+
+  get<K extends keyof T>(name: K): T[K] {
+    const metric = this.metrics?.[name]
+    if (!metric) {
+      throw new Error(`Metric "${name as string}" was not initialized before use`)
+    }
+    return metric
+  }
+}
 
 const httpRequestsTotalLabels = [
   'method',
@@ -89,348 +105,13 @@ const httpRequestsTotalLabels = [
   'provider_status_code',
 ] as const
 
-export class Metrics {
-  static httpRequestsTotal?: client.Counter<typeof httpRequestsTotalLabels[number]>
-  static httpRequestDurationSeconds?: client.Histogram<''>
-  static dataProviderRequests?: client.Counter<'method' | 'provider_status_code'>
-  static dataProviderRequestDurationSeconds?: client.Histogram<''>
-  static requesterQueueSize?: client.Gauge<''>
-  static requesterQueueOverflow?: client.Counter<''>
-
-  // Cache Metrics
-  static cacheDataGetCount?: client.Counter<typeof cacheMetricsLabels[number]>
-  static cacheDataGetValues?: client.Gauge<typeof cacheMetricsLabels[number]>
-  static cacheDataMaxAge?: client.Gauge<typeof cacheMetricsLabels[number]>
-  static cacheDataSetCount?: client.Counter<typeof cacheMetricsLabels[number]>
-  static cacheDataStalenessSeconds?: client.Gauge<typeof cacheMetricsLabels[number]>
-  static totalDataStalenessSeconds?: client.Gauge<typeof cacheMetricsLabels[number]>
-  static providerTimeDelta?: client.Gauge<'feed_id'>
-
-  // Redis Metrics
-  static redisConnectionsOpen?: client.Counter<''>
-  static redisRetriesCount?: client.Counter<''>
-  static redisCommandsSentCount?: client.Counter<'status' | 'function_name'>
-
-  // Cache Warmer Metrics
-  static cacheWarmerCount?: client.Gauge<'isBatched'>
-
-  // Rate Limit Metrics
-  static rateLimitCreditsSpentTotal?: client.Counter<'participant_id' | 'feed_id'>
-
-  // WS Metrics
-  static wsConnectionActive?: client.Gauge<'url'>
-  static wsConnectionErrors?: client.Counter<'url' | 'message'>
-  static wsSubscriptionActive?: client.Gauge<'connection_url' | 'feed_id' | 'subscription_key'>
-  static wsSubscriptionTotal?: client.Counter<'connection_url' | 'feed_id' | 'subscription_key'>
-  static wsMessageTotal?: client.Counter<'feed_id' | 'subscription_key' | 'direction'>
-
-  // V3 specific metrics
-  static bgExecuteTotal?: client.Counter<'endpoint'>
-  static bgExecuteDurationSeconds?: client.Gauge<'endpoint'>
-  static bgExecuteSubscriptionSetCount?: client.Gauge<'endpoint' | 'transport_type'>
-  static transportPollingFailureCount?: client.Counter<'endpoint'>
-  static transportPollingDurationSeconds?: client.Gauge<'endpoint' | 'succeeded'>
-
-  static intialize() {
-    Metrics.httpRequestsTotal = new client.Counter({
-      name: 'http_requests_total',
-      help: 'The number of http requests this external adapter has serviced for its entire uptime',
-      labelNames: httpRequestsTotalLabels,
-    })
-    Metrics.httpRequestDurationSeconds = new client.Histogram({
-      name: 'http_request_duration_seconds',
-      help: 'A histogram bucket of the distribution of http request durations',
-      buckets: requestDurationBuckets,
-    })
-    Metrics.dataProviderRequests = new client.Counter({
-      name: 'data_provider_requests',
-      help: 'The number of http requests that are made to a data provider',
-      labelNames: ['method', 'provider_status_code'] as const,
-    })
-    Metrics.dataProviderRequestDurationSeconds = new client.Histogram({
-      name: 'data_provider_request_duration_seconds',
-      help: 'A histogram bucket of the distribution of data provider request durations',
-      buckets: requestDurationBuckets,
-    })
-    Metrics.requesterQueueSize = new client.Gauge({
-      name: 'requester_queue_size',
-      help: 'The number of provider http requests currently queued to be executed',
-    })
-    Metrics.requesterQueueOverflow = new client.Counter({
-      name: 'requester_queue_overflow',
-      help: 'Total times the requester queue replaced the oldest item to avoid an overflow',
-    })
-
-    // Cache Metrics
-    Metrics.cacheDataGetCount = new client.Counter({
-      name: 'cache_data_get_count',
-      help: 'A counter that increments every time a value is fetched from the cache',
-      labelNames: cacheMetricsLabels,
-    })
-    Metrics.cacheDataGetValues = new client.Gauge({
-      name: 'cache_data_get_values',
-      help: 'A gauge keeping track of values being fetched from cache',
-      labelNames: cacheMetricsLabels,
-    })
-    Metrics.cacheDataMaxAge = new client.Gauge({
-      name: 'cache_data_max_age',
-      help: 'A gauge tracking the max age of stored values in the cache',
-      labelNames: cacheMetricsLabels,
-    })
-    Metrics.cacheDataSetCount = new client.Counter({
-      name: 'cache_data_set_count',
-      help: 'A counter that increments every time a value is set to the cache',
-      labelNames: [...cacheMetricsLabels, 'status_code'],
-    })
-    Metrics.cacheDataStalenessSeconds = new client.Gauge({
-      name: 'cache_data_staleness_seconds',
-      help: 'Observes the cache staleness of the data returned (i.e., time since the data was written to the cache)',
-      labelNames: cacheMetricsLabels,
-    })
-    Metrics.totalDataStalenessSeconds = new client.Gauge({
-      name: 'total_data_staleness_seconds',
-      help: 'Observes the total staleness of the data returned (i.e., time since the provider indicated the data was sent)',
-      labelNames: cacheMetricsLabels,
-    })
-    Metrics.providerTimeDelta = new client.Gauge({
-      name: 'provider_time_delta',
-      help: 'Measures the difference between the time indicated by a DP for a value vs the time it was written to cache',
-      labelNames: ['feed_id'],
-    })
-
-    // Redis Metrics
-    Metrics.redisConnectionsOpen = new client.Counter({
-      name: 'redis_connections_open',
-      help: 'The number of redis connections that are open',
-    })
-    Metrics.redisRetriesCount = new client.Counter({
-      name: 'redis_retries_count',
-      help: 'The number of retries that have been made to establish a redis connection',
-    })
-    Metrics.redisCommandsSentCount = new client.Counter({
-      name: 'redis_commands_sent_count',
-      help: 'The number of redis commands sent',
-      labelNames: ['status', 'function_name'],
-    })
-
-    // Cache Warmer Metrics
-    Metrics.cacheWarmerCount = new client.Gauge({
-      name: 'cache_warmer_get_count',
-      help: 'The number of cache warmers running',
-      labelNames: ['isBatched'] as const,
-    })
-
-    // Rate Limit Metrics
-    Metrics.rateLimitCreditsSpentTotal = new client.Counter({
-      name: 'rate_limit_credits_spent_total',
-      help: 'The number of data provider credits the adapter is consuming',
-      labelNames: ['participant_id', 'feed_id'] as const,
-    })
-
-    // WS Metrics
-    Metrics.wsConnectionActive = new client.Gauge({
-      name: 'ws_connection_active',
-      help: 'The number of active connections',
-      labelNames: ['url'] as const,
-    })
-    Metrics.wsConnectionErrors = new client.Counter({
-      name: 'ws_connection_errors',
-      help: 'The number of connection errors',
-      labelNames: ['url', 'message'] as const,
-    })
-    Metrics.wsSubscriptionActive = new client.Gauge({
-      name: 'ws_subscription_active',
-      help: 'The number of currently active subscriptions',
-      labelNames: ['connection_url', 'feed_id', 'subscription_key'] as const,
-    })
-    Metrics.wsSubscriptionTotal = new client.Counter({
-      name: 'ws_subscription_total',
-      help: 'The number of subscriptions opened in total',
-      labelNames: ['connection_url', 'feed_id', 'subscription_key'] as const,
-    })
-    Metrics.wsMessageTotal = new client.Counter({
-      name: 'ws_message_total',
-      help: 'The number of messages sent in total',
-      labelNames: ['feed_id', 'subscription_key', 'direction'] as const,
-    })
-
-    // V3 specific metrics
-    Metrics.bgExecuteTotal = new client.Counter({
-      name: 'bg_execute_total',
-      help: 'The number of background executes performed per endpoint',
-      labelNames: ['endpoint'] as const,
-    })
-    Metrics.bgExecuteDurationSeconds = new client.Gauge({
-      name: 'bg_execute_duration_seconds',
-      help: 'A histogram bucket of the distribution of background execute durations',
-      labelNames: ['endpoint'] as const,
-    })
-    Metrics.bgExecuteSubscriptionSetCount = new client.Gauge({
-      name: 'bg_execute_subscription_set_count',
-      help: 'The number of active subscriptions in background execute',
-      labelNames: ['endpoint', 'transport_type'] as const,
-    })
-    Metrics.transportPollingFailureCount = new client.Counter({
-      name: 'transport_polling_failure_count',
-      help: 'The number of times the polling mechanism ran out of attempts and failed to return a response',
-      labelNames: ['endpoint'] as const,
-    })
-    Metrics.transportPollingDurationSeconds = new client.Gauge({
-      name: 'transport_polling_duration_seconds',
-      help: 'A histogram bucket of the distribution of transport polling idle time durations',
-      labelNames: ['endpoint', 'succeeded'] as const,
-    })
-  }
-
-  static setHttpRequestsTotal(labels: Record<string, string | number | undefined>) {
-    Metrics.httpRequestsTotal && Metrics.httpRequestsTotal.labels(labels).inc()
-  }
-  static setHttpRequestDurationSeconds(responseTime: number) {
-    Metrics.httpRequestDurationSeconds &&
-      Metrics.httpRequestDurationSeconds.observe(responseTime / 1000)
-  }
-  static setDataProviderRequests(status: number, method?: string) {
-    Metrics.dataProviderRequests &&
-      Metrics.dataProviderRequests.labels(dataProviderMetricsLabel(status, method)).inc()
-  }
-  static setDataProviderRequestDurationSeconds(): (
-    labels?: Partial<Record<'', string | number>> | undefined,
-  ) => void {
-    return Metrics.dataProviderRequestDurationSeconds
-      ? Metrics.dataProviderRequestDurationSeconds.startTimer()
-      : () => {
-          return
-        }
-  }
-  static setRequesterQueueSize(inc: boolean) {
-    if (inc) {
-      Metrics.requesterQueueSize && Metrics.requesterQueueSize.inc()
-    } else {
-      Metrics.requesterQueueSize && Metrics.requesterQueueSize.dec()
-    }
-  }
-  static setRequesterQueueOverflow() {
-    Metrics.requesterQueueOverflow && Metrics.requesterQueueOverflow.inc()
-  }
-
-  // Cache Metrics
-  static setCacheDataGetCount(label: CacheMetricsLabels) {
-    Metrics.cacheDataGetCount && Metrics.cacheDataGetCount.labels(label).inc()
-  }
-  static setCacheDataGetValues(label: CacheMetricsLabels, parsedValue: number) {
-    Metrics.cacheDataGetValues && Metrics.cacheDataGetValues.labels(label).set(parsedValue)
-  }
-  static setCacheDataMaxAge(label: CacheMetricsLabels, maxAge: number) {
-    Metrics.cacheDataMaxAge && Metrics.cacheDataMaxAge.labels(label).set(maxAge)
-  }
-  static setCacheDataSetCount(label: CacheMetricsLabels) {
-    Metrics.cacheDataSetCount && Metrics.cacheDataSetCount.labels(label).inc()
-  }
-  static setCacheDataStalenessSeconds(label: CacheMetricsLabels, staleness: number) {
-    Metrics.cacheDataStalenessSeconds &&
-      Metrics.cacheDataStalenessSeconds.labels(label).set(staleness)
-  }
-  static setTotalDataStalenessSeconds(label: CacheMetricsLabels, staleness: number) {
-    Metrics.totalDataStalenessSeconds &&
-      Metrics.totalDataStalenessSeconds.labels(label).set(staleness)
-  }
-  static setProviderTimeDelta(feed_id: string, timeDelta: number) {
-    Metrics.providerTimeDelta && Metrics.providerTimeDelta.labels({ feed_id }).set(timeDelta)
-  }
-
-  // Redis Metrics
-  static setRedisConnectionsOpen() {
-    Metrics.redisConnectionsOpen && Metrics.redisConnectionsOpen.inc()
-  }
-  static setRedisRetriesCount() {
-    Metrics.redisRetriesCount && Metrics.redisRetriesCount.inc()
-  }
-  static setRedisCommandsSentCount(status: CMD_SENT_STATUS, function_name: string) {
-    Metrics.redisCommandsSentCount &&
-      Metrics.redisCommandsSentCount
-        .labels({ status: CMD_SENT_STATUS[status], function_name })
-        .inc()
-  }
-
-  // Cache Warmer Metrics
-  static setCacheWarmerCount(inc: boolean, isBatched: string) {
-    if (inc) {
-      Metrics.cacheWarmerCount && Metrics.cacheWarmerCount.labels({ isBatched }).inc()
-    } else {
-      Metrics.cacheWarmerCount && Metrics.cacheWarmerCount.labels({ isBatched }).dec()
-    }
-  }
-
-  // Rate Limit Metrics
-  static setRateLimitCreditsSpentTotal(feed_id: string, participant_id: string, cost: number) {
-    Metrics.rateLimitCreditsSpentTotal &&
-      Metrics.rateLimitCreditsSpentTotal.labels({ feed_id, participant_id }).inc(cost)
-  }
-
-  // WS Metrics
-  static setWsConnectionActive(inc: boolean) {
-    if (inc) {
-      Metrics.wsConnectionActive && Metrics.wsConnectionActive.inc()
-    } else {
-      Metrics.wsConnectionActive && Metrics.wsConnectionActive.dec()
-    }
-  }
-  static setWsConnectionErrors(message: string) {
-    Metrics.wsConnectionErrors &&
-      Metrics.wsConnectionErrors.labels(connectionErrorLabels(message)).inc()
-  }
-  static setWsSubscriptionActive(
-    inc: boolean,
-    label: { feed_id: string; subscription_key: string },
-  ) {
-    if (inc) {
-      Metrics.wsSubscriptionActive && Metrics.wsSubscriptionActive.labels(label).inc()
-    } else {
-      Metrics.wsSubscriptionActive && Metrics.wsSubscriptionActive.labels(label).dec()
-    }
-  }
-  static setWsSubscriptionTotal(label: { feed_id: string; subscription_key: string }) {
-    Metrics.wsSubscriptionTotal && Metrics.wsSubscriptionTotal.labels(label).inc()
-  }
-  static setWsMessageTotal(label: {
-    feed_id?: string
-    subscription_key?: string
-    direction: string
-  }) {
-    Metrics.wsMessageTotal && Metrics.wsMessageTotal.labels(label).inc()
-  }
-
-  // V3 specific metrics
-  static setBgExecuteTotal(endpoint: string) {
-    Metrics.bgExecuteTotal && Metrics.bgExecuteTotal.labels({ endpoint }).inc()
-  }
-  static setBgExecuteDurationSeconds(
-    endpoint: string,
-  ): (labels?: Partial<Record<'endpoint', string | number>> | undefined) => void {
-    return Metrics.bgExecuteDurationSeconds
-      ? Metrics.bgExecuteDurationSeconds.labels({ endpoint }).startTimer()
-      : () => {
-          return
-        }
-  }
-  static setBgExecuteSubscriptionSetCount(endpoint: string, transport_type: string, size: number) {
-    Metrics.bgExecuteSubscriptionSetCount &&
-      Metrics.bgExecuteSubscriptionSetCount.labels({ endpoint, transport_type }).set(size)
-  }
-  static setTransportPollingFailureCount(endpoint: string) {
-    Metrics.transportPollingFailureCount &&
-      Metrics.transportPollingFailureCount.labels({ endpoint }).inc()
-  }
-  static setTransportPollingDurationSeconds(
-    endpoint: string,
-  ): (labels?: Partial<Record<'endpoint' | 'succeeded', string | number>> | undefined) => void {
-    return Metrics.transportPollingDurationSeconds
-      ? Metrics.transportPollingDurationSeconds.labels({ endpoint }).startTimer()
-      : () => {
-          return
-        }
-  }
-}
+const cacheMetricsLabels = [
+  'feed_id',
+  'participant_id',
+  'cache_type',
+  'is_from_ws',
+  'experimental',
+] as const
 
 export const buildHttpRequestMetricsLabel = (
   feedId: string,
@@ -479,3 +160,142 @@ export const retrieveCost = <ProviderResponseBody>(data: ProviderResponseBody): 
     return 1
   }
 }
+
+export const metrics = new Metrics(() => ({
+  httpRequestsTotal: new client.Counter({
+    name: 'http_requests_total',
+    help: 'The number of http requests this external adapter has serviced for its entire uptime',
+    labelNames: httpRequestsTotalLabels,
+  }),
+  httpRequestDurationSeconds: new client.Histogram({
+    name: 'http_request_duration_seconds',
+    help: 'A histogram bucket of the distribution of http request durations',
+    buckets: requestDurationBuckets,
+  }),
+  dataProviderRequests: new client.Counter({
+    name: 'data_provider_requests',
+    help: 'The number of http requests that are made to a data provider',
+    labelNames: ['method', 'provider_status_code'] as const,
+  }),
+  dataProviderRequestDurationSeconds: new client.Histogram({
+    name: 'data_provider_request_duration_seconds',
+    help: 'A histogram bucket of the distribution of data provider request durations',
+    buckets: requestDurationBuckets,
+  }),
+  requesterQueueSize: new client.Gauge({
+    name: 'requester_queue_size',
+    help: 'The number of provider http requests currently queued to be executed',
+  }),
+  requesterQueueOverflow: new client.Counter({
+    name: 'requester_queue_overflow',
+    help: 'Total times the requester queue replaced the oldest item to avoid an overflow',
+  }),
+  bgExecuteSubscriptionSetCount: new client.Gauge({
+    name: 'bg_execute_subscription_set_count',
+    help: 'The number of active subscriptions in background execute',
+    labelNames: ['endpoint', 'transport_type'] as const,
+  }),
+  bgExecuteTotal: new client.Counter({
+    name: 'bg_execute_total',
+    help: 'The number of background executes performed per endpoint',
+    labelNames: ['endpoint'] as const,
+  }),
+  bgExecuteDurationSeconds: new client.Gauge({
+    name: 'bg_execute_duration_seconds',
+    help: 'A histogram bucket of the distribution of background execute durations',
+    labelNames: ['endpoint'] as const,
+  }),
+  cacheDataGetCount: new client.Counter({
+    name: 'cache_data_get_count',
+    help: 'A counter that increments every time a value is fetched from the cache',
+    labelNames: cacheMetricsLabels,
+  }),
+  cacheDataGetValues: new client.Gauge({
+    name: 'cache_data_get_values',
+    help: 'A gauge keeping track of values being fetched from cache',
+    labelNames: cacheMetricsLabels,
+  }),
+  cacheDataMaxAge: new client.Gauge({
+    name: 'cache_data_max_age',
+    help: 'A gauge tracking the max age of stored values in the cache',
+    labelNames: cacheMetricsLabels,
+  }),
+  cacheDataSetCount: new client.Counter({
+    name: 'cache_data_set_count',
+    help: 'A counter that increments every time a value is set to the cache',
+    labelNames: [...cacheMetricsLabels, 'status_code'],
+  }),
+  cacheDataStalenessSeconds: new client.Gauge({
+    name: 'cache_data_staleness_seconds',
+    help: 'Observes the cache staleness of the data returned (i.e., time since the data was written to the cache)',
+    labelNames: cacheMetricsLabels,
+  }),
+  totalDataStalenessSeconds: new client.Gauge({
+    name: 'total_data_staleness_seconds',
+    help: 'Observes the total staleness of the data returned (i.e., time since the provider indicated the data was sent)',
+    labelNames: cacheMetricsLabels,
+  }),
+  providerTimeDelta: new client.Gauge({
+    name: 'provider_time_delta',
+    help: 'Measures the difference between the time indicated by a DP for a value vs the time it was written to cache',
+    labelNames: ['feed_id'],
+  }),
+  redisConnectionsOpen: new client.Counter({
+    name: 'redis_connections_open',
+    help: 'The number of redis connections that are open',
+  }),
+  redisRetriesCount: new client.Counter({
+    name: 'redis_retries_count',
+    help: 'The number of retries that have been made to establish a redis connection',
+  }),
+  redisCommandsSentCount: new client.Counter({
+    name: 'redis_commands_sent_count',
+    help: 'The number of redis commands sent',
+    labelNames: ['status', 'function_name'],
+  }),
+  cacheWarmerCount: new client.Gauge({
+    name: 'cache_warmer_get_count',
+    help: 'The number of cache warmers running',
+    labelNames: ['isBatched'] as const,
+  }),
+  wsConnectionActive: new client.Gauge({
+    name: 'ws_connection_active',
+    help: 'The number of active connections',
+    labelNames: ['url'] as const,
+  }),
+  wsConnectionErrors: new client.Counter({
+    name: 'ws_connection_errors',
+    help: 'The number of connection errors',
+    labelNames: ['url', 'message'] as const,
+  }),
+  wsSubscriptionActive: new client.Gauge({
+    name: 'ws_subscription_active',
+    help: 'The number of currently active subscriptions',
+    labelNames: ['connection_url', 'feed_id', 'subscription_key'] as const,
+  }),
+  wsSubscriptionTotal: new client.Counter({
+    name: 'ws_subscription_total',
+    help: 'The number of subscriptions opened in total',
+    labelNames: ['connection_url', 'feed_id', 'subscription_key'] as const,
+  }),
+  wsMessageTotal: new client.Counter({
+    name: 'ws_message_total',
+    help: 'The number of messages sent in total',
+    labelNames: ['feed_id', 'subscription_key', 'direction'] as const,
+  }),
+  transportPollingFailureCount: new client.Counter({
+    name: 'transport_polling_failure_count',
+    help: 'The number of times the polling mechanism ran out of attempts and failed to return a response',
+    labelNames: ['endpoint'] as const,
+  }),
+  transportPollingDurationSeconds: new client.Gauge({
+    name: 'transport_polling_duration_seconds',
+    help: 'A histogram bucket of the distribution of transport polling idle time durations',
+    labelNames: ['endpoint', 'succeeded'] as const,
+  }),
+  rateLimitCreditsSpentTotal: new client.Counter({
+    name: 'rate_limit_credits_spent_total',
+    help: 'The number of data provider credits the adapter is consuming',
+    labelNames: ['participant_id', 'feed_id'] as const,
+  }),
+}))

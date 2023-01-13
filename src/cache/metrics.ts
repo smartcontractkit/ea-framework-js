@@ -1,4 +1,4 @@
-import { Metrics } from '../metrics'
+import { metrics } from '../metrics'
 
 export interface CacheMetricsLabels {
   participant_id: string
@@ -18,13 +18,13 @@ export const cacheGet = (
   if (typeof value === 'number' || typeof value === 'string') {
     const parsedValue = Number(value)
     if (!Number.isNaN(parsedValue) && Number.isFinite(parsedValue)) {
-      Metrics.setCacheDataGetValues(label, parsedValue)
+      metrics.get('cacheDataGetValues').labels(label).set(parsedValue)
     }
   }
-  Metrics.setCacheDataGetCount(label)
-  Metrics.setCacheDataStalenessSeconds(label, staleness.cache)
+  metrics.get('cacheDataGetCount').labels(label).inc()
+  metrics.get('cacheDataStalenessSeconds').labels(label).set(staleness.cache)
   if (staleness.total) {
-    Metrics.setTotalDataStalenessSeconds(label, staleness.total)
+    metrics.get('totalDataStalenessSeconds').labels(label).set(staleness.total)
   }
 }
 
@@ -33,11 +33,11 @@ export const cacheSet = (
   maxAge: number,
   timeDelta: number | undefined,
 ) => {
-  Metrics.setCacheDataSetCount(label)
-  Metrics.setCacheDataMaxAge(label, maxAge)
-  Metrics.setCacheDataStalenessSeconds(label, 0)
+  metrics.get('cacheDataSetCount').labels(label).inc()
+  metrics.get('cacheDataMaxAge').labels(label).set(maxAge)
+  metrics.get('cacheDataStalenessSeconds').labels(label).set(0)
   if (timeDelta) {
-    Metrics.setProviderTimeDelta(label.feed_id, timeDelta)
+    metrics.get('providerTimeDelta').labels({ feed_id: label.feed_id }).set(timeDelta)
   }
 }
 

@@ -7,7 +7,7 @@ import { Requester } from '../util/requester'
 import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
 import { TransportDependencies, TransportGenerics } from '.'
 import { SubscriptionTransport } from './abstract/subscription'
-import { Metrics, retrieveCost } from '../metrics'
+import { metrics, retrieveCost } from '../metrics'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
 
@@ -130,14 +130,14 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
       )
       if (this.WARMER_ACTIVE) {
         // Decrement count when warmer changed from having entries to having none
-        Metrics.setCacheWarmerCount(false, 'true')
+        metrics.get('cacheWarmerCount').labels({ isBatched: 'true' }).dec()
         this.WARMER_ACTIVE = false
       }
       await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_HTTP)
       return
     } else if (this.WARMER_ACTIVE === false) {
       // Increment count when warmer changed from having no entries to having some
-      Metrics.setCacheWarmerCount(true, 'true')
+      metrics.get('cacheWarmerCount').labels({ isBatched: 'true' }).inc()
       this.WARMER_ACTIVE = true
     }
 
@@ -219,7 +219,10 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
       // Record cost of data provider call
       const cost = retrieveCost(requesterResult.response.data)
-      Metrics.setRateLimitCreditsSpentTotal('N/A', WARMUP_BATCH_REQUEST_ID, cost)
+      metrics
+        .get('rateLimitCreditsSpentTotal')
+        .labels({ feed_id: 'N/A', participant_id: WARMUP_BATCH_REQUEST_ID })
+        .inc(cost)
 
       return results
     } catch (e) {

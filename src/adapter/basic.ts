@@ -1,6 +1,5 @@
 import Redis from 'ioredis'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
-import * as cacheMetrics from '../cache/metrics'
 import {
   AdapterConfig,
   BaseAdapterConfig,
@@ -29,7 +28,8 @@ import {
 } from './types'
 import { AdapterTimeoutError } from '../validation/error'
 import { Requester } from '../util/requester'
-import { Metrics } from '../metrics'
+import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
+import { metrics } from '../metrics'
 
 const logger = makeLogger('Adapter')
 
@@ -263,7 +263,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
           path: this.config.CACHE_REDIS_PATH, // If set, port and host are ignored
           timeout: this.config.CACHE_REDIS_TIMEOUT,
           retryStrategy(times: number): number {
-            Metrics.setRedisRetriesCount()
+            metrics.get('redisRetriesCount').inc()
             logger.warn(`Redis reconnect attempt #${times}`)
             return Math.min(times * 100, maxCooldown) // Next reconnect attempt time
           },
@@ -277,7 +277,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
         }
 
         dependencies.redisClient.on('connect', () => {
-          Metrics.setRedisConnectionsOpen()
+          metrics.get('redisConnectionsOpen').inc()
         })
       }
     }
@@ -347,7 +347,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
 
     if (response) {
       if (this.config.METRICS_ENABLED && this.config.EXPERIMENTAL_METRICS_ENABLED) {
-        const label = cacheMetrics.cacheMetricsLabel(
+        const label = cacheMetricsLabel(
           req.requestContext.cacheKey,
           req.requestContext.meta?.metrics?.feedId || 'N/A',
           this.config.CACHE_TYPE,
@@ -355,7 +355,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
 
         // Record cache staleness and cache get count and value
         const now = Date.now()
-        cacheMetrics.cacheGet(label, response.result, {
+        cacheGet(label, response.result, {
           cache: now - response.timestamps.providerDataReceived,
           total: response.timestamps.providerIndicatedTime
             ? now - response.timestamps.providerIndicatedTime
@@ -481,7 +481,10 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     }
 
     // Observe the idle time taken for polling response
-    const metricsTimer = Metrics.setTransportPollingDurationSeconds(req.requestContext.endpointName)
+    const metricsTimer = metrics
+      .get('transportPollingDurationSeconds')
+      .labels({ endpoint: req.requestContext.endpointName })
+      .startTimer()
 
     logger.debug('Transport is set up, polling cache for response...')
     const response = await pollResponseFromCache(
@@ -501,7 +504,10 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     }
 
     // Record polling mechanism failure to return response
-    Metrics.setTransportPollingFailureCount(req.requestContext.endpointName)
+    metrics
+      .get('transportPollingFailureCount')
+      .labels({ endpoint: req.requestContext.endpointName })
+      .inc()
 
     logger.debug('Ran out of polling attempts, returning timeout')
     throw new AdapterTimeoutError({

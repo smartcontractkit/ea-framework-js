@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { makeLogger, sleep } from '.'
 import { AdapterConfig } from '../config'
-import { Metrics } from '../metrics'
+import { dataProviderMetricsLabel, metrics } from '../metrics'
 import { RateLimiter } from '../rate-limiting'
 import {
   AdapterConnectionError,
@@ -44,7 +44,7 @@ class UniqueLinkedList<T> {
 
     this.last = node
     this.length++
-    Metrics.setRequesterQueueSize(true)
+    metrics.get('requesterQueueSize').inc()
     return overflow
   }
 
@@ -57,7 +57,7 @@ class UniqueLinkedList<T> {
 
     this.first = node.next
     this.length--
-    Metrics.setRequesterQueueSize(false)
+    metrics.get('requesterQueueSize').dec()
     return node.value
   }
 }
@@ -148,7 +148,7 @@ export class Requester {
           this.queue.length
         })`,
       )
-      Metrics.setRequesterQueueOverflow()
+      metrics.get('requesterQueueOverflow').inc()
       overflowedRequest.reject(
         new AdapterRateLimitError({
           message:
@@ -212,7 +212,7 @@ export class Requester {
   private async executeRequest(req: QueuedRequest) {
     const { key, config, resolve, reject, retries } = req
     const providerDataRequested = Date.now()
-    const responseTimer = Metrics.setDataProviderRequestDurationSeconds()
+    const responseTimer = metrics.get('dataProviderRequestDurationSeconds').startTimer()
 
     // Set configured timeout for all requests unless manually specified
     config.timeout = config.timeout || this.timeout
@@ -233,7 +233,10 @@ export class Requester {
       delete this.map[key]
 
       // Record count of successful data provider requests
-      Metrics.setDataProviderRequests(response.status, config.method)
+      metrics
+        .get('dataProviderRequests')
+        .labels(dataProviderMetricsLabel(response.status, config.method))
+        .inc()
     } catch (e) {
       if (retries >= this.maxRetries) {
         logger.trace(`Request failed and no more retries remaining, rejecting promise...`)
@@ -241,7 +244,10 @@ export class Requester {
         const ErrorClass = err.response?.status ? AdapterDataProviderError : AdapterConnectionError
 
         // Record count of failed data provider request
-        Metrics.setDataProviderRequests(err.response?.status || 0, config.method)
+        metrics
+          .get('dataProviderRequests')
+          .labels(dataProviderMetricsLabel(err.response?.status || 0, config.method))
+          .inc()
 
         reject(
           new ErrorClass(

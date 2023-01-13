@@ -2,7 +2,7 @@ import { TransportGenerics } from '.'
 import { EndpointContext } from '../adapter'
 import { calculateCacheKey, calculateFeedId } from '../cache'
 import { AdapterConfig } from '../config'
-import { Metrics } from '../metrics'
+import { metrics } from '../metrics'
 import { InputParameters } from '../validation'
 
 // Websocket Metrics
@@ -42,17 +42,17 @@ export const recordWsMessageMetrics = <T extends TransportGenerics>(
     const baseLabels = messageSubsLabels(context, params)
 
     // Record total number of ws messages sent
-    Metrics.setWsMessageTotal({
-      ...baseLabels,
-      direction: 'sent',
-    })
+    metrics
+      .get('wsMessageTotal')
+      .labels({ ...baseLabels, direction: 'sent' })
+      .inc()
 
     // Record total number of subscriptions made
     if (type === 'sub') {
-      Metrics.setWsSubscriptionTotal(baseLabels)
-      Metrics.setWsSubscriptionActive(true, baseLabels)
+      metrics.get('wsSubscriptionTotal').labels(baseLabels).inc()
+      metrics.get('wsSubscriptionActive').labels(baseLabels).inc()
     } else {
-      Metrics.setWsSubscriptionActive(false, baseLabels)
+      metrics.get('wsSubscriptionActive').labels(baseLabels).dec()
     }
   }
 
