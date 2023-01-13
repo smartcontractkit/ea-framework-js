@@ -35,7 +35,6 @@ test('Generate http request metrics label test (adapter error)', (t) => {
     type: HttpRequestType.DP_ERROR,
     provider_status_code: 500,
   }
-  label.type
   t.deepEqual(label, result)
 })
 
@@ -47,7 +46,6 @@ test('Generate http request metrics label test (generic error)', (t) => {
     status_code: 500,
     type: HttpRequestType.ADAPTER_ERROR,
   }
-  label.type
   t.deepEqual(label, result)
 })
 

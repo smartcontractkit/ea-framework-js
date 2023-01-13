@@ -1,19 +1,17 @@
 import Redis from 'ioredis'
+import { metrics } from '../metrics'
 import { AdapterResponse, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
-import * as cacheMetrics from './metrics'
-import { CMD_SENT_STATUS } from './metrics'
+import { cacheMetricsLabel, cacheSet, CacheTypes, CMD_SENT_STATUS } from './metrics'
 
 const logger = makeLogger('RedisCache')
 
-export const recordRedisCommandMetric = (
-  status: cacheMetrics.CMD_SENT_STATUS,
-  functionName: string,
-): void => {
-  cacheMetrics.redisCommandsSentCount
-    .labels({ status: cacheMetrics.CMD_SENT_STATUS[status], function_name: functionName })
+export const recordRedisCommandMetric = (status: CMD_SENT_STATUS, functionName: string): void =>
+  metrics
+    .get('redisCommandsSentCount')
+    .labels({ status: CMD_SENT_STATUS[status], function_name: functionName })
     .inc()
-}
+
 /**
  * Redis implementation of a Cache. It uses a simple js Object, storing entries with both
  * a value and an expiration timestamp. Expired entries are deleted on reads (i.e. no background gc/upkeep).
@@ -21,7 +19,7 @@ export const recordRedisCommandMetric = (
  * @typeParam T - the type for the entries' values
  */
 export class RedisCache<T = unknown> implements Cache<T> {
-  type = cacheMetrics.CacheTypes.Redis
+  type = CacheTypes.Redis
 
   constructor(private client: Redis) {}
 
@@ -78,12 +76,8 @@ export class RedisCache<T = unknown> implements Cache<T> {
         const timeDelta = providerTime ? now - providerTime : undefined
 
         // Record cache set count, max age, and staleness (set to 0 for cache set)
-        const label = cacheMetrics.cacheMetricsLabel(
-          entry.key,
-          feedId,
-          cacheMetrics.CacheTypes.Redis,
-        )
-        cacheMetrics.cacheSet(label, ttl, timeDelta)
+        const label = cacheMetricsLabel(entry.key, feedId, CacheTypes.Redis)
+        cacheSet(label, ttl, timeDelta)
       }
     }
 
