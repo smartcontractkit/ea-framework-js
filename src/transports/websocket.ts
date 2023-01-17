@@ -332,3 +332,15 @@ export class WebSocketTransport<
     }
   }
 }
+
+export class WebsocketReverseMappingTransport<T extends WebsocketTransportGenerics, K> extends WebSocketTransport<T> {
+  private requestMapping: Map<K, T["Request"]["Params"]> = new Map()
+
+  setReverseMapping(request: T["Request"]["Params"], value: K) {
+    this.requestMapping.set(value, request)
+  }
+
+  getReverseMapping(value: K): T["Request"]["Params"] | undefined {
+    return this.requestMapping.get(value)
+  }
+}
