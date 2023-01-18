@@ -151,7 +151,8 @@ export function assertEqualResponses(
   t.is(typeof actual?.timestamps?.providerDataReceivedUnixMs, 'number')
   t.is(
     typeof (
-      actual?.timestamps?.providerDataReceivedUnixMs ?? actual?.timestamps?.providerDataStreamEstablishedUnixMs
+      actual?.timestamps?.providerDataReceivedUnixMs ??
+      actual?.timestamps?.providerDataStreamEstablishedUnixMs
     ),
     'number',
   )
