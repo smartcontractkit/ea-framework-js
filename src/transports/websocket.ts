@@ -333,16 +333,41 @@ export class WebSocketTransport<
   }
 }
 
+/**
+ * Transport that wraps the WebSocketTransport in order to provide helper methods for a reverse mapping. This is useful
+ * when the Data Provider uses pair IDs that cannot be programmatically translated into request params.
+ *
+ * Example with `{from: "STETH", to: "USD"} -> "STETHUSD"`:
+ * Instead of trying to split the Data Provider ID string based on length, we can use
+ * `setReverseMapping("STETHUSD", {from: "STETH", to: "USD"})` to map the Data Provider ID to the request payload, then
+ * use `getReverseMapping("STETHUSD")` to get the right input parameters.
+ *
+ * @typeParam T - Helper struct type that will be used to pass types to the generic parameters (check [[WebsocketTransportGenerics]])
+ * @typeParam K - The type for the Data Provider's IDs
+ */
 export class WebsocketReverseMappingTransport<
   T extends WebsocketTransportGenerics,
   K,
 > extends WebSocketTransport<T> {
   private requestMapping: Map<K, T['Request']['Params']> = new Map()
 
-  setReverseMapping(params: T['Request']['Params'], value: K) {
+  /**
+   * Sets the request params mapping for the given value
+   *
+   * @param value - the Data Provider lookup value to map to `params`
+   * @param params - the body of the adapter request
+   * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
+   */
+  setReverseMapping(value: K, params: T['Request']['Params']) {
     this.requestMapping.set(value, params)
   }
 
+  /**
+   * Gets the request params mapping for the given value
+   *
+   * @param value - the Data Provider lookup value
+   * @returns the request parameters for the Data Provider lookup value, if one has been set
+   */
   getReverseMapping(value: K): T['Request']['Params'] | undefined {
     return this.requestMapping.get(value)
   }

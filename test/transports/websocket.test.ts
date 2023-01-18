@@ -562,7 +562,7 @@ const createReverseMappingAdapter = (adapterParams?: Partial<AdapterParams<Setti
     builders: {
       subscribeMessage: (params: AdapterRequestParams) => {
         const pair = `${params.base}/${params.quote}`
-        websocketTransport.setReverseMapping(params, pair)
+        websocketTransport.setReverseMapping(pair, params)
         return {
           request: 'subscribe',
           pair,
