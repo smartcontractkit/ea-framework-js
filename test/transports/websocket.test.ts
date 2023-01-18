@@ -6,7 +6,7 @@ import { AddressInfo } from 'net'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint, AdapterParams } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
+import { WebSocketClassProvider, WebsocketReverseMappingTransport, WebSocketTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
@@ -535,3 +535,136 @@ test.serial(
     await t.context.clock.runAllAsync()
   },
 )
+
+const createReverseMappingAdapter = (adapterParams?: Partial<AdapterParams<SettingsMap>>): Adapter => {
+  const websocketTransport: WebsocketReverseMappingTransport<WebSocketTypes, string> = new WebsocketReverseMappingTransport<WebSocketTypes, string>({
+    url: () => URL,
+    handlers: {
+      message(message) {
+        const params = websocketTransport.getReverseMapping(message.pair)
+        if (!params) {
+          return undefined
+        }
+
+        return [
+          {
+            params,
+            response: {
+              data: {
+                result: message.value,
+              },
+              result: message.value,
+            },
+          },
+        ]
+      },
+    },
+    builders: {
+      subscribeMessage: (params: AdapterRequestParams) => {
+        const pair = `${params.base}/${params.quote}`
+        websocketTransport.setReverseMapping(pair, params)
+        return {
+          request: 'subscribe',
+          pair,
+        }
+      },
+      unsubscribeMessage: (params: AdapterRequestParams) => ({
+        request: 'unsubscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+    },
+  })
+
+  const webSocketEndpoint = new AdapterEndpoint({
+    name: 'TEST',
+    transport: websocketTransport,
+    inputParameters,
+  })
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    endpoints: [webSocketEndpoint],
+    ...adapterParams,
+    envDefaultOverrides: {
+      BACKGROUND_EXECUTE_MS_WS,
+      ...adapterParams?.envDefaultOverrides,
+    },
+  })
+
+  return adapter
+}
+
+test.serial('can set reverse mapping and read from it', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(URL, { mock: false })
+  mockWsServer.on('connection', (socket) => {
+    let counter = 0
+    const parseMessage = () => {
+      if (counter++ === 0) {
+        socket.send(
+          JSON.stringify({
+            pair: `${base}/${quote}`,
+            value: price,
+          }),
+        )
+      }
+    }
+    socket.on('message', parseMessage)
+  })
+
+  const adapter = createReverseMappingAdapter({
+    envDefaultOverrides: {
+      WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+    },
+  })
+
+  // Create mocked cache so we can listen when values are set
+  // This is a more reliable method than expecting precise clock timings
+  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
+
+  // Start up adapter
+  const api = await expose(adapter, {
+    cache: mockCache,
+  })
+  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+
+  const makeRequest = () =>
+    axios.post(address, {
+      data: {
+        base,
+        quote,
+      },
+    })
+
+  // Expect the first response to time out
+  // The polling behavior is tested in the cache tests, so this is easier here.
+  // Start the request:
+  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
+  // Advance enough time for the initial request async flow
+  // clock.tickAsync(10)
+  // Wait for the failed cache get -> instant 504
+  const error = await errorPromise
+  t.is(error?.response?.status, 504)
+
+  // Advance clock so that the background execute is called once again and wait for the cache to be set
+  const cacheValueSetPromise = mockCache.waitForNextSet()
+  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_WS + 10)
+  await cacheValueSetPromise
+
+  // Second request should find the response in the cache
+  const response = await makeRequest()
+
+  t.is(response.status, 200)
+  assertEqualResponses(t, response.data, {
+    data: {
+      result: price,
+    },
+    result: price,
+    statusCode: 200,
+  })
+})
