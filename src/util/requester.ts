@@ -74,8 +74,8 @@ interface QueuedRequest<T = unknown> {
 interface RequesterResult<T> {
   response: AxiosResponse<T>
   timestamps: {
-    providerDataRequested: number
-    providerDataReceived: number
+    providerDataRequestedUnixMs: number
+    providerDataReceivedUnixMs: number
   }
 }
 
@@ -224,8 +224,8 @@ export class Requester {
       resolve({
         response,
         timestamps: {
-          providerDataRequested,
-          providerDataReceived: Date.now(),
+          providerDataRequestedUnixMs: providerDataRequested,
+          providerDataReceivedUnixMs: Date.now(),
         },
       })
 

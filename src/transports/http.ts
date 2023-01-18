@@ -246,7 +246,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
             statusCode: 429,
             timestamps: {
               providerDataReceivedUnixMs: 0,
-              providerDataRequested: 0,
+              providerDataRequestedUnixMs: 0,
               providerIndicatedTimeUnixMs: undefined,
             },
           },
