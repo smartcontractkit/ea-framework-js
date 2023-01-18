@@ -107,9 +107,9 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
             const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
             const result = r as TimestampedProviderResult<T>
             result.response.timestamps = {
-              providerDataStreamEstablished: this.providerDataStreamEstablished,
-              providerDataReceived,
-              providerIndicatedTime: partialResponse.timestamps?.providerIndicatedTime,
+              providerDataStreamEstablishedUnixMs: this.providerDataStreamEstablished,
+              providerDataReceivedUnixMs: providerDataReceived,
+              providerIndicatedTimeUnixMs: partialResponse.timestamps?.providerIndicatedTimeUnixMs,
             }
             return result
           })

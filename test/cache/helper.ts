@@ -21,8 +21,8 @@ export class BasicCacheSetterTransport extends NopTransport {
           result: req.requestContext.data['factor'] as null,
           timestamps: {
             providerDataRequested: 0,
-            providerDataReceived: 0,
-            providerIndicatedTime: undefined,
+            providerDataReceivedUnixMs: 0,
+            providerIndicatedTimeUnixMs: undefined,
           },
         },
       },

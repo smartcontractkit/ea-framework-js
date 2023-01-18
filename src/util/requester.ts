@@ -261,9 +261,9 @@ export class Requester {
               url: config.url,
             },
             {
-              providerDataRequested,
-              providerDataReceived: Date.now(),
-              providerIndicatedTime: undefined,
+              providerDataRequestedUnixMs: providerDataRequested,
+              providerDataReceivedUnixMs: Date.now(),
+              providerIndicatedTimeUnixMs: undefined,
             },
           ),
         )

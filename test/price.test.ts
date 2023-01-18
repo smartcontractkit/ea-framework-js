@@ -98,8 +98,8 @@ test('does not invert result if no includes are present', async (t) => {
     statusCode: 200,
     timestamps: {
       providerDataRequested: 0,
-      providerDataReceived: 0,
-      providerIndicatedTime: undefined,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
     },
   }
 
@@ -143,8 +143,8 @@ test('does not invert result if no includes match', async (t) => {
     statusCode: 200,
     timestamps: {
       providerDataRequested: 0,
-      providerDataReceived: 0,
-      providerIndicatedTime: undefined,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
     },
   }
 
@@ -188,8 +188,8 @@ test('inverts result if matching includes are present in request', async (t) => 
     statusCode: 200,
     timestamps: {
       providerDataRequested: 0,
-      providerDataReceived: 0,
-      providerIndicatedTime: undefined,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
     },
   }
 
@@ -236,8 +236,8 @@ test('does not invert result if inverse pair sent directly', async (t) => {
     statusCode: 200,
     timestamps: {
       providerDataRequested: 0,
-      providerDataReceived: 0,
-      providerIndicatedTime: undefined,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
     },
   }
 
