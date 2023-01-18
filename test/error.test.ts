@@ -172,7 +172,7 @@ test('Adapter returns error when transport returns response with error message',
           errorMessage: 'test error message',
           timestamps: {
             providerDataReceivedUnixMs: 0,
-            providerDataRequested: 0,
+            providerDataRequestedUnixMs: 0,
             providerIndicatedTimeUnixMs: undefined,
           },
         }
