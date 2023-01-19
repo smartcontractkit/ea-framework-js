@@ -222,9 +222,10 @@ endpoint does not use the `base/from` and `quote/to` input params.
 
 # Config
 
+In v2, EA-specific properties such as `API_ENDPOINT` and `API_KEY` were maintained in an adapter's `env.json`. When migrating to v3 these configs need to be moved to the individual EA's `customSettings` object. They are no longer part of the EA framework config.
+
 For EAs that do not need a custom config, using the type `SettingsMap` from
-`@chainlink/external-adapter-framework/config` when needed will be sufficient. However, if your v2 EA uses any custom
-settings in its config (including the `API_KEY`), you will need to define this in a custom config.
+`@chainlink/external-adapter-framework/config` when needed will be sufficient.
 
 The config will be a map of `(ENV_VAR, Setting)` pairs:
 
