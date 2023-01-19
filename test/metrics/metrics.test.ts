@@ -73,7 +73,7 @@ const createAdapterEndpoint = (): AdapterEndpoint<RestEndpointTypes> => {
             statusCode: 200,
             result: res.data.price,
             timestamps: {
-              providerIndicatedTime: Date.now() - 100,
+              providerIndicatedTimeUnixMs: Date.now() - 100,
             },
           },
         },
