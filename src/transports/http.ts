@@ -212,7 +212,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
           const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
           result.response.timestamps = {
             ...requesterResult.timestamps,
-            providerIndicatedTime: partialResponse.timestamps?.providerIndicatedTime,
+            providerIndicatedTimeUnixMs: partialResponse.timestamps?.providerIndicatedTimeUnixMs,
           }
           return result
         })
@@ -245,9 +245,9 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
             errorMessage: err.message,
             statusCode: 429,
             timestamps: {
-              providerDataReceived: 0,
-              providerDataRequested: 0,
-              providerIndicatedTime: undefined,
+              providerDataReceivedUnixMs: 0,
+              providerDataRequestedUnixMs: 0,
+              providerIndicatedTimeUnixMs: undefined,
             },
           },
         }))

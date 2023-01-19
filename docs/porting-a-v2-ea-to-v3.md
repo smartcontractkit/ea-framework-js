@@ -145,7 +145,7 @@ const httpTransport = new HttpTransport<EndpointTypes>({
         data: res.data,
         result: res.data.price,
         timestamps: {
-          providerIndicatedTime: res.data.ts,
+          providerIndicatedTimeUnixMs: res.data.ts,
         },
       },
     }))

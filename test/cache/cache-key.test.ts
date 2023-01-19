@@ -33,9 +33,9 @@ test.beforeEach(async (t) => {
               statusCode: 200,
               result: req.requestContext.cacheKey as unknown as null,
               timestamps: {
-                providerDataRequested: 0,
-                providerDataReceived: 0,
-                providerIndicatedTime: undefined,
+                providerDataRequestedUnixMs: 0,
+                providerDataReceivedUnixMs: 0,
+                providerIndicatedTimeUnixMs: undefined,
               },
             }
           }

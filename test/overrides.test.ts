@@ -43,9 +43,9 @@ class OverrideTestTransport implements Transport<TestTransportGenerics> {
       statusCode: 200,
       result: null,
       timestamps: {
-        providerDataRequested: 0,
-        providerDataReceived: 0,
-        providerIndicatedTime: undefined,
+        providerDataRequestedUnixMs: 0,
+        providerDataReceivedUnixMs: 0,
+        providerIndicatedTimeUnixMs: undefined,
       },
     }
   }

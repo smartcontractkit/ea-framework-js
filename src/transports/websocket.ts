@@ -163,9 +163,9 @@ export class WebSocketTransport<
           const result = r as TimestampedProviderResult<T>
           const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
           result.response.timestamps = {
-            providerDataStreamEstablished: this.providerDataStreamEstablished,
-            providerDataReceived,
-            providerIndicatedTime: partialResponse.timestamps?.providerIndicatedTime,
+            providerDataStreamEstablishedUnixMs: this.providerDataStreamEstablished,
+            providerDataReceivedUnixMs: providerDataReceived,
+            providerIndicatedTimeUnixMs: partialResponse.timestamps?.providerIndicatedTimeUnixMs,
           }
           return result
         })

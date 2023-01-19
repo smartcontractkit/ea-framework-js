@@ -356,9 +356,9 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
         // Record cache staleness and cache get count and value
         const now = Date.now()
         cacheGet(label, response.result, {
-          cache: now - response.timestamps.providerDataReceived,
-          total: response.timestamps.providerIndicatedTime
-            ? now - response.timestamps.providerIndicatedTime
+          cache: now - response.timestamps.providerDataReceivedUnixMs,
+          total: response.timestamps.providerIndicatedTimeUnixMs
+            ? now - response.timestamps.providerIndicatedTimeUnixMs
             : null,
         })
         req.requestContext.meta = {

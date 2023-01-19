@@ -90,7 +90,7 @@ export class ResponseCache<
       const response = value as unknown as AdapterResponse
       const feedId = response.meta?.metrics?.feedId
       if (feedId) {
-        const providerTime = response.timestamps?.providerIndicatedTime
+        const providerTime = response.timestamps?.providerIndicatedTimeUnixMs
         const timeDelta = providerTime ? now - providerTime : undefined
 
         // Record cache set count, max age, and staleness (set to 0 for cache set)

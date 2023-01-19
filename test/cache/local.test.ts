@@ -70,8 +70,6 @@ test.serial('Test local cache max size', async (t) => {
   await cache.set('3', 3, 10000)
   await cache.set('4', 4, 10000)
 
-
-
   const value1 = await cache.get('1')
   t.is(value1, undefined)
   const value2 = await cache.get('2')

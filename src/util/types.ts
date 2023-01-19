@@ -157,26 +157,26 @@ export type ResponseGenerics = {
  */
 export type ResponseTimestamps = {
   /** Time at which data was received from the provider */
-  providerDataReceived: number
+  providerDataReceivedUnixMs: number
 
   /** Time indicated by the provider representing the time at which this value was calculated/set/valid */
-  providerIndicatedTime: number | undefined // This is | undefined and not optional (:?) to force every transport impl to explicitly include this
+  providerIndicatedTimeUnixMs: number | undefined // This is | undefined and not optional (:?) to force every transport impl to explicitly include this
 } & (
   | {
       /**
        * For sync protocols (request -\> response).
        * Time at which data was requested from the provider.
        */
-      providerDataRequested: number
-      providerDataStreamEstablished?: never // <- to make sure it's one or the other
+      providerDataRequestedUnixMs: number
+      providerDataStreamEstablishedUnixMs?: never // <- to make sure it's one or the other
     }
   | {
       /**
        * For async protocols (subscription -\> n events received).
        * Time at which a data stream was established for the provider.
        */
-      providerDataStreamEstablished: number
-      providerDataRequested?: never // <- to make sure it's one or the other
+      providerDataStreamEstablishedUnixMs: number
+      providerDataRequestedUnixMs?: never // <- to make sure it's one or the other
     }
 )
 
@@ -220,7 +220,7 @@ export type PartialSuccessfulResponse<T extends ResponseGenerics> = {
   result: T['Result']
 
   /** Optionally, specify manually some of the timestamps here */
-  timestamps?: Pick<ResponseTimestamps, 'providerIndicatedTime'>
+  timestamps?: Pick<ResponseTimestamps, 'providerIndicatedTimeUnixMs'>
 } & {
   // Ensure the union types below (e.g. [[AdapterResponse]]) are mutually exclusive
   errorMessage?: never

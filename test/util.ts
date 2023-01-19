@@ -148,10 +148,11 @@ export function assertEqualResponses(
     statusCode: number
   },
 ) {
-  t.is(typeof actual?.timestamps?.providerDataReceived, 'number')
+  t.is(typeof actual?.timestamps?.providerDataReceivedUnixMs, 'number')
   t.is(
     typeof (
-      actual?.timestamps?.providerDataReceived ?? actual?.timestamps?.providerDataStreamEstablished
+      actual?.timestamps?.providerDataReceivedUnixMs ??
+      actual?.timestamps?.providerDataStreamEstablishedUnixMs
     ),
     'number',
   )

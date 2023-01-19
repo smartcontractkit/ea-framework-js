@@ -171,9 +171,9 @@ test('Adapter returns error when transport returns response with error message',
           statusCode: 502,
           errorMessage: 'test error message',
           timestamps: {
-            providerDataReceived: 0,
-            providerDataRequested: 0,
-            providerIndicatedTime: undefined,
+            providerDataReceivedUnixMs: 0,
+            providerDataRequestedUnixMs: 0,
+            providerIndicatedTimeUnixMs: undefined,
           },
         }
 
