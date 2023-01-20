@@ -46,7 +46,8 @@ The structure you end up with can look something like this:
 adapter
 ├─ config
 │  ├─ index.ts // Common config vars
-│  └─ overrides.json // Overrides file
+│  ├─ overrides.json // Overrides file
+|  └─ includes.json // Includes file (e.x. inverses)
 ├─ endpoints
 │  ├─ crypto // Input: {"endpoint": "crypto"} or {"endpoint": "crypto-ws"} (if added as an alias)
 │  │  └─ RoutingTransport // A single routing transport that wraps multiple
@@ -259,6 +260,7 @@ import { SettingsMap } from '@chainlink/external-adapter-framework/config'
 import { cryptoEndpoint } from './endpoint'
 import { defaultEndpoint } from './config'
 import overrides from './config/overrides.json'
+import includes from './config/includes.json'
 
 export const adapter = new PriceAdapter({
   name: 'ADAPTER_NAME', // The EA name, in uppercase without any spaces
@@ -276,6 +278,7 @@ export const adapter = new PriceAdapter({
     },
   },
   overrides: overrides['adapterName'], // If applicable, reference the overrides config
+  includes, // If applicable, reference the includes config
   customSettings: CustomSettings, // If applicable, any custom settings
 })
 
