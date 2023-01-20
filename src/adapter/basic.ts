@@ -99,6 +99,9 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
       throw new Error('This adapter has already been initialized!')
     }
 
+    // Initialize metrics to register them with the prom-client
+    metrics.initialize()
+
     // Building configs during initialization to avoid validation errors during construction
     validateAdapterConfig(this.config, this.customSettings)
 

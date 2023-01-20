@@ -4,7 +4,7 @@ import { join } from 'path'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
 import { AdapterConfig, SettingsMap } from './config'
-import { buildMetricsMiddleware, metrics, setupMetricsServer } from './metrics'
+import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
 import { AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
 import { loadTestPayload } from './util/test-payload-loader'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
@@ -69,9 +69,6 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
   await adapter.initialize(dependencies)
 
   let api: FastifyInstance | undefined = undefined
-
-  // Initialize metrics to register them with the prom-client
-  metrics.initialize()
 
   if (adapter.config.METRICS_ENABLED && adapter.config.EXPERIMENTAL_METRICS_ENABLED) {
     setupMetricsServer(adapter.name, adapter.config as AdapterConfig)
