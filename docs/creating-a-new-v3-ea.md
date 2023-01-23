@@ -13,8 +13,9 @@ adapter
 │  ├─ overrides.json // Overrides file (optional)
 |  └─ includes.json // Includes file (e.x. inverses) (optional)
 ├─ endpoints
-│  ├─ crypto // Input: {"endpoint": "crypto"} or {"endpoint": "price"} (if added as an alias)
-├─ index.ts // References endpoints, rate limit tiers, custom settings, etc.
+│  ├─ crypto // Data provider endpoints the adapter uses
+|  └─ forex // Data provider endpoints the adapter uses
+├─ index.ts // Adapter defined here with references to endpoints, rate limit tiers, custom settings, etc.
 ├─ test
 ├─ package.json
 ├─ CHANGELOG.md
@@ -77,7 +78,7 @@ Rate limits tiers specific to the data provider can be specified under the `rate
 
 ### Custom Settings
 
-The v3 framework allows developers to specify env vars that are relevant to their specific EA. They would be specified in the format below.
+The v3 framework allows developers to specify env vars that are relevant to their specific EA. They would be specified in the format below in the `config/index.ts` file.
 
 If the EA does not require any custom env vars, this file can be ignored. Instead using the type `SettingsMap` from `@chainlink/external-adapter-framework/config`, where applicable, would be sufficient.
 
@@ -98,7 +99,7 @@ export const customSettings = {
 
 ### Overrides
 
-Overrides allow input parameters to be overriden from a generic symbol to something more specific for the data provider such as an ID. An example of the format is below.
+Overrides are defined in the `/config/overrides.json` file. They allow input parameters to be overriden from a generic symbol to something more specific for the data provider such as an ID. An example of the format is below.
 
 ```json
 {
@@ -110,7 +111,7 @@ Overrides allow input parameters to be overriden from a generic symbol to someth
 
 ### Includes
 
-The includes list is a parameter only for the `PriceAdapter`. In the v3 framework's current implementation, it is only used to define inverses. This feature allows data to be retrieved for inverted pairs that a data provider does not support.
+The includes list, defined in the `/config/includes.json` file, is a parameter only for the `PriceAdapter`. In the v3 framework's current implementation, it is only used to define inverses. This feature allows data to be retrieved for inverted pairs that a data provider does not support.
 
 The most common example of this is for foreign exchange. Data providers will only support pairs in one direction such as USD/JPY but not JPY/USD. To solve this issue for requests that are JPY/USD, we can add an entry for this pair in the includes list like below. This will allow the adapter to retrieve data for USD/JPY instead and return 1 / result.
 
@@ -176,18 +177,20 @@ export const adapter = new Adapter({
 
 ## Endpoints
 
-Endpoints allow developers to retrieve data from a variety of API endpoints from a data provider. To reach a particular endpoint in the adapter, the `endpoint` parameter can be specified in the request using either the endpoint name or any of its aliases. If the endpoint field is omitted, the adapter will use the default endpoint in the `Adapter` parameters. If the endpoint that does not match any endpoint or its aliases, the request will fail.
+Endpoints allow developers to retrieve data from a variety of API endpoints from a data provider. To reach a particular endpoint in the adapter, the `endpoint` parameter can be specified in the request using either the endpoint name or any of its aliases.
 
-Below is an example of an `AdapterEndpoint` with all of the parameters that can be specified.
+If the endpoint field is omitted, the adapter will use the default endpoint in the `Adapter` parameters. If the endpoint that does not match any endpoints or their aliases, the request will fail.
+
+Define each endpoint in its own file in the `/endpoints` folder. Name the file the endpoints name such as `test.ts`. Below is an example of an `AdapterEndpoint` with all of the parameters that can be specified.
 
 ```typescript
 import { AdapterEndpoint } from '@chainlink/external-adapter-framework/adapter'
 
 export const endpoint = new AdapterEndpoint<EndpointTypes>({
-  name: 'test', // The name of this endpoint. { "endpoint": "test" }
+  name: 'test', // Required. The name of this endpoint. { "endpoint": "test" }
   aliases: ['test-alias'], // Aliases for the endpoint. { "endpoint": "test-alias" }
-  transport: httpTransport, // The transport this endpoint is referencing
-  inputParameters, // Input parameters sent to this endpoint
+  transport: httpTransport, // Required. The transport this endpoint is referencing
+  inputParameters, // Required. Input parameters sent to this endpoint
   rateLimiting: { allocationPercentage: 50 }, // If applicable, specifiy percentage of rate limit to allocate to this endpoint
   cacheKeyGenerator, // If applicable, specify a custom cache key generator
   customInputValidation, // If applicable, specify custom input validation
@@ -232,8 +235,8 @@ type EndpointTypes = {
   CustomSettings: typeof customSettings
   // Expected data provider request and response structures. Options for REST and Websocket
   Provider: {
-    RequestBody: RequestBody // Used for REST transports
-    ResponseBody: ResponseSchema // Used for REST transports
+    RequestBody: RequestBody // Used for HTTP transports
+    ResponseBody: ResponseSchema // Used for HTTP transports
     WsMessage: ProviderMessage // Used for Websocket transports
   }
 }
@@ -329,5 +332,40 @@ export const endpoint = new PriceEndpoint<EndpointTypes>({
 ```
 
 ## Transports
+
+A transport is the method in which the data is retrieved from a data provider for that particular endpoint. As seen in the [Endpoints](#endpoints) section, every endpoint requires one and only one transport. Define this transport in the same file as its associated endpoint. To learn more about specific transports, check the [Transport Types](#transport-types) section.
+
+### Routing Transport
+
+As mentioned above, each endpoint only accepts a single transport. However, there are scenarios where a data provider will have multiple ways to access the same data. For example, a data provider could offer crypto data through REST API and Websockets which would require two different transports. The `RoutingTransport` allows an endpoint to have access to both.
+
+The `RoutingTransport` is used to direct requests to different transports based on request parameters and/or adapter configs. In the example above, the requests could be directed to either an HTTP or Websocket transport. An example of what the code would look like for this scenario is below. The code assumes that requests are directed based on an env var, `WS_ENABLED`.
+
+```typescript
+import { httpTransport } from './crypto-http'
+import { wsTransport } from './crypto-ws'
+
+export const routingTransport = new RoutingTransport<EndpointTypes>(
+  {
+    WS: wsTransport,
+    REST: httpTransport,
+  },
+  (req, adapterConfig) => (adapterConfig.WS_ENABLED ? 'WS' : 'REST'),
+)
+
+export const endpoint = new AdapterEndpoint<EndpointTypes>({
+  name: 'test',
+  aliases: ['test-alias'],
+  transport: routingTransport,
+  inputParameters,
+})
+```
+
+### Transport Types
+
+[HTTP Transport]() (Guide coming soon)
+[Websocket Transport]() (Guide coming soon)
+[SSE Transport]() (Guide coming soon)
+[Custom Transport]() (Guide coming soon)
 
 ## Tests
