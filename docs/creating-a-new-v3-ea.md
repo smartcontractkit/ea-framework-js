@@ -363,9 +363,9 @@ export const endpoint = new AdapterEndpoint<EndpointTypes>({
 
 ### Transport Types
 
-[HTTP Transport]() (Guide coming soon)
-[Websocket Transport]() (Guide coming soon)
-[SSE Transport]() (Guide coming soon)
-[Custom Transport]() (Guide coming soon)
+- [HTTP Transport](#transport-types) (Guide coming soon)
+- [Websocket Transport](#transport-types) (Guide coming soon)
+- [SSE Transport](#transport-types) (Guide coming soon)
+- [Custom Transport](#transport-types) (Guide coming soon)
 
 ## Tests
