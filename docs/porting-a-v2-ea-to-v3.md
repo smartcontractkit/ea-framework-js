@@ -232,8 +232,8 @@ The config will be a map of `(ENV_VAR, Setting)` pairs:
 
 ```typescript
 export const customSettings = {
+  // Env var name
   API_KEY: {
-    // Env var name
     description: '', // Description of the env var
     type: 'string', // What type should the value be
     options: ['foo', 'bar'], // If applicable, a list of valid options this env var could be set to

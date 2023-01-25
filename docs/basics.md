@@ -110,3 +110,9 @@ EAs have one or more "endpoints", which can provide different data from the data
 ## Metrics
 
 EAs can expose metrics in the Prometheus format, enabled by setting the `METRICS_ENABLED` environment variable to `true`. They are enabled by default (we emphatically recommend that you set up metrics!) but can be disabled by setting the value to `false` instead.
+
+## Types of Adapters
+
+- **Source**: Adapters that connect to only one data provider.
+- **Composite**: Adapters that connect to multiple data providers. Achieved using mulitple source adapters.
+- **Non-Deployable**: Adapters used as dependencies for other adapters that are not mean to be ran independently.
