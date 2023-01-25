@@ -4,7 +4,7 @@ To learn more about what transports are and what they do, please refer to the [E
 
 As seen in the [Endpoints Guide](endpoints.md), every endpoint requires one and only one transport. Define this transport in the same file as its associated endpoint.
 
-### Choosing Transports
+## Choosing Transports
 
 The v3 framework provides transports for the common protocols a DP endpoint could use. Please refer to the guides listed below for the relevant transports your adapter endpoints need.
 
@@ -12,12 +12,12 @@ In certain cases, the same data can be retrieved through different protocols. Fo
 
 If you find that the built-in features of a transport do not meet your endpoint's requirements, you can define a custom transport extending one of the existing ones to include the custom functionality yourself.
 
-- [HTTP Transport](./v3-ea-components/http-transport.md)
-- [Websocket Transport](./v3-ea-components/websocket-transport.md)
-- [SSE Transport](./v3-ea-components/sse-transport.md)
-- [Custom Transport](./v3-ea-components/custom-transport.md)
+- [HTTP Transport](./transport-types/http-transport.md)
+- [Websocket Transport](./transport-types/websocket-transport.md)
+- [SSE Transport](./transport-types/sse-transport.md)
+- [Custom Transport](./transport-types/custom-transport.md)
 
-### Routing Transport
+## Routing Transport
 
 As mentioned above, each endpoint only accepts a single transport. However, there are scenarios where a data provider will have multiple ways to access the same data. For example, a data provider could offer crypto data through REST API and Websockets which would require two different transports. The `RoutingTransport` allows an endpoint to have access to both.
 

@@ -138,7 +138,7 @@ type EndpointTypes = {
   // The PriceEndpointInputParameters type is the most common request params for a price endpoint. {base: string, quote: string}
   Request: {
     Params: PriceEndpointParams,
-  }
+  },
   ...
   // The SingleNumberResultResponse type is the most common response format for price endpoints. {result: number, data: { result: number }}
   Response: SingleNumberResultResponse,
