@@ -155,13 +155,15 @@ export class PriceAdapter<CustomSettings extends SettingsMap> extends Adapter<Cu
 
     if (this.includesMap && req.requestContext.priceMeta.inverse) {
       // We need to search in the reverse order (quote -> base) because the request transform will have inverted the pair
-      const inverseResult = 1 / (response.result as number)
-      response.result = inverseResult
+      const cloneResponse = { ...response }
+      const inverseResult = 1 / (cloneResponse.result as number)
+      cloneResponse.result = inverseResult
       // Check if response data has a result within it
-      const data = response.data as { result: number } | null
+      const data = cloneResponse.data as { result: number } | null
       if (data?.result) {
         data.result = inverseResult
       }
+      return cloneResponse
     }
 
     return response

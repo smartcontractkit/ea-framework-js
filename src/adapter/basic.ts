@@ -343,7 +343,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
    * @param req - the incoming request to this adapter
    * @returns the cached value if exists
    */
-  async findResponseInCache(req: AdapterRequest): Promise<AdapterResponse | undefined> {
+  async findResponseInCache(req: AdapterRequest): Promise<Readonly<AdapterResponse> | undefined> {
     const response = await (this.dependencies.cache as Cache<AdapterResponse>).get(
       req.requestContext.cacheKey,
     )
@@ -420,7 +420,10 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
    * @param replySent - a promise that resolves when the reply has already been sent
    * @returns a simple Promise when it's done
    */
-  async handleRequest(req: AdapterRequest, replySent: Promise<unknown>): Promise<AdapterResponse> {
+  async handleRequest(
+    req: AdapterRequest,
+    replySent: Promise<unknown>,
+  ): Promise<Readonly<AdapterResponse>> {
     // Get transport, must be here because it's already checked in the validator
     const transport = this.endpointsMap[req.requestContext.endpointName].transport
 

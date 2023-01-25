@@ -32,7 +32,7 @@ export interface Cache<T = unknown> {
    * @param key - the key of the desired entry for which to fetch its value
    * @returns a Promise of the entry's value, or undefined if not found / expired.
    */
-  get: (key: string) => Promise<T | undefined>
+  get: (key: string) => Promise<Readonly<T> | undefined>
 
   /**
    * Sets an item in the Cache.
@@ -42,7 +42,7 @@ export interface Cache<T = unknown> {
    * @param ttl - the time in milliseconds until the entry expires
    * @returns an empty Promise that resolves when the entry has been set
    */
-  set: (key: string, value: T, ttl: number) => Promise<void>
+  set: (key: string, value: Readonly<T>, ttl: number) => Promise<void>
 
   /**
    * Sets a list of items in the Cache.
@@ -51,7 +51,7 @@ export interface Cache<T = unknown> {
    * @param ttl - the time in milliseconds until the entries expire
    * @returns an empty Promise that resolves when all entries have been set
    */
-  setMany: (entries: CacheEntry<T>[], ttl: number) => Promise<void>
+  setMany: (entries: CacheEntry<Readonly<T>>[], ttl: number) => Promise<void>
 
   /**
    * Deletes the specified item from the Cache

@@ -33,7 +33,7 @@ export class LocalCache<T = unknown> implements Cache<T> {
     this.list = new DoubleLinkedList()
   }
 
-  async get(key: string): Promise<T | undefined> {
+  async get(key: string): Promise<Readonly<T> | undefined> {
     logger.trace(`Getting key ${key}`)
     if (this.cache.has(key)) {
       const node = this.cache.get(key) as LinkedListNode<LocalCacheEntry<T>>
@@ -61,7 +61,7 @@ export class LocalCache<T = unknown> implements Cache<T> {
     }
   }
 
-  async set(key: string, value: T, ttl: number): Promise<void> {
+  async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
     logger.trace(`Setting key ${key} with ttl ${ttl}`)
     if (this.cache.has(key)) {
       logger.trace(`Found existing key ${key}. Updating value...`)
@@ -86,7 +86,7 @@ export class LocalCache<T = unknown> implements Cache<T> {
     }
   }
 
-  async setMany(entries: CacheEntry<T>[], ttl: number): Promise<void> {
+  async setMany(entries: CacheEntry<Readonly<T>>[], ttl: number): Promise<void> {
     logger.trace(`Setting a bunch of keys with ttl ${ttl}`)
     for (const { key, value } of entries) {
       this.set(key, value, ttl)

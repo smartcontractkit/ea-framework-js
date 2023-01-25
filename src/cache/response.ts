@@ -78,7 +78,7 @@ export class ResponseCache<
           r.params,
         ),
         value: response,
-      }
+      } as const
     })
 
     const ttl = this.config.CACHE_MAX_AGE

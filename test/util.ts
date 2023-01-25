@@ -60,7 +60,7 @@ export class MockCache extends LocalCache {
     return new Promise((resolve) => (this.awaitingPromiseResolve = resolve))
   }
 
-  override async set(key: string, value: unknown, ttl: number): Promise<void> {
+  override async set(key: string, value: Readonly<unknown>, ttl: number): Promise<void> {
     super.set(key, value, ttl)
     if (this.awaitingPromiseResolve) {
       this.awaitingPromiseResolve(value)
