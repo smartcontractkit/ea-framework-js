@@ -23,7 +23,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
   constructor(private client: Redis) {}
 
-  async get(key: string): Promise<T | undefined> {
+  async get(key: string): Promise<Readonly<T> | undefined> {
     logger.trace(`Getting key ${key}`)
     const value = await this.client.get(key)
 
@@ -46,7 +46,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'delete')
   }
 
-  async set(key: string, value: T, ttl: number): Promise<void> {
+  async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
     logger.trace(`Setting key ${key}`)
     await this.client.set(key, JSON.stringify(value), 'PX', ttl)
 
@@ -54,7 +54,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'set')
   }
 
-  async setMany(entries: CacheEntry<T>[], ttl: number): Promise<void> {
+  async setMany(entries: CacheEntry<Readonly<T>>[], ttl: number): Promise<void> {
     logger.trace(`Setting a bunch of keys`)
     // Unfortunately, there's no ttl for mset
     let chain = this.client.multi()
