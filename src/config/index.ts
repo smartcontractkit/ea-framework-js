@@ -28,7 +28,7 @@ export const BaseSettings = {
     description: 'Maximum amount of time (in ms) that a response will stay cached',
     type: 'number',
     default: 90000,
-    validate: validator.integer({ min: 1000, max: 180000 }),
+    validate: validator.integer({ min: 1000, max: 20 * 60 * 60 * 1000 }), // Max 20 minutes
   },
   CACHE_MAX_ITEMS: {
     type: 'number',
