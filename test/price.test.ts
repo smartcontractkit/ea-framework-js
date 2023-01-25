@@ -4,6 +4,7 @@ import { AddressInfo } from 'net'
 import { expose } from '../src'
 import {
   AdapterEndpoint,
+  CryptoPriceEndpoint,
   IncludesFile,
   PriceAdapter,
   PriceEndpoint,
@@ -261,4 +262,80 @@ test('does not invert result if inverse pair sent directly', async (t) => {
   })
   t.is(response.status, 200)
   t.is(response.data.result, 1 / 1234)
+})
+
+test('crypto price endpoint has common aliases', async (t) => {
+  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
+    result: 1234,
+    data: null,
+    statusCode: 200,
+    timestamps: {
+      providerDataRequestedUnixMs: 0,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
+    },
+  }
+
+  const data = {
+    base: 'BTC',
+    quote: 'ETH',
+  }
+
+  const adapter = new PriceAdapter({
+    name: 'TEST',
+    endpoints: [
+      new CryptoPriceEndpoint({
+        name: 'test',
+        inputParameters: priceEndpointInputParameters,
+        transport: new PriceTestTransport(() => mockResponse),
+      }),
+    ],
+  })
+
+  const api = await expose(adapter)
+  if (!api) {
+    throw 'Server did not start'
+  }
+  const serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
+
+  for (const endpoint of ['price', 'crypto']) {
+    const response = await axios.post(serverAddress, {
+      endpoint,
+      data,
+    })
+    t.is(response.status, 200)
+    t.is(response.data.result, 1234)
+  }
+})
+
+test('price adapter throws if non-crypto endpoint reuses aliases', async (t) => {
+  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
+    result: 1234,
+    data: null,
+    statusCode: 200,
+    timestamps: {
+      providerDataRequestedUnixMs: 0,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
+    },
+  }
+
+  const adapter = new PriceAdapter({
+    name: 'TEST',
+    endpoints: [
+      new CryptoPriceEndpoint({
+        name: 'test',
+        inputParameters: priceEndpointInputParameters,
+        transport: new PriceTestTransport(() => mockResponse),
+      }),
+      new AdapterEndpoint({
+        name: 'price',
+        inputParameters: priceEndpointInputParameters,
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+
+  const error: Error | undefined = await t.throwsAsync(() => expose(adapter))
+  t.is(error?.message, 'Duplicate endpoint / alias: "price"')
 })
