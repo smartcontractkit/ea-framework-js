@@ -147,5 +147,5 @@ This diagram expands on the `Validation Middleware` section of the `EA v3 Design
 
 ```mermaid
 flowchart TD
-  A[Default Input Validations] --> B[Custom Input Validations] --> C[Symbol Overrides Transformations] --> D[Custom Request Transformation] --> E[Includes Inverse Transformation] --> F[Cache Key Generation]
+  A[Default Input Validations] --> B[Custom Input Validations] --> C[Symbol Overrides Transformations] -..-> |Perform all custom request transformations sequentially| E[Includes Inverse Transformation] --> F[Cache Key Generation]
 ```
