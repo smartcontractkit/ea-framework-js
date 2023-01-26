@@ -143,7 +143,7 @@ The test payload is not specified as a parameter for an adapter. It is defined i
 
 ## Request Validation & Transformation
 
-This diagram expands on the `Validation Middleware` section of the `EA v3 Design` diagram in [Basics](../basics.md)
+This diagram expands on the `Validation Middleware` section of the `EA v3 Design` diagram in [Basics](../basics.md/#ea-v3-design)
 
 ```mermaid
 flowchart TD

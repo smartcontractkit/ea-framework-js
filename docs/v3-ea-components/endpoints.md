@@ -101,6 +101,8 @@ function cacheKeyGenerator(data) {
 }
 ```
 
+To understand where the cache key generator is applied, please refer to the [Request Validation & Transformation Diagram](./adapter.md/#request-validation--transformation)
+
 ## Custom input validation
 
 **Only use if absolutely necessary**
