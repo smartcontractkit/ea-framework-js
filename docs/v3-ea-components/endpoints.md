@@ -122,6 +122,8 @@ function customInputValidation(
 }
 ```
 
+To understand where these validations are applied, please refer to the [Request Validation & Transformation Diagram](./adapter.md/#request-validation--transformation)
+
 ## Price Endpoint
 
 As mentioned in the [Adapter Guide](./adapter.md), `PriceAdapter` requires that one of its endpoints is a `PriceEndpoint`. To help standardize the format of a price feed endpoint, the framework provides helpful built-in types. This would alter some of the examples shown in the previous sections like below.
