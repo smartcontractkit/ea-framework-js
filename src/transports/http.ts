@@ -37,8 +37,8 @@ type HttpTransportGenerics = TransportGenerics & {
 /**
  * Structure containing the association between EA params and a provider request.
  */
-type ProviderRequestConfig<T extends HttpTransportGenerics> = {
-  /** The input paramters for requests that will get responses from the request in this struct */
+export type ProviderRequestConfig<T extends HttpTransportGenerics> = {
+  /** The input parameters for requests that will get responses from the request in this struct */
   params: T['Request']['Params'][]
 
   /** The request that will be sent to the data provider to fetch values for the params in this struct */
