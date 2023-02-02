@@ -184,7 +184,7 @@ export class CryptoPriceEndpoint<T extends PriceEndpointGenerics> extends PriceE
       params.aliases = []
     }
     for (const alias of DEFAULT_ALIASES) {
-      if (!params.aliases.includes(alias)) {
+      if (params.name !== alias && !params.aliases.includes(alias)) {
         params.aliases.push(alias)
       }
     }
