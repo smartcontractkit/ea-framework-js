@@ -66,10 +66,12 @@ export interface Cache<T = unknown> {
 export const calculateCacheKey = <T extends EndpointGenerics>(
   {
     inputParameters,
+    adapterName,
     endpointName,
     adapterConfig,
   }: {
     inputParameters: InputParameters
+    adapterName: string
     endpointName: string
     adapterConfig: AdapterConfig<T['CustomSettings']>
   },
@@ -79,7 +81,7 @@ export const calculateCacheKey = <T extends EndpointGenerics>(
     logger.trace(`Using default cache key ${adapterConfig.DEFAULT_CACHE_KEY}`)
     return adapterConfig.DEFAULT_CACHE_KEY
   }
-  const cacheKey = `${endpointName}-${calculateKey(data, adapterConfig)}`
+  const cacheKey = `${adapterName}-${endpointName}-${calculateKey(data, adapterConfig)}`
   logger.trace(`Generated cache key for request: "${cacheKey}"`)
   return cacheKey
 }
