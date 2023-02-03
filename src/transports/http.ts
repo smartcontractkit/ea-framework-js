@@ -151,7 +151,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     // with the full combination of possible params within the request queue
     logger.trace(`Sending ${requests.length} requests...`)
     const start = Date.now()
-    await Promise.all(requests.map((r) => this.handleRequest(r, context.adapterConfig)))
+    await Promise.all(requests.map((r) => this.handleRequest(r, context)))
     const duration = Date.now() - start
     logger.trace(`All requests in the background execute were completed`)
 
@@ -177,9 +177,9 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
   private async handleRequest(
     requestConfig: ProviderRequestConfig<T>,
-    adapterConfig: AdapterConfig<T['CustomSettings']>,
+    context: EndpointContext<T>,
   ): Promise<void> {
-    const results = await this.makeRequest(requestConfig, adapterConfig)
+    const results = await this.makeRequest(requestConfig, context)
 
     if (!results.length) {
       logger.trace('Got no results from the request.')
@@ -192,21 +192,25 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
   private async makeRequest(
     requestConfig: ProviderRequestConfig<T>,
-    adapterConfig: AdapterConfig<T['CustomSettings']>,
+    context: EndpointContext<T>,
   ): Promise<TimestampedProviderResult<T>[]> {
     try {
       // The key generated here that we pass to the requester is potentially very long, but we're not considering it an issue given that:
       //   - the requester will store values in memory, so we're not sending the string anywhere
       //   - there's no problems using very large strings as object keys
       //   - there should be a limit on the amount of subscriptions in the set
+      // Append endpoint name to key to avoid coalescing requests across different endpoints
+      const requestKey = `${context.endpointName}-${requestConfig.params
+        .map((p) => JSON.stringify(p))
+        .join('|')}`
       const requesterResult = await this.requester.request<T['Provider']['ResponseBody']>(
-        requestConfig.params.map((p) => JSON.stringify(p)).join('|'),
+        requestKey,
         requestConfig.request,
       )
 
       // Parse responses and apply timestamps
       const results = this.config
-        .parseResponse(requestConfig.params, requesterResult.response, adapterConfig)
+        .parseResponse(requestConfig.params, requesterResult.response, context.adapterConfig)
         .map((r) => {
           const result = r as TimestampedProviderResult<T>
           const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
