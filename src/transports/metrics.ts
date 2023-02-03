@@ -1,6 +1,6 @@
 import { TransportGenerics } from '.'
 import { EndpointContext } from '../adapter'
-import { calculateCacheKey, calculateFeedId } from '../cache'
+import { calculateFeedId } from '../cache'
 import { AdapterConfig } from '../config'
 import { metrics } from '../metrics'
 import { InputParameters } from '../validation'
@@ -22,11 +22,10 @@ export const messageSubsLabels = <T extends TransportGenerics>(
   params: T['Request']['Params'],
 ) => {
   const feedId = calculateFeedId(context, params)
-  const cacheKey = calculateCacheKey(context, params)
 
   return {
     feed_id: feedId,
-    subscription_key: cacheKey,
+    subscription_key: `${context.endpointName}-${feedId}`,
   }
 }
 

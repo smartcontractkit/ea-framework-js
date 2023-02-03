@@ -100,6 +100,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     } else {
       req.requestContext.cacheKey = calculateCacheKey(
         {
+          adapterName: adapter.name,
           endpointName: endpoint.name,
           inputParameters: endpoint.inputParameters,
           adapterConfig: adapter.config,

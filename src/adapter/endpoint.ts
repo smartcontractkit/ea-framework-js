@@ -45,12 +45,14 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @param config - configuration for the adapter
    */
   async initialize(
+    adapterName: string,
     dependencies: AdapterDependencies,
     config: AdapterConfig<T['CustomSettings']>,
   ): Promise<void> {
     const responseCache = new ResponseCache({
       dependencies,
       config: config as AdapterConfig,
+      adapterName,
       endpointName: this.name,
       inputParameters: this.inputParameters,
     })

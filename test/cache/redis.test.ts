@@ -4,7 +4,7 @@ import { expose } from '../../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { CacheFactory, RedisCache } from '../../src/cache'
 import { NopTransport, RedisMock } from '../util'
-import { BasicCacheSetterTransport, cacheTests, test } from './helper'
+import { BasicCacheSetterTransport, buildDiffResultAdapter, cacheTests, test } from './helper'
 import axios, { AxiosError } from 'axios'
 
 test.beforeEach(async (t) => {
@@ -84,4 +84,41 @@ test.serial('Test cache factory failure (redis)', async (t) => {
   } catch (e: unknown) {
     t.pass()
   }
+})
+
+test.serial('Test cache key collision across adapters', async (t) => {
+  const adapterA = buildDiffResultAdapter('TESTA')
+  const adapterB = buildDiffResultAdapter('TESTB')
+
+  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const dependencies: Partial<AdapterDependencies> = {
+    cache,
+  }
+
+  t.context.cache = cache
+  const apiA = await expose(adapterA, dependencies)
+  if (!apiA) {
+    throw 'Server did not start'
+  }
+  const addressA = `http://localhost:${(apiA.server.address() as AddressInfo).port}`
+
+  const apiB = await expose(adapterB, dependencies)
+  if (!apiB) {
+    throw 'Server did not start'
+  }
+  const addressB = `http://localhost:${(apiB.server.address() as AddressInfo).port}`
+
+  const data = {
+    base: 'eth',
+  }
+
+  // Populate cache
+  await axios.post(`${addressA}`, { data })
+  await axios.post(`${addressB}`, { data })
+
+  // Get results from cache to ensure the cache key is not returning the same response for both adapters
+  const cacheResponseA = await axios.post(`${addressA}`, { data })
+  const cacheResponseB = await axios.post(`${addressB}`, { data })
+
+  t.not(cacheResponseA.data.result, cacheResponseB.data.result)
 })

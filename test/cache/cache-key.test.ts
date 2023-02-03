@@ -125,7 +125,7 @@ test.serial('builds cache key correctly from input params', async (t) => {
   })
   t.is(
     response.data.result,
-    'test-{"base":"eth","factor":123,"proper":true,"details":{"asd":"qwe","zxc":432}}',
+    'TEST-test-{"base":"eth","factor":123,"proper":true,"details":{"asd":"qwe","zxc":432}}',
   )
 })
 
@@ -147,7 +147,7 @@ test.serial('cache key is truncated if over max size', async (t) => {
         .join('|'),
     },
   })
-  t.is(response.data.result.length, 150 + 1 + 4) // Max common key + separator + endpoint name
+  t.is(response.data.result.length, 4 + 1 + 4 + 1 + 150) // Adapter Name + separator + Endpoint Name + separator + Max common key
 })
 
 test.serial('custom cache key', async (t) => {

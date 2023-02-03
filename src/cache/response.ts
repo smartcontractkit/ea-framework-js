@@ -22,22 +22,26 @@ export class ResponseCache<
 > {
   cache: Cache<AdapterResponse<T['Response']>>
   inputParameters: InputParameters
+  adapterName: string
   endpointName: string
   config: AdapterConfig
 
   constructor({
     inputParameters,
+    adapterName,
     endpointName,
     config,
     dependencies,
   }: {
     dependencies: AdapterDependencies
     config: AdapterConfig
+    adapterName: string
     endpointName: string
     inputParameters: InputParameters
   }) {
     this.cache = dependencies.cache as Cache<AdapterResponse<T['Response']>>
     this.inputParameters = inputParameters
+    this.adapterName = adapterName
     this.endpointName = endpointName
     this.config = config
   }
@@ -72,6 +76,7 @@ export class ResponseCache<
         key: calculateCacheKey(
           {
             inputParameters: this.inputParameters,
+            adapterName: this.adapterName,
             endpointName: this.endpointName,
             adapterConfig: this.config,
           },

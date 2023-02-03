@@ -1,6 +1,6 @@
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosError } from 'axios'
-import { AdapterEndpoint } from '../../src/adapter'
+import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { Cache } from '../../src/cache'
 import { AdapterRequest } from '../../src/util'
 import { NopTransport, NopTransportTypes } from '../util'
@@ -30,6 +30,44 @@ export class BasicCacheSetterTransport extends NopTransport {
   }
 }
 
+export class DifferentResultTransport extends NopTransport {
+  override async foregroundExecute(req: AdapterRequest): Promise<void> {
+    await this.responseCache.write([
+      {
+        params: req.requestContext.data,
+        response: {
+          data: null,
+          result: Date.now() as unknown as null,
+          timestamps: {
+            providerDataRequestedUnixMs: 0,
+            providerDataReceivedUnixMs: 0,
+            providerIndicatedTimeUnixMs: undefined,
+          },
+        },
+      },
+    ])
+  }
+}
+
+export function buildDiffResultAdapter(name: Uppercase<string>) {
+  return new Adapter({
+    name,
+    defaultEndpoint: 'test',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters: {
+          base: {
+            type: 'string',
+            required: true,
+          },
+        },
+        transport: new DifferentResultTransport(),
+      }),
+    ],
+  })
+}
+
 export const cacheTests = () => {
   test('returns value set in cache from setup', async (t) => {
     const data = {
@@ -47,7 +85,7 @@ export const cacheTests = () => {
       factor: 111,
     }
 
-    const cacheKey = 'test-{"base":"qweqwe","factor":111}'
+    const cacheKey = 'TEST-test-{"base":"qweqwe","factor":111}'
 
     // Inject values directly into the cache
     const injectedEntry = {
@@ -68,7 +106,7 @@ export const cacheTests = () => {
       factor: 24637,
     }
 
-    const cacheKey = 'test-{"base":"sdfghj","factor":24637}'
+    const cacheKey = 'TEST-test-{"base":"sdfghj","factor":24637}'
 
     // Inject values directly into the cache
     const injectedEntry = {
