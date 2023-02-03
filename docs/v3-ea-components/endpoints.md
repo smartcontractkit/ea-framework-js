@@ -1,6 +1,6 @@
 # Endpoints
 
-Endpoints are defined for the different types of data points an adapter needs to provide. There are no restrictions as to how many data provider endpoints a particular adapter endpoint has to use. To reach a particular adapter endpoint, the `endpoint` parameter can be specified in the request using either its name or any of its aliases.
+Endpoints are defined for the different types of data points an adapter needs to provide. These bear no relation to HTTP endpoints for a Data Provider, although in many cases there will be a 1:1 match. To reach a particular adapter endpoint, the `endpoint` parameter can be specified in the request using either its name or any of its aliases.
 
 If the endpoint field is omitted, the adapter will use the default endpoint in the `Adapter` parameters, if set. If the field is explicitly set and does not match any endpoints or their aliases, the request will fail.
 

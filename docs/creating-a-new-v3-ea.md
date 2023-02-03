@@ -2,7 +2,7 @@
 
 This guide outlines the steps needed to setup a basic adapter.
 
-The v3 framework currently only supports development of source adapters (adapters that only connect to one data provider). This guide will assume the adapter is being created in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js) under `packages/sources/`.
+This guide carries stylistic biases, mainly in the context of the collection of EAs found in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js) under `packages/sources/`. That being said, this framework can be used outside of that to build standalone adapters, in which case its organization does not need to follow the structure laid out in this guide.
 
 ## Steps
 

@@ -147,5 +147,17 @@ This diagram expands on the `Validation Middleware` section of the `EA v3 Design
 
 ```mermaid
 flowchart TD
-  A[Default Input Validations] --> B[Custom Input Validations] --> C[Symbol Overrides Transformations] -..-> D[All Custom Request Transformations Sequentially] -..-> E[Includes Inverse Transformation] --> F[Cache Key Generation]
+    R((Incoming \nRequest))
+    R --> A
+    subgraph Validation Middleware
+        A["Default Input Validations"] --> B
+        B["Custom Input Validations"] --> RC
+        RC[Request.requestContext Generation] --> C
+        subgraph "Request Transforms (sequential)"
+            C["Symbol Overrides Transformations \n (default)"] -.-> D
+            D["Custom Request Transforms"] -.-> E
+        end
+        E["Includes Inverse Transformation \n (in PriceAdapters)"] --> F
+        F[Cache Key Generation]
+    end
 ```
