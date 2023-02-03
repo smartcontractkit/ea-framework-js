@@ -169,3 +169,28 @@ export class PriceAdapter<CustomSettings extends SettingsMap> extends Adapter<Cu
     return response
   }
 }
+
+const DEFAULT_ALIASES = ['crypto', 'price']
+
+/**
+ * A CryptoPriceEndpoint expands on the existing [[PriceEndpoint]], with the addition of adding
+ * a set of common aliases that are used across EAs to specify endpoints that provide crypto prices.
+ */
+export class CryptoPriceEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {
+  constructor(
+    params: AdapterEndpointParams<T> & {
+      inputParameters: PriceEndpointInputParameters
+    },
+  ) {
+    if (!params.aliases) {
+      params.aliases = []
+    }
+    for (const alias of DEFAULT_ALIASES) {
+      if (params.name !== alias && !params.aliases.includes(alias)) {
+        params.aliases.push(alias)
+      }
+    }
+
+    super(params)
+  }
+}
