@@ -8,6 +8,7 @@ import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/e
 import { TransportDependencies, TransportGenerics } from '.'
 import { SubscriptionTransport } from './abstract/subscription'
 import { metrics, retrieveCost } from '../metrics'
+import { calculateCacheKey } from '../cache'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
 
@@ -199,12 +200,9 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
       //   - the requester will store values in memory, so we're not sending the string anywhere
       //   - there's no problems using very large strings as object keys
       //   - there should be a limit on the amount of subscriptions in the set
-      // Append endpoint name to key to avoid coalescing requests across different endpoints
-      const requestKey = `${context.endpointName}-${requestConfig.params
-        .map((p) => JSON.stringify(p))
-        .join('|')}`
+      // Use cache key to avoid coalescing requests across different endpoints
       const requesterResult = await this.requester.request<T['Provider']['ResponseBody']>(
-        requestKey,
+        calculateCacheKey(context, requestConfig.params),
         requestConfig.request,
       )
 
