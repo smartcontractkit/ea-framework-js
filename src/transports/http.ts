@@ -8,7 +8,7 @@ import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/e
 import { TransportDependencies, TransportGenerics } from '.'
 import { SubscriptionTransport } from './abstract/subscription'
 import { metrics, retrieveCost } from '../metrics'
-import { calculateCacheKey } from '../cache'
+import { calculateHttpRequestKey } from '../cache'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
 
@@ -202,7 +202,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
       //   - there should be a limit on the amount of subscriptions in the set
       // Use cache key to avoid coalescing requests across different endpoints
       const requesterResult = await this.requester.request<T['Provider']['ResponseBody']>(
-        calculateCacheKey(context, requestConfig.params),
+        calculateHttpRequestKey(context, requestConfig.params),
         requestConfig.request,
       )
 

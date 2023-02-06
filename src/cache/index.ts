@@ -1,4 +1,4 @@
-import { EndpointGenerics } from '../adapter'
+import { EndpointContext, EndpointGenerics } from '../adapter'
 import { AdapterConfig, SettingsMap } from '../config'
 import { AdapterResponse, makeLogger, sleep } from '../util'
 import { InputParameters } from '../validation'
@@ -84,6 +84,20 @@ export const calculateCacheKey = <T extends EndpointGenerics>(
   const cacheKey = `${adapterName}-${endpointName}-${calculateKey(data, adapterConfig)}`
   logger.trace(`Generated cache key for request: "${cacheKey}"`)
   return cacheKey
+}
+
+// Used to coalesce HTTP requests within the same endpoint
+export const calculateHttpRequestKey = <T extends EndpointGenerics>(
+  context: EndpointContext<T>,
+  data: unknown,
+): string => {
+  if (Object.keys(context.inputParameters).length === 0) {
+    logger.trace(`Using default cache key ${context.adapterConfig.DEFAULT_CACHE_KEY}`)
+    return `${context.endpointName}-${context.adapterConfig.DEFAULT_CACHE_KEY}`
+  }
+  const key = `${context.endpointName}-${calculateKey(data, context.adapterConfig)}`
+  logger.trace(`Generated HTTP request queue key: "${key}"`)
+  return key
 }
 
 export const calculateFeedId = <T extends EndpointGenerics>(

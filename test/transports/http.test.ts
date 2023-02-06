@@ -5,9 +5,11 @@ import { AddressInfo } from 'net'
 import nock from 'nock'
 import { expose, ServerInstance } from '../../src'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
-import { SettingsMap } from '../../src/config'
+import { calculateHttpRequestKey } from '../../src/cache'
+import { buildAdapterConfig, SettingsMap } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { AdapterResponse, ProviderResult, SingleNumberResultResponse } from '../../src/util'
+import { InputParameters } from '../../src/validation'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
 
 const test = untypedTest as TestFn<{
@@ -882,3 +884,23 @@ test.serial(
     })
   },
 )
+
+test.serial('builds HTTP request queue key correctly from input params', async (t) => {
+  const endpointName = 'test'
+  const adapterConfig = buildAdapterConfig({})
+  const params: InputParameters = {
+    base: {
+      type: 'string',
+      required: true,
+    },
+    quote: {
+      type: 'string',
+      required: true,
+    },
+  }
+  const data = { base: 'ETH', quote: 'BTC' }
+  t.is(
+    calculateHttpRequestKey({ inputParameters: params, adapterConfig, endpointName }, data),
+    'test-{"base":"eth","quote":"btc"}',
+  )
+})
