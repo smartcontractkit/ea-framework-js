@@ -5,9 +5,11 @@ import { AddressInfo } from 'net'
 import nock from 'nock'
 import { expose, ServerInstance } from '../../src'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
-import { SettingsMap } from '../../src/config'
+import { calculateHttpRequestKey } from '../../src/cache'
+import { buildAdapterConfig, SettingsMap } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { AdapterResponse, ProviderResult, SingleNumberResultResponse } from '../../src/util'
+import { InputParameters } from '../../src/validation'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
 
 const test = untypedTest as TestFn<{
@@ -34,6 +36,13 @@ interface ProviderResponseBody {
   prices: Array<{
     pair: string
     price: number
+  }>
+}
+
+interface ProviderVolumeResponseBody {
+  volumes: Array<{
+    pair: string
+    volume: number
   }>
 }
 
@@ -68,6 +77,11 @@ type HttpTransportTypes = {
   }
 }
 
+type HttpVolumeTransportTypes = HttpTransportTypes & {
+  Provider: {
+    ResponseBody: ProviderVolumeResponseBody
+  }
+}
 const BACKGROUND_EXECUTE_MS_HTTP = 1000
 
 class MockHttpTransport extends HttpTransport<HttpTransportTypes> {
@@ -125,6 +139,7 @@ process.env['API_TIMEOUT'] = '0'
 const from = 'ETH'
 const to = 'USD'
 const price = 1234
+const volume = 4567
 
 nock(URL)
   .post(endpoint, {
@@ -402,8 +417,8 @@ test.serial(
     t.is(errorB?.response?.status, 504)
 
     await runAllUntilTime(t.context.clock, 20 * 1000)
-    t.is(transportA.backgroundExecuteCalls, 20 * rateLimit1s)
-    t.is(transportB.backgroundExecuteCalls, 20 * rateLimit1s)
+    t.is(transportA.backgroundExecuteCalls, 10 * rateLimit1s)
+    t.is(transportB.backgroundExecuteCalls, 10 * rateLimit1s)
   },
 )
 
@@ -568,41 +583,67 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
   })
 })
 
-test.serial('requests from different transports are coalesced', async (t) => {
+test.serial('requests from different transports are NOT coalesced', async (t) => {
+  const transportA = new MockHttpTransport(true)
+  const transportB = new (class extends HttpTransport<HttpVolumeTransportTypes> {
+    backgroundExecuteCalls = 0
+
+    constructor() {
+      super({
+        prepareRequests: (params) => ({
+          params,
+          request: {
+            baseURL: URL,
+            url: '/volume',
+            method: 'POST',
+            data: {
+              pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+            },
+          },
+        }),
+        parseResponse: (
+          params: AdapterRequestParams[],
+          res: AxiosResponse<ProviderVolumeResponseBody>,
+        ): ProviderResult<HttpVolumeTransportTypes>[] =>
+          res.data.volumes?.map((p) => {
+            const [base, quote] = p.pair.split('/')
+            return {
+              params: { from: base, to: quote },
+              response: {
+                data: {
+                  result: p.volume,
+                },
+                result: p.volume,
+              },
+            }
+          }) || [],
+      })
+    }
+    override async backgroundExecute(context: EndpointContext<HttpTransportTypes>): Promise<void> {
+      const entries = await this.subscriptionSet.getAll()
+      if (entries.length) {
+        this.backgroundExecuteCalls++
+      }
+      return super.backgroundExecute(context)
+    }
+  })()
+
   const adapter = new Adapter({
     name: 'TEST',
+    defaultEndpoint: 'testA',
     endpoints: [
       new AdapterEndpoint({
-        name: 'a',
+        name: 'testA',
         inputParameters,
-        transport: new MockHttpTransport(true),
+        transport: transportA,
       }),
       new AdapterEndpoint({
-        name: 'b',
+        name: 'testB',
         inputParameters,
-        transport: new MockHttpTransport(true),
+        transport: transportB,
       }),
     ],
   })
-
-  nock(URL)
-    .post(endpoint, {
-      pairs: [
-        {
-          base: 'COALESCE',
-          quote: to,
-        },
-      ],
-    })
-    .once() // Ensure that this request happens only once, but should satisfy both transports
-    .reply(200, {
-      prices: [
-        {
-          pair: `coalesce/${to}`,
-          price,
-        },
-      ],
-    })
 
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
@@ -613,35 +654,68 @@ test.serial('requests from different transports are coalesced', async (t) => {
     cache: mockCache,
   })
   const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
-  const makeRequest = (inputEndpoint: string) => () =>
+
+  nock(URL)
+    .post('/volume', {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(200, {
+      volumes: [
+        {
+          pair: `${from}/${to}`,
+          volume,
+        },
+      ],
+    })
+    .persist()
+
+  const makeRequest = (endpointParam: string) =>
     axios.post(address, {
       data: {
-        from: 'COALESCE',
+        from,
         to,
-        endpoint: inputEndpoint,
       },
+      endpoint: endpointParam,
     })
 
-  const errorPromiseA: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest('a'))
-  const errorPromiseB: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest('b'))
+  const errorPromiseA: Promise<AxiosError | undefined> = t.throwsAsync(() => makeRequest('testA'))
+  const errorPromiseB: Promise<AxiosError | undefined> = t.throwsAsync(() => makeRequest('testB'))
   // Advance enough time for the initial request async flow
   t.context.clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504s
+  // Wait for the failed cache get -> instant 504
   const [errorA, errorB] = await Promise.all([errorPromiseA, errorPromiseB])
   t.is(errorA?.response?.status, 504)
   t.is(errorB?.response?.status, 504)
-
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
   const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_HTTP * 2 + 200)
+  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_HTTP + 10)
   await cacheValueSetPromise
 
-  // Second requests should find the response in the cache
-  const responseA = await makeRequest('a')()
-  const responseB = await makeRequest('b')()
+  // Second request should find the response in the cache
+  const responseA = await makeRequest('testA')
+  const responseB = await makeRequest('testB')
 
   t.is(responseA.status, 200)
+  assertEqualResponses(t, responseA.data, {
+    data: {
+      result: price,
+    },
+    result: price,
+    statusCode: 200,
+  })
   t.is(responseB.status, 200)
+  assertEqualResponses(t, responseB.data, {
+    data: {
+      result: volume,
+    },
+    result: volume,
+    statusCode: 200,
+  })
 })
 
 test.serial('requests for the same transport are coalesced', async (t) => {
@@ -810,3 +884,23 @@ test.serial(
     })
   },
 )
+
+test.serial('builds HTTP request queue key correctly from input params', async (t) => {
+  const endpointName = 'test'
+  const adapterConfig = buildAdapterConfig({})
+  const params: InputParameters = {
+    base: {
+      type: 'string',
+      required: true,
+    },
+    quote: {
+      type: 'string',
+      required: true,
+    },
+  }
+  const data = { base: 'ETH', quote: 'BTC' }
+  t.is(
+    calculateHttpRequestKey({ inputParameters: params, adapterConfig, endpointName }, data),
+    'test-{"base":"eth","quote":"btc"}',
+  )
+})
