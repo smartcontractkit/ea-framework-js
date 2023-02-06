@@ -125,7 +125,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
       }
 
       logger.debug(`Initializing endpoint "${endpoint.name}"...`)
-      await endpoint.initialize(this.dependencies, this.config)
+      await endpoint.initialize(this.name, this.dependencies, this.config)
     }
 
     // Build list of key/values that need to be redacted in logs

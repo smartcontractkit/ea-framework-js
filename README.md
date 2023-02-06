@@ -29,7 +29,7 @@ yarn # Install yarn dependencies
 
 - [Basics](./docs/basics.md)
 - [Porting a v2 EA to v3](./docs/porting-a-v2-ea-to-v3.md)
-- Creating a new v3 EA
+- [Creating a new v3 EA](./docs/creating-a-new-v3-ea.md)
 - Transports
   - Basic
     - REST
