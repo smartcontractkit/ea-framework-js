@@ -2,7 +2,7 @@ import { ResponseCache } from '../cache/response'
 import { AdapterConfig } from '../config'
 import { MetaTransport, Transport } from '../transports'
 import { makeLogger } from '../util'
-import { InputParameters } from '../validation'
+import { SpecificInputParameters } from '../validation'
 import { InputValidator } from '../validation/input-validator'
 import {
   AdapterDependencies,
@@ -13,7 +13,6 @@ import {
 } from './types'
 
 const logger = makeLogger('AdapterEndpoint')
-
 /**
  * Main class to represent an endpoint within an External Adapter
  */
@@ -21,7 +20,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   name: string
   aliases?: string[] | undefined
   transport: Transport<T> | MetaTransport<T>
-  inputParameters: InputParameters
+  inputParameters: SpecificInputParameters<T['Request']['Params']>
   rateLimiting?: EndpointRateLimitingConfig | undefined
   validator: InputValidator
   cacheKeyGenerator?: (data: Record<string, unknown>) => string

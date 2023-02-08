@@ -12,14 +12,14 @@ import {
 import { ResponseCache } from '../src/cache/response'
 import { SettingsMap } from '../src/config'
 import { Transport } from '../src/transports'
-import { AdapterRequest, AdapterResponse, EmptyObject } from '../src/util'
+import { AdapterRequest, AdapterResponse } from '../src/util'
 import { NopTransport } from './util'
 
 const test = untypedTest as TestFn
 
 type PriceTestTypes = {
   Request: {
-    Params: EmptyObject
+    Params: unknown
   }
   Response: {
     Data: null

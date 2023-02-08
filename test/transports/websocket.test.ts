@@ -6,7 +6,11 @@ import { AddressInfo } from 'net'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint, AdapterParams } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { WebSocketClassProvider, WebsocketReverseMappingTransport, WebSocketTransport } from '../../src/transports'
+import {
+  WebSocketClassProvider,
+  WebsocketReverseMappingTransport,
+  WebSocketTransport,
+} from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
@@ -20,7 +24,7 @@ export const test = untypedTest as TestFn<{
   clock: InstalledClock
 }>
 
-export const inputParameters: InputParameters = {
+export const inputParameters = {
   base: {
     type: 'string',
     required: true,
@@ -29,7 +33,7 @@ export const inputParameters: InputParameters = {
     type: 'string',
     required: true,
   },
-}
+} satisfies InputParameters
 
 interface ProviderMessage {
   pair: string
@@ -536,44 +540,47 @@ test.serial(
   },
 )
 
-const createReverseMappingAdapter = (adapterParams?: Partial<AdapterParams<SettingsMap>>): Adapter => {
-  const websocketTransport: WebsocketReverseMappingTransport<WebSocketTypes, string> = new WebsocketReverseMappingTransport<WebSocketTypes, string>({
-    url: () => URL,
-    handlers: {
-      message(message) {
-        const params = websocketTransport.getReverseMapping(message.pair)
-        if (!params) {
-          return undefined
-        }
+const createReverseMappingAdapter = (
+  adapterParams?: Partial<AdapterParams<SettingsMap>>,
+): Adapter => {
+  const websocketTransport: WebsocketReverseMappingTransport<WebSocketTypes, string> =
+    new WebsocketReverseMappingTransport<WebSocketTypes, string>({
+      url: () => URL,
+      handlers: {
+        message(message) {
+          const params = websocketTransport.getReverseMapping(message.pair)
+          if (!params) {
+            return undefined
+          }
 
-        return [
-          {
-            params,
-            response: {
-              data: {
+          return [
+            {
+              params,
+              response: {
+                data: {
+                  result: message.value,
+                },
                 result: message.value,
               },
-              result: message.value,
             },
-          },
-        ]
+          ]
+        },
       },
-    },
-    builders: {
-      subscribeMessage: (params: AdapterRequestParams) => {
-        const pair = `${params.base}/${params.quote}`
-        websocketTransport.setReverseMapping(pair, params)
-        return {
-          request: 'subscribe',
-          pair,
-        }
+      builders: {
+        subscribeMessage: (params: AdapterRequestParams) => {
+          const pair = `${params.base}/${params.quote}`
+          websocketTransport.setReverseMapping(pair, params)
+          return {
+            request: 'subscribe',
+            pair,
+          }
+        },
+        unsubscribeMessage: (params: AdapterRequestParams) => ({
+          request: 'unsubscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
       },
-      unsubscribeMessage: (params: AdapterRequestParams) => ({
-        request: 'unsubscribe',
-        pair: `${params.base}/${params.quote}`,
-      }),
-    },
-  })
+    })
 
   const webSocketEndpoint = new AdapterEndpoint({
     name: 'TEST',

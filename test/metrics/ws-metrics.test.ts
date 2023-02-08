@@ -23,7 +23,7 @@ interface AdapterRequestParams {
   quote: string
 }
 
-export const inputParameters: InputParameters = {
+export const inputParameters = {
   base: {
     type: 'string',
     required: true,
@@ -32,7 +32,7 @@ export const inputParameters: InputParameters = {
     type: 'string',
     required: true,
   },
-}
+} satisfies InputParameters
 
 interface ProviderMessage {
   pair: string
