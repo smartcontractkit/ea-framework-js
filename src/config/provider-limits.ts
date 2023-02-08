@@ -61,14 +61,14 @@ const getProviderLimits = (
   const providerConfig = parseLimits(limits)
   if (!providerConfig) {
     throw new Error(
-      `Rate Limit: Provider: "${provider}" doesn't match any provider spec in limits.json`,
+      `Rate Limit: Provider: "${provider}" doesn't match any provider spec in the adapter rate limiting configurations`,
     )
   }
 
   const protocolConfig = providerConfig[protocol]
   if (!protocolConfig) {
     throw new Error(
-      `Rate Limit: "${provider}" doesn't have any configuration for ${protocol} in limits.json`,
+      `Rate Limit: "${provider}" doesn't have any configuration for ${protocol} in the adapter rate limiting configurations`,
     )
   }
 
@@ -83,7 +83,7 @@ const getProviderLimits = (
 
   if (!limitsConfig) {
     throw new Error(
-      `Rate Limit: Provider: "${provider}" has no tiers defined for ${protocol} in limits.json`,
+      `Rate Limit: Provider: "${provider}" has no tiers defined for ${protocol} in the adapter rate limiting configurations`,
     )
   }
 
