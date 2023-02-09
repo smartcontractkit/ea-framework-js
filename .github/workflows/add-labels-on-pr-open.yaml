@@ -35,14 +35,15 @@ jobs:
           elif [[ $HR == bump-version/*  ]]; then
             LABELS="version-bump"
           else
+            # Add a no-op label so we trigger the validation
+            LABELS="needs-label"
             echo "Could not determine labels based on branch name: $HR"
           fi
           # Below is a direct instruction to the set-output action, evaluated as a bash command
-          echo "::set-output name=LABELS::$LABELS"
+          echo "LABELS=$LABELS" >> $GITHUB_OUTPUT
       - uses: andymckay/labeler@master # This is the external step used in the official GHA docs
         if: github.event_name == 'pull_request'
         with:
           add-labels: ${{ steps.calc-labels.outputs.LABELS }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}ß
