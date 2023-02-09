@@ -247,6 +247,7 @@ export class WebSocketTransport<
     // No new subs && connection -> unsubs only
     if (!subscriptions.new.length && !this.wsConnection) {
       logger.debug('No entries in subscription set and no established connection, skipping')
+      await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_WS)
       return
     }
 

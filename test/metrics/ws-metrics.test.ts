@@ -217,7 +217,7 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   t.is(metricsMap.get(`ws_subscription_total{${feed},${basic}}`), 1)
   t.is(metricsMap.get(`ws_message_total{${feed},direction="sent",${basic}}`), 1)
   t.is(metricsMap.get(`ws_message_total{direction="received",${basic}}`), 1)
-  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 3)
+  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 2)
   t.is(metricsMap.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 1)
 
   const responseTime = metricsMap.get(`bg_execute_duration_seconds{${endpoint},${basic}}`)
@@ -257,6 +257,6 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   metricsMap = parsePromMetrics(response.data)
 
   t.is(metricsMap.get(`ws_connection_active{${basic}}`), 0)
-  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 7)
+  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 6)
   t.is(metricsMap.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 0)
 })

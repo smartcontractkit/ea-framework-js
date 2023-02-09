@@ -304,7 +304,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
 
     if (perSecRateLimit > highestTierValue) {
       logger.warn(
-        `The configured RATE_LIMIT_CAPACITY_SECOND value is higher than the highest tier value from limits.json ${highestTierValue}`,
+        `The configured RATE_LIMIT_CAPACITY_SECOND value is higher than the highest tier value in the adapter rate limiting configurations ${highestTierValue}`,
       )
     }
 
@@ -314,7 +314,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
           ? 'RATE_LIMIT_CAPACITY_MINUTE'
           : 'RATE_LIMIT_CAPACITY'
       }
-      value is higher than the highest tier value from limits.json ${highestTierValue}`)
+      value is higher than the highest tier value the adapter rate limiting configurations ${highestTierValue}`)
     }
 
     if (!dependencies.rateLimiter) {
