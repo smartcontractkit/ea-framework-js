@@ -677,6 +677,80 @@ test.serial('missing transport in input params with no default fails request', a
   )
 })
 
+test.serial('missing transport in input params with default succeeds', async (t) => {
+  const { from, to } = t.context
+  const transport = new RoutingTransport<BaseEndpointTypes>(transports, {
+    defaultTransport: 'batch',
+  })
+  const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+    inputParameters: {
+      ...inputParameters,
+      transport: {
+        ...inputParameters.transport,
+        required: false,
+      },
+    },
+    name: 'price', // /price
+    transport,
+  })
+
+  const adapter = new Adapter<typeof CustomSettings>({
+    name: 'TEST',
+    defaultEndpoint: 'price',
+    endpoints: [endpoint],
+    rateLimiting: {
+      tiers: {
+        default: {
+          rateLimit1s: 5,
+        },
+      },
+    },
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const api = await expose(adapter)
+  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+  const price = 1500
+
+  nock(restUrl)
+    .post('/price', {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(200, {
+      prices: [
+        {
+          pair: `${from}/${to}`,
+          price,
+        },
+      ],
+    })
+    .persist()
+
+  const makeRequest = () =>
+    axios.post(address, {
+      data: {
+        from,
+        to,
+      },
+    })
+
+  const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
+
+  t.is(error?.response?.status, 504)
+  const internalTransport = transports['batch'] as MockHttpTransport
+  t.assert(internalTransport.backgroundExecuteCalls > 0)
+})
+
 test.serial('transport creation fails if transport names are not acceptable', async (t) => {
   const invalidNames = ['WebSocket', 'HTTP', 'hyphen-test', 'camel_test', 'space test']
 
