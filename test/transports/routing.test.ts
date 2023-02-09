@@ -15,6 +15,7 @@ import {
   WebSocketTransport,
 } from '../../src/transports'
 import { RoutingTransport } from '../../src/transports/meta'
+import { InputParameters } from '../../src/validation'
 import { MockCache } from '../util'
 
 const test = untypedTest as TestFn<{
@@ -36,7 +37,7 @@ interface ProviderResponseBody {
 interface AdapterRequestParams {
   from: string
   to: string
-  routeToTransport: string
+  transport: string
 }
 
 interface ProviderMessage {
@@ -76,6 +77,24 @@ type WebSocketTypes = BaseEndpointTypes & {
   }
 }
 
+const inputParameters = {
+  from: {
+    description: 'from',
+    required: true,
+    type: 'string',
+  },
+  to: {
+    description: 'to',
+    required: true,
+    type: 'string',
+  },
+  transport: {
+    description: 'which transport to route to',
+    required: true,
+    type: 'string',
+  },
+} satisfies InputParameters
+
 class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
   public backgroundExecuteCalls = 0
 
@@ -90,7 +109,7 @@ class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
         message(message) {
           return [
             {
-              params: { from: 'ETH', to: 'USD', routeToTransport: 'WEBSOCKET' },
+              params: { from: 'ETH', to: 'USD', transport: 'WEBSOCKET' },
               response: {
                 data: { price: message.value },
                 result: message.value,
@@ -220,7 +239,7 @@ class MockSseTransport extends SseTransport<SSETypes> {
           parseResponse: (evt: MessageEvent) => {
             return [
               {
-                params: { from: 'ETH', to: 'USD', routeToTransport: 'SSE' },
+                params: { from: 'ETH', to: 'USD', transport: 'SSE' },
                 response: {
                   data: { price: evt.data.price },
                   result: evt.data.price,
@@ -239,18 +258,14 @@ class MockSseTransport extends SseTransport<SSETypes> {
   }
 }
 
-const transports: {
-  [key: string]: Transport<BaseEndpointTypes>
-} = {
-  WEBSOCKET: new MockWebSocketTransport(),
-  BATCH: new MockHttpTransport(),
-  SSE: new MockSseTransport(),
-}
+const transports = {
+  websocket: new MockWebSocketTransport(),
+  batch: new MockHttpTransport(),
+  sse: new MockSseTransport(),
+} as const satisfies Record<string, Transport<BaseEndpointTypes>>
 
-// Route function is used to select an adapter based on the supplied string, routeToTransport
-const routingTransport = new RoutingTransport<BaseEndpointTypes>(transports, (req, _) => {
-  return req.requestContext.data.routeToTransport
-})
+// Route function is used to select an adapter based on the supplied string, transport
+const routingTransport = new RoutingTransport<BaseEndpointTypes>(transports)
 
 test.before(() => {
   nock.disableNetConnect()
@@ -263,23 +278,7 @@ test.after(() => {
 
 test.beforeEach((t) => {
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
-    inputParameters: {
-      from: {
-        description: 'from',
-        required: true,
-        type: 'string',
-      },
-      to: {
-        description: 'to',
-        required: true,
-        type: 'string',
-      },
-      routeToTransport: {
-        description: 'which transport to route to',
-        required: true,
-        type: 'string',
-      },
-    },
+    inputParameters,
     name: 'price', // /price
     transport: routingTransport,
   })
@@ -325,7 +324,7 @@ test.serial('routing transport errors on invalid transport', async (t) => {
       data: {
         from,
         to,
-        routeToTransport: 'INVALID',
+        transport: 'INVALID',
       },
     })
 
@@ -364,14 +363,14 @@ test.serial('RoutingTransport can route to HttpTransport', async (t) => {
       data: {
         from,
         to,
-        routeToTransport: 'BATCH',
+        transport: 'BATCH',
       },
     })
 
   const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
 
   t.is(error?.response?.status, 504)
-  const internalTransport = transports['BATCH'] as MockHttpTransport
+  const internalTransport = transports['batch'] as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -404,13 +403,13 @@ test.serial('RoutingTransport can route to WebSocket transport', async (t) => {
       data: {
         from,
         to,
-        routeToTransport: 'WEBSOCKET',
+        transport: 'WEBSOCKET',
       },
     })
   }
   const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
   t.is(error?.response?.status, 504)
-  const internalTransport = transports['WEBSOCKET'] as MockWebSocketTransport
+  const internalTransport = transports['websocket'] as MockWebSocketTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -424,7 +423,7 @@ test.serial('RoutingTransport can route to SSE transport', async (t) => {
       data: {
         from,
         to,
-        routeToTransport: 'SSE',
+        transport: 'SSE',
       },
     })
   }
@@ -456,6 +455,320 @@ test.serial('RoutingTransport can route to SSE transport', async (t) => {
   const earlyError = await earlyErrorPromise
   t.is(earlyError?.response?.status, 504)
 
-  const internalTransport = transports['SSE'] as MockSseTransport
+  const internalTransport = transports['sse'] as MockSseTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
+})
+
+test.serial('custom router is applied to get valid transport to route to', async (t) => {
+  const { from, to } = t.context
+  const transport = new RoutingTransport<BaseEndpointTypes>(transports, {
+    customRouter: () => {
+      return 'batch'
+    },
+  })
+  const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+    inputParameters,
+    name: 'price', // /price
+    transport,
+  })
+
+  const adapter = new Adapter<typeof CustomSettings>({
+    name: 'TEST',
+    defaultEndpoint: 'price',
+    endpoints: [endpoint],
+    rateLimiting: {
+      tiers: {
+        default: {
+          rateLimit1s: 5,
+        },
+      },
+    },
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const api = await expose(adapter)
+  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+  const price = 1500
+
+  nock(restUrl)
+    .post('/price', {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(200, {
+      prices: [
+        {
+          pair: `${from}/${to}`,
+          price,
+        },
+      ],
+    })
+    .persist()
+
+  const makeRequest = () =>
+    axios.post(address, {
+      data: {
+        from,
+        to,
+        transport: 'BATCH',
+      },
+    })
+
+  const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
+
+  t.is(error?.response?.status, 504)
+  const internalTransport = transports['batch'] as MockHttpTransport
+  t.assert(internalTransport.backgroundExecuteCalls > 0)
+})
+
+test.serial('custom router returns invalid transport and request fails', async (t) => {
+  const { from, to } = t.context
+  const transport = new RoutingTransport<BaseEndpointTypes>(transports, {
+    customRouter: () => {
+      return 'qweqwe'
+    },
+  })
+  const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+    inputParameters,
+    name: 'price', // /price
+    transport,
+  })
+
+  const adapter = new Adapter<typeof CustomSettings>({
+    name: 'TEST',
+    defaultEndpoint: 'price',
+    endpoints: [endpoint],
+    rateLimiting: {
+      tiers: {
+        default: {
+          rateLimit1s: 5,
+        },
+      },
+    },
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const api = await expose(adapter)
+  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+  const price = 1500
+
+  nock(restUrl)
+    .post('/price', {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(200, {
+      prices: [
+        {
+          pair: `${from}/${to}`,
+          price,
+        },
+      ],
+    })
+    .persist()
+
+  const makeRequest = () =>
+    axios.post(address, {
+      data: {
+        from,
+        to,
+        transport: 'BATCH',
+      },
+    })
+
+  const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
+
+  t.is(error?.response?.status, 400)
+  t.is(
+    (error?.response?.data as { error: { message: string } }).error?.message,
+    'No transport found for qweqwe',
+  )
+})
+
+test.serial('missing transport in input params with no default fails request', async (t) => {
+  const { from, to } = t.context
+  const transport = new RoutingTransport<BaseEndpointTypes>(transports)
+  const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+    inputParameters: {
+      ...inputParameters,
+      transport: {
+        ...inputParameters.transport,
+        required: false,
+      },
+    },
+    name: 'price', // /price
+    transport,
+  })
+
+  const adapter = new Adapter<typeof CustomSettings>({
+    name: 'TEST',
+    defaultEndpoint: 'price',
+    endpoints: [endpoint],
+    rateLimiting: {
+      tiers: {
+        default: {
+          rateLimit1s: 5,
+        },
+      },
+    },
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const api = await expose(adapter)
+  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+  const price = 1500
+
+  nock(restUrl)
+    .post('/price', {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(200, {
+      prices: [
+        {
+          pair: `${from}/${to}`,
+          price,
+        },
+      ],
+    })
+    .persist()
+
+  const makeRequest = () =>
+    axios.post(address, {
+      data: {
+        from,
+        to,
+      },
+    })
+
+  const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
+
+  t.is(error?.response?.status, 400)
+  t.is(
+    (error?.response?.data as { error: { message: string } }).error?.message,
+    'No transport was specified in the input parameters, and this endpoint does not have a default set.',
+  )
+})
+
+test.serial('missing transport in input params with default succeeds', async (t) => {
+  const { from, to } = t.context
+  const transport = new RoutingTransport<BaseEndpointTypes>(transports, {
+    defaultTransport: 'batch',
+  })
+  const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+    inputParameters: {
+      ...inputParameters,
+      transport: {
+        ...inputParameters.transport,
+        required: false,
+      },
+    },
+    name: 'price', // /price
+    transport,
+  })
+
+  const adapter = new Adapter<typeof CustomSettings>({
+    name: 'TEST',
+    defaultEndpoint: 'price',
+    endpoints: [endpoint],
+    rateLimiting: {
+      tiers: {
+        default: {
+          rateLimit1s: 5,
+        },
+      },
+    },
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const api = await expose(adapter)
+  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
+  const price = 1500
+
+  nock(restUrl)
+    .post('/price', {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(200, {
+      prices: [
+        {
+          pair: `${from}/${to}`,
+          price,
+        },
+      ],
+    })
+    .persist()
+
+  const makeRequest = () =>
+    axios.post(address, {
+      data: {
+        from,
+        to,
+      },
+    })
+
+  const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
+
+  t.is(error?.response?.status, 504)
+  const internalTransport = transports['batch'] as MockHttpTransport
+  t.assert(internalTransport.backgroundExecuteCalls > 0)
+})
+
+test.serial('transport creation fails if transport names are not acceptable', async (t) => {
+  const invalidNames = ['WebSocket', 'HTTP', 'hyphen-test', 'camel_test', 'space test']
+
+  for (const name of invalidNames) {
+    t.throws(
+      () =>
+        new RoutingTransport<BaseEndpointTypes>({
+          [name]: transports.batch,
+        }),
+    )
+  }
+})
+
+test.serial('transport creation fails if default transport is not in transports map', async (t) => {
+  t.throws(
+    () =>
+      new RoutingTransport<BaseEndpointTypes>(transports, {
+        defaultTransport: 'asd',
+      }),
+  )
 })

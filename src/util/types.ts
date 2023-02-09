@@ -121,19 +121,13 @@ export type TimestampedProviderResult<T extends ProviderResultGenerics> = Pick<
 }
 
 /**
- * Here we do actually want an object, since unknown could be a primitive.
- * The rule itself does say "marginally better"
- */
-export type EmptyObject = Object // eslint-disable-line @typescript-eslint/ban-types
-
-/**
  * Helper struct type that provides detail about the incoming Adapter Request
  */
 export type RequestGenerics = {
   /**
    * Type for the parameters sent to the EA in the data property of the body.
    */
-  Params: EmptyObject
+  Params: unknown
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   SubscriptionSetFactory,
 } from '../util'
 import { Requester } from '../util/requester'
-import { InputParameters } from '../validation'
+import { InputParameters, SpecificInputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { Adapter } from './basic'
 import { AdapterEndpoint } from './endpoint'
@@ -165,7 +165,7 @@ export interface AdapterEndpointParams<T extends EndpointGenerics> {
   transport: Transport<T>
 
   /** Specification of what the body of a request hitting this endpoint should look like (used for validation) */
-  inputParameters: InputParameters
+  inputParameters: SpecificInputParameters<T['Request']['Params']>
 
   /** Specific details related to the rate limiting for this endpoint in particular */
   rateLimiting?: EndpointRateLimitingConfig

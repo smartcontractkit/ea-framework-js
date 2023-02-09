@@ -1,30 +1,66 @@
 import { EndpointContext } from '../../adapter'
 import { ResponseCache } from '../../cache/response'
 import { AdapterConfig } from '../../config'
-import { AdapterRequest, AdapterResponse, makeLogger } from '../../util'
+import { AdapterRequest, AdapterResponse, makeLogger, RequestGenerics } from '../../util'
 import { AdapterError } from '../../validation/error'
 import { MetaTransport, Transport, TransportDependencies, TransportGenerics } from '..'
+import { InputParameters } from '../../validation'
 
 const logger = makeLogger('RoutingTransport')
+
+export type RoutingTransportGenerics = TransportGenerics & {
+  Request: RequestGenerics & {
+    Params: RequestGenerics['Params'] & {
+      transport: string
+    }
+  }
+}
+
+export const routingTransportParams = {
+  transport: {
+    description: 'Name of the transport this request shuold be routed to',
+    type: 'string',
+  },
+} satisfies InputParameters
 
 /**
  * Transport implementation that takes 2 or more transports and a function that determines with transport to use.
  *
  * @typeParam T - Helper struct type that will be used to pass types to the generic parameters (check [[TransportGenerics]])
  */
-export class RoutingTransport<T extends TransportGenerics>
+export class RoutingTransport<T extends RoutingTransportGenerics>
   // This complex class header is used to accommodate all different ways that underlying transports implement the Transport interface
   implements MetaTransport<T>
 {
   constructor(
+    public transports: Record<string, Transport<T>>,
     //  This is public for tests, which sometimes need the underlying transport for things like ticking the clock
-    public transports: { [key: string]: Transport<T> },
-    // Route should return to a string key that corresponds to a transport in the transports object
-    private route: (
-      req: AdapterRequest<T['Request']>,
-      adapterConfig: AdapterConfig<T['CustomSettings']>,
-    ) => string,
-  ) {}
+    private options?: {
+      // Route should return to a string key that corresponds to a transport in the transports object
+      defaultTransport?: string
+      customRouter?: (
+        req: AdapterRequest<T['Request']>,
+        adapterConfig: AdapterConfig<T['CustomSettings']>,
+      ) => string
+    },
+  ) {
+    for (const transportName in this.transports) {
+      // This is intentional, to keep names to one word only
+      if (!/^[a-z]+$/.test(transportName)) {
+        throw new Error(
+          `Transport name "${transportName}" names in the RoutingTransport map can only include lowercase letters`,
+        )
+      }
+    }
+
+    // This could also potentially be solved with types, but inference is hard and adding another generic would be even more cumbersome
+    if (this.options?.defaultTransport && !this.transports[this.options.defaultTransport]) {
+      throw new Error(
+        `Transport "${this.options.defaultTransport}" does not exist in the transports map for this RoutingTransport`,
+      )
+    }
+  }
+
   responseCache!: ResponseCache<{
     Request: T['Request']
     Response: T['Response']
@@ -59,12 +95,29 @@ export class RoutingTransport<T extends TransportGenerics>
     logger.debug(`Retrieved transport doesn't implement registerRequest`)
   }
 
+  private defaultRouter(req: AdapterRequest<T['Request']>) {
+    return req.requestContext.data.transport?.toLowerCase() || this.options?.defaultTransport
+  }
+
   private resolveTransport(
     req: AdapterRequest<T['Request']>,
     adapterConfig: AdapterConfig<T['CustomSettings']>,
   ): Transport<T> {
-    logger.debug(`routing request using `, req.requestContext.data)
-    const key = this.route(req, adapterConfig)
+    logger.debug(`Routing request using `, req.requestContext.data)
+    const key = this.options?.customRouter
+      ? this.options.customRouter(req, adapterConfig)
+      : this.defaultRouter(req)
+
+    if (!key) {
+      logger.error(
+        `No transport was specified in the input parameters, and this endpoint does not have a default set.`,
+      )
+      throw new AdapterError({
+        statusCode: 400,
+        message: `No transport was specified in the input parameters, and this endpoint does not have a default set.`,
+      })
+    }
+
     if (!this.transports[key]) {
       logger.error(`No transport found for key ${key}`)
       throw new AdapterError({ statusCode: 400, message: `No transport found for ${key}` })

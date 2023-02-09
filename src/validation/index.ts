@@ -7,7 +7,7 @@ import { AdapterMiddlewareBuilder, AdapterRequest, AdapterRequestBody } from '..
 import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
 import { CMD_SENT_STATUS } from '../cache/metrics'
 import { ReplyError as RedisError } from 'ioredis'
-export { InputParameters } from './input-params'
+export { InputParameters, SpecificInputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
 

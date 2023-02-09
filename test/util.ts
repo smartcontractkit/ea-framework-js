@@ -4,12 +4,12 @@ import { LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
 import { AdapterConfig, SettingsMap } from '../src/config'
 import { Transport, TransportDependencies } from '../src/transports'
-import { AdapterRequest, AdapterResponse, EmptyObject, PartialAdapterResponse } from '../src/util'
+import { AdapterRequest, AdapterResponse, PartialAdapterResponse } from '../src/util'
 import { ReplyError } from 'ioredis'
 
 export type NopTransportTypes = {
   Request: {
-    Params: EmptyObject
+    Params: unknown
   }
   Response: {
     Data: null
