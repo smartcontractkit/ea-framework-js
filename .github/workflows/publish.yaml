@@ -1,0 +1,38 @@
+name: 'Publish NPM Package'
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'If true, skips commit on npm version and passes the --dry-run flag to npm publish. Useful for testing.'
+        required: false
+        default: 'false'
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    needs: preflight # Will be skipped if preflight is skipped, which causes this to not run on closes w/o merge unless it's a manual run
+    environment: main
+    outputs:
+      VERSION_TAG: ${{ steps.get-version-tag.outputs.VERSION_TAG }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup
+      - run: yarn build
+      - run: |
+          # Can't use `npm show . version` because that will show the version of the package in the registry, not the version in package.json, and we haven't published yet
+
+          params=(--access restricted)
+          if [[ ${{ inputs.dry-run || 'false' }} == "true" ]]; then
+            params+=(--dry-run)
+          fi
+          if ! npm publish "${params[@]}" ; then # scoped packages are restricted by default, but this is set because not all branches currently have a scoped package name in package.json
+            echo "Failed to publish package"
+            exit 1
+          fi
+        working-directory: dist/src
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
