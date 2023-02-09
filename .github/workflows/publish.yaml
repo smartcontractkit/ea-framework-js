@@ -1,0 +1,54 @@
+name: 'Publish NPM Package'
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'If true, skips commit on npm version and passes the --dry-run flag to npm publish. Useful for testing.'
+        required: false
+        default: 'false'
+  push:
+    branches:
+      - main
+    paths:
+      - 'package.json'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: main
+    outputs:
+      VERSION_TAG: ${{ steps.get-version-tag.outputs.VERSION_TAG }}
+    steps:
+      - uses: actions/checkout@v3
+      - id: version-check
+        run: |
+          PACKAGE_VERSION=$(cat package.json \
+            | grep version \
+            | head -1 \
+            | awk -F: '{ print $2 }' \
+            | sed 's/[", ]//g')
+          PUBLISHED_VERSION=$(npm show . version)
+
+          # Check that the versions are different
+          if [[ $PACKAGE_VERSION != $PUBLISHED_VERSION ]]; then
+            echo "Current version ($PACKAGE_VERSION) is different than the published one ($PUBLISHED_VERSION), will publish"
+            echo "SHOULD_PUBLISH=true" >> $GITHUB_OUTPUT
+          fi
+      - if: steps.version-check.outputs.SHOULD_PUBLISH == true
+        uses: ./.github/actions/setup
+      - if: steps.version-check.outputs.SHOULD_PUBLISH == true
+        run: yarn build
+      - if: steps.version-check.outputs.SHOULD_PUBLISH == true
+        run: |
+          params=(--access public)
+          if [[ ${{ inputs.dry-run || 'false' }} == "true" ]]; then
+            params+=(--dry-run)
+          fi
+          if ! npm publish "${params[@]}" ; then # scoped packages are restricted by default, but this is set because not all branches currently have a scoped package name in package.json
+            echo "Failed to publish package"
+            exit 1
+          fi
+        working-directory: dist/src
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

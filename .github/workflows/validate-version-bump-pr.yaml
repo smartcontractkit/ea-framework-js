@@ -2,6 +2,7 @@
 name: 'Version bump branch only contains version change'
 on:
   pull_request:
+
 jobs:
   validateVersionBumpPR:
     if: ${{ startsWith(github.head_ref, 'version-bump') }}
@@ -23,7 +24,7 @@ jobs:
 
           if [[ ! $FILES == "package.json" ]]; then
             MESSAGE="Expected the only modified file to be package.json, received: $FILES"
-            echo "::set-output name=MESSAGE::$MESSAGE"
+            echo "MESSAGE=$MESSAGE" >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -36,7 +37,7 @@ jobs:
           ADD_COUNT=$(echo "$ADDS" | wc -l | tr -dc '0-9')
           if [[ ! $SUB_COUNT == 1 || ! $ADD_COUNT == 1 ]]; then
             MESSAGE="Expected exactly one add and one subtract in package.json, received: $SUB_COUNT subtracts and $ADD_COUNT adds"
-            echo "::set-output name=MESSAGE::$MESSAGE"
+            echo "MESSAGE=$MESSAGE" >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -44,7 +45,7 @@ jobs:
           VERSION_PAT='"version": +"([0-9]+\.){2}[0-9]+'
           if [[ ! $SUBS =~ $VERSION_PAT || ! $ADDS =~ $VERSION_PAT ]] ; then
             MESSAGE="Could not detect if the change in this PR was a version change. Expected (\"version\": \"#.#.#\"), received: $SUBS and $ADDS"
-            echo "::set-output name=MESSAGE::$MESSAGE"
+            echo "MESSAGE=$MESSAGE" >> $GITHUB_OUTPUT
             exit 1
           fi
   reportResult:
@@ -53,17 +54,17 @@ jobs:
     needs:
       - validateVersionBumpPR
     steps:
-    - name: Post success or failure to workflow run
-      uses: actions/github-script@v6
-      with:
-        script: |
-          // This message is only visible when drilling into the workflow run, so we don't show a success or cancelled message
-          // since the only reason you'd be looking at this run is if it failed and was blocking your PR merge
-          const needs = ${{ toJSON(needs) }}
+      - name: Post success or failure to workflow run
+        uses: actions/github-script@v6
+        with:
+          script: |
+            // This message is only visible when drilling into the workflow run, so we don't show a success or cancelled message
+            // since the only reason you'd be looking at this run is if it failed and was blocking your PR merge
+            const needs = ${{ toJSON(needs) }}
 
-          const { MESSAGE } = needs?.validateVersionBumpPR?.outputs
-          const status = needs?.validateVersionBumpPR?.result
-         
-          if (status === 'failure'){
-            core.error(`Failed to validate version bump PR: ${MESSAGE}`)
-          }
+            const { MESSAGE } = needs?.validateVersionBumpPR?.outputs
+            const status = needs?.validateVersionBumpPR?.result
+
+            if (status === 'failure'){
+              core.error(`Failed to validate version bump PR: ${MESSAGE}`)
+            }
