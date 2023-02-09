@@ -6,7 +6,11 @@ import { AddressInfo } from 'net'
 import { expose } from '../../src'
 import { Adapter, AdapterEndpoint, AdapterParams } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
-import { WebSocketClassProvider, WebsocketReverseMappingTransport, WebSocketTransport } from '../../src/transports'
+import {
+  WebSocketClassProvider,
+  WebsocketReverseMappingTransport,
+  WebSocketTransport,
+} from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
@@ -393,9 +397,9 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
   const error = await errorPromise
   t.is(error?.response?.status, 504)
 
-  // The WS connection should not send any messages to the EA, so we dvance the clock until
+  // The WS connection should not send any messages to the EA, so we advance the clock until
   // we reach the point where the EA will consider it unhealthy and reconnect.
-  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 - 100)
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
 
   // The connection was opened twice
   t.is(connectionCounter, 2)
@@ -536,44 +540,47 @@ test.serial(
   },
 )
 
-const createReverseMappingAdapter = (adapterParams?: Partial<AdapterParams<SettingsMap>>): Adapter => {
-  const websocketTransport: WebsocketReverseMappingTransport<WebSocketTypes, string> = new WebsocketReverseMappingTransport<WebSocketTypes, string>({
-    url: () => URL,
-    handlers: {
-      message(message) {
-        const params = websocketTransport.getReverseMapping(message.pair)
-        if (!params) {
-          return undefined
-        }
+const createReverseMappingAdapter = (
+  adapterParams?: Partial<AdapterParams<SettingsMap>>,
+): Adapter => {
+  const websocketTransport: WebsocketReverseMappingTransport<WebSocketTypes, string> =
+    new WebsocketReverseMappingTransport<WebSocketTypes, string>({
+      url: () => URL,
+      handlers: {
+        message(message) {
+          const params = websocketTransport.getReverseMapping(message.pair)
+          if (!params) {
+            return undefined
+          }
 
-        return [
-          {
-            params,
-            response: {
-              data: {
+          return [
+            {
+              params,
+              response: {
+                data: {
+                  result: message.value,
+                },
                 result: message.value,
               },
-              result: message.value,
             },
-          },
-        ]
+          ]
+        },
       },
-    },
-    builders: {
-      subscribeMessage: (params: AdapterRequestParams) => {
-        const pair = `${params.base}/${params.quote}`
-        websocketTransport.setReverseMapping(pair, params)
-        return {
-          request: 'subscribe',
-          pair,
-        }
+      builders: {
+        subscribeMessage: (params: AdapterRequestParams) => {
+          const pair = `${params.base}/${params.quote}`
+          websocketTransport.setReverseMapping(pair, params)
+          return {
+            request: 'subscribe',
+            pair,
+          }
+        },
+        unsubscribeMessage: (params: AdapterRequestParams) => ({
+          request: 'unsubscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
       },
-      unsubscribeMessage: (params: AdapterRequestParams) => ({
-        request: 'unsubscribe',
-        pair: `${params.base}/${params.quote}`,
-      }),
-    },
-  })
+    })
 
   const webSocketEndpoint = new AdapterEndpoint({
     name: 'TEST',

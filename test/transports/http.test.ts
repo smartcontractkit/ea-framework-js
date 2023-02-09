@@ -355,7 +355,7 @@ test.serial(
 )
 
 test.serial(
-  'per second limit of 1 with two batch transports that make the same request results in a call every 1000ms for each, since the requests will coalesce',
+  'per second limit of 1 with two batch transports that make the same request results in a call every 2000ms for each',
   async (t) => {
     const rateLimit1s = 1
     const transportA = new MockHttpTransport(true)
