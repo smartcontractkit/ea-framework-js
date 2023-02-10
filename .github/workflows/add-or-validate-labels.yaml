@@ -1,0 +1,111 @@
+# Adds labels to pull requests based on the branch name. Labels are required by the "publish" workflow to determine
+name: 'Validate PR labels'
+
+on:
+  workflow_dispatch: # Lets you see what labels would be added, but doesn't actually add them because no PR triggered it
+  pull_request:
+    types:
+      - opened
+      - labeled
+      - unlabeled
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  add-labels: # Load the dependencies cache for all jobs
+    name: Add PR labels
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Calculate labels
+        id: calc-labels
+        run: |
+          shopt -s nocasematch
+          HR=${{ github.head_ref || github.ref }}
+          echo "Calculating labels based on branch: $HR"
+          LABELS=""
+          if [[ $HR == release/*  ]]; then
+            LABELS="release, major"
+          elif [[ $HR == feature/*  ]]; then
+            LABELS="feature, minor"
+          elif [[ $HR == improvement/*  ]]; then
+            LABELS="improvement, patch"
+          elif [[ $HR == bugfix/*  ]]; then
+            LABELS="bugfix, patch"
+          elif [[ $HR == hotfix/* || $HR == fix/* ]]; then
+            LABELS="hotfix, patch"
+          elif [[ $HR == chore/*  ]]; then
+            LABELS="chore, patch"
+          elif [[ $HR == docs/*  ]]; then
+            LABELS="docs, none"
+          elif [[ $HR == bump-version/*  ]]; then
+            LABELS="version-bump"
+          else
+            # Add a no-op label so we trigger the validation
+            LABELS="needs-label"
+            echo "Could not determine labels based on branch name: $HR"
+          fi
+          # Below is a direct instruction to the set-output action, evaluated as a bash command
+          echo "LABELS=$LABELS" >> $GITHUB_OUTPUT
+      - uses: andymckay/labeler@master # This is the external step used in the official GHA docs
+        with:
+          add-labels: ${{ steps.calc-labels.outputs.LABELS }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  validate-labels:
+    name: Validate PR labels
+    if: always()
+    needs: add-labels
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION_INSTRUCTION: ${{ steps.validate.outputs.VERSION_INSTRUCTION }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Validate that version bump labels are on the PR
+        id: validate
+        uses: ./.github/actions/validate-version-labels
+        with:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+
+  upsert-pr-comment:
+    name: Upsert PR labels comment
+    if: always()
+    needs: validate-labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build comment contents
+        id: bc
+        run: |
+          VERSION_INSTRUCTION=${{ needs.validate-labels.outputs.VERSION_INSTRUCTION }}
+
+          if [[ -z $VERSION_INSTRUCTION ]]; then 
+            MESSAGE=":stop_sign: This PR needs labels to indicate how to increase the current package version in the automated workflows. Please add one of the following labels: \`none\`, \`patch\`, \`minor\`, or \`major\`."
+          elif [[ $VERSION_INSTRUCTION == none ]]; then
+            MESSAGE=":large_blue_circle: This PR has the \`none\` label set and it will not cause a version bump."
+          else
+            MESSAGE=":green_circle: This PR has valid version labels and will cause a \`$VERSION_INSTRUCTION\` bump."
+          fi
+
+          echo "MESSAGE=$MESSAGE" >> $GITHUB_OUTPUT
+
+      - name: Find previous comment
+        uses: peter-evans/find-comment@v2
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: NPM Publishing labels
+
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### NPM Publishing labels :label:
+            ${{ steps.bc.outputs.MESSAGE }}
+          edit-mode: replace

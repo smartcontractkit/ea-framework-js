@@ -1,5 +1,5 @@
-# Ticks the version, and publishes to NPM. Runs automatically when a PR is closed, and can be run manually if failed
-name: 'Tick version if closing a regular PR, or publish if closing a version bump PR'
+name: 'Open Version Bump PR'
+
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +13,8 @@ on:
         default: 'false'
   pull_request:
     types:
-    - closed
+      - closed
+
 jobs:
   preflight: # Check that labels include a version bump, and extract the version bump label
     runs-on: ubuntu-latest
@@ -24,13 +25,14 @@ jobs:
       VERSION_INSTRUCTION: ${{ steps.validate.outputs.VERSION_INSTRUCTION }}
     steps:
       - id: set-job-name
-        run: echo "::set-output name=JOB_NAME::${{ github.job }}"
+        run: echo "JOB_NAME=${{ github.job }}" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v3
       - id: validate
         name: Validate that version bump labels are on the PR
         uses: ./.github/actions/validate-version-labels
         with:
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') || inputs.version-type }}
+
   createVersionBumpPR:
     if: (github.event.pull_request.merged == true || inputs.version-type != 'none' || inputs.dry-run == 'true') && needs.preflight.outputs.VERSION_INSTRUCTION != 'version-bump'
     runs-on: ubuntu-latest
@@ -43,7 +45,7 @@ jobs:
       VERSION_TAG: ${{ steps.tick-version.outputs.VERSION_TAG }}
     steps:
       - id: set-job-name
-        run: echo "::set-output name=JOB_NAME::${{ github.job }}"
+        run: echo "JOB_NAME=${{ github.job }}" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.base_ref || github.ref }} # Explicit ref required to push from PR because of github internals
@@ -57,13 +59,13 @@ jobs:
             exit 0    
           elif [[ -z $VERSION_INSTRUCTION ]]; then 
             MESSAGE="`createVersionBumpPR failed` because no `VERSION_INSTRUCTION` was provided. This is most likely because the `preflight` job or [validate_version_labels](./.github/actions/validate_version_labels) isn't producing output."
-            echo "::set-output name=MESSAGE::$MESSAGE"
+            echo "MESSAGE=$MESSAGE" >> $GITHUB_OUTPUT
             exit 1
           fi
 
           if ! npm version $VERSION_INSTRUCTION ; then
             MESSAGE="Failed to tick version with `npm version $VERSION_INSTRUCTION`"
-            echo "::set-output name=MESSAGE::$MESSAGE"
+            echo "MESSAGE=$MESSAGE" >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -73,7 +75,7 @@ jobs:
             | head -1 \
             | awk -F: '{ print $2 }' \
             | sed 's/[", ]//g')  
-          echo "::set-output name=VERSION_TAG::$PACKAGE_VERSION"
+          echo "VERSION_TAG=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
       - id: create-pr
         name: Create PR
         if: inputs.dry-run != 'true'
@@ -90,54 +92,12 @@ jobs:
           labels: version-bump
           base: ${{ github.base_ref || 'main' }} #always use target branch from PR or main when running manually because we always need some base branch to compare to
 
-  publish:
-    runs-on: ubuntu-latest
-    if: needs.preflight.outputs.VERSION_INSTRUCTION == 'version-bump'
-    needs: preflight # Will be skipped if preflight is skipped, which causes this to not run on closes w/o merge unless it's a manual run
-    environment: main
-    outputs:
-      MESSAGE: ${{ steps.publish.outputs.MESSAGE }}
-      JOB_NAME: ${{ steps.set-job-name.outputs.JOB_NAME }}
-      VERSION_TAG: ${{ steps.get-version-tag.outputs.VERSION_TAG }}
-    steps:
-      - id: set-job-name
-        run: echo "::set-output name=JOB_NAME::${{ github.job }}"
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/setup
-      - id: get-version-tag
-        run: |
-          PACKAGE_VERSION=$(cat package.json \
-                      | grep version \
-                      | head -1 \
-                      | awk -F: '{ print $2 }' \
-                      | sed 's/[", ]//g')  
-          echo "::set-output name=VERSION_TAG::$PACKAGE_VERSION"
-      - run: yarn build
-      - run: cp package.json dist/src/
-      - run: cp README.md dist/src/
-      - run: |
-          # Can't use `npm show . version` because that will show the version of the package in the registry, not the version in package.json, and we haven't published yet
-          
-          params=(--access restricted)
-          if [[ ${{ inputs.dry-run || 'false' }} == "true" ]]; then
-            params+=(--dry-run)
-          fi
-          if ! npm publish "${params[@]}" ; then # scoped packages are restricted by default, but this is set because not all branches currently have a scoped package name in package.json
-            MESSAGE="Failed to publish package" # Details about the job will be appended in the 'post-results-to-pr' job
-            echo "::set-output name=MESSAGE::$MESSAGE"
-            exit 1
-          fi
-
-        working-directory: dist/src
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
   post-result-to-pr:
     runs-on: ubuntu-latest
     if: ${{ always() }} # Always run, even if a previous step fails, since we always want to post a result message/comment
     needs:
       - preflight
       - createVersionBumpPR
-      - publish
     steps:
       - name: Post success or failure comment to PR
         uses: actions/github-script@v6
@@ -146,16 +106,14 @@ jobs:
             // `needs` isn't loaded into `actions/github-script@v6`.context, so we have to read it from the outer context
             // Using toJSON will dump a string representation of the object verbatim, which effective generates code for the `needs` javascript variable below
             const needs = ${{ toJSON(needs) }}
-            
 
-            
             // Note, it's possible to iterate over jobs to show multiple failures, but we instead consolidate since each job depends on the prior.
             // needs["JOB"] will be undefined for skipped jobs, so spreading will show the latest failure in the chain
             const { MESSAGE, JOB_NAME, VERSION_TAG, PR_URL } = {
               ...needs?.preflight?.outputs,
               ...needs?.createVersionBumpPR?.outputs,
-              ...needs?.publish?.outputs,
             }
+
             // This workflow always runs on PR close, and this job always runs because of always(). 
             // We have limited access to PR context, so check for a universally set param to determine if the PR was merged
             // A skipped job is a successful job, so we can't check skipped.
@@ -163,20 +121,17 @@ jobs:
               core.notice("No job name found, won't post comment to PR")
               return
             }
-            
-            
-            const cancelledMessage = `:x: ${JOB_NAME} was cancelled.`
 
-            const failed = needs?.preflight?.result == 'failure' || needs?.createVersionBumpPR?.result == 'failure' || needs?.publish?.result == 'failure'
-            const cancelled = needs?.preflight?.result == 'cancelled' || needs?.createVersionBumpPR?.result == 'cancelled' || needs?.publish?.result == 'cancelled'
+            const failed = needs?.preflight?.result == 'failure' || needs?.createVersionBumpPR?.result == 'failure'
+            const cancelled = needs?.preflight?.result == 'cancelled' || needs?.createVersionBumpPR?.result == 'cancelled'
+
+            const cancelledMessage = `:x: ${JOB_NAME} was cancelled.`
             let failureMessage = `:x: failed to run create-pr/publish workflow`
             let successMessage = `:white_check_mark: successfully ran create-pr/publish workflow.`
+
             if (JOB_NAME === 'createVersionBumpPR') {
               successMessage = `:rocket: Successfully created version bump PR: ${PR_URL}`
-              failureMessage = `:x: failed to create version bump PR`
-            } else if (JOB_NAME === 'publish') {
-                successMessage = `:rocket: Successfully published version [${VERSION_TAG}](https://www.npmjs.com/package/@chainlink/external-adapter-framework/v/${VERSION_TAG}) to NPM.`
-                failureMessage = `:x: Failed to publish to NPM. Please re-run the close-pr workflow manually.`                 
+              failureMessage = `:x: failed to create version bump PR`        
             } else if (JOB_NAME === 'preflight') {
               successMessage = `:rocket: Successfully ran preflight checks.`
               failureMessage = `:x: failed to run preflight checks`
