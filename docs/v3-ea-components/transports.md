@@ -19,6 +19,6 @@ If you find that the built-in features of a transport do not meet your endpoint'
 
 ### Meta Transports
 
-In some cases, a combination of Transports is necessary. For example, an EA endpoint might be reliant on a combination of transports.
+In some cases, an EA endpoint might be reliant on a combination of transports.
 
 - [Routing Transport](./transport-types/routing-transport.md)
