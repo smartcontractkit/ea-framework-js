@@ -30,13 +30,18 @@ yarn # Install yarn dependencies
 - [Basics](./docs/basics.md)
 - [Porting a v2 EA to v3](./docs/porting-a-v2-ea-to-v3.md)
 - [Creating a new v3 EA](./docs/creating-a-new-v3-ea.md)
-- Transports
-  - Basic
-    - REST
-    - WebSocket
-    - SSE
-  - Meta
-    - Routing
+- Framework components
+  - [Adapter](./docs/v3-ea-components/adapter.md)
+  - [Endpoints](./docs/v3-ea-components/endpoints.md)
+  - [Tests](./docs/v3-ea-components/tests.md)
+  - [Transports](./docs/v3-ea-components/transports.md)
+    - Basic
+      - [HTTP](./docs/v3-ea-components/transport-types/http-transport.md)
+      - [WebSocket](./docs/v3-ea-components/transport-types/websocket-transport.md)
+      - [SSE](./docs/v3-ea-components/transport-types/sse-transport.md)
+      - [Custom](./docs/v3-ea-components/transport-types/custom-transport.md)
+    - Meta
+      - [Routing](./docs/v3-ea-components/transport-types/routing-transport.md)
 
 ## Testing
 
