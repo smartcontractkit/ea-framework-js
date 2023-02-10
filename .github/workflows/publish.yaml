@@ -35,11 +35,11 @@ jobs:
             echo "Current version ($PACKAGE_VERSION) is different than the published one ($PUBLISHED_VERSION), will publish"
             echo "SHOULD_PUBLISH=true" >> $GITHUB_OUTPUT
           fi
-      - if: steps.version-check.outputs.SHOULD_PUBLISH == true
+      - if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
         uses: ./.github/actions/setup
-      - if: steps.version-check.outputs.SHOULD_PUBLISH == true
+      - if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
         run: yarn build
-      - if: steps.version-check.outputs.SHOULD_PUBLISH == true
+      - if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
         run: |
           params=(--access public)
           if [[ ${{ inputs.dry-run || 'false' }} == "true" ]]; then
