@@ -5,7 +5,6 @@ import { SettingsMap } from '../../src/config'
 import { retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { TestAdapter } from '../util'
-import { parsePromMetrics } from './helper'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -127,15 +126,13 @@ test.serial('Test http requests total metrics (data provider hit)', async (t) =>
 
   await t.context.testAdapter.request({ from, to })
 
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{method="POST",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",status_code="200",type="dataProviderHit",provider_status_code="200",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`http_requests_total${expectedLabel}`), 1)
 })
 
 test.serial('Test http request duration metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{app_name="TEST",app_version="${version}"}`
   const responseTime = metricsMap.get(`http_request_duration_seconds_sum${expectedLabel}`)
   if (responseTime !== undefined) {
@@ -147,15 +144,13 @@ test.serial('Test http request duration metrics', async (t) => {
 })
 
 test.serial('Test data provider requests metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{provider_status_code="200",method="GET",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`data_provider_requests${expectedLabel}`), 1)
 })
 
 test.serial('Test data provider request duration metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{app_name="TEST",app_version="${version}"}`
   const responseTime = metricsMap.get(`data_provider_request_duration_seconds_sum${expectedLabel}`)
   if (responseTime !== undefined) {
@@ -167,22 +162,19 @@ test.serial('Test data provider request duration metrics', async (t) => {
 })
 
 test.serial('Test cache set count metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_set_count${expectedLabel}`), 1)
 })
 
 test.serial('Test cache max age metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_max_age${expectedLabel}`), 90000)
 })
 
 test.serial('Test cache set staleness metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   const staleness = metricsMap.get(`cache_data_staleness_seconds${expectedLabel}`)
   if (staleness !== undefined) {
@@ -194,15 +186,13 @@ test.serial('Test cache set staleness metrics', async (t) => {
 })
 
 test.serial('Test provider time delta metric', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_max_age${expectedLabel}`), 90000)
 })
 
 test.serial('Test credit spent metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{feed_id="N/A",participant_id="9002",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`rate_limit_credits_spent_total${expectedLabel}`), 1)
 })
@@ -220,29 +210,25 @@ test.serial('Test http requests total metrics (cache hit)', async (t) => {
 
   await t.context.testAdapter.request({ from, to })
 
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{method="POST",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",status_code="200",type="cacheHit",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`http_requests_total${expectedLabel}`), 1)
 })
 
 test.serial('Test cache get count metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_get_count${expectedLabel}`), 1)
 })
 
 test.serial('Test cache get value metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_get_values${expectedLabel}`), 1234)
 })
 
 test.serial('Test cache get staleness metrics', async (t) => {
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   const staleness = metricsMap.get(`cache_data_staleness_seconds${expectedLabel}`)
   if (staleness !== undefined) {

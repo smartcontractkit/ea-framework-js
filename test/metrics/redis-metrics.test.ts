@@ -4,7 +4,6 @@ import { Adapter, AdapterDependencies, AdapterEndpoint, EndpointGenerics } from 
 import { Cache, LocalCache, RedisCache } from '../../src/cache'
 import { BasicCacheSetterTransport } from '../cache/helper'
 import { NopTransport, TestAdapter } from '../util'
-import { parsePromMetrics } from './helper'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -98,8 +97,7 @@ test.serial('Test redis sent command metric', async (t) => {
   }
 
   await t.context.testAdapter.request(data)
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{status="SUCCESS",function_name="exec",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`redis_commands_sent_count${expectedLabel}`), 1)
 })

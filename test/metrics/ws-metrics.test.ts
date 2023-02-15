@@ -5,11 +5,9 @@ import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { MockCache, runAllUntil, TestAdapter } from '../util'
-import { parsePromMetrics } from './helper'
+import { TestAdapter } from '../util'
 
 export const test = untypedTest as TestFn<{
-  cache: MockCache
   adapterEndpoint: AdapterEndpoint<WebSocketEndpointTypes>
   testAdapter: TestAdapter
   server: Server
@@ -159,13 +157,8 @@ test.before(async (t) => {
     socket.on('message', parseMessage)
   })
 
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-
   t.context.clock = FakeTimers.install()
-  t.context.testAdapter = await TestAdapter.start(adapter, t.context, { cache: mockCache })
-  t.context.cache = mockCache
+  t.context.testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
   t.context.server = mockWsServer
 })
 
@@ -174,25 +167,10 @@ test.after(async (t) => {
 })
 
 test.serial('Test WS connection, subscription, and message metrics', async (t) => {
-  const makeRequest = () => t.context.testAdapter.request({ base, quote })
-
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-
-  const error = await makeRequest()
-  t.is(error?.statusCode, 504)
-
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  await runAllUntil(t.context.clock, () => t.context.cache.cache.size > 0)
-
-  // Second request should find the response in the cache
-  const response = await makeRequest()
-  t.is(response.statusCode, 200)
+  await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, { base, quote })
 
   // Check connection, subscription active, subscription total, and message total metrics when subscribed to feed
-  const metricsResponse = await t.context.testAdapter.getMetrics()
-  let metricsMap = parsePromMetrics(metricsResponse)
+  const metricsMap = await t.context.testAdapter.getMetrics()
 
   const basic = `app_name="TEST",app_version="${version}"`
   const feed = `feed_id="{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}",subscription_key="test-{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}"`
@@ -224,26 +202,24 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   )
 
   // Now that the cache is out and the subscription no longer there, this should time out
-  const error2 = await makeRequest()
+  const error2 = await t.context.testAdapter.request({ base, quote })
   t.is(error2?.statusCode, 504)
 
   // Check connection, subscription active, subscription total, and message total metrics when unsubscribed from feed
-  const metricsResponse2 = await t.context.testAdapter.getMetrics()
-  metricsMap = parsePromMetrics(metricsResponse2)
+  const metricsMap2 = await t.context.testAdapter.getMetrics()
 
-  t.is(metricsMap.get(`ws_connection_active{${basic}}`), 1)
-  t.is(metricsMap.get(`ws_subscription_active{${feed},${basic}}`), 0)
-  t.is(metricsMap.get(`ws_subscription_total{${feed},${basic}}`), 1)
-  t.is(metricsMap.get(`ws_message_total{${feed},direction="sent",${basic}}`), 2)
-  t.is(metricsMap.get(`ws_message_total{direction="received",${basic}}`), 1)
+  t.is(metricsMap2.get(`ws_connection_active{${basic}}`), 1)
+  t.is(metricsMap2.get(`ws_subscription_active{${feed},${basic}}`), 0)
+  t.is(metricsMap2.get(`ws_subscription_total{${feed},${basic}}`), 1)
+  t.is(metricsMap2.get(`ws_message_total{${feed},direction="sent",${basic}}`), 2)
+  t.is(metricsMap2.get(`ws_message_total{direction="received",${basic}}`), 1)
 
   t.context.server.close()
 
   // Check connection metric after connection closed
-  const metricsResponse3 = await t.context.testAdapter.getMetrics()
-  metricsMap = parsePromMetrics(metricsResponse3)
+  const metricsMap3 = await t.context.testAdapter.getMetrics()
 
-  t.is(metricsMap.get(`ws_connection_active{${basic}}`), 0)
-  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 5)
-  t.is(metricsMap.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 0)
+  t.is(metricsMap3.get(`ws_connection_active{${basic}}`), 0)
+  t.is(metricsMap3.get(`bg_execute_total{${endpoint},${basic}}`), 5)
+  t.is(metricsMap3.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 0)
 })

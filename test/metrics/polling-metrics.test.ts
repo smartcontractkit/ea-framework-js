@@ -1,19 +1,17 @@
-import FakeTimers from '@sinonjs/fake-timers'
+import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import nock from 'nock'
-import { MockCache, TestAdapter } from '../util'
-import { buildHttpAdapter, parsePromMetrics } from './helper'
+import { TestAdapter } from '../util'
+import { buildHttpAdapter } from './helper'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
-  cache: MockCache
+  clock: InstalledClock
 }>
 
 const URL = 'http://test-url.com'
 const endpoint = '/price'
 const version = process.env['npm_package_version']
-
-const clock = FakeTimers.install({ shouldAdvanceTime: true, advanceTimeDelta: 100 })
 
 test.before(async (t) => {
   nock.disableNetConnect()
@@ -24,18 +22,14 @@ test.before(async (t) => {
 
   const adapter = buildHttpAdapter()
 
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-
   // Start the adapter
-  t.context.testAdapter = await TestAdapter.start(adapter, t.context, { cache: mockCache })
-  t.context.cache = mockCache
+  t.context.clock = FakeTimers.install()
+  t.context.testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 })
 
-test.after(() => {
+test.after((t) => {
   nock.restore()
-  clock.uninstall()
+  t.context.clock.uninstall()
 })
 
 const from = 'ETH'
@@ -65,8 +59,7 @@ test.serial('Test cache warmer active metric', async (t) => {
   const error = await t.context.testAdapter.request({ from, to })
   t.is(error?.statusCode, 504)
 
-  const response = await t.context.testAdapter.getMetrics()
-  const metricsMap = parsePromMetrics(response)
+  const metricsMap = await t.context.testAdapter.getMetrics()
 
   let expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`transport_polling_failure_count${expectedLabel}`), 1)

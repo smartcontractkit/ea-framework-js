@@ -4,7 +4,7 @@ import { FastifyInstance } from 'fastify'
 import { ReplyError } from 'ioredis'
 import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
-import { LocalCache } from '../src/cache'
+import { Cache, LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
 import { AdapterConfig, SettingsMap } from '../src/config'
 import { Transport, TransportDependencies } from '../src/transports'
@@ -165,13 +165,54 @@ export function assertEqualResponses(
   t.deepEqual(expected, actual)
 }
 
+// Parse metrics scrape into object to use for tests
+export const parsePromMetrics = (data: string): Map<string, number> => {
+  const responseLines = data.split('\n')
+  const metricsMap = new Map<string, number>()
+  responseLines.forEach((line) => {
+    if (!line.startsWith('#') && line !== '') {
+      const metric = line.split(' ')
+      const nameLabel = metric[0]
+      const value = Number(metric[1])
+      metricsMap.set(nameLabel, value)
+    }
+  })
+  return metricsMap
+}
+
 export class TestAdapter {
+  mockCache?: MockCache
+
+  // eslint-disable-next-line max-params
   constructor(
     public api: FastifyInstance,
     public adapter: Adapter,
     public metricsApi?: FastifyInstance,
     public clock?: InstalledClock,
-  ) {}
+    cache?: Cache,
+  ) {
+    if (cache instanceof MockCache) {
+      this.mockCache = cache
+    }
+  }
+
+  static async startWithMockedCache(
+    adapter: Adapter,
+    context: ExecutionContext<{
+      clock?: InstalledClock
+      testAdapter: TestAdapter
+    }>['context'],
+    dependencies?: Partial<AdapterDependencies>,
+  ) {
+    // Create mocked cache so we can listen when values are set
+    // This is a more reliable method than expecting precise clock timings
+    const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
+
+    return TestAdapter.start(adapter, context, {
+      cache: mockCache,
+      ...dependencies,
+    })
+  }
 
   static async start(
     adapter: Adapter,
@@ -185,7 +226,13 @@ export class TestAdapter {
     if (!api) {
       throw new Error('EA was not able to start properly')
     }
-    context.testAdapter = new TestAdapter(api, adapter, metricsApi, context.clock)
+    context.testAdapter = new TestAdapter(
+      api,
+      adapter,
+      metricsApi,
+      context.clock,
+      dependencies?.cache,
+    )
     return context.testAdapter
   }
 
@@ -210,14 +257,45 @@ export class TestAdapter {
     return waitUntilResolved(this.clock, makeRequest)
   }
 
-  async getMetrics(): Promise<string> {
+  async startBackgroundExecuteThenGetResponse(t: ExecutionContext, data: object) {
+    if (!this.clock) {
+      throw new Error(
+        'The "startBackgroundExecuteThenGetResponse" method should only be called if a fake clock is installed',
+      )
+    }
+
+    if (!this.mockCache) {
+      throw new Error(
+        'The "startBackgroundExecuteThenGetResponse" method should only be called if a mock cache was provided',
+      )
+    }
+
+    // Expect the first response to time out
+    // The polling behavior is tested in the cache tests, so this is easier here.
+    // Start the request:
+    const error = await this.request(data)
+    t.is(error?.statusCode, 504)
+
+    // Advance clock so that the batch warmer executes once again and wait for the cache to be set
+    // We disable the non-null assertion because we've already checked for existence in the line above
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    await runAllUntil(this.clock, () => this.mockCache!.cache.size > 0)
+
+    // Second request should find the response in the cache
+    const response = await this.request(data)
+    t.is(response.statusCode, 200)
+
+    return response
+  }
+
+  async getMetrics(): Promise<Map<string, number>> {
     if (!this.metricsApi) {
       throw new Error(
         'An attempt was made to fetch metrics, but the adapter was started without metrics enabled',
       )
     }
     const response = await this.metricsApi.inject('/metrics')
-    return response.body
+    return parsePromMetrics(response.body)
   }
 }
 

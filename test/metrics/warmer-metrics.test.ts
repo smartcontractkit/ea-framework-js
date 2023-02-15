@@ -1,12 +1,11 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import nock from 'nock'
-import { MockCache, runAllUntil, runAllUntilTime, TestAdapter } from '../util'
-import { buildHttpAdapter, parsePromMetrics } from './helper'
+import { runAllUntilTime, TestAdapter } from '../util'
+import { buildHttpAdapter } from './helper'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
-  cache: MockCache
   clock: InstalledClock
 }>
 
@@ -29,14 +28,9 @@ test.before(async (t) => {
 
   const adapter = buildHttpAdapter()
 
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-
   // Start the adapter
   t.context.clock = FakeTimers.install()
-  t.context.testAdapter = await TestAdapter.start(adapter, t.context, { cache: mockCache })
-  t.context.cache = mockCache
+  t.context.testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 })
 
 test.after((t) => {
@@ -68,27 +62,12 @@ nock(URL)
   .persist()
 
 test.serial('Test cache warmer active metric', async (t) => {
-  const makeRequest = () =>
-    t.context.testAdapter.request({
-      from,
-      to,
-    })
+  await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    from,
+    to,
+  })
 
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-  const error = await makeRequest()
-  t.is(error?.statusCode, 504)
-
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  await runAllUntil(t.context.clock, () => t.context.cache.cache.size > 0)
-
-  // Second request should find the response in the cache
-  const response = await makeRequest()
-  t.is(response.statusCode, 200)
-
-  const metricsResponse = await t.context.testAdapter.getMetrics()
-  let metricsMap = parsePromMetrics(metricsResponse)
+  const metricsMap = await t.context.testAdapter.getMetrics()
 
   let expectedLabel = `{isBatched="true",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_warmer_get_count${expectedLabel}`), 1)
@@ -112,18 +91,20 @@ test.serial('Test cache warmer active metric', async (t) => {
   await runAllUntilTime(t.context.clock, 15000) // The provider response is slower
 
   // Now that the cache is out and the subscription no longer there, this should time out
-  const error2 = await makeRequest()
+  const error2 = await t.context.testAdapter.request({
+    from,
+    to,
+  })
   t.is(error2?.statusCode, 504)
 
-  const metricsResponse2 = await t.context.testAdapter.getMetrics()
-  metricsMap = parsePromMetrics(metricsResponse2)
+  const metricsMap2 = await t.context.testAdapter.getMetrics()
 
   expectedLabel = `{isBatched="true",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`cache_warmer_get_count${expectedLabel}`), 0)
+  t.is(metricsMap2.get(`cache_warmer_get_count${expectedLabel}`), 0)
 
   expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 17)
+  t.is(metricsMap2.get(`bg_execute_total${expectedLabel}`), 17)
 
   expectedLabel = `{endpoint="test",transport_type="MockHttpTransport",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`bg_execute_subscription_set_count${expectedLabel}`), 0)
+  t.is(metricsMap2.get(`bg_execute_subscription_set_count${expectedLabel}`), 0)
 })

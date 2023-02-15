@@ -1,20 +1,17 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError, AxiosResponse } from 'axios'
+import { AxiosResponse } from 'axios'
 import Redis, { ScanStream } from 'ioredis'
 import nock from 'nock'
-import { AddressInfo } from 'ws'
-import { expose } from '../../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
-import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
+import { assertEqualResponses, runAllUntilTime, TestAdapter } from '../util'
 
 export const test = untypedTest as TestFn<{
-  serverAddress: string
+  testAdapter: TestAdapter
   clock: InstalledClock
-  cache: MockCache
 }>
 
 class RedisMock {
@@ -185,45 +182,17 @@ test.afterEach((t) => {
 
 test.serial('Test redis subscription set (add and getAll)', async (t) => {
   const adapter = buildAdapter()
-
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
   const dependencies: Partial<AdapterDependencies> = {
     redisClient: new RedisMock() as unknown as Redis,
-    cache: mockCache,
   }
 
-  const api = await expose(adapter, dependencies)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
-  t.context.cache = mockCache
+  t.context.testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context, dependencies)
 
-  const makeRequest = () =>
-    axios.post(t.context.serverAddress, {
-      data: {
-        from,
-        to,
-      },
-    })
-
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-  // Advance enough time for the initial request async flow
-  t.context.clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504
-  const error = await errorPromise
-  t.is(error?.response?.status, 504)
-
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  await runAllUntilTime(t.context.clock, 5000)
-
-  // Second request should find the response in the cache
-  const response = await makeRequest()
-  t.is(response.status, 200)
-  assertEqualResponses(t, response.data, {
+  const response = await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    from,
+    to,
+  })
+  assertEqualResponses(t, response.json(), {
     data: {
       result: price,
     },
@@ -235,6 +204,6 @@ test.serial('Test redis subscription set (add and getAll)', async (t) => {
   await runAllUntilTime(t.context.clock, 20000)
 
   // Now that the cache is out and the subscription no longer there, this should time out
-  const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)
-  t.is(error2?.response?.status, 504)
+  const error = await t.context.testAdapter.request({ from, to })
+  t.is(error?.statusCode, 504)
 })

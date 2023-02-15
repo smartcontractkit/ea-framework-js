@@ -4,21 +4,6 @@ import { SettingsMap } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 
-// Parse metrics scrape into object to use for tests
-export const parsePromMetrics = (data: string): Map<string, number> => {
-  const responseLines = data.split('\n')
-  const metricsMap = new Map<string, number>()
-  responseLines.forEach((line) => {
-    if (!line.startsWith('#') && line !== '') {
-      const metric = line.split(' ')
-      const nameLabel = metric[0]
-      const value = Number(metric[1])
-      metricsMap.set(nameLabel, value)
-    }
-  })
-  return metricsMap
-}
-
 export const buildHttpAdapter = (): Adapter => {
   return new Adapter({
     name: 'TEST',
