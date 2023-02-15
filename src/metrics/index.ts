@@ -27,10 +27,7 @@ export function setupMetricsServer(name: string, config: AdapterConfig) {
     res.send(await client.register.metrics())
   })
 
-  metricsApp.listen({
-    port: metricsPort,
-    host: eaHost,
-  })
+  return metricsApp
 }
 
 export const setupMetrics = (name: string): void => {

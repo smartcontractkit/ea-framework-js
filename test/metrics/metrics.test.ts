@@ -1,16 +1,14 @@
 import untypedTest, { TestFn } from 'ava'
-import axios from 'axios'
-import { AddressInfo } from 'net'
 import nock from 'nock'
-import { expose } from '../../src'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import { retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
+import { TestAdapter } from '../util'
 import { parsePromMetrics } from './helper'
 
 const test = untypedTest as TestFn<{
-  serverAddress: string
+  testAdapter: TestAdapter
 }>
 
 const URL = 'http://test-url.com'
@@ -104,8 +102,6 @@ const version = process.env['npm_package_version']
 
 test.before(async (t) => {
   process.env['METRICS_ENABLED'] = 'true'
-  // Set unique port between metrics tests to avoid conflicts in metrics servers
-  process.env['METRICS_PORT'] = '9090'
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
@@ -115,15 +111,10 @@ test.before(async (t) => {
     },
   })
 
-  const api = await expose(adapter)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
+  t.context.testAdapter = await TestAdapter.start(adapter, t.context)
 })
 
 test.serial('Test http requests total metrics (data provider hit)', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   nock(URL)
     .get(endpoint)
     .query({
@@ -134,23 +125,17 @@ test.serial('Test http requests total metrics (data provider hit)', async (t) =>
       price,
     })
 
-  await axios.post(t.context.serverAddress, {
-    data: {
-      from,
-      to,
-    },
-  })
+  await t.context.testAdapter.request({ from, to })
 
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{method="POST",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",status_code="200",type="dataProviderHit",provider_status_code="200",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`http_requests_total${expectedLabel}`), 1)
 })
 
 test.serial('Test http request duration metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{app_name="TEST",app_version="${version}"}`
   const responseTime = metricsMap.get(`http_request_duration_seconds_sum${expectedLabel}`)
   if (responseTime !== undefined) {
@@ -162,17 +147,15 @@ test.serial('Test http request duration metrics', async (t) => {
 })
 
 test.serial('Test data provider requests metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{provider_status_code="200",method="GET",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`data_provider_requests${expectedLabel}`), 1)
 })
 
 test.serial('Test data provider request duration metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{app_name="TEST",app_version="${version}"}`
   const responseTime = metricsMap.get(`data_provider_request_duration_seconds_sum${expectedLabel}`)
   if (responseTime !== undefined) {
@@ -184,25 +167,22 @@ test.serial('Test data provider request duration metrics', async (t) => {
 })
 
 test.serial('Test cache set count metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_set_count${expectedLabel}`), 1)
 })
 
 test.serial('Test cache max age metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_max_age${expectedLabel}`), 90000)
 })
 
 test.serial('Test cache set staleness metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   const staleness = metricsMap.get(`cache_data_staleness_seconds${expectedLabel}`)
   if (staleness !== undefined) {
@@ -214,23 +194,20 @@ test.serial('Test cache set staleness metrics', async (t) => {
 })
 
 test.serial('Test provider time delta metric', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_max_age${expectedLabel}`), 90000)
 })
 
 test.serial('Test credit spent metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{feed_id="N/A",participant_id="9002",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`rate_limit_credits_spent_total${expectedLabel}`), 1)
 })
 
 test.serial('Test http requests total metrics (cache hit)', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
   nock(URL)
     .get(endpoint)
     .query({
@@ -241,39 +218,31 @@ test.serial('Test http requests total metrics (cache hit)', async (t) => {
       price,
     })
 
-  await axios.post(t.context.serverAddress, {
-    data: {
-      from,
-      to,
-    },
-  })
+  await t.context.testAdapter.request({ from, to })
 
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{method="POST",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",status_code="200",type="cacheHit",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`http_requests_total${expectedLabel}`), 1)
 })
 
 test.serial('Test cache get count metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_get_count${expectedLabel}`), 1)
 })
 
 test.serial('Test cache get value metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_data_get_values${expectedLabel}`), 1234)
 })
 
 test.serial('Test cache get staleness metrics', async (t) => {
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
   const staleness = metricsMap.get(`cache_data_staleness_seconds${expectedLabel}`)
   if (staleness !== undefined) {

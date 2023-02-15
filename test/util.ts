@@ -2,7 +2,7 @@ import { InstalledClock } from '@sinonjs/fake-timers'
 import { ExecutionContext } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { ReplyError } from 'ioredis'
-import { expose } from '../src'
+import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
 import { LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
@@ -169,6 +169,7 @@ export class TestAdapter {
   constructor(
     public api: FastifyInstance,
     public adapter: Adapter,
+    public metricsApi?: FastifyInstance,
     public clock?: InstalledClock,
   ) {}
 
@@ -180,11 +181,11 @@ export class TestAdapter {
     }>['context'],
     dependencies?: Partial<AdapterDependencies>,
   ) {
-    const api = await expose(adapter, dependencies)
+    const { api, metricsApi } = await start(adapter, dependencies)
     if (!api) {
       throw new Error('EA was not able to start properly')
     }
-    context.testAdapter = new TestAdapter(api, adapter, context.clock)
+    context.testAdapter = new TestAdapter(api, adapter, metricsApi, context.clock)
     return context.testAdapter
   }
 
@@ -207,6 +208,16 @@ export class TestAdapter {
     }
 
     return waitUntilResolved(this.clock, makeRequest)
+  }
+
+  async getMetrics(): Promise<string> {
+    if (!this.metricsApi) {
+      throw new Error(
+        'An attempt was made to fetch metrics, but the adapter was started without metrics enabled',
+      )
+    }
+    const response = await this.metricsApi.inject('/metrics')
+    return response.body
   }
 }
 

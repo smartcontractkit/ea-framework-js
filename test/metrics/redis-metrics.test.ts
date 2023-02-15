@@ -1,16 +1,13 @@
 import untypedTest, { TestFn } from 'ava'
-import axios from 'axios'
 import Redis from 'ioredis'
-import { AddressInfo } from 'ws'
-import { expose } from '../../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache, LocalCache, RedisCache } from '../../src/cache'
 import { BasicCacheSetterTransport } from '../cache/helper'
-import { NopTransport } from '../util'
+import { NopTransport, TestAdapter } from '../util'
 import { parsePromMetrics } from './helper'
 
 export const test = untypedTest as TestFn<{
-  serverAddress: string
+  testAdapter: TestAdapter
   cache: Cache
   adapterEndpoint: AdapterEndpoint<EndpointGenerics>
 }>
@@ -91,11 +88,7 @@ test.before(async (t) => {
   }
 
   t.context.cache = cache
-  const api = await expose(adapter, dependencies)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
+  t.context.testAdapter = await TestAdapter.start(adapter, t.context, dependencies)
 })
 
 test.serial('Test redis sent command metric', async (t) => {
@@ -104,10 +97,9 @@ test.serial('Test redis sent command metric', async (t) => {
     factor: 123,
   }
 
-  await axios.post(t.context.serverAddress, { data })
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  const response = await axios.get(metricsAddress)
-  const metricsMap = parsePromMetrics(response.data)
+  await t.context.testAdapter.request(data)
+  const response = await t.context.testAdapter.getMetrics()
+  const metricsMap = parsePromMetrics(response)
   const expectedLabel = `{status="SUCCESS",function_name="exec",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`redis_commands_sent_count${expectedLabel}`), 1)
 })

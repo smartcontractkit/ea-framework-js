@@ -55,10 +55,13 @@ export const getMTLSOptions = (config: AdapterConfig) => {
  * @param dependencies - an optional object with adapter dependencies to inject
  * @returns a Promise that resolves to the http.Server listening for connections
  */
-export const expose = async <T extends SettingsMap = SettingsMap>(
+export const start = async <T extends SettingsMap = SettingsMap>(
   adapter: Adapter<T>,
   dependencies?: Partial<AdapterDependencies>,
-): Promise<FastifyInstance | undefined> => {
+): Promise<{
+  api: FastifyInstance | undefined
+  metricsApi: FastifyInstance | undefined
+}> => {
   if (!(adapter instanceof Adapter)) {
     throw new Error(
       'The adapter has not been initialized as an instance of the Adapter class, exiting.',
@@ -69,9 +72,10 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
   await adapter.initialize(dependencies)
 
   let api: FastifyInstance | undefined = undefined
+  let metricsApi: FastifyInstance | undefined = undefined
 
   if (adapter.config.METRICS_ENABLED && adapter.config.EXPERIMENTAL_METRICS_ENABLED) {
-    setupMetricsServer(adapter.name, adapter.config as AdapterConfig)
+    metricsApi = setupMetricsServer(adapter.name, adapter.config as AdapterConfig)
   }
 
   // Optional Promise to indicate that the API is shutting down (for us to close background executors)
@@ -85,22 +89,6 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
     apiShutdownPromise = new Promise<void>((resolve) => {
       api?.addHook('onClose', async () => resolve())
     })
-
-    // Tests will not use the port
-    if (!(process.env['FRAMEWORK_TESTING'] === 'true')) {
-      // Start listening for incoming requests
-      try {
-        await api.listen({
-          port: adapter.config.EA_PORT,
-          host: adapter.config.EA_HOST,
-        })
-      } catch (err) {
-        logger.fatal(`There was an error when starting the EA server: ${err}`)
-        process.exit()
-      }
-
-      logger.info(`Listening on port ${(api.server.address() as AddressInfo).port}`)
-    }
   } else {
     logger.info('REST API is disabled; this instance will not process incoming requests.')
   }
@@ -115,6 +103,37 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
     )
   }
 
+  return { api, metricsApi }
+}
+
+export const expose = async <T extends SettingsMap = SettingsMap>(
+  adapter: Adapter<T>,
+  dependencies?: Partial<AdapterDependencies>,
+): Promise<FastifyInstance | undefined> => {
+  const { api, metricsApi } = await start(adapter, dependencies)
+
+  const exposeApp = async (app: FastifyInstance | undefined, host: string, port: number) => {
+    if (app) {
+      try {
+        await app.listen({ port, host })
+      } catch (err) {
+        logger.fatal(`There was an error when starting the server: ${err}`)
+        process.exit()
+      }
+
+      logger.info(`Listening on port ${(app.server.address() as AddressInfo).port}`)
+    }
+  }
+
+  const metricsUrl = adapter.config.METRICS_USE_BASE_URL
+    ? join(adapter.config.BASE_URL, 'metrics')
+    : '/metrics'
+
+  // Start listening for incoming requests
+  await exposeApp(api, adapter.config.EA_HOST, adapter.config.EA_PORT)
+  await exposeApp(metricsApi, metricsUrl, adapter.config.METRICS_PORT)
+
+  // We return only the main API to maintain backwards compatibility
   return api
 }
 
