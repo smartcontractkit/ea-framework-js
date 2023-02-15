@@ -1,20 +1,22 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosError, AxiosResponse } from 'axios'
+import { FastifyInstance, LightMyRequestResponse } from 'fastify'
 import { AddressInfo } from 'net'
 import nock from 'nock'
-import { expose, ServerInstance } from '../../src'
+import { expose } from '../../src'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { calculateHttpRequestKey } from '../../src/cache'
 import { buildAdapterConfig, SettingsMap } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { AdapterResponse, ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
+import { assertEqualResponses, MockCache, runAllUntil, runAllUntilTime, TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
-  api: ServerInstance | undefined
+  testAdapter: TestAdapter
+  api: FastifyInstance | undefined
 }>
 
 const URL = 'http://test-url.com'
@@ -60,9 +62,8 @@ test.beforeEach((t) => {
 })
 
 test.afterEach(async (t) => {
-  t.context.api?.close()
-  await t.context.clock.runAllAsync()
   t.context.clock.uninstall()
+  await t.context.testAdapter.api.close()
 })
 
 type HttpTransportTypes = {
@@ -135,6 +136,7 @@ process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 process.env['RETRY'] = '0'
 process.env['BACKGROUND_EXECUTE_MS_HTTP'] = BACKGROUND_EXECUTE_MS_HTTP.toString()
 process.env['API_TIMEOUT'] = '0'
+process.env['FRAMEWORK_TESTING'] = 'true'
 
 const from = 'ETH'
 const to = 'USD'
@@ -181,7 +183,7 @@ const inputParameters = {
   },
 } as const
 
-test.serial('sends request to DP and returns response', async (t) => {
+test.only('sends request to DP and returns response', async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
@@ -199,39 +201,30 @@ test.serial('sends request to DP and returns response', async (t) => {
   const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
-  t.context.api = await expose(adapter, {
+  const testAdapter = await TestAdapter.start(adapter, t.context, {
     cache: mockCache,
   })
-  const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
 
   const makeRequest = () =>
-    axios.post(address, {
-      data: {
-        from,
-        to,
-      },
+    testAdapter.request({
+      from,
+      to,
     })
 
   // Expect the first response to time out
   // The polling behavior is tested in the cache tests, so this is easier here.
   // Start the request:
-  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-  // Advance enough time for the initial request async flow
-  t.context.clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504
-  const error = await errorPromise
-  t.is(error?.response?.status, 504)
+  const error: LightMyRequestResponse = await makeRequest()
+  t.is(error?.statusCode, 504)
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_HTTP + 10)
-  await cacheValueSetPromise
+  await runAllUntil(t.context.clock, () => mockCache.cache.size > 0)
 
   // Second request should find the response in the cache
   const response = await makeRequest()
 
-  t.is(response.status, 200)
-  assertEqualResponses(t, response.data, {
+  t.is(response.statusCode, 200)
+  assertEqualResponses(t, JSON.parse(response.body), {
     data: {
       result: price,
     },

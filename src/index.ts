@@ -86,18 +86,21 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
       api?.addHook('onClose', async () => resolve())
     })
 
-    // Start listening for incoming requests
-    try {
-      await api.listen({
-        port: adapter.config.EA_PORT,
-        host: adapter.config.EA_HOST,
-      })
-    } catch (err) {
-      logger.fatal(`There was an error when starting the EA server: ${err}`)
-      process.exit()
-    }
+    // Tests will not use the port
+    if (!(process.env['FRAMEWORK_TESTING'] === 'true')) {
+      // Start listening for incoming requests
+      try {
+        await api.listen({
+          port: adapter.config.EA_PORT,
+          host: adapter.config.EA_HOST,
+        })
+      } catch (err) {
+        logger.fatal(`There was an error when starting the EA server: ${err}`)
+        process.exit()
+      }
 
-    logger.info(`Listening on port ${(api.server.address() as AddressInfo).port}`)
+      logger.info(`Listening on port ${(api.server.address() as AddressInfo).port}`)
+    }
   } else {
     logger.info('REST API is disabled; this instance will not process incoming requests.')
   }

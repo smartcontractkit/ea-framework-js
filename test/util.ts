@@ -1,11 +1,14 @@
 import { InstalledClock } from '@sinonjs/fake-timers'
 import { ExecutionContext } from 'ava'
+import { FastifyInstance } from 'fastify'
+import { ReplyError } from 'ioredis'
+import { expose } from '../src'
+import { Adapter, AdapterDependencies } from '../src/adapter'
 import { LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
 import { AdapterConfig, SettingsMap } from '../src/config'
 import { Transport, TransportDependencies } from '../src/transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse } from '../src/util'
-import { ReplyError } from 'ioredis'
 
 export type NopTransportTypes = {
   Request: {
@@ -62,6 +65,7 @@ export class MockCache extends LocalCache {
 
   override async set(key: string, value: Readonly<unknown>, ttl: number): Promise<void> {
     super.set(key, value, ttl)
+    console.log('setting value')
     if (this.awaitingPromiseResolve) {
       this.awaitingPromiseResolve(value)
     }
@@ -160,4 +164,69 @@ export function assertEqualResponses(
   delete (actual as unknown as Record<string, unknown>)['timestamps']
 
   t.deepEqual(expected, actual)
+}
+
+export class TestAdapter {
+  constructor(
+    public api: FastifyInstance,
+    public adapter: Adapter,
+    public clock?: InstalledClock,
+  ) {}
+
+  static async start(
+    adapter: Adapter,
+    context: ExecutionContext<{
+      clock?: InstalledClock
+      testAdapter: TestAdapter
+    }>['context'],
+    dependencies?: Partial<AdapterDependencies>,
+  ) {
+    const api = await expose(adapter, dependencies)
+    if (!api) {
+      throw new Error('EA was not able to start properly')
+    }
+    context.testAdapter = new TestAdapter(api, adapter, context.clock)
+    return context.testAdapter
+  }
+
+  async request(data: object) {
+    const makeRequest = async () =>
+      this.api.inject({
+        method: 'post',
+        url: '/',
+        headers: {
+          'content-type': 'application/json',
+        },
+        payload: {
+          data,
+        },
+      })
+
+    // If there's no installed clock, just return the normal response promise
+    if (!this.clock) {
+      return makeRequest()
+    }
+
+    return waitUntilResolved(this.clock, makeRequest)
+  }
+}
+
+// This is the janky workaround to synchronously running async flows with fixed timers that block threads
+export async function waitUntilResolved<T>(
+  clock: InstalledClock,
+  fn: () => Promise<T>,
+): Promise<T> {
+  let result
+  const execute = async () => {
+    result = await fn()
+  }
+  execute()
+  // eslint-disable-next-line no-unmodified-loop-condition
+  while (result === undefined) {
+    // Console.log('executing next', result)
+    await clock.nextAsync()
+  }
+  console.log('done')
+
+  return result
 }
