@@ -99,4 +99,12 @@ module.exports = {
     'symbol-description': 'error',
     yoda: 'error',
   },
+  overrides: [
+    {
+      files: ['./test/**/*.ts'],
+      rules: {
+        'require-atomic-updates': 'off',
+      },
+    },
+  ],
 }

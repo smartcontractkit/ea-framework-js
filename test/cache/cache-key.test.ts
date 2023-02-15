@@ -1,16 +1,13 @@
 import untypedTest, { TestFn } from 'ava'
-import axios from 'axios'
-import { AddressInfo } from 'net'
-import { expose } from '../../src'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache } from '../../src/cache'
 import { BaseSettings } from '../../src/config'
 import { AdapterRequest, AdapterResponse } from '../../src/util'
 import { InputValidator } from '../../src/validation/input-validator'
-import { NopTransport, NopTransportTypes } from '../util'
+import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
-  serverAddress: string
+  testAdapter: TestAdapter
   cache: Cache
   adapterEndpoint: AdapterEndpoint<EndpointGenerics>
 }>
@@ -69,16 +66,12 @@ test.beforeEach(async (t) => {
   })
 
   t.context.adapterEndpoint = adapter.endpoints[0]
-  const api = await expose(adapter)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
+  t.context.testAdapter = await TestAdapter.start(adapter, t.context)
 })
 
 test.serial('no parameters returns default cache key', async (t) => {
-  const response = await axios.post(`${t.context.serverAddress}`, {})
-  t.is(response.data.result, BaseSettings.DEFAULT_CACHE_KEY.default)
+  const response = await t.context.testAdapter.request({})
+  t.is(response.json().result, BaseSettings.DEFAULT_CACHE_KEY.default)
 })
 
 test.serial('builds cache key correctly from input params', async (t) => {
@@ -111,20 +104,18 @@ test.serial('builds cache key correctly from input params', async (t) => {
   t.context.adapterEndpoint.validator = new InputValidator(
     t.context.adapterEndpoint.inputParameters,
   )
-  const response = await axios.post(`${t.context.serverAddress}`, {
-    data: {
-      base: 'eth',
-      factor: 123,
-      proper: true,
-      details: {
-        asd: 'qwe',
-        zxc: 432,
-      },
-      nullable: null,
+  const response = await t.context.testAdapter.request({
+    base: 'eth',
+    factor: 123,
+    proper: true,
+    details: {
+      asd: 'qwe',
+      zxc: 432,
     },
+    nullable: null,
   })
   t.is(
-    response.data.result,
+    response.json().result,
     'TEST-test-{"base":"eth","factor":123,"proper":true,"details":{"asd":"qwe","zxc":432}}',
   )
 })
@@ -139,20 +130,18 @@ test.serial('cache key is truncated if over max size', async (t) => {
   t.context.adapterEndpoint.validator = new InputValidator(
     t.context.adapterEndpoint.inputParameters,
   )
-  const response = await axios.post(`${t.context.serverAddress}`, {
-    data: {
-      base: Array(100)
-        .fill(null)
-        .map((s, i) => `----------${i}`)
-        .join('|'),
-    },
+  const response = await t.context.testAdapter.request({
+    base: Array(100)
+      .fill(null)
+      .map((s, i) => `----------${i}`)
+      .join('|'),
   })
-  t.is(response.data.result.length, 4 + 1 + 4 + 1 + 150) // Adapter Name + separator + Endpoint Name + separator + Max common key
+  t.is(response.json().result.length, 4 + 1 + 4 + 1 + 150) // Adapter Name + separator + Endpoint Name + separator + Max common key
 })
 
 test.serial('custom cache key', async (t) => {
-  const response = await axios.post(`${t.context.serverAddress}`, {
+  const response = await t.context.testAdapter.request({
     endpoint: 'test-custom-cache-key',
   })
-  t.is(response.data.result, 'test:custom_cache_key')
+  t.is(response.json().result, 'test:custom_cache_key')
 })

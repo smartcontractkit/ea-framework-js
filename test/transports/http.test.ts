@@ -222,7 +222,7 @@ test.serial('sends request to DP and returns response', async (t) => {
   const response = await makeRequest()
 
   t.is(response.statusCode, 200)
-  assertEqualResponses(t, JSON.parse(response.body), {
+  assertEqualResponses(t, response.json(), {
     data: {
       result: price,
     },
@@ -517,7 +517,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
   const response = await makeRequest()
 
   t.is(response.statusCode, 502)
-  assertEqualResponses(t, JSON.parse(response.body), {
+  assertEqualResponses(t, response.json(), {
     errorMessage: 'Provider request failed with status undefined: "There was an unexpected issue"',
     statusCode: 502,
   })
@@ -635,7 +635,7 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
   const responseB = await makeRequest('testB')
 
   t.is(responseA.statusCode, 200)
-  assertEqualResponses(t, JSON.parse(responseA.body), {
+  assertEqualResponses(t, responseA.json(), {
     data: {
       result: price,
     },
@@ -643,7 +643,7 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
     statusCode: 200,
   })
   t.is(responseB.statusCode, 200)
-  assertEqualResponses(t, JSON.parse(responseB.body), {
+  assertEqualResponses(t, responseB.json(), {
     data: {
       result: volume,
     },
@@ -798,7 +798,7 @@ test.serial(
     // Request for the last 2 requests should be fulfilled, since the first one will have been kicked off the queue
     const error3 = await makeRequest(3)
     t.is(error3?.statusCode, 429)
-    assertEqualResponses(t, JSON.parse(error3.body), {
+    assertEqualResponses(t, error3.json(), {
       errorMessage:
         'The EA was unable to execute the request to fetch the requested data from the DP because the request queue overflowed. This likely indicates that a higher API tier is needed.',
       statusCode: 429,
