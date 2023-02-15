@@ -1,14 +1,13 @@
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError } from 'axios'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { Cache } from '../../src/cache'
 import { AdapterRequest } from '../../src/util'
-import { NopTransport, NopTransportTypes } from '../util'
+import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
 
 export const test = untypedTest as TestFn<{
-  serverAddress: string
   cache: Cache
   adapterEndpoint: AdapterEndpoint<NopTransportTypes>
+  testAdapter: TestAdapter
 }>
 
 export class BasicCacheSetterTransport extends NopTransport {
@@ -75,8 +74,8 @@ export const cacheTests = () => {
       factor: 123,
     }
 
-    const response = await axios.post(`${t.context.serverAddress}`, { data })
-    t.is(response.data.result, 123)
+    const response = await t.context.testAdapter.request(data)
+    t.is(response.json().result, 123)
   })
 
   test('returns value already found in cache', async (t) => {
@@ -96,8 +95,8 @@ export const cacheTests = () => {
 
     t.context.cache.set(cacheKey, injectedEntry, 10000)
 
-    const response = await axios.post(`${t.context.serverAddress}`, { data })
-    t.is(response.data.result, 'injected')
+    const response = await t.context.testAdapter.request(data)
+    t.is(response.json().result, 'injected')
   })
 
   test('skips expired cache entry and returns set up value', async (t) => {
@@ -117,16 +116,14 @@ export const cacheTests = () => {
 
     t.context.cache.set(cacheKey, injectedEntry, -10)
 
-    const response = await axios.post(`${t.context.serverAddress}`, { data })
-    t.is(response.data.result, 24637)
+    const response = await t.context.testAdapter.request(data)
+    t.is(response.json().result, 24637)
   })
 
   test('polls forever and returns timeout', async (t) => {
-    const makeRequest = () =>
-      axios.post(`${t.context.serverAddress}`, {
-        endpoint: 'nowork',
-      })
-    const error: AxiosError | undefined = await t.throwsAsync(makeRequest)
-    t.is(error?.response?.status, 504)
+    const error = await t.context.testAdapter.request({
+      endpoint: 'nowork',
+    })
+    t.is(error?.statusCode, 504)
   })
 }

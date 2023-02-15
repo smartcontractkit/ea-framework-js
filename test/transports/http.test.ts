@@ -134,7 +134,6 @@ process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 process.env['RETRY'] = '0'
 process.env['BACKGROUND_EXECUTE_MS_HTTP'] = BACKGROUND_EXECUTE_MS_HTTP.toString()
 process.env['API_TIMEOUT'] = '0'
-process.env['FRAMEWORK_TESTING'] = 'true'
 
 const from = 'ETH'
 const to = 'USD'

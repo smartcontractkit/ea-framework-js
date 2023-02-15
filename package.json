@@ -68,7 +68,8 @@
     ],
     "workerThreads": false,
     "environmentVariables": {
-      "METRICS_ENABLED": "false"
+      "METRICS_ENABLED": "false",
+      "FRAMEWORK_TESTING": "true"
     },
     "timeout": "20s"
   }
