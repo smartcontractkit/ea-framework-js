@@ -180,7 +180,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     requestConfig: ProviderRequestConfig<T>,
     context: EndpointContext<T>,
   ): Promise<void> {
-    const results = await this.makeRequest(requestConfig, context)
+    const { results, msUntilNextExecution } = await this.makeRequest(requestConfig, context)
 
     if (!results.length) {
       logger.trace('Got no results from the request.')
@@ -189,12 +189,24 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
     logger.debug('Setting adapter responses in cache')
     await this.responseCache.write(results)
+
+    if (msUntilNextExecution) {
+      // If we got this, it means that the queue was unable to accomomdate this request.
+      // We want to sleep here for a bit, to avoid running into constant queue overflow replacements in competing threads.
+      logger.info(
+        `Request queue has overflowed, sleeping for ${msUntilNextExecution}ms until reprocessing...`,
+      )
+      await sleep(msUntilNextExecution)
+    }
   }
 
   private async makeRequest(
     requestConfig: ProviderRequestConfig<T>,
     context: EndpointContext<T>,
-  ): Promise<TimestampedProviderResult<T>[]> {
+  ): Promise<{
+    results: TimestampedProviderResult<T>[]
+    msUntilNextExecution?: number
+  }> {
     try {
       // The key generated here that we pass to the requester is potentially very long, but we're not considering it an issue given that:
       //   - the requester will store values in memory, so we're not sending the string anywhere
@@ -226,36 +238,45 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
         .labels({ feed_id: 'N/A', participant_id: WARMUP_BATCH_REQUEST_ID })
         .inc(cost)
 
-      return results
+      logger.trace('Storing successful response')
+      return { results }
     } catch (e) {
       if (e instanceof AdapterDataProviderError && e.cause instanceof AxiosError) {
         const err = e as AdapterDataProviderError
         const cause = err.cause as AxiosError
-        return requestConfig.params.map((entry) => ({
-          params: entry,
-          response: {
-            errorMessage: `Provider request failed with status ${cause.status}: "${cause.response?.data}"`,
-            statusCode: 502,
-            timestamps: err.timestamps,
-          },
-        }))
+        const errorMessage = `Provider request failed with status ${cause.status}: "${cause.response?.data}"`
+        logger.info(errorMessage)
+        return {
+          results: requestConfig.params.map((entry) => ({
+            params: entry,
+            response: {
+              errorMessage,
+              statusCode: 502,
+              timestamps: err.timestamps,
+            },
+          })),
+        }
       } else if (e instanceof AdapterRateLimitError) {
         const err = e as AdapterRateLimitError
-        return requestConfig.params.map((entry) => ({
-          params: entry,
-          response: {
-            errorMessage: err.message,
-            statusCode: 429,
-            timestamps: {
-              providerDataReceivedUnixMs: 0,
-              providerDataRequestedUnixMs: 0,
-              providerIndicatedTimeUnixMs: undefined,
+        logger.info(err.message)
+        return {
+          results: requestConfig.params.map((entry) => ({
+            params: entry,
+            response: {
+              errorMessage: err.message,
+              statusCode: 429,
+              timestamps: {
+                providerDataReceivedUnixMs: 0,
+                providerDataRequestedUnixMs: 0,
+                providerIndicatedTimeUnixMs: undefined,
+              },
             },
-          },
-        }))
+          })),
+          msUntilNextExecution: err.msUntilNextExecution,
+        }
       } else {
         logger.error(e)
-        return []
+        return { results: [] }
       }
     }
   }

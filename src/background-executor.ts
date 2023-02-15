@@ -1,7 +1,7 @@
 import { Adapter, AdapterEndpoint, EndpointContext, EndpointGenerics } from './adapter'
 import { metrics } from './metrics'
 import { MetaTransport, Transport, TransportGenerics } from './transports'
-import { makeLogger } from './util'
+import { asyncLocalStorage, makeLogger } from './util'
 
 const logger = makeLogger('BackgroundExecutor')
 
@@ -64,7 +64,14 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       logger.debug(`Calling background execute for endpoint "${endpoint.name}"`)
 
       try {
-        await backgroundExecute(context)
+        await asyncLocalStorage.run(
+          {
+            correlationId: `Endpoint: ${endpoint.name} - Transport: ${transport.constructor.name}`,
+          },
+          () => {
+            return backgroundExecute(context)
+          },
+        )
       } catch (error) {
         logger.error(error)
       }
@@ -72,10 +79,10 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       // This background execute loop is no longer the one to determine the sleep between bg execute calls.
       // That is now instead responsibility of each transport, to allow for custom ones to implement their own timings.
       logger.trace(
-        `Finished background execute for endpoint "${endpoint.name}", calling it again in 1ms...`,
+        `Finished background execute for endpoint "${endpoint.name}", calling it again in 10ms...`,
       )
       metricsTimer()
-      timeoutsMap[endpoint.name] = setTimeout(handler, 1)
+      timeoutsMap[endpoint.name] = setTimeout(handler, 10)
     }
 
     // Start recursive async calls

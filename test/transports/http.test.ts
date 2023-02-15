@@ -1,15 +1,13 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError, AxiosResponse } from 'axios'
+import { AxiosResponse } from 'axios'
 import { FastifyInstance, LightMyRequestResponse } from 'fastify'
-import { AddressInfo } from 'net'
 import nock from 'nock'
-import { expose } from '../../src'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { calculateHttpRequestKey } from '../../src/cache'
 import { buildAdapterConfig, SettingsMap } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
-import { AdapterResponse, ProviderResult, SingleNumberResultResponse } from '../../src/util'
+import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { assertEqualResponses, MockCache, runAllUntil, runAllUntilTime, TestAdapter } from '../util'
 
@@ -63,7 +61,7 @@ test.beforeEach((t) => {
 
 test.afterEach(async (t) => {
   t.context.clock.uninstall()
-  await t.context.testAdapter.api.close()
+  await t.context.testAdapter?.api.close()
 })
 
 type HttpTransportTypes = {
@@ -183,7 +181,7 @@ const inputParameters = {
   },
 } as const
 
-test.only('sends request to DP and returns response', async (t) => {
+test.serial('sends request to DP and returns response', async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
@@ -262,29 +260,20 @@ test.serial(
     })
 
     // Start the adapter
-    t.context.api = await expose(adapter)
-    const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
+    const testAdapter = await TestAdapter.start(adapter, t.context)
 
     const makeRequest = () =>
-      axios.post(address, {
-        data: {
-          from,
-          to,
-        },
+      testAdapter.request({
+        from,
+        to,
       })
 
     // Expect the first response to time out
     // The polling behavior is tested in the cache tests, so this is easier here.
-    // Start the request:
-    const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-    // Advance enough time for the initial request async flow
-    t.context.clock.tickAsync(10)
-    // Wait for the failed cache get -> instant 504
-    const error = await errorPromise
-    t.is(error?.response?.status, 504)
+    const error = await makeRequest()
+    t.is(error?.statusCode, 504)
 
     // Advance the clock a few minutes and check that the amount of calls is as expected
-    //
     await runAllUntilTime(t.context.clock, 3 * 60 * 1000) // 4m
     const expected = rateLimit1m * Math.ceil(adapter.config.WARMUP_SUBSCRIPTION_TTL / 60_000)
     t.is(transport.backgroundExecuteCalls, expected)
@@ -320,29 +309,20 @@ test.serial(
     })
 
     // Start the adapter
-    t.context.api = await expose(adapter)
-    const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
+    const testAdapter = await TestAdapter.start(adapter, t.context)
 
     const makeRequest = () =>
-      axios.post(address, {
-        data: {
-          from,
-          to,
-        },
+      testAdapter.request({
+        from,
+        to,
       })
 
     // Expect the first response to time out
-    // The polling behavior is tested in the cache tests, so this is easier here.
-    // Start the request:
-    const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-    // Advance enough time for the initial request async flow
-    t.context.clock.tickAsync(10)
-    // Wait for the failed cache get -> instant 504
-    const error = await errorPromise
-    t.is(error?.response?.status, 504)
+    const error = await makeRequest()
+    t.is(error?.statusCode, 504)
 
     // Run for an entire minute and check that the values are as expected
-    await runAllUntilTime(t.context.clock, 60 * 1000)
+    await runAllUntilTime(t.context.clock, 60 * 1000 + 100)
     t.is(transport.backgroundExecuteCalls, 60 * rateLimit1s)
   },
 )
@@ -381,35 +361,24 @@ test.serial(
     })
 
     // Start the adapter
-    t.context.api = await expose(adapter)
-    const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
+    const testAdapter = await TestAdapter.start(adapter, t.context)
 
     const makeRequest = (endpointParam: string) =>
-      axios.post(address, {
-        data: {
-          from,
-          to,
-        },
+      testAdapter.request({
         endpoint: endpointParam,
+        from,
+        to,
       })
 
     // Expect the first response to time out
-    // The polling behavior is tested in the cache tests, so this is easier here.
-    // Start the request:
-    const errorPromiseA: Promise<AxiosError | undefined> = t.throwsAsync(() => makeRequest('A'))
-    // Advance enough time for the initial request async flow
-    t.context.clock.tickAsync(10)
-    // Wait for the failed cache get -> instant 504
-    const errorA = await errorPromiseA
-    t.is(errorA?.response?.status, 504)
+    const errorA = await makeRequest('A')
+    t.is(errorA?.statusCode, 504)
 
     // Do the same thing for transport B
-    const errorPromiseB: Promise<AxiosError | undefined> = t.throwsAsync(() => makeRequest('B'))
-    t.context.clock.tickAsync(10)
-    const errorB = await errorPromiseB
-    t.is(errorB?.response?.status, 504)
+    const errorB = await makeRequest('B')
+    t.is(errorB?.statusCode, 504)
 
-    await runAllUntilTime(t.context.clock, 20 * 1000)
+    await runAllUntilTime(t.context.clock, 20 * 1000 + 100)
     t.is(transportA.backgroundExecuteCalls, 10 * rateLimit1s)
     t.is(transportB.backgroundExecuteCalls, 10 * rateLimit1s)
   },
@@ -485,36 +454,25 @@ test.serial(
     })
 
     // Start the adapter
-    t.context.api = await expose(adapter)
-    const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
+    const testAdapter = await TestAdapter.start(adapter, t.context)
 
     const makeRequest = (endpointParam: string) =>
-      axios.post(address, {
-        data: {
-          from: from + endpointParam,
-          to,
-        },
+      testAdapter.request({
         endpoint: endpointParam,
+        from: from + endpointParam,
+        to,
       })
 
     // Expect the first response to time out
-    // The polling behavior is tested in the cache tests, so this is easier here.
-    // Start the request:
-    const errorPromiseA: Promise<AxiosError | undefined> = t.throwsAsync(() => makeRequest('A'))
-    // Advance enough time for the initial request async flow
-    t.context.clock.tickAsync(10)
-    // Wait for the failed cache get -> instant 504
-    const errorA = await errorPromiseA
-    t.is(errorA?.response?.status, 504)
+    const errorA = await makeRequest('A')
+    t.is(errorA?.statusCode, 504)
 
     // Do the same thing for transport B
-    const errorPromiseB: Promise<AxiosError | undefined> = t.throwsAsync(() => makeRequest('B'))
-    t.context.clock.tickAsync(10)
-    const errorB = await errorPromiseB
-    t.is(errorB?.response?.status, 504)
+    const errorB = await makeRequest('B')
+    t.is(errorB?.statusCode, 504)
 
     // Run for a minute (59s actually, it'll start at 0 and go on regular intervals)
-    await runAllUntilTime(t.context.clock, 10 * 1000)
+    await runAllUntilTime(t.context.clock, 10 * 1000 + 100)
     t.is(transportA.backgroundExecuteCalls, 5 * rateLimit1s)
     t.is(transportB.backgroundExecuteCalls, 5 * rateLimit1s)
   },
@@ -532,45 +490,34 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
       }),
     ],
   })
-
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
   const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
-  t.context.api = await expose(adapter, {
+  const testAdapter = await TestAdapter.start(adapter, t.context, {
     cache: mockCache,
   })
-  const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
 
   const makeRequest = () =>
-    axios.post(address, {
-      data: {
-        from: 'ERR',
-        to,
-      },
+    testAdapter.request({
+      from: 'ERR',
+      to,
     })
 
   // Expect the first response to time out
   // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-  // Advance enough time for the initial request async flow
-  t.context.clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504
-  const error = await errorPromise
-  t.is(error?.response?.status, 504)
+  const error = await makeRequest()
+  t.is(error?.statusCode, 504)
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  const cacheValueSetPromise = mockCache.waitForNextSet()
-  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_HTTP + 200)
-  await cacheValueSetPromise
+  await runAllUntil(t.context.clock, () => mockCache.cache.size > 0)
 
   // Second request should find the response in the cache
-  const error2 = (await t.throwsAsync(makeRequest)) as AxiosError
+  const response = await makeRequest()
 
-  t.is(error2?.response?.status, 502)
-  assertEqualResponses(t, error2?.response?.data as AdapterResponse, {
+  t.is(response.statusCode, 502)
+  assertEqualResponses(t, JSON.parse(response.body), {
     errorMessage: 'Provider request failed with status undefined: "There was an unexpected issue"',
     statusCode: 502,
   })
@@ -643,10 +590,9 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
   const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
-  t.context.api = await expose(adapter, {
+  const testAdapter = await TestAdapter.start(adapter, t.context, {
     cache: mockCache,
   })
-  const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
 
   nock(URL)
     .post('/volume', {
@@ -668,41 +614,36 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
     .persist()
 
   const makeRequest = (endpointParam: string) =>
-    axios.post(address, {
-      data: {
-        from,
-        to,
-      },
+    testAdapter.request({
+      from,
+      to,
       endpoint: endpointParam,
     })
 
-  const errorPromiseA: Promise<AxiosError | undefined> = t.throwsAsync(() => makeRequest('testA'))
-  const errorPromiseB: Promise<AxiosError | undefined> = t.throwsAsync(() => makeRequest('testB'))
-  // Advance enough time for the initial request async flow
-  t.context.clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504
-  const [errorA, errorB] = await Promise.all([errorPromiseA, errorPromiseB])
-  t.is(errorA?.response?.status, 504)
-  t.is(errorB?.response?.status, 504)
+  // Expect the first response to time out
+  // The polling behavior is tested in the cache tests, so this is easier here.
+  const errorA = await makeRequest('testA')
+  const errorB = await makeRequest('testB')
+  t.is(errorA?.statusCode, 504)
+  t.is(errorB?.statusCode, 504)
+
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_HTTP + 10)
-  await cacheValueSetPromise
+  await runAllUntil(t.context.clock, () => mockCache.cache.size > 1)
 
   // Second request should find the response in the cache
   const responseA = await makeRequest('testA')
   const responseB = await makeRequest('testB')
 
-  t.is(responseA.status, 200)
-  assertEqualResponses(t, responseA.data, {
+  t.is(responseA.statusCode, 200)
+  assertEqualResponses(t, JSON.parse(responseA.body), {
     data: {
       result: price,
     },
     result: price,
     statusCode: 200,
   })
-  t.is(responseB.status, 200)
-  assertEqualResponses(t, responseB.data, {
+  t.is(responseB.statusCode, 200)
+  assertEqualResponses(t, JSON.parse(responseB.body), {
     data: {
       result: volume,
     },
@@ -749,34 +690,27 @@ test.serial('requests for the same transport are coalesced', async (t) => {
   const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
-  t.context.api = await expose(adapter, {
+  const testAdapter = await TestAdapter.start(adapter, t.context, {
     cache: mockCache,
   })
-  const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
+
   const makeRequest = () =>
-    axios.post(address, {
-      data: {
-        from: 'COALESCE2',
-        to,
-      },
+    testAdapter.request({
+      from: 'COALESCE2',
+      to,
     })
 
-  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-  // Advance enough time for the initial request async flow
-  t.context.clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504s
-  const error = await errorPromise
-  t.is(error?.response?.status, 504)
+  // Expect the first response to time out
+  // The polling behavior is tested in the cache tests, so this is easier here.
+  const error = await makeRequest()
+  t.is(error?.statusCode, 504)
 
-  // Advance clock so that the batch warmer executes twice again and wait for the cache to be set
-  const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_HTTP * 2 + 200)
-  await cacheValueSetPromise
+  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
+  await runAllUntil(t.context.clock, () => mockCache.cache.size > 0)
 
-  // Second requests should find the response in the cache
+  // Second request should find the response in the cache
   const response = await makeRequest()
-
-  t.is(response.status, 200)
+  t.is(response.statusCode, 200)
 })
 
 test.serial(
@@ -839,38 +773,32 @@ test.serial(
     t.context.clock.tick(1000)
 
     // Start the adapter
-    // eslint-disable-next-line
-    t.context.api = await expose(adapter, {
+    const testAdapter = await TestAdapter.start(adapter, t.context, {
       cache: mockCache,
     })
-    const address = `http://localhost:${(t.context.api?.server.address() as AddressInfo)?.port}`
-    const makeRequest = (number: number) => () =>
-      axios.post(address, {
-        data: {
-          from: `symbol${number}`,
-          to,
-          endpoint: `${number}`,
-        },
+
+    const makeRequest = (number: number) =>
+      testAdapter.request({
+        from: `symbol${number}`,
+        to,
+        endpoint: `${number}`,
       })
 
     // Send an initial request for all our numbers to ensure they're part of the subscription set
     for (const number of numbers) {
-      const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest(number))
-      // Advance enough time for the initial request async flow
-      t.context.clock.tickAsync(10)
-      // Wait for the failed cache get -> instant 504s
-      const error = await errorPromise
-      t.is(error?.response?.status, 504)
+      // Expect the first response to time out
+      // The polling behavior is tested in the cache tests, so this is easier here.
+      const error = await makeRequest(number)
+      t.is(error?.statusCode, 504)
     }
 
     // Advance clock so that the batch warmer executes
     await t.context.clock.tickAsync(60_000)
 
     // Request for the last 2 requests should be fulfilled, since the first one will have been kicked off the queue
-    const error3 = (await t.throwsAsync(makeRequest(3))) as AxiosError
-
-    t.is(error3?.response?.status, 429)
-    assertEqualResponses(t, error3?.response?.data as AdapterResponse, {
+    const error3 = await makeRequest(3)
+    t.is(error3?.statusCode, 429)
+    assertEqualResponses(t, JSON.parse(error3.body), {
       errorMessage:
         'The EA was unable to execute the request to fetch the requested data from the DP because the request queue overflowed. This likely indicates that a higher API tier is needed.',
       statusCode: 429,

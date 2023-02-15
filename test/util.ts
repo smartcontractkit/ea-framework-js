@@ -65,7 +65,6 @@ export class MockCache extends LocalCache {
 
   override async set(key: string, value: Readonly<unknown>, ttl: number): Promise<void> {
     super.set(key, value, ttl)
-    console.log('setting value')
     if (this.awaitingPromiseResolve) {
       this.awaitingPromiseResolve(value)
     }
@@ -223,10 +222,8 @@ export async function waitUntilResolved<T>(
   execute()
   // eslint-disable-next-line no-unmodified-loop-condition
   while (result === undefined) {
-    // Console.log('executing next', result)
     await clock.nextAsync()
   }
-  console.log('done')
 
   return result
 }

@@ -144,9 +144,7 @@ export class Requester {
     if (overflowedRequest) {
       // If we have overflow, it means the oldest request needs to be rejected because the queue is at its limits
       logger.debug(
-        `Request (Key: ${key}, Retry #: ${0}) was removed from the queue to make room for a newer one (Size: ${
-          this.queue.length
-        })`,
+        `Request (Key: ${overflowedRequest.key}, Retry #: ${overflowedRequest.retries}) was removed from the queue to make room for a newer one (Size: ${this.queue.length})`,
       )
       metrics.get('requesterQueueOverflow').inc()
       overflowedRequest.reject(
@@ -154,6 +152,7 @@ export class Requester {
           message:
             'The EA was unable to execute the request to fetch the requested data from the DP because the request queue overflowed. This likely indicates that a higher API tier is needed.',
           statusCode: 429,
+          msUntilNextExecution: this.rateLimiter.msUntilNextExecution(),
         }),
       )
     }
