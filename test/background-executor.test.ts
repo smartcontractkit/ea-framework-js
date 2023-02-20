@@ -1,7 +1,7 @@
-import test from 'ava'
 import FakeTimers from '@sinonjs/fake-timers'
-import { expose } from '../src'
-import { Adapter, EndpointContext, AdapterEndpoint } from '../src/adapter'
+import test from 'ava'
+import { start } from '../src'
+import { Adapter, AdapterEndpoint, EndpointContext } from '../src/adapter'
 import { deferredPromise, NopTransport, NopTransportTypes } from './util'
 
 test('background executor calls transport function with background context', async (t) => {
@@ -29,7 +29,7 @@ test('background executor calls transport function with background context', asy
     ],
   })
 
-  await expose(adapter)
+  await start(adapter)
   const context = await promise
   t.is(context.endpointName, 'test')
 })
@@ -55,12 +55,9 @@ test.serial('background executor ends recursive chain on server close', async (t
     ],
   })
 
-  const server = await expose(adapter)
-  if (!server) {
-    throw 'Server did not start'
-  }
+  const server = await start(adapter)
   t.is(timesCalled, 1)
-  server.close()
+  server.api?.close()
   await clock.tickAsync(999999)
   t.is(timesCalled, 1) // The background process closed, so this was never called again
 

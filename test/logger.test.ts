@@ -1,10 +1,10 @@
 import test from 'ava'
-import { expose } from '../src'
+import { start } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
+import { SettingsMap } from '../src/config'
 import CensorList from '../src/util/censor/censor-list'
 import { censor, colorFactory, COLORS } from '../src/util/logger'
 import { NopTransport } from './util'
-import { SettingsMap } from '../src/config'
 
 test.before(async () => {
   const customSettings: SettingsMap = {
@@ -26,7 +26,7 @@ test.before(async () => {
       }),
     ],
   })
-  await expose(adapter)
+  await start(adapter)
 })
 
 test('properly builds censor list', async (t) => {

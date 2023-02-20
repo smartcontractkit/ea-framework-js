@@ -1,12 +1,10 @@
 import untypedTest, { TestFn } from 'ava'
-import axios from 'axios'
-import { AddressInfo } from 'net'
-import { expose } from '../src'
+import { expose, start } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
-import { NopTransport } from './util'
+import { NopTransport, TestAdapter } from './util'
 
 const test = untypedTest as TestFn<{
-  serverAddress: string
+  testAdapter: TestAdapter
 }>
 
 test.beforeEach(async (t) => {
@@ -21,16 +19,12 @@ test.beforeEach(async (t) => {
     ],
   })
 
-  const api = await expose(adapter)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
+  t.context.testAdapter = await TestAdapter.start(adapter, t.context)
 })
 
 test('health endpoint returns health OK', async (t) => {
-  const response = await axios.get(`${t.context.serverAddress}/health`)
-  t.deepEqual(response.data, {
+  const response = await t.context.testAdapter.getHealth()
+  t.deepEqual(response.json(), {
     message: 'OK',
     version: process.env['npm_package_version'],
   })
@@ -51,7 +45,7 @@ test('MTLS_ENABLED with no TLS params should error', async (t) => {
     },
   })
   try {
-    await expose(adapter)
+    await start(adapter)
   } catch (e: unknown) {
     t.is(
       (e as Error).message,
@@ -78,7 +72,7 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
     },
   })
   try {
-    await expose(adapter)
+    await start(adapter)
   } catch (e: unknown) {
     t.pass()
   }
@@ -105,7 +99,7 @@ test('Adapter writer mode api disabled', async (t) => {
 
 test('Initialize adapter (error)', async (t) => {
   try {
-    await expose({} as Adapter)
+    await start({} as Adapter)
   } catch (e: unknown) {
     t.is(
       (e as Error).message,

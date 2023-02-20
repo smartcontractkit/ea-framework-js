@@ -240,13 +240,14 @@ export class TestAdapter {
     return context.testAdapter
   }
 
-  async request(data: object) {
+  async request(data: object, headers?: Record<string, string>) {
     const makeRequest = async () =>
       this.api.inject({
         method: 'post',
         url: '/',
         headers: {
           'content-type': 'application/json',
+          ...headers,
         },
         payload: {
           data,
@@ -317,6 +318,10 @@ export class TestAdapter {
     }
     const response = await this.metricsApi.inject('/metrics')
     return parsePromMetrics(response.body)
+  }
+
+  async getHealth() {
+    return this.api.inject('/health')
   }
 }
 
