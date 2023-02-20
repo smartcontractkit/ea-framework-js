@@ -63,8 +63,10 @@ nock(URL)
 
 test.serial('Test cache warmer active metric', async (t) => {
   await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, {
-    from,
-    to,
+    requestData: {
+      from,
+      to,
+    },
   })
 
   const metricsMap = await t.context.testAdapter.getMetrics()

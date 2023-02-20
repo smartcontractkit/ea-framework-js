@@ -162,15 +162,14 @@ test('connects to EventSource, subscribes, gets message, unsubscribes and handle
     eventSource: EventSource,
   })
 
-  await testAdapter.startBackgroundExecuteThenGetResponse(
-    t,
-    { base, quote },
-    {
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
       data: { result: 111 },
       result: price,
       statusCode: 200,
     },
-  )
+  })
 
   // Make a request for an unsupported ticker symbol
   const error = await testAdapter.request({

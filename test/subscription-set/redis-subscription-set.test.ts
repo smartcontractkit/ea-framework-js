@@ -189,8 +189,10 @@ test.serial('Test redis subscription set (add and getAll)', async (t) => {
   t.context.testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context, dependencies)
 
   const response = await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, {
-    from,
-    to,
+    requestData: {
+      from,
+      to,
+    },
   })
   assertEqualResponses(t, response.json(), {
     data: {

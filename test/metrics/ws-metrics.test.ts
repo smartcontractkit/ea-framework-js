@@ -167,7 +167,12 @@ test.after(async (t) => {
 })
 
 test.serial('Test WS connection, subscription, and message metrics', async (t) => {
-  await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, { base, quote })
+  await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: {
+      base,
+      quote,
+    },
+  })
 
   // Check connection, subscription active, subscription total, and message total metrics when subscribed to feed
   const metricsMap = await t.context.testAdapter.getMetrics()

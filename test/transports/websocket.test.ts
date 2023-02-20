@@ -170,17 +170,16 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-  await testAdapter.startBackgroundExecuteThenGetResponse(
-    t,
-    { base, quote },
-    {
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
       data: {
         result: price,
       },
       result: price,
       statusCode: 200,
     },
-  )
+  })
 
   // Wait until the cache expires, and the subscription is out
   const duration =
@@ -274,18 +273,17 @@ test.serial('reconnects when url changed', async (t) => {
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
   const testResponse = async (base: string, count: number) => {
-    await testAdapter.startBackgroundExecuteThenGetResponse(
-      t,
-      { base, quote: 'USD' },
-      {
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base, quote: 'USD' },
+      expectedCacheSize: count,
+      expectedResponse: {
         data: {
           result: price,
         },
         result: price,
         statusCode: 200,
       },
-      count,
-    )
+    })
     t.is(connectionCounter, count)
   }
 
@@ -417,17 +415,16 @@ test.serial(
 
     const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-    await testAdapter.startBackgroundExecuteThenGetResponse(
-      t,
-      { base, quote },
-      {
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base, quote },
+      expectedResponse: {
         data: {
           result: price,
         },
         result: price,
         statusCode: 200,
       },
-    )
+    })
 
     // Wait until the cache expires, and the subscription is out
     const duration =
@@ -540,15 +537,14 @@ test.serial('can set reverse mapping and read from it', async (t) => {
   })
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
-  await testAdapter.startBackgroundExecuteThenGetResponse(
-    t,
-    { base, quote },
-    {
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
       data: {
         result: price,
       },
       result: price,
       statusCode: 200,
     },
-  )
+  })
 })

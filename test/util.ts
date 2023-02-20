@@ -263,11 +263,13 @@ export class TestAdapter {
 
   async startBackgroundExecuteThenGetResponse(
     t: ExecutionContext,
-    data: object,
-    expectedResponse?: PartialAdapterResponse & {
-      statusCode: number
+    params: {
+      requestData: object
+      expectedResponse?: PartialAdapterResponse & {
+        statusCode: number
+      }
+      expectedCacheSize?: number
     },
-    expectedCacheSize = 1,
   ) {
     if (!this.clock) {
       throw new Error(
@@ -284,7 +286,7 @@ export class TestAdapter {
     // Expect the first response to time out
     // The polling behavior is tested in the cache tests, so this is easier here.
     // Start the request:
-    const error = await this.request(data)
+    const error = await this.request(params.requestData)
     t.is(error.statusCode, 504)
 
     // Advance clock so that the batch warmer executes once again and wait for the cache to be set
@@ -292,14 +294,14 @@ export class TestAdapter {
     await runAllUntil(this.clock, () => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const cacheSize = this.mockCache!.cache.size
-      return cacheSize >= expectedCacheSize
+      return cacheSize >= (params.expectedCacheSize || 1)
     })
 
     // Second request should find the response in the cache
-    const response = await this.request(data)
+    const response = await this.request(params.requestData)
 
-    if (expectedResponse) {
-      assertEqualResponses(t, response.json(), expectedResponse)
+    if (params.expectedResponse) {
+      assertEqualResponses(t, response.json(), params.expectedResponse)
     } else {
       t.is(response.statusCode, 200)
     }

@@ -195,13 +195,15 @@ test.serial('sends request to DP and returns response', async (t) => {
 
   // Start the adapter
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
-  const response = await testAdapter.startBackgroundExecuteThenGetResponse(t, { from, to })
-  assertEqualResponses(t, response.json(), {
-    data: {
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { from, to },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
       result: price,
+      statusCode: 200,
     },
-    result: price,
-    statusCode: 200,
   })
 })
 
@@ -462,18 +464,17 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
     cache: mockCache,
   })
 
-  await testAdapter.startBackgroundExecuteThenGetResponse(
-    t,
-    {
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: {
       from: 'ERR',
       to,
     },
-    {
+    expectedResponse: {
       errorMessage:
         'Provider request failed with status undefined: "There was an unexpected issue"',
       statusCode: 502,
     },
-  )
+  })
 })
 
 test.serial('requests from different transports are NOT coalesced', async (t) => {
@@ -636,8 +637,10 @@ test.serial('requests for the same transport are coalesced', async (t) => {
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
   await testAdapter.startBackgroundExecuteThenGetResponse(t, {
-    from: 'COALESCE2',
-    to,
+    requestData: {
+      from: 'COALESCE2',
+      to,
+    },
   })
 })
 
