@@ -205,5 +205,5 @@ test.serial('Test redis subscription set (add and getAll)', async (t) => {
 
   // Now that the cache is out and the subscription no longer there, this should time out
   const error = await t.context.testAdapter.request({ from, to })
-  t.is(error?.statusCode, 504)
+  t.is(error.statusCode, 504)
 })

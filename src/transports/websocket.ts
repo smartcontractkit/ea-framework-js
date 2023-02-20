@@ -273,6 +273,16 @@ export class WebSocketTransport<
         ? `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`
         : `Last message was received ${timeSinceLastMessage} ago, exceeding the threshold of ${context.adapterConfig.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}ms, closing connection...`
       logger.info(reason)
+
+      // Check if connection was opened very recently; if so, wait a bit before continuing.
+      // This is so if we just opened the connection and are waiting to receive some messages,
+      // we don't close is immediately after and miss the chance to receive them
+      if (timeSinceConnectionOpened < 1000) {
+        logger.info(
+          `Connection was opened only ${timeSinceConnectionOpened}ms ago, waiting for that to get to 1s before continuing...`,
+        )
+        await sleep(1000 - timeSinceConnectionOpened)
+      }
       this.wsConnection.close()
       connectionClosed = true
 
@@ -295,11 +305,16 @@ export class WebSocketTransport<
       // Need to write this now, otherwise there could be messages sent with values before the open handler finishes
       this.providerDataStreamEstablished = Date.now()
       await this.establishWsConnection(context, urlFromConfig, options)
+      // Now that we successfully opened the connection, we can reset the variables
+      connectionClosed = false
       this.connectionOpenedAt = Date.now()
     }
 
-    if (this.config.builders) {
-      logger.debug('Sending subs/unsubs if there are any')
+    // Send messages only if the connection is open
+    // Otherwise we could encounter the case where we just closed the connection because there's no desired ones,
+    // but without this check we'd attempt to send out all the unsubscribe messages
+    if (!connectionClosed && this.config.builders) {
+      logger.debug('Connection is open, sending subs/unsubs if there are any')
       const { subscribeMessage, unsubscribeMessage } = this.config.builders
       await this.sendMessages(
         context,

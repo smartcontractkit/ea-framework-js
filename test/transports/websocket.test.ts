@@ -1,9 +1,6 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError } from 'axios'
 import { Server, WebSocket } from 'mock-socket'
-import { AddressInfo } from 'net'
-import { expose } from '../../src'
 import { Adapter, AdapterEndpoint, AdapterParams } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import {
@@ -13,7 +10,7 @@ import {
 } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
+import { runAllUntilTime, TestAdapter } from '../util'
 
 interface AdapterRequestParams {
   base: string
@@ -21,6 +18,7 @@ interface AdapterRequestParams {
 }
 
 export const test = untypedTest as TestFn<{
+  testAdapter: TestAdapter
   clock: InstalledClock
 }>
 
@@ -170,50 +168,19 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
     },
   })
 
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-  // Start up adapter
-  const api = await expose(adapter, {
-    cache: mockCache,
-  })
-  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
-
-  const makeRequest = () =>
-    axios.post(address, {
+  await testAdapter.startBackgroundExecuteThenGetResponse(
+    t,
+    { base, quote },
+    {
       data: {
-        base,
-        quote,
+        result: price,
       },
-    })
-
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-  // Advance enough time for the initial request async flow
-  // clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504
-  const error = await errorPromise
-  t.is(error?.response?.status, 504)
-
-  // Advance clock so that the background execute is called once again and wait for the cache to be set
-  const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_WS + 10)
-  await cacheValueSetPromise
-
-  // Second request should find the response in the cache
-  const response = await makeRequest()
-
-  t.is(response.status, 200)
-  assertEqualResponses(t, response.data, {
-    data: {
       result: price,
+      statusCode: 200,
     },
-    result: price,
-    statusCode: 200,
-  })
+  )
 
   // Wait until the cache expires, and the subscription is out
   const duration =
@@ -223,11 +190,15 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
   await runAllUntilTime(t.context.clock, duration)
 
   // Now that the cache is out and the subscription no longer there, this should time out
-  const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)
-  t.is(error2?.response?.status, 504)
-  api?.close()
+  const error2 = await testAdapter.request({
+    base,
+    quote,
+  })
+  t.is(error2.statusCode, 504)
+
+  testAdapter.api.close()
   mockWsServer.close()
-  await t.context.clock.runAllAsync()
+  await t.context.clock.runToLastAsync()
 })
 
 test.serial('reconnects when url changed', async (t) => {
@@ -296,57 +267,35 @@ test.serial('reconnects when url changed', async (t) => {
     defaultEndpoint: 'test',
     endpoints: [webSocketEndpoint],
     envDefaultOverrides: {
-      WS_SUBSCRIPTION_TTL: 120000,
+      WS_SUBSCRIPTION_TTL: 20000,
     },
   })
 
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-  const api = await expose(adapter, { cache: mockCache })
-
-  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
-
-  const makeRequest = (newBase: string) =>
-    axios.post(address, {
-      data: {
-        base: newBase,
-        quote: 'USD',
-      },
-    })
-
-  const fullRequest = async (newBase: string) => {
-    // Expect the first response to time out
-    const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest(newBase))
-    const error = await errorPromise
-    t.is(error?.response?.status, 504)
-
-    // Advance clock so that the background execute is called once again and wait for the cache to be set
-    const cacheValueSetPromise = mockCache.waitForNextSet()
-    await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS + 10)
-    await cacheValueSetPromise
-
-    // Second request should find the response in the cache
-    const response = await makeRequest(newBase)
-    t.is(response.status, 200)
-    assertEqualResponses(t, response.data, {
-      data: {
+  const testResponse = async (base: string, count: number) => {
+    await testAdapter.startBackgroundExecuteThenGetResponse(
+      t,
+      { base, quote: 'USD' },
+      {
+        data: {
+          result: price,
+        },
         result: price,
+        statusCode: 200,
       },
-      result: price,
-      statusCode: 200,
-    })
+      count,
+    )
+    t.is(connectionCounter, count)
   }
 
-  await fullRequest('BTC')
-  t.is(connectionCounter, 1)
-  await fullRequest('ETH')
-  t.is(connectionCounter, 2)
-  await fullRequest('MATIC')
-  t.is(connectionCounter, 3)
+  await testResponse('BTC', 1)
+  await testResponse('ETH', 2)
+  await testResponse('MATIC', 3)
 
-  api?.close()
+  testAdapter.api.close()
   mockWsServer.close()
-  await t.context.clock.runAllAsync()
+  await t.context.clock.runToLastAsync()
 })
 
 test.serial('reconnects if connection becomes unresponsive', async (t) => {
@@ -374,28 +323,13 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
     },
   })
 
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-  const api = await expose(adapter, { cache: mockCache })
-
-  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
-
-  const makeRequest = () =>
-    axios.post(address, {
-      data: {
-        base,
-        quote,
-      },
-    })
-
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-  // Advance enough time for the initial request async flow
-  // Wait for the failed cache get -> instant 504
-  const error = await errorPromise
-  t.is(error?.response?.status, 504)
+  const error = await testAdapter.request({
+    base,
+    quote,
+  })
+  t.is(error.statusCode, 504)
 
   // The WS connection should not send any messages to the EA, so we advance the clock until
   // we reach the point where the EA will consider it unhealthy and reconnect.
@@ -406,9 +340,9 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
   // The subscribe message was sent twice as well, since when we reopened we resubscribed to everything
   t.is(messageCounter, 2)
 
-  api?.close()
+  testAdapter.api.close()
   mockWsServer.close()
-  await t.context.clock.runAllAsync()
+  await t.context.clock.runToLastAsync()
 })
 
 test.serial(
@@ -481,48 +415,19 @@ test.serial(
       },
     })
 
-    const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-    // Start up adapter
-    const api = await expose(adapter, {
-      cache: mockCache,
-    })
-    const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
-
-    const makeRequest = () =>
-      axios.post(address, {
+    await testAdapter.startBackgroundExecuteThenGetResponse(
+      t,
+      { base, quote },
+      {
         data: {
-          base,
-          quote,
+          result: price,
         },
-      })
-
-    // Expect the first response to time out
-    // The polling behavior is tested in the cache tests, so this is easier here.
-    // Start the request:
-    const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-    // Advance enough time for the initial request async flow
-    // clock.tickAsync(10)
-    // Wait for the failed cache get -> instant 504
-    const error = await errorPromise
-    t.is(error?.response?.status, 504)
-
-    // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-    const cacheValueSetPromise = mockCache.waitForNextSet()
-    await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_WS + 10)
-    await cacheValueSetPromise
-
-    // Second request should find the response in the cache
-    const response = await makeRequest()
-
-    t.is(response.status, 200)
-    assertEqualResponses(t, response.data, {
-      data: {
         result: price,
+        statusCode: 200,
       },
-      result: price,
-      statusCode: 200,
-    })
+    )
 
     // Wait until the cache expires, and the subscription is out
     const duration =
@@ -532,9 +437,13 @@ test.serial(
     await runAllUntilTime(t.context.clock, duration)
 
     // Now that the cache is out and the subscription no longer there, this should time out
-    const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)
-    t.is(error2?.response?.status, 504)
-    api?.close()
+    const error = await testAdapter.request({
+      base,
+      quote,
+    })
+    t.is(error.statusCode, 504)
+
+    testAdapter.api.close()
     mockWsServer.close()
     await t.context.clock.runAllAsync()
   },
@@ -630,48 +539,16 @@ test.serial('can set reverse mapping and read from it', async (t) => {
     },
   })
 
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-
-  // Start up adapter
-  const api = await expose(adapter, {
-    cache: mockCache,
-  })
-  const address = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
-
-  const makeRequest = () =>
-    axios.post(address, {
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+  await testAdapter.startBackgroundExecuteThenGetResponse(
+    t,
+    { base, quote },
+    {
       data: {
-        base,
-        quote,
+        result: price,
       },
-    })
-
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-  // Advance enough time for the initial request async flow
-  // clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504
-  const error = await errorPromise
-  t.is(error?.response?.status, 504)
-
-  // Advance clock so that the background execute is called once again and wait for the cache to be set
-  const cacheValueSetPromise = mockCache.waitForNextSet()
-  await t.context.clock.tickAsync(BACKGROUND_EXECUTE_MS_WS + 10)
-  await cacheValueSetPromise
-
-  // Second request should find the response in the cache
-  const response = await makeRequest()
-
-  t.is(response.status, 200)
-  assertEqualResponses(t, response.data, {
-    data: {
       result: price,
+      statusCode: 200,
     },
-    result: price,
-    statusCode: 200,
-  })
+  )
 })

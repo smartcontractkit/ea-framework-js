@@ -57,7 +57,7 @@ nock(URL)
 
 test.serial('Test cache warmer active metric', async (t) => {
   const error = await t.context.testAdapter.request({ from, to })
-  t.is(error?.statusCode, 504)
+  t.is(error.statusCode, 504)
 
   const metricsMap = await t.context.testAdapter.getMetrics()
 

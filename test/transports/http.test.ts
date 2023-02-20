@@ -1,7 +1,7 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { AxiosResponse } from 'axios'
-import { FastifyInstance, LightMyRequestResponse } from 'fastify'
+import { FastifyInstance } from 'fastify'
 import nock from 'nock'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { calculateHttpRequestKey } from '../../src/cache'
@@ -193,34 +193,9 @@ test.serial('sends request to DP and returns response', async (t) => {
     ],
   })
 
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-
   // Start the adapter
-  const testAdapter = await TestAdapter.start(adapter, t.context, {
-    cache: mockCache,
-  })
-
-  const makeRequest = () =>
-    testAdapter.request({
-      from,
-      to,
-    })
-
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-  const error: LightMyRequestResponse = await makeRequest()
-  t.is(error?.statusCode, 504)
-
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  await runAllUntil(t.context.clock, () => mockCache.cache.size > 0)
-
-  // Second request should find the response in the cache
-  const response = await makeRequest()
-
-  t.is(response.statusCode, 200)
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+  const response = await testAdapter.startBackgroundExecuteThenGetResponse(t, { from, to })
   assertEqualResponses(t, response.json(), {
     data: {
       result: price,
@@ -261,16 +236,10 @@ test.serial(
     // Start the adapter
     const testAdapter = await TestAdapter.start(adapter, t.context)
 
-    const makeRequest = () =>
-      testAdapter.request({
-        from,
-        to,
-      })
-
     // Expect the first response to time out
     // The polling behavior is tested in the cache tests, so this is easier here.
-    const error = await makeRequest()
-    t.is(error?.statusCode, 504)
+    const error = await testAdapter.request({ from, to })
+    t.is(error.statusCode, 504)
 
     // Advance the clock a few minutes and check that the amount of calls is as expected
     await runAllUntilTime(t.context.clock, 3 * 60 * 1000) // 4m
@@ -310,15 +279,10 @@ test.serial(
     // Start the adapter
     const testAdapter = await TestAdapter.start(adapter, t.context)
 
-    const makeRequest = () =>
-      testAdapter.request({
-        from,
-        to,
-      })
-
     // Expect the first response to time out
-    const error = await makeRequest()
-    t.is(error?.statusCode, 504)
+    // The polling behavior is tested in the cache tests, so this is easier here.
+    const error = await testAdapter.request({ from, to })
+    t.is(error.statusCode, 504)
 
     // Run for an entire minute and check that the values are as expected
     await runAllUntilTime(t.context.clock, 60 * 1000 + 100)
@@ -498,28 +462,18 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
     cache: mockCache,
   })
 
-  const makeRequest = () =>
-    testAdapter.request({
+  await testAdapter.startBackgroundExecuteThenGetResponse(
+    t,
+    {
       from: 'ERR',
       to,
-    })
-
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  const error = await makeRequest()
-  t.is(error?.statusCode, 504)
-
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  await runAllUntil(t.context.clock, () => mockCache.cache.size > 0)
-
-  // Second request should find the response in the cache
-  const response = await makeRequest()
-
-  t.is(response.statusCode, 502)
-  assertEqualResponses(t, response.json(), {
-    errorMessage: 'Provider request failed with status undefined: "There was an unexpected issue"',
-    statusCode: 502,
-  })
+    },
+    {
+      errorMessage:
+        'Provider request failed with status undefined: "There was an unexpected issue"',
+      statusCode: 502,
+    },
+  )
 })
 
 test.serial('requests from different transports are NOT coalesced', async (t) => {
@@ -584,14 +538,8 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
     ],
   })
 
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-
   // Start the adapter
-  const testAdapter = await TestAdapter.start(adapter, t.context, {
-    cache: mockCache,
-  })
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
   nock(URL)
     .post('/volume', {
@@ -627,7 +575,7 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
   t.is(errorB?.statusCode, 504)
 
   // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  await runAllUntil(t.context.clock, () => mockCache.cache.size > 1)
+  await runAllUntil(t.context.clock, () => testAdapter.mockCache.cache.size > 1)
 
   // Second request should find the response in the cache
   const responseA = await makeRequest('testA')
@@ -684,32 +632,13 @@ test.serial('requests for the same transport are coalesced', async (t) => {
       ],
     })
 
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-
   // Start the adapter
-  const testAdapter = await TestAdapter.start(adapter, t.context, {
-    cache: mockCache,
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    from: 'COALESCE2',
+    to,
   })
-
-  const makeRequest = () =>
-    testAdapter.request({
-      from: 'COALESCE2',
-      to,
-    })
-
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  const error = await makeRequest()
-  t.is(error?.statusCode, 504)
-
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  await runAllUntil(t.context.clock, () => mockCache.cache.size > 0)
-
-  // Second request should find the response in the cache
-  const response = await makeRequest()
-  t.is(response.statusCode, 200)
 })
 
 test.serial(
@@ -764,17 +693,11 @@ test.serial(
         })
     }
 
-    // Create mocked cache so we can listen when values are set
-    // This is a more reliable method than expecting precise clock timings
-    const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-
     // Advance the clock for a second so we can do all this logic and the interval break doesn't occur right in the middle
     t.context.clock.tick(1000)
 
     // Start the adapter
-    const testAdapter = await TestAdapter.start(adapter, t.context, {
-      cache: mockCache,
-    })
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
     const makeRequest = (number: number) =>
       testAdapter.request({
@@ -788,7 +711,7 @@ test.serial(
       // Expect the first response to time out
       // The polling behavior is tested in the cache tests, so this is easier here.
       const error = await makeRequest(number)
-      t.is(error?.statusCode, 504)
+      t.is(error.statusCode, 504)
     }
 
     // Advance clock so that the batch warmer executes

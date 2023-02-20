@@ -1,17 +1,21 @@
-import test from 'ava'
-import FakeTimers from '@sinonjs/fake-timers'
-import axios, { AxiosError, AxiosRequestConfig } from 'axios'
-import { SettingsMap } from '../../src/config'
-import { AddressInfo } from 'net'
-import { expose } from '../../src'
+import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import untypedTest, { TestFn } from 'ava'
+import { AxiosRequestConfig } from 'axios'
+import nock from 'nock'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { SseTransport, SSEConfig } from '../../src/transports'
+import { SettingsMap } from '../../src/config'
+import { SSEConfig, SseTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { assertEqualResponses, MockCache, runAllUntilTime } from '../util'
-import nock from 'nock'
+import { TestAdapter } from '../util'
 const { MockEvent, EventSource } = require('mocksse') // eslint-disable-line
+
 const URL = 'http://test.com'
+
+const test = untypedTest as TestFn<{
+  clock: InstalledClock
+  testAdapter: TestAdapter
+}>
 
 interface AdapterRequestParams {
   base: string
@@ -107,92 +111,6 @@ const adapter = new Adapter({
   },
 })
 
-test('connects to EventSource, subscribes, gets message, unsubscribes and handles misconfigured subscription', async (t) => {
-  const clock = FakeTimers.install()
-
-  // Mocks SSE events which are handled by the mock EventListener dependency
-  mockSSE()
-  mockHTTP()
-
-  const base = 'ETH'
-  const quote = 'USD'
-  const price = 111
-
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  // Also use the mock event source provided by mocksee
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-  // Start up adapter
-  const api = await expose(adapter, {
-    cache: mockCache,
-    eventSource: EventSource,
-  })
-  const address = `http://localhost:${(api?.server?.address() as AddressInfo)?.port}`
-
-  const makeRequest = () =>
-    axios.post(address, {
-      data: {
-        base,
-        quote,
-      },
-    })
-
-  // Expect the first response to time out
-  // The polling behavior is tested in the cache tests, so this is easier here.
-  // Start the request:
-  const earlyErrorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeRequest)
-  // Advance enough time for the initial request async flow
-  // clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504
-  const earlyError = await earlyErrorPromise
-  t.is(earlyError?.response?.status, 504)
-
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  const cacheValueSetPromise = mockCache.waitForNextSet()
-  await runAllUntilTime(clock, BACKGROUND_EXECUTE_MS_SSE + 10)
-  await cacheValueSetPromise
-
-  // Second request should find the response in the cache
-  const response = await makeRequest()
-
-  t.is(response.status, 200)
-  assertEqualResponses(t, response.data, {
-    data: { result: 111 },
-    result: price,
-    statusCode: 200,
-  })
-
-  // Handles misconfigured subscription
-
-  // Make a request for an unsupported ticker symbol
-  const makeBadRequest = () =>
-    axios.post(address, {
-      data: {
-        base: 'NONE',
-        quote: 'USD',
-      },
-    })
-
-  await clock.tickAsync(BACKGROUND_EXECUTE_MS_SSE + 10)
-
-  // Expect the request to fail since the token is invalid
-  const errorPromise: Promise<AxiosError | undefined> = t.throwsAsync(makeBadRequest)
-  // Advance enough time for the initial request async flow
-  // clock.tickAsync(10)
-  // Wait for the failed cache get -> instant 504
-  const error = await errorPromise
-  t.is(error?.response?.status, 504)
-
-  // Wait until the cache expires, and the subscription is out
-  await clock.tickAsync(11000)
-
-  // Now that the cache is out and the subscription no longer there, this should time out
-  const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)
-  t.is(error2?.response?.status, 504)
-
-  clock.uninstall()
-})
-
 const mockSSE = () => {
   const mock = new MockEvent({
     url: URL,
@@ -227,3 +145,49 @@ const mockHTTP = () => {
       message: 'Pong',
     })
 }
+
+test('connects to EventSource, subscribes, gets message, unsubscribes and handles misconfigured subscription', async (t) => {
+  t.context.clock = FakeTimers.install()
+
+  // Mocks SSE events which are handled by the mock EventListener dependency
+  mockSSE()
+  mockHTTP()
+
+  const base = 'ETH'
+  const quote = 'USD'
+  const price = 111
+
+  // Start up adapter
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context, {
+    eventSource: EventSource,
+  })
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(
+    t,
+    { base, quote },
+    {
+      data: { result: 111 },
+      result: price,
+      statusCode: 200,
+    },
+  )
+
+  // Make a request for an unsupported ticker symbol
+  const error = await testAdapter.request({
+    base: 'NONE',
+    quote: 'USD',
+  })
+  t.is(error.statusCode, 504)
+
+  // Wait until the cache expires, and the subscription is out
+  await t.context.clock.tickAsync(11000)
+
+  // Now that the cache is out and the subscription no longer there, this should time out
+  const error2 = await testAdapter.request({
+    base,
+    quote,
+  })
+  t.is(error2.statusCode, 504)
+
+  t.context.clock.uninstall()
+})

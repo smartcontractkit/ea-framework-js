@@ -211,7 +211,11 @@ export class TestAdapter {
     return TestAdapter.start(adapter, context, {
       cache: mockCache,
       ...dependencies,
-    })
+    }) as Promise<
+      TestAdapter & {
+        mockCache: MockCache
+      }
+    >
   }
 
   static async start(
@@ -257,7 +261,14 @@ export class TestAdapter {
     return waitUntilResolved(this.clock, makeRequest)
   }
 
-  async startBackgroundExecuteThenGetResponse(t: ExecutionContext, data: object) {
+  async startBackgroundExecuteThenGetResponse(
+    t: ExecutionContext,
+    data: object,
+    expectedResponse?: PartialAdapterResponse & {
+      statusCode: number
+    },
+    expectedCacheSize = 1,
+  ) {
     if (!this.clock) {
       throw new Error(
         'The "startBackgroundExecuteThenGetResponse" method should only be called if a fake clock is installed',
@@ -274,16 +285,24 @@ export class TestAdapter {
     // The polling behavior is tested in the cache tests, so this is easier here.
     // Start the request:
     const error = await this.request(data)
-    t.is(error?.statusCode, 504)
+    t.is(error.statusCode, 504)
 
     // Advance clock so that the batch warmer executes once again and wait for the cache to be set
     // We disable the non-null assertion because we've already checked for existence in the line above
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    await runAllUntil(this.clock, () => this.mockCache!.cache.size > 0)
+    await runAllUntil(this.clock, () => {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const cacheSize = this.mockCache!.cache.size
+      return cacheSize >= expectedCacheSize
+    })
 
     // Second request should find the response in the cache
     const response = await this.request(data)
-    t.is(response.statusCode, 200)
+
+    if (expectedResponse) {
+      assertEqualResponses(t, response.json(), expectedResponse)
+    } else {
+      t.is(response.statusCode, 200)
+    }
 
     return response
   }

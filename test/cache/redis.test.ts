@@ -53,7 +53,7 @@ test.serial('running adapter throws on cache error', async (t) => {
   }
 
   const error = await t.context.testAdapter.request(data)
-  t.is(error?.statusCode, 500)
+  t.is(error.statusCode, 500)
 })
 
 test.serial('Test cache factory success (redis)', async (t) => {

@@ -73,7 +73,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
           },
         )
       } catch (error) {
-        logger.error(error)
+        logger.error(error, (error as Error).stack)
       }
 
       // This background execute loop is no longer the one to determine the sleep between bg execute calls.

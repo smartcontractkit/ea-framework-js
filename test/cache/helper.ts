@@ -124,6 +124,6 @@ export const cacheTests = () => {
     const error = await t.context.testAdapter.request({
       endpoint: 'nowork',
     })
-    t.is(error?.statusCode, 504)
+    t.is(error.statusCode, 504)
   })
 }
