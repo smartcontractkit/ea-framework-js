@@ -1,17 +1,14 @@
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError } from 'axios'
-import { AddressInfo } from 'net'
-import { expose } from '../src'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../src/adapter'
 import { AdapterConfig } from '../src/config'
 import { AdapterResponse } from '../src/util'
 import { AdapterInputError } from '../src/validation/error'
 import { InputValidator } from '../src/validation/input-validator'
-import { NopTransport, NopTransportTypes } from './util'
 import { validator } from '../src/validation/utils'
+import { NopTransport, NopTransportTypes, TestAdapter } from './util'
 
 const test = untypedTest as TestFn<{
-  serverAddress: string
+  testAdapter: TestAdapter
   adapterEndpoint: AdapterEndpoint<EndpointGenerics>
 }>
 
@@ -38,11 +35,7 @@ test.beforeEach(async (t) => {
   })
 
   t.context.adapterEndpoint = adapter.endpoints[0]
-  const api = await expose(adapter)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
+  t.context.testAdapter = await TestAdapter.start(adapter, t.context)
 })
 
 /**
@@ -52,68 +45,50 @@ test.beforeEach(async (t) => {
 test.serial('any content-type other than application/json throws 400', async (t) => {
   t.context.adapterEndpoint.inputParameters = {}
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, 'test string', {
-      headers: {
-        'Content-Type': 'text/plain',
-      },
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.api.inject({
+    url: '/',
+    method: 'post',
+    payload: 'test string',
+    headers: {
+      'content-type': 'text/plain',
+    },
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('no body in request throws 400', async (t) => {
   t.context.adapterEndpoint.inputParameters = {}
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, '', {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.api.inject({
+    url: '/',
+    method: 'post',
+    payload: '',
+    headers: {
+      'content-type': 'application/json',
+    },
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('invalid endpoint name throws 404', async (t) => {
   t.context.adapterEndpoint.inputParameters = {}
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      endpoint: 'random',
-    }),
-  )
-  t.is(error?.response?.status, 404)
+  const error = await t.context.testAdapter.request({ endpoint: 'random' })
+  t.is(error.statusCode, 404)
 })
 
 test.serial('no endpoint without default throws 400', async (t) => {
   t.context.adapterEndpoint.inputParameters = {}
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {},
-    }),
-  )
-  t.is(error?.response?.status, 400)
-})
-
-test.serial('endpoint in data object', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {}
-
-  const response = await axios.post(`${t.context.serverAddress}`, {
-    data: { endpoint: 'test' },
-  })
-  t.is(response.status, 200)
+  const error = await t.context.testAdapter.request({})
+  t.is(error.statusCode, 400)
 })
 
 test.serial('no params returns 200', async (t) => {
   t.context.adapterEndpoint.inputParameters = {}
 
-  const response = await axios.post(`${t.context.serverAddress}`, {
-    data: {},
-    endpoint: 'test',
-  })
-  t.is(response.status, 200)
+  const response = await t.context.testAdapter.request({ endpoint: 'test' })
+  t.is(response.statusCode, 200)
 })
 
 test.serial('missing required param throws 400', async (t) => {
@@ -127,12 +102,10 @@ test.serial('missing required param throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {},
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('wrongly typed string throws 400', async (t) => {
@@ -146,15 +119,11 @@ test.serial('wrongly typed string throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: 123,
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 123,
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('wrongly typed number throws 400', async (t) => {
@@ -168,15 +137,11 @@ test.serial('wrongly typed number throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: '123',
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: '123',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('wrongly typed boolean throws 400', async (t) => {
@@ -190,15 +155,11 @@ test.serial('wrongly typed boolean throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: '123',
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: '123',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('wrongly typed array throws 400', async (t) => {
@@ -212,15 +173,11 @@ test.serial('wrongly typed array throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: '123',
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: '123',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('wrongly typed object throws 400', async (t) => {
@@ -234,15 +191,11 @@ test.serial('wrongly typed object throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: '123',
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: '123',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('wrongly typed optional param throws 400', async (t) => {
@@ -256,15 +209,11 @@ test.serial('wrongly typed optional param throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: 123,
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 123,
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('param not in options throws 400', async (t) => {
@@ -279,15 +228,11 @@ test.serial('param not in options throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: 'LINK',
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 'LINK',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('missing dependent params throws 400', async (t) => {
@@ -304,16 +249,11 @@ test.serial('missing dependent params throws 400', async (t) => {
   t.context.adapterEndpoint.validator = new InputValidator(
     t.context.adapterEndpoint.inputParameters,
   )
-
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: 'ETH',
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 'ETH',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('presented exclusive params throws 400', async (t) => {
@@ -331,16 +271,12 @@ test.serial('presented exclusive params throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: 'ETH',
-        quote: 'BTC',
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 'ETH',
+    quote: 'USD',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('invalid overrides object throws 400', async (t) => {
@@ -358,18 +294,13 @@ test.serial('invalid overrides object throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: 'OVER2',
-        quote: 'USD',
-        overrides: 'test',
-      },
-      endpoint: 'test',
-    }),
-  )
-
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 'OVER2',
+    quote: 'USD',
+    overrides: 'test',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('invalid overrides key throws 400', async (t) => {
@@ -387,27 +318,22 @@ test.serial('invalid overrides key throws 400', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: 'OVER2',
-        quote: 'USD',
-        overrides: {
-          test: {
-            OVER2: {
-              json: '123',
-            },
-          },
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 'OVER2',
+    quote: 'USD',
+    overrides: {
+      test: {
+        OVER2: {
+          json: '123',
         },
       },
-      endpoint: 'test',
-    }),
-  )
-
-  t.is(error?.response?.status, 400)
+    },
+  })
+  t.is(error.statusCode, 400)
 })
 
-test.serial('correctly typed param returns 200', async (t) => {
+test.serial('correctly typed params returns 200', async (t) => {
   t.context.adapterEndpoint.inputParameters = {
     string: {
       type: 'string',
@@ -434,17 +360,15 @@ test.serial('correctly typed param returns 200', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const response = await axios.post(`${t.context.serverAddress}`, {
-    data: {
-      string: 'test',
-      number: 2,
-      boolean: false,
-      array: [1, 'test'],
-      object: { test: 'test' },
-    },
+  const response = await t.context.testAdapter.request({
     endpoint: 'test',
+    string: 'test',
+    number: 2,
+    boolean: false,
+    array: [1, 'test'],
+    object: { test: 'test' },
   })
-  t.is(response.status, 200)
+  t.is(response.statusCode, 200)
 })
 
 test.serial('omitted optional param returns 200', async (t) => {
@@ -458,11 +382,10 @@ test.serial('omitted optional param returns 200', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const response = await axios.post(`${t.context.serverAddress}`, {
-    data: {},
+  const response = await t.context.testAdapter.request({
     endpoint: 'test',
   })
-  t.is(response.status, 200)
+  t.is(response.statusCode, 200)
 })
 
 test.serial('duplicate params throws 400', async (t) => {
@@ -495,7 +418,6 @@ test.serial('default value is used for optional param', async (t) => {
   )
 
   const data = t.context.adapterEndpoint.validator.validateInput({})
-
   t.is(data['base'], 'ETH')
 })
 
@@ -610,25 +532,19 @@ test.serial('custom input validation', async (t) => {
     t.context.adapterEndpoint.inputParameters,
   )
 
-  const response = await axios.post(`${t.context.serverAddress}`, {
-    data: {
-      base: 'BTC',
-      quote: 'USD',
-    },
+  const response = await t.context.testAdapter.request({
+    base: 'BTC',
+    quote: 'USD',
     endpoint: 'test',
   })
-  t.is(response.status, 200)
+  t.is(response.statusCode, 200)
 
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, {
-      data: {
-        base: 'BTC',
-        quote: 'BTC',
-      },
-      endpoint: 'test',
-    }),
-  )
-  t.is(error?.response?.status, 400)
+  const error = await t.context.testAdapter.request({
+    base: 'BTC',
+    quote: 'BTC',
+    endpoint: 'test',
+  })
+  t.is(error.statusCode, 400)
 })
 
 test.serial('limit size of input parameters', async (t) => {
@@ -656,13 +572,6 @@ test.serial('limit size of input parameters', async (t) => {
   })
 
   t.context.adapterEndpoint = adapter.endpoints[0]
-
-  const api = await expose(adapter)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
-
   t.context.adapterEndpoint.inputParameters = {
     addresses: {
       type: 'array',
@@ -674,20 +583,15 @@ test.serial('limit size of input parameters', async (t) => {
   )
 
   const request = {
-    data: {
-      addresses: [
-        '0x933ad9491b62059dd065b560d256d8957a8c402cc6e8d8ee7290ae11e8f7329267a8811c397529dac52ae1342ba58c95',
-      ],
-    },
+    addresses: [
+      '0x933ad9491b62059dd065b560d256d8957a8c402cc6e8d8ee7290ae11e8f7329267a8811c397529dac52ae1342ba58c95',
+    ],
   }
 
   for (let i = 0; i < 14; i++) {
-    request.data.addresses = request.data.addresses.concat(request.data.addresses)
+    request.addresses = request.addresses.concat(request.addresses)
   }
-
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(`${t.context.serverAddress}`, request),
-  )
-  t.is(error?.response?.status, 413)
-  t.is(error?.response?.data, 'Request body is too large')
+  const error = await t.context.testAdapter.request(request)
+  t.is(error.statusCode, 413)
+  t.is(error.body, 'Request body is too large')
 })
