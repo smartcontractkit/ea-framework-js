@@ -263,10 +263,6 @@ export const BaseSettings = {
     default: 300,
     validate: validator.integer({ min: 150, max: 500 }),
   },
-  SMOKE_TEST_PAYLOAD_FILE_NAME: {
-    description: 'Name of the test payload file used for the smoke endpoint',
-    type: 'string',
-  },
   MTLS_ENABLED: {
     description: 'Flag to specify whether mutual TLS/SSL is enabled or not',
     type: 'boolean',
