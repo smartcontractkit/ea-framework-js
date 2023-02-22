@@ -112,10 +112,10 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
 ): Promise<FastifyInstance | undefined> => {
   const { api, metricsApi } = await start(adapter, dependencies)
 
-  const exposeApp = async (app: FastifyInstance | undefined, host: string, port: number) => {
+  const exposeApp = async (app: FastifyInstance | undefined, port: number) => {
     if (app) {
       try {
-        await app.listen({ port, host })
+        await app.listen({ port, host: adapter.config.EA_HOST })
       } catch (err) {
         logger.fatal(`There was an error when starting the server: ${err}`)
         process.exit()
@@ -125,13 +125,9 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
     }
   }
 
-  const metricsUrl = adapter.config.METRICS_USE_BASE_URL
-    ? join(adapter.config.BASE_URL, 'metrics')
-    : '/metrics'
-
   // Start listening for incoming requests
-  await exposeApp(api, adapter.config.EA_HOST, adapter.config.EA_PORT)
-  await exposeApp(metricsApi, metricsUrl, adapter.config.METRICS_PORT)
+  await exposeApp(api, adapter.config.EA_PORT)
+  await exposeApp(metricsApi, adapter.config.METRICS_PORT)
 
   // We return only the main API to maintain backwards compatibility
   return api
