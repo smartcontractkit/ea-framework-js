@@ -6,7 +6,6 @@ import { callBackgroundExecutes } from './background-executor'
 import { AdapterConfig, SettingsMap } from './config'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
 import { AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
-import { loadTestPayload } from './util/test-payload-loader'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
 
 export { FastifyInstance as ServerInstance }
@@ -175,46 +174,5 @@ async function buildRestApi(adapter: Adapter) {
     }
   })
 
-  // Add smoke endpoint after middleware which are needed for tests
-  buildSmokeEndpoint(app, adapter.config)
   return app
-}
-
-/**
- * Adds the /smoke endpoint to the API for smoke testing the adapter
- *
- * @param app - the Fastify instance
- * @param config - the initialized adapter config
- */
-function buildSmokeEndpoint(app: FastifyInstance, config: AdapterConfig) {
-  app.get(join(config.BASE_URL, 'smoke'), async (_, res) => {
-    const testPayload = loadTestPayload(config.SMOKE_TEST_PAYLOAD_FILE_NAME)
-    if (testPayload.isDefault) {
-      return res.status(200).send('OK')
-    }
-
-    const errors = []
-    for (const index in testPayload.requests) {
-      try {
-        const request = { id: index, data: testPayload.requests[index] }
-        // Use Fastify's app inject to pass smoke requests internally
-        const response = await app.inject({
-          method: 'POST',
-          url: '/',
-          payload: request,
-        })
-        const parsedResponse = JSON.parse(response.body)
-        // Throw error if not 2xx status code
-        if (parsedResponse.statusCode < 200 || parsedResponse.statusCode > 299) {
-          throw Error('Smoke test request failed')
-        }
-      } catch (e: unknown) {
-        errors.push(e)
-      }
-    }
-    if (errors.length > 0) {
-      return res.status(500).send(errors)
-    }
-    return res.status(200).send('OK')
-  })
 }

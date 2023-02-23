@@ -123,7 +123,7 @@ export const adapter = new Adapter({
 
 ## Test Payload
 
-The test payload is not specified as a parameter for an adapter. It is defined in the `test-payload.json` file in the root-level of the adapter folder. It is used by the `/smoke` endpoint of the adapter to test if basic requests to the adapter are functioning as expected. An example of this file is shown below.
+The test payload is not specified as a parameter for an adapter. It is defined in the `test-payload.json` file in the root-level of the adapter folder. It is used for soak testing the adapter. An example of this file is shown below.
 
 ```json
 {
