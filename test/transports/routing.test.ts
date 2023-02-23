@@ -403,10 +403,8 @@ test.serial('RoutingTransport can route to SSE transport', async (t) => {
 })
 
 test.serial('custom router is applied to get valid transport to route to', async (t) => {
-  const transport = new RoutingTransport<BaseEndpointTypes>(transports, {
-    customRouter: () => {
-      return 'batch'
-    },
+  const transport = new RoutingTransport<BaseEndpointTypes>(transports, () => {
+    return 'batch'
   })
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
@@ -465,10 +463,8 @@ test.serial('custom router is applied to get valid transport to route to', async
 })
 
 test.serial('custom router returns invalid transport and request fails', async (t) => {
-  const transport = new RoutingTransport<BaseEndpointTypes>(transports, {
-    customRouter: () => {
-      return 'qweqwe'
-    },
+  const transport = new RoutingTransport<BaseEndpointTypes>(transports, () => {
+    return 'qweqwe'
   })
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
@@ -589,14 +585,13 @@ test.serial('missing transport in input params with no default fails request', a
 })
 
 test.serial('missing transport in input params with default succeeds', async (t) => {
-  const transport = new RoutingTransport<BaseEndpointTypes>(transports, {
-    defaultTransport: 'batch',
-  })
+  const transport = new RoutingTransport<BaseEndpointTypes>(transports)
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters: {
       ...inputParameters,
       transport: {
         ...inputParameters.transport,
+        default: 'batch',
         required: false,
       },
     },
@@ -664,13 +659,4 @@ test.serial('transport creation fails if transport names are not acceptable', as
         }),
     )
   }
-})
-
-test.serial('transport creation fails if default transport is not in transports map', async (t) => {
-  t.throws(
-    () =>
-      new RoutingTransport<BaseEndpointTypes>(transports, {
-        defaultTransport: 'asd',
-      }),
-  )
 })
