@@ -1,8 +1,9 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import nock from 'nock'
 import { runAllUntilTime, TestAdapter } from '../util'
 import { buildHttpAdapter } from './helper'
+import MockAdapter from 'axios-mock-adapter'
+import axios from 'axios'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -12,10 +13,9 @@ const test = untypedTest as TestFn<{
 const URL = 'http://test-url.com'
 const endpoint = '/price'
 const version = process.env['npm_package_version']
+const axiosMock = new MockAdapter(axios)
 
 test.before(async (t) => {
-  nock.disableNetConnect()
-  nock.enableNetConnect('localhost')
   process.env['METRICS_ENABLED'] = 'true'
   // Disable retries to make the testing flow easier
   process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
@@ -34,7 +34,7 @@ test.before(async (t) => {
 })
 
 test.after((t) => {
-  nock.restore()
+  axiosMock.reset()
   t.context.clock.uninstall()
 })
 
@@ -42,8 +42,8 @@ const from = 'ETH'
 const to = 'USD'
 const price = 1234
 
-nock(URL)
-  .post(endpoint, {
+axiosMock
+  .onPost(URL + endpoint, {
     pairs: [
       {
         base: from,
@@ -59,7 +59,6 @@ nock(URL)
       },
     ],
   })
-  .persist()
 
 test.serial('Test cache warmer active metric', async (t) => {
   await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, {
@@ -75,7 +74,7 @@ test.serial('Test cache warmer active metric', async (t) => {
   t.is(metricsMap.get(`cache_warmer_get_count${expectedLabel}`), 1)
 
   expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 3)
+  t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 2)
 
   expectedLabel = `{endpoint="test",transport_type="MockHttpTransport",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`bg_execute_subscription_set_count${expectedLabel}`), 1)

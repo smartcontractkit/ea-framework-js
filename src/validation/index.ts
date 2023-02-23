@@ -121,8 +121,12 @@ export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: Fa
 
   // Add the request context to the error so that we can check things like incoming params, endpoint, etc
   const errorWithContext = {
-    requestContext: req.requestContext,
-    ...err,
+    ...req.requestContext,
+    error: {
+      name: err.name,
+      stack: err.stack,
+      message: err.message,
+    },
   }
 
   if (err instanceof AdapterTimeoutError) {

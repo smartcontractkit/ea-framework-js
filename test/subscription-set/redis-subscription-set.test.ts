@@ -1,13 +1,13 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import { AxiosResponse } from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import Redis, { ScanStream } from 'ioredis'
-import nock from 'nock'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { assertEqualResponses, runAllUntilTime, TestAdapter } from '../util'
+import MockAdapter from 'axios-mock-adapter'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -34,9 +34,9 @@ class RedisMock {
   }
   async zremrangebyscore(): Promise<void> {
     const expiredEntries = Array.from(this.store.entries()).filter(
-      ([key, ttl]) => Number(ttl) < Date.now(),
+      ([_, ttl]) => Number(ttl) < Date.now(),
     )
-    expiredEntries.forEach(([key, ttl]) => {
+    expiredEntries.forEach(([key, _]) => {
       this.store.delete(key)
     })
   }
@@ -66,6 +66,7 @@ interface ProviderResponseBody {
 }
 
 const URL = 'https://test.chainlink.com'
+const axiosMock = new MockAdapter(axios)
 
 type BatchEndpointTypes = {
   Request: {
@@ -142,8 +143,8 @@ const from = 'ETH'
 const to = 'USD'
 const price = 1234
 
-nock(URL)
-  .post('/price', {
+axiosMock
+  .onPost(`${URL}/price`, {
     pairs: [
       {
         base: from,
@@ -159,9 +160,8 @@ nock(URL)
       },
     ],
   })
-  .persist()
 
-test.before(async (t) => {
+test.before(async (_) => {
   process.env['CACHE_TYPE'] = 'redis'
   // So that we don't have to wait that long in the test for the subscription to expire
   process.env['WARMUP_SUBSCRIPTION_TTL'] = '5000'
