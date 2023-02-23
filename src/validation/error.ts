@@ -85,8 +85,15 @@ export class AdapterInputError extends AdapterError {
   }
 }
 export class AdapterRateLimitError extends AdapterError {
-  constructor(input: Partial<AdapterError>) {
+  msUntilNextExecution: number
+
+  constructor(
+    input: Partial<AdapterError> & {
+      msUntilNextExecution?: number
+    },
+  ) {
     super({ ...input, metricsLabel: HttpRequestType.RATE_LIMIT_ERROR })
+    this.msUntilNextExecution = input.msUntilNextExecution ?? 0
   }
 }
 export class AdapterTimeoutError extends AdapterError {

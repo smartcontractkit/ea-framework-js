@@ -1,11 +1,8 @@
 import Redis from 'ioredis'
-import { AddressInfo } from 'ws'
-import { expose } from '../../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { CacheFactory, RedisCache } from '../../src/cache'
-import { NopTransport, RedisMock } from '../util'
+import { NopTransport, RedisMock, TestAdapter } from '../util'
 import { BasicCacheSetterTransport, buildDiffResultAdapter, cacheTests, test } from './helper'
-import axios, { AxiosError } from 'axios'
 
 test.beforeEach(async (t) => {
   const adapter = new Adapter({
@@ -44,11 +41,7 @@ test.beforeEach(async (t) => {
   }
 
   t.context.cache = cache
-  const api = await expose(adapter, dependencies)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
+  t.context.testAdapter = await TestAdapter.start(adapter, t.context, dependencies)
 })
 
 cacheTests()
@@ -59,10 +52,8 @@ test.serial('running adapter throws on cache error', async (t) => {
     factor: 123,
   }
 
-  const error: AxiosError | undefined = await t.throwsAsync(
-    axios.post(`${t.context.serverAddress}`, { data }),
-  )
-  t.is(error?.response?.status, 500)
+  const error = await t.context.testAdapter.request(data)
+  t.is(error.statusCode, 500)
 })
 
 test.serial('Test cache factory success (redis)', async (t) => {
@@ -96,29 +87,20 @@ test.serial('Test cache key collision across adapters', async (t) => {
   }
 
   t.context.cache = cache
-  const apiA = await expose(adapterA, dependencies)
-  if (!apiA) {
-    throw 'Server did not start'
-  }
-  const addressA = `http://localhost:${(apiA.server.address() as AddressInfo).port}`
-
-  const apiB = await expose(adapterB, dependencies)
-  if (!apiB) {
-    throw 'Server did not start'
-  }
-  const addressB = `http://localhost:${(apiB.server.address() as AddressInfo).port}`
+  const testAdapterA = await TestAdapter.start(adapterA, t.context, dependencies)
+  const testAdapterB = await TestAdapter.start(adapterB, t.context, dependencies)
 
   const data = {
     base: 'eth',
   }
 
   // Populate cache
-  await axios.post(`${addressA}`, { data })
-  await axios.post(`${addressB}`, { data })
+  await testAdapterA.request(data)
+  await testAdapterB.request(data)
 
   // Get results from cache to ensure the cache key is not returning the same response for both adapters
-  const cacheResponseA = await axios.post(`${addressA}`, { data })
-  const cacheResponseB = await axios.post(`${addressB}`, { data })
+  const cacheResponseA = await testAdapterA.request(data)
+  const cacheResponseB = await testAdapterB.request(data)
 
-  t.not(cacheResponseA.data.result, cacheResponseB.data.result)
+  t.not(cacheResponseA.json().result, cacheResponseB.json().result)
 })

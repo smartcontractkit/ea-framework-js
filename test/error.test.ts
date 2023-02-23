@@ -1,7 +1,4 @@
-import test from 'ava'
-import axios, { AxiosError } from 'axios'
-import { AddressInfo } from 'net'
-import { expose } from '../src'
+import untypedTest, { ExecutionContext, TestFn } from 'ava'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
 import { AdapterResponse, ResponseTimestamps } from '../src/util'
 import {
@@ -13,19 +10,26 @@ import {
   AdapterRateLimitError,
   AdapterTimeoutError,
 } from '../src/validation/error'
-import { assertEqualResponses, NopTransport, NopTransportTypes } from './util'
+import { assertEqualResponses, NopTransport, NopTransportTypes, TestAdapter } from './util'
 
-const makeAdapter = async (endpoint: AdapterEndpoint<NopTransportTypes>): Promise<string> => {
+type TestContext = {
+  testAdapter: TestAdapter
+  adapterEndpoint: AdapterEndpoint<NopTransportTypes>
+}
+const test = untypedTest as TestFn<TestContext>
+
+const makeAdapter = async (
+  endpoint: AdapterEndpoint<NopTransportTypes>,
+  context: ExecutionContext<TestContext>['context'],
+) => {
   const adapter = new Adapter({
     name: 'TEST',
+    defaultEndpoint: 'test',
     endpoints: [endpoint],
   })
 
-  const api = await expose(adapter)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  return `http://localhost:${(api.server.address() as AddressInfo).port}`
+  context.testAdapter = await TestAdapter.start(adapter, context)
+  return context.testAdapter
 }
 
 test('Non AdapterError exception returns 500', async (t) => {
@@ -39,17 +43,10 @@ test('Non AdapterError exception returns 500', async (t) => {
     })(),
   })
 
-  const address = await makeAdapter(endpoint)
-
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(address, {
-      data: {},
-      endpoint: 'test',
-    }),
-  )
-
-  t.is(error?.response?.status, 500)
-  t.is(error?.response?.data, 'Test error')
+  const testAdapter = await makeAdapter(endpoint, t.context)
+  const error = await testAdapter.request({})
+  t.is(error.statusCode, 500)
+  t.is(error.body, 'Test error')
 })
 
 test('Non AdapterError exception returns 500 with default message', async (t) => {
@@ -63,17 +60,10 @@ test('Non AdapterError exception returns 500 with default message', async (t) =>
     })(),
   })
 
-  const address = await makeAdapter(endpoint)
-
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(address, {
-      data: {},
-      endpoint: 'test',
-    }),
-  )
-
-  t.is(error?.response?.status, 500)
-  t.is(error?.response?.data, 'There was an unexpected error in the adapter.')
+  const testAdapter = await makeAdapter(endpoint, t.context)
+  const error = await testAdapter.request({})
+  t.is(error.statusCode, 500)
+  t.is(error.body, 'There was an unexpected error in the adapter.')
 })
 
 test('Adapter error returns default status of 500', async (t) => {
@@ -87,17 +77,10 @@ test('Adapter error returns default status of 500', async (t) => {
     })(),
   })
 
-  const address = await makeAdapter(endpoint)
-
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(address, {
-      data: {},
-      endpoint: 'test',
-    }),
-  )
-
-  t.is(error?.response?.status, 500)
-  t.deepEqual(error?.response?.data, {
+  const testAdapter = await makeAdapter(endpoint, t.context)
+  const error = await testAdapter.request({})
+  t.is(error.statusCode, 500)
+  t.deepEqual(error.json(), {
     error: {
       message: 'Expected error, returning 500',
       name: 'AdapterError',
@@ -124,15 +107,10 @@ test('Adapter error returns specified 200, with accompanying provider status cod
     })(),
   })
 
-  const address = await makeAdapter(endpoint)
-
-  const response = await axios.post(address, {
-    data: {},
-    endpoint: 'test',
-  })
-
-  t.is(response.status, 200)
-  t.deepEqual(response.data, {
+  const testAdapter = await makeAdapter(endpoint, t.context)
+  const error = await testAdapter.request({})
+  t.is(error.statusCode, 200)
+  t.deepEqual(error.json(), {
     error: {
       message: 'Expected error, returning 200',
       name: 'AdapterError',
@@ -182,17 +160,10 @@ test('Adapter returns error when transport returns response with error message',
     })(),
   })
 
-  const address = await makeAdapter(endpoint)
-
-  const error: AxiosError | undefined = await t.throwsAsync(() =>
-    axios.post(address, {
-      data: {},
-      endpoint: 'test',
-    }),
-  )
-
-  t.is(error?.response?.status, 502)
-  assertEqualResponses(t, error?.response?.data as AdapterResponse, {
+  const testAdapter = await makeAdapter(endpoint, t.context)
+  const error = await testAdapter.request({})
+  t.is(error.statusCode, 502)
+  assertEqualResponses(t, error.json(), {
     statusCode: 502,
     errorMessage: 'test error message',
   })

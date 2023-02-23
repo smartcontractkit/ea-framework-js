@@ -1,5 +1,5 @@
 import test from 'ava'
-import { expose } from '../src'
+import { start } from '../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../src/adapter'
 import {
   buildRateLimitTiersFromConfig,
@@ -24,7 +24,7 @@ test('empty tiers in rate limiting fails on startup', async (t) => {
     },
   })
 
-  await t.throwsAsync(async () => expose(adapter), {
+  await t.throwsAsync(async () => start(adapter), {
     message: 'The tiers object is defined, but has no entries',
   })
 })
@@ -54,7 +54,7 @@ test('selected tier is not a valid option', async (t) => {
     },
   })
 
-  await t.throwsAsync(async () => expose(adapter), {
+  await t.throwsAsync(async () => start(adapter), {
     message: 'The selected rate limit tier "asdasdasd" is not valid (can be one of "free", "pro")',
   })
 })
@@ -178,7 +178,7 @@ test('uses most restrictive tier if none is specified in settings', async (t) =>
     },
   })
 
-  await expose(adapter)
+  await start(adapter)
 })
 
 test('uses unlimited tier if none is specified in settings', async (t) => {
@@ -201,7 +201,7 @@ test('uses unlimited tier if none is specified in settings', async (t) => {
     ],
   })
 
-  await expose(adapter)
+  await start(adapter)
 })
 
 test('uses specified tier if present in settings', async (t) => {
@@ -242,7 +242,7 @@ test('uses specified tier if present in settings', async (t) => {
     },
   })
 
-  await expose(adapter)
+  await start(adapter)
 })
 
 test('test build rate limits from env vars (second, minute)', async (t) => {

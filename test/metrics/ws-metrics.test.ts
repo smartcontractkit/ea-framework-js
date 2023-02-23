@@ -1,21 +1,17 @@
-import FakeTimers from '@sinonjs/fake-timers'
+import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import axios, { AxiosError } from 'axios'
 import { Server, WebSocket } from 'mock-socket'
-import { AddressInfo } from 'net'
-import { expose } from '../../src'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { MockCache, runAllUntilTime } from '../util'
-import { parsePromMetrics } from './helper'
+import { TestAdapter } from '../util'
 
 export const test = untypedTest as TestFn<{
-  serverAddress: string
-  cache: MockCache
   adapterEndpoint: AdapterEndpoint<WebSocketEndpointTypes>
+  testAdapter: TestAdapter
   server: Server
+  clock: InstalledClock
 }>
 
 interface AdapterRequestParams {
@@ -127,8 +123,6 @@ export const webSocketEndpoint = new AdapterEndpoint({
 const CACHE_MAX_AGE = 10000
 
 process.env['METRICS_ENABLED'] = 'true'
-// Set unique port between metrics tests to avoid conflicts in metrics servers
-process.env['METRICS_PORT'] = '9093'
 // Disable retries to make the testing flow easier
 process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 
@@ -143,8 +137,6 @@ const adapter = new Adapter({
     BACKGROUND_EXECUTE_MS_WS,
   },
 })
-
-const clock = FakeTimers.install()
 
 test.before(async (t) => {
   // Mock WS
@@ -165,47 +157,25 @@ test.before(async (t) => {
     socket.on('message', parseMessage)
   })
 
-  // Create mocked cache so we can listen when values are set
-  // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
-
-  // Start up adapter
-  const api = await expose(adapter, {
-    cache: mockCache,
-  })
-  t.context.serverAddress = `http://localhost:${(api?.server.address() as AddressInfo)?.port}`
-  t.context.cache = mockCache
+  t.context.clock = FakeTimers.install()
+  t.context.testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
   t.context.server = mockWsServer
 })
 
-test.after(async () => {
-  clock.uninstall()
+test.after(async (t) => {
+  t.context.clock.uninstall()
 })
 
 test.serial('Test WS connection, subscription, and message metrics', async (t) => {
-  const makeRequest = () =>
-    axios.post(t.context.serverAddress, {
-      data: {
-        base,
-        quote,
-      },
-    })
-
-  // Expect the first response to time out
-  const error = (await t.throwsAsync(makeRequest)) as AxiosError | undefined
-  t.is(error?.response?.status, 504)
-
-  // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-  await runAllUntilTime(clock, BACKGROUND_EXECUTE_MS_WS + 10)
-
-  // Second request should find the response in the cache
-  let response = await makeRequest()
-  t.is(response.status, 200)
+  await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: {
+      base,
+      quote,
+    },
+  })
 
   // Check connection, subscription active, subscription total, and message total metrics when subscribed to feed
-  const metricsAddress = `http://localhost:${process.env['METRICS_PORT']}/metrics`
-  response = await axios.get(metricsAddress)
-  let metricsMap = parsePromMetrics(response.data)
+  const metricsMap = await t.context.testAdapter.getMetrics()
 
   const basic = `app_name="TEST",app_version="${version}"`
   const feed = `feed_id="{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}",subscription_key="test-{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}"`
@@ -229,7 +199,7 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   }
 
   // Wait until the cache expires, and the subscription is out
-  await clock.tickAsync(
+  await t.context.clock.tickAsync(
     Math.ceil(CACHE_MAX_AGE / adapter.config.WS_SUBSCRIPTION_TTL) *
       adapter.config.WS_SUBSCRIPTION_TTL *
       2 +
@@ -237,26 +207,24 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   )
 
   // Now that the cache is out and the subscription no longer there, this should time out
-  const error2: AxiosError | undefined = await t.throwsAsync(makeRequest)
-  t.is(error2?.response?.status, 504)
+  const error2 = await t.context.testAdapter.request({ base, quote })
+  t.is(error2?.statusCode, 504)
 
   // Check connection, subscription active, subscription total, and message total metrics when unsubscribed from feed
-  response = await axios.get(metricsAddress)
-  metricsMap = parsePromMetrics(response.data)
+  const metricsMap2 = await t.context.testAdapter.getMetrics()
 
-  t.is(metricsMap.get(`ws_connection_active{${basic}}`), 1)
-  t.is(metricsMap.get(`ws_subscription_active{${feed},${basic}}`), 0)
-  t.is(metricsMap.get(`ws_subscription_total{${feed},${basic}}`), 1)
-  t.is(metricsMap.get(`ws_message_total{${feed},direction="sent",${basic}}`), 2)
-  t.is(metricsMap.get(`ws_message_total{direction="received",${basic}}`), 1)
+  t.is(metricsMap2.get(`ws_connection_active{${basic}}`), 1)
+  t.is(metricsMap2.get(`ws_subscription_active{${feed},${basic}}`), 0)
+  t.is(metricsMap2.get(`ws_subscription_total{${feed},${basic}}`), 1)
+  t.is(metricsMap2.get(`ws_message_total{${feed},direction="sent",${basic}}`), 2)
+  t.is(metricsMap2.get(`ws_message_total{direction="received",${basic}}`), 1)
 
   t.context.server.close()
 
   // Check connection metric after connection closed
-  response = await axios.get(metricsAddress)
-  metricsMap = parsePromMetrics(response.data)
+  const metricsMap3 = await t.context.testAdapter.getMetrics()
 
-  t.is(metricsMap.get(`ws_connection_active{${basic}}`), 0)
-  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 6)
-  t.is(metricsMap.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 0)
+  t.is(metricsMap3.get(`ws_connection_active{${basic}}`), 0)
+  t.is(metricsMap3.get(`bg_execute_total{${endpoint},${basic}}`), 5)
+  t.is(metricsMap3.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 0)
 })

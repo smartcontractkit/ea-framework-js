@@ -1,8 +1,6 @@
-import { AddressInfo } from 'ws'
-import { expose } from '../../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { CacheFactory, LocalCache } from '../../src/cache'
-import { NopTransport } from '../util'
+import { NopTransport, TestAdapter } from '../util'
 import { BasicCacheSetterTransport, cacheTests, test } from './helper'
 
 test.beforeEach(async (t) => {
@@ -42,11 +40,7 @@ test.beforeEach(async (t) => {
   }
 
   t.context.cache = cache
-  const api = await expose(adapter, dependencies)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  t.context.serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
+  t.context.testAdapter = await TestAdapter.start(adapter, t.context, dependencies)
 })
 
 cacheTests()

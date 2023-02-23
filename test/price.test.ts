@@ -1,7 +1,5 @@
-import untypedTest, { TestFn } from 'ava'
-import axios from 'axios'
-import { AddressInfo } from 'net'
-import { expose } from '../src'
+import untypedTest, { ExecutionContext, TestFn } from 'ava'
+import { start } from '../src'
 import {
   AdapterEndpoint,
   CryptoPriceEndpoint,
@@ -14,9 +12,12 @@ import { ResponseCache } from '../src/cache/response'
 import { SettingsMap } from '../src/config'
 import { Transport } from '../src/transports'
 import { AdapterRequest, AdapterResponse } from '../src/util'
-import { NopTransport } from './util'
+import { NopTransport, TestAdapter } from './util'
 
-const test = untypedTest as TestFn
+type TestContext = {
+  testAdapter: TestAdapter
+}
+const test = untypedTest as TestFn<TestContext>
 
 type PriceTestTypes = {
   Request: {
@@ -51,9 +52,10 @@ class PriceTestTransport implements Transport<PriceTestTypes> {
 }
 
 const buildAdapter = async (
+  context: ExecutionContext<TestContext>['context'],
   mockResponse: (req: AdapterRequest) => AdapterResponse<PriceTestTypes['Response']>,
   includes?: IncludesFile,
-): Promise<string> => {
+) => {
   const adapter = new PriceAdapter({
     name: 'TEST',
     endpoints: [
@@ -66,11 +68,8 @@ const buildAdapter = async (
     includes,
   })
 
-  const api = await expose(adapter)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  return `http://localhost:${(api.server.address() as AddressInfo).port}`
+  context.testAdapter = await TestAdapter.start(adapter, context)
+  return context.testAdapter
 }
 
 test('price adapter fails to start if no price endpoint is defined', async (t) => {
@@ -109,18 +108,18 @@ test('does not invert result if no includes are present', async (t) => {
     quote: 'BTC',
   }
 
-  const serverAddress = await buildAdapter((req) => {
+  const testAdapter = await buildAdapter(t.context, (req) => {
     t.deepEqual(req.requestContext.data, data)
 
     return mockResponse
   })
 
-  const response = await axios.post(serverAddress, {
+  const response = await testAdapter.request({
+    ...data,
     endpoint: 'test',
-    data,
   })
-  t.is(response.status, 200)
-  t.is(response.data.result, mockResponse.result)
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, mockResponse.result)
 })
 
 test('does not invert result if no includes match', async (t) => {
@@ -154,18 +153,22 @@ test('does not invert result if no includes match', async (t) => {
     quote: 'BTC',
   }
 
-  const serverAddress = await buildAdapter((req) => {
-    t.deepEqual(req.requestContext.data, data)
+  const testAdapter = await buildAdapter(
+    t.context,
+    (req) => {
+      t.deepEqual(req.requestContext.data, data)
 
-    return mockResponse
-  }, includes)
+      return mockResponse
+    },
+    includes,
+  )
 
-  const response = await axios.post(serverAddress, {
+  const response = await testAdapter.request({
+    ...data,
     endpoint: 'test',
-    data,
   })
-  t.is(response.status, 200)
-  t.is(response.data.result, mockResponse.result)
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, mockResponse.result)
 })
 
 test('inverts result if matching includes are present in request', async (t) => {
@@ -199,21 +202,25 @@ test('inverts result if matching includes are present in request', async (t) => 
     quote: 'BTC',
   }
 
-  const serverAddress = await buildAdapter((req) => {
-    t.deepEqual(req.requestContext.data, {
-      base: 'BTC',
-      quote: 'ETH',
-    })
+  const testAdapter = await buildAdapter(
+    t.context,
+    (req) => {
+      t.deepEqual(req.requestContext.data, {
+        base: 'BTC',
+        quote: 'ETH',
+      })
 
-    return mockResponse
-  }, includes)
+      return mockResponse
+    },
+    includes,
+  )
 
-  const response = await axios.post(serverAddress, {
+  const response = await testAdapter.request({
+    ...data,
     endpoint: 'test',
-    data,
   })
-  t.is(response.status, 200)
-  t.is(response.data.result, 1234)
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, 1234)
 })
 
 test('does not invert result if inverse pair sent directly', async (t) => {
@@ -247,21 +254,25 @@ test('does not invert result if inverse pair sent directly', async (t) => {
     quote: 'ETH',
   }
 
-  const serverAddress = await buildAdapter((req) => {
-    t.deepEqual(req.requestContext.data, {
-      base: 'BTC',
-      quote: 'ETH',
-    })
+  const testAdapter = await buildAdapter(
+    t.context,
+    (req) => {
+      t.deepEqual(req.requestContext.data, {
+        base: 'BTC',
+        quote: 'ETH',
+      })
 
-    return mockResponse
-  }, includes)
+      return mockResponse
+    },
+    includes,
+  )
 
-  const response = await axios.post(serverAddress, {
+  const response = await testAdapter.request({
+    ...data,
     endpoint: 'test',
-    data,
   })
-  t.is(response.status, 200)
-  t.is(response.data.result, 1 / 1234)
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, 1 / 1234)
 })
 
 test('crypto price endpoint has common aliases', async (t) => {
@@ -292,19 +303,12 @@ test('crypto price endpoint has common aliases', async (t) => {
     ],
   })
 
-  const api = await expose(adapter)
-  if (!api) {
-    throw 'Server did not start'
-  }
-  const serverAddress = `http://localhost:${(api.server.address() as AddressInfo).port}`
+  const testAdapter = await TestAdapter.start(adapter, t.context)
 
   for (const endpoint of ['price', 'crypto']) {
-    const response = await axios.post(serverAddress, {
-      endpoint,
-      data,
-    })
-    t.is(response.status, 200)
-    t.is(response.data.result, 1234)
+    const response = await testAdapter.request({ ...data, endpoint })
+    t.is(response.statusCode, 200)
+    t.is(response.json().result, 1234)
   }
 })
 
@@ -336,6 +340,6 @@ test('price adapter throws if non-crypto endpoint reuses aliases', async (t) => 
     ],
   })
 
-  const error: Error | undefined = await t.throwsAsync(() => expose(adapter))
+  const error: Error | undefined = await t.throwsAsync(() => start(adapter))
   t.is(error?.message, 'Duplicate endpoint / alias: "price"')
 })
