@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios'
+import { AxiosRequestConfig } from 'axios'
 import EventSource from 'eventsource'
 import { EndpointContext } from '../adapter'
 import { AdapterConfig } from '../config'
@@ -6,6 +6,8 @@ import { makeLogger, sleep } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportDependencies, TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
+import { Requester } from '../util/requester'
+import { calculateHttpRequestKey } from '../cache'
 
 const logger = makeLogger('SSETransport')
 
@@ -43,6 +45,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
   }[]
   sseConnection?: EventSource
   timeOfLastReq = 0
+  requester!: Requester
 
   constructor(
     private config: {
@@ -82,6 +85,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
     endpointName: string,
   ): Promise<void> {
     super.initialize(dependencies, config, endpointName)
+    this.requester = dependencies.requester
     if (dependencies.eventSource) {
       this.EventSource = dependencies.eventSource
     }
@@ -122,26 +126,24 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
       })
     }
 
-    const makeRequest = async (req: AxiosRequestConfig<T['Provider']['RequestBody']>) => {
-      try {
-        const res = await axios.request(req)
-        logger.debug(res.data, `response status ${res.statusText} from keepalive request`)
-      } catch (err) {
-        logger.error(err, `Error on keepalive request`)
-      }
+    const makeRequest = async (
+      key: string,
+      req: AxiosRequestConfig<T['Provider']['RequestBody']>,
+    ) => {
+      await this.requester.request(key, req)
       this.timeOfLastReq = Date.now()
     }
 
     if (subscriptions.new.length) {
       const subscribeRequest = this.config.prepareSubscriptionRequest(subscriptions.new, context)
-      makeRequest(subscribeRequest)
+      makeRequest(calculateHttpRequestKey(context, subscriptions.new), subscribeRequest)
     }
     if (subscriptions.stale.length) {
       const unsubscribeRequest = this.config.prepareUnsubscriptionRequest(
         subscriptions.stale,
         context,
       )
-      makeRequest(unsubscribeRequest)
+      makeRequest(calculateHttpRequestKey(context, subscriptions.stale), unsubscribeRequest)
     }
     if (
       this.config.prepareKeepAliveRequest &&
@@ -149,7 +151,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
       Date.now() - this.timeOfLastReq > context.adapterConfig.SSE_KEEPALIVE_SLEEP
     ) {
       const prepareKeepAliveRequest = this.config.prepareKeepAliveRequest(context)
-      makeRequest(prepareKeepAliveRequest)
+      makeRequest(calculateHttpRequestKey(context, subscriptions.desired), prepareKeepAliveRequest)
     }
 
     // The background execute loop no longer sleeps between executions, so we have to do it here
