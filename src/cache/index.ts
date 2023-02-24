@@ -3,6 +3,7 @@ import { AdapterConfig, SettingsMap } from '../config'
 import { AdapterResponse, makeLogger, sleep } from '../util'
 import { InputParameters } from '../validation'
 import { CacheTypes as CacheType } from './metrics'
+import crypto from 'crypto'
 
 export * from './factory'
 export * from './local'
@@ -138,7 +139,7 @@ export const calculateKey = <CustomSettings extends SettingsMap>(
     throw new Error('Data to calculate cache key should be an object')
   }
 
-  let cacheKey = JSON.stringify(data, (_, value) => {
+  const cacheKey = JSON.stringify(data, (_, value) => {
     if (value && typeof value === 'string') {
       return value.toLowerCase()
     }
@@ -146,10 +147,12 @@ export const calculateKey = <CustomSettings extends SettingsMap>(
   })
 
   if (cacheKey.length > adapterConfig.MAX_COMMON_KEY_SIZE) {
-    logger.warn(
-      `Generated cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be truncated`,
+    logger.debug(
+      `Generated cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be hashed`,
     )
-    cacheKey = cacheKey.slice(0, adapterConfig.MAX_COMMON_KEY_SIZE)
+    const shasum = crypto.createHash('sha1')
+    shasum.update(cacheKey)
+    return shasum.digest('base64')
   }
 
   return cacheKey
