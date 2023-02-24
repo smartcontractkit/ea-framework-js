@@ -28,14 +28,13 @@ export const routingTransport = new RoutingTransport<EndpointTypes>(
     ws: wsTransport,
     rest: httpTransport,
   },
-    customRouter: (req, adapterConfig) => {
-      // This code is not really a realistic use case, but does show the available context within the custom router
-      if (adapterConfig.SETTING === req.requestContext.data.base) {
-        return 'ws'
-      } else {
-        return 'rest'
-      }
-    },
+  (req, adapterConfig) => {
+    // This code is not really a realistic use case, but does show the available context within the custom router
+    if (adapterConfig.SETTING === req.requestContext.data.base) {
+      return 'ws'
+    } else {
+      return 'rest'
+    }
   },
 )
 ```
