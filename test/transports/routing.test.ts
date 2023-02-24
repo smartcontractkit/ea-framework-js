@@ -1,7 +1,6 @@
 import untypedTest, { TestFn } from 'ava'
-import { AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { Server, WebSocket } from 'mock-socket'
-import nock from 'nock'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import {
@@ -15,6 +14,7 @@ import {
 import { RoutingTransport } from '../../src/transports/meta'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
+import MockAdapter from 'axios-mock-adapter'
 
 const test = untypedTest as TestFn<{
   endpoint: AdapterEndpoint<BaseEndpointTypes>
@@ -53,6 +53,7 @@ const CustomSettings: SettingsMap = {
 
 const restUrl = 'http://test-url.com'
 const websocketUrl = 'wss://test-ws.com/asd'
+const axiosMock = new MockAdapter(axios)
 
 type BaseEndpointTypes = {
   Request: {
@@ -286,15 +287,6 @@ const transports = {
 // Route function is used to select an adapter based on the supplied string, transport
 const routingTransport = new RoutingTransport<BaseEndpointTypes>(transports)
 
-test.before(() => {
-  nock.disableNetConnect()
-  nock.enableNetConnect('localhost')
-})
-
-test.after(() => {
-  nock.restore()
-})
-
 test.beforeEach(async (t) => {
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
@@ -344,8 +336,8 @@ test.serial('routing transport errors on invalid transport', async (t) => {
 })
 
 test.serial('RoutingTransport can route to HttpTransport', async (t) => {
-  nock(restUrl)
-    .post('/price', {
+  axiosMock
+    .onPost(`${restUrl}/price`, {
       pairs: [
         {
           base: from,
@@ -361,7 +353,6 @@ test.serial('RoutingTransport can route to HttpTransport', async (t) => {
         },
       ],
     })
-    .persist()
 
   const error = await t.context.testAdapter.request({
     from,
@@ -386,19 +377,16 @@ test.serial('RoutingTransport can route to WebSocket transport', async (t) => {
 })
 
 test.serial('RoutingTransport can route to SSE transport', async (t) => {
-  nock(restUrl)
-    .post('/sub')
-    .times(2)
+  axiosMock
+    .onPost(`${restUrl}/sub`)
     .reply(200, {
       message: 'Successfully subscribed to ETH/USD',
     })
-    .post('/unsub')
-    .times(2)
+    .onPost(`${restUrl}/unsub`)
     .reply(200, {
       message: 'Successfully unsubscribed from ETH/USD',
     })
-    .post('/ping')
-    .times(9999999)
+    .onPost(`${restUrl}/ping`)
     .reply(200, {
       message: 'Pong',
     })
@@ -447,8 +435,8 @@ test.serial('custom router is applied to get valid transport to route to', async
 
   const testAdapter = await TestAdapter.start(adapter, t.context)
 
-  nock(restUrl)
-    .post('/price', {
+  axiosMock
+    .onPost(`${restUrl}/price`, {
       pairs: [
         {
           base: from,
@@ -464,7 +452,6 @@ test.serial('custom router is applied to get valid transport to route to', async
         },
       ],
     })
-    .persist()
 
   const error = await testAdapter.request({
     from,
@@ -510,8 +497,8 @@ test.serial('custom router returns invalid transport and request fails', async (
 
   const testAdapter = await TestAdapter.start(adapter, t.context)
 
-  nock(restUrl)
-    .post('/price', {
+  axiosMock
+    .onPost(`${restUrl}/price`, {
       pairs: [
         {
           base: from,
@@ -527,7 +514,6 @@ test.serial('custom router returns invalid transport and request fails', async (
         },
       ],
     })
-    .persist()
 
   const error = await testAdapter.request({
     from,
@@ -573,8 +559,8 @@ test.serial('missing transport in input params with no default fails request', a
 
   const testAdapter = await TestAdapter.start(adapter, t.context)
 
-  nock(restUrl)
-    .post('/price', {
+  axiosMock
+    .onPost(`${restUrl}/price`, {
       pairs: [
         {
           base: from,
@@ -590,7 +576,6 @@ test.serial('missing transport in input params with no default fails request', a
         },
       ],
     })
-    .persist()
 
   const error = await testAdapter.request({
     from,
@@ -640,8 +625,8 @@ test.serial('missing transport in input params with default succeeds', async (t)
 
   const testAdapter = await TestAdapter.start(adapter, t.context)
 
-  nock(restUrl)
-    .post('/price', {
+  axiosMock
+    .onPost(`${restUrl}/price`, {
       pairs: [
         {
           base: from,
@@ -657,7 +642,6 @@ test.serial('missing transport in input params with default succeeds', async (t)
         },
       ],
     })
-    .persist()
 
   const error = await testAdapter.request({
     from,

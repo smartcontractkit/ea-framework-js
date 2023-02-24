@@ -1,8 +1,9 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import nock from 'nock'
 import { TestAdapter } from '../util'
 import { buildHttpAdapter } from './helper'
+import MockAdapter from 'axios-mock-adapter'
+import axios from 'axios'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -12,10 +13,9 @@ const test = untypedTest as TestFn<{
 const URL = 'http://test-url.com'
 const endpoint = '/price'
 const version = process.env['npm_package_version']
+const axiosMock = new MockAdapter(axios)
 
 test.before(async (t) => {
-  nock.disableNetConnect()
-  nock.enableNetConnect('localhost')
   process.env['METRICS_ENABLED'] = 'true'
   // Set higher retries for polling metrics testing
   process.env['CACHE_POLLING_MAX_RETRIES'] = '5'
@@ -28,7 +28,7 @@ test.before(async (t) => {
 })
 
 test.after((t) => {
-  nock.restore()
+  axiosMock.reset()
   t.context.clock.uninstall()
 })
 
@@ -36,8 +36,8 @@ const from = 'ETH'
 const to = 'USD'
 const price = 1234
 
-nock(URL)
-  .post(endpoint, {
+axiosMock
+  .onPost(URL + endpoint, {
     pairs: [
       {
         base: from,
@@ -53,7 +53,6 @@ nock(URL)
       },
     ],
   })
-  .persist()
 
 test.serial('Test cache warmer active metric', async (t) => {
   const error = await t.context.testAdapter.request({ from, to })

@@ -1,16 +1,17 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import { AxiosRequestConfig } from 'axios'
-import nock from 'nock'
+import axios, { AxiosRequestConfig } from 'axios'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import { SSEConfig, SseTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
+import MockAdapter from 'axios-mock-adapter'
 const { MockEvent, EventSource } = require('mocksse') // eslint-disable-line
 
 const URL = 'http://test.com'
+const axiosMock = new MockAdapter(axios)
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
@@ -128,19 +129,16 @@ const mockSSE = () => {
 }
 
 const mockHTTP = () => {
-  nock('http://test.com')
-    .post('/sub')
-    .times(2)
+  axiosMock
+    .onPost(`${URL}/sub`)
     .reply(200, {
       message: 'Successfully subscribed to ETH/USD',
     })
-    .post('/unsub')
-    .times(2)
+    .onPost(`${URL}/unsub`)
     .reply(200, {
       message: 'Successfully unsubscribed from ETH/USD',
     })
-    .post('/ping')
-    .times(9999999)
+    .onPost(`${URL}/ping`)
     .reply(200, {
       message: 'Pong',
     })

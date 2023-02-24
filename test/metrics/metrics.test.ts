@@ -1,13 +1,16 @@
 import untypedTest, { TestFn } from 'ava'
-import nock from 'nock'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
 import { retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { TestAdapter } from '../util'
+import MockAdapter from 'axios-mock-adapter'
+import axios from 'axios'
+import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
+  clock: InstalledClock
 }>
 
 const URL = 'http://test-url.com'
@@ -100,6 +103,7 @@ const price = 1234
 const version = process.env['npm_package_version']
 
 test.before(async (t) => {
+  t.context.clock = FakeTimers.install()
   process.env['METRICS_ENABLED'] = 'true'
   const adapter = new Adapter({
     name: 'TEST',
@@ -113,10 +117,14 @@ test.before(async (t) => {
   t.context.testAdapter = await TestAdapter.start(adapter, t.context)
 })
 
+const axiosMock = new MockAdapter(axios, {
+  onNoMatch: 'throwException',
+  delayResponse: 1,
+})
+
 test.serial('Test http requests total metrics (data provider hit)', async (t) => {
-  nock(URL)
-    .get(endpoint)
-    .query({
+  axiosMock
+    .onGet(`${URL}/price`, {
       base: from,
       quote: to,
     })
@@ -146,7 +154,7 @@ test.serial('Test http request duration metrics', async (t) => {
 test.serial('Test data provider requests metrics', async (t) => {
   const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{provider_status_code="200",method="GET",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`data_provider_requests${expectedLabel}`), 1)
+  t.is(metricsMap.get(`data_provider_requests${expectedLabel}`), 9)
 })
 
 test.serial('Test data provider request duration metrics', async (t) => {
@@ -164,7 +172,7 @@ test.serial('Test data provider request duration metrics', async (t) => {
 test.serial('Test cache set count metrics', async (t) => {
   const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`cache_data_set_count${expectedLabel}`), 1)
+  t.is(metricsMap.get(`cache_data_set_count${expectedLabel}`), 9)
 })
 
 test.serial('Test cache max age metrics', async (t) => {
@@ -194,13 +202,12 @@ test.serial('Test provider time delta metric', async (t) => {
 test.serial('Test credit spent metrics', async (t) => {
   const metricsMap = await t.context.testAdapter.getMetrics()
   const expectedLabel = `{feed_id="N/A",participant_id="9002",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`rate_limit_credits_spent_total${expectedLabel}`), 1)
+  t.is(metricsMap.get(`rate_limit_credits_spent_total${expectedLabel}`), 9)
 })
 
 test.serial('Test http requests total metrics (cache hit)', async (t) => {
-  nock(URL)
-    .get(endpoint)
-    .query({
+  axiosMock
+    .onGet(`${URL}/price`, {
       base: from,
       quote: to,
     })

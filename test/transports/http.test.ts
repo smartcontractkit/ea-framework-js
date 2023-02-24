@@ -1,15 +1,15 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import { AxiosResponse } from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import { FastifyInstance } from 'fastify'
-import nock from 'nock'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { calculateHttpRequestKey } from '../../src/cache'
 import { buildAdapterConfig, SettingsMap } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
-import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
+import { ProviderResult, SingleNumberResultResponse, sleep } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { assertEqualResponses, MockCache, runAllUntil, runAllUntilTime, TestAdapter } from '../util'
+import MockAdapter from 'axios-mock-adapter'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
@@ -19,6 +19,7 @@ const test = untypedTest as TestFn<{
 
 const URL = 'http://test-url.com'
 const endpoint = '/price'
+const axiosMock = new MockAdapter(axios)
 
 interface AdapterRequestParams {
   from: string
@@ -45,15 +46,6 @@ interface ProviderVolumeResponseBody {
     volume: number
   }>
 }
-
-test.before(() => {
-  nock.disableNetConnect()
-  nock.enableNetConnect('localhost')
-})
-
-test.after(() => {
-  nock.restore()
-})
 
 test.beforeEach((t) => {
   t.context.clock = FakeTimers.install()
@@ -140,8 +132,8 @@ const to = 'USD'
 const price = 1234
 const volume = 4567
 
-nock(URL)
-  .post(endpoint, {
+axiosMock
+  .onPost(URL + endpoint, {
     pairs: [
       {
         base: from,
@@ -157,8 +149,7 @@ nock(URL)
       },
     ],
   })
-  .persist()
-  .post(endpoint, {
+  .onPost(URL + endpoint, {
     pairs: [
       {
         base: 'ERR',
@@ -167,7 +158,6 @@ nock(URL)
     ],
   })
   .reply(500, 'There was an unexpected issue')
-  .persist()
 
 const inputParameters = {
   from: {
@@ -343,7 +333,7 @@ test.serial(
     const errorB = await makeRequest('B')
     t.is(errorB?.statusCode, 504)
 
-    await runAllUntilTime(t.context.clock, 20 * 1000 + 100)
+    await runAllUntilTime(t.context.clock, 20 * 1000)
     t.is(transportA.backgroundExecuteCalls, 10 * rateLimit1s)
     t.is(transportB.backgroundExecuteCalls, 10 * rateLimit1s)
   },
@@ -356,8 +346,8 @@ test.serial(
     const transportA = new MockHttpTransport(true)
     const transportB = new MockHttpTransport(true)
 
-    nock(URL)
-      .post(endpoint, {
+    axiosMock
+      .onPost(URL + endpoint, {
         pairs: [
           {
             base: `${from}A`,
@@ -373,8 +363,7 @@ test.serial(
           },
         ],
       })
-      .persist()
-      .post(endpoint, {
+      .onPost(URL + endpoint, {
         pairs: [
           {
             base: `${from}B`,
@@ -390,7 +379,6 @@ test.serial(
           },
         ],
       })
-      .persist()
 
     const adapter = new Adapter({
       name: 'TEST',
@@ -437,7 +425,7 @@ test.serial(
     t.is(errorB?.statusCode, 504)
 
     // Run for a minute (59s actually, it'll start at 0 and go on regular intervals)
-    await runAllUntilTime(t.context.clock, 10 * 1000 + 100)
+    await runAllUntilTime(t.context.clock, 10 * 1000)
     t.is(transportA.backgroundExecuteCalls, 5 * rateLimit1s)
     t.is(transportB.backgroundExecuteCalls, 5 * rateLimit1s)
   },
@@ -542,8 +530,8 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
   // Start the adapter
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-  nock(URL)
-    .post('/volume', {
+  axiosMock
+    .onPost(`${URL}/volume`, {
       pairs: [
         {
           base: from,
@@ -559,7 +547,6 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
         },
       ],
     })
-    .persist()
 
   const makeRequest = (endpointParam: string) =>
     testAdapter.request({
@@ -613,8 +600,8 @@ test.serial('requests for the same transport are coalesced', async (t) => {
     ],
   })
 
-  nock(URL)
-    .post(endpoint, {
+  axiosMock
+    .onPost(endpoint, {
       pairs: [
         {
           base: 'COALESCE2',
@@ -622,15 +609,19 @@ test.serial('requests for the same transport are coalesced', async (t) => {
         },
       ],
     })
-    .once() // Ensure that this request happens only once
-    .delay(BACKGROUND_EXECUTE_MS_HTTP)
-    .reply(200, {
-      prices: [
+    .replyOnce(async () => {
+      await sleep(BACKGROUND_EXECUTE_MS_HTTP)
+      return [
+        200,
         {
-          pair: `coalesce2/${to}`,
-          price,
+          prices: [
+            {
+              pair: `coalesce2/${to}`,
+              price,
+            },
+          ],
         },
-      ],
+      ]
     })
 
   // Start the adapter
@@ -676,8 +667,8 @@ test.serial(
 
     // Mock valid responses for the requests we'll send
     for (const number of numbers) {
-      nock(URL)
-        .post(endpoint, {
+      axiosMock
+        .onPost(URL + endpoint, {
           pairs: [
             {
               base: `symbol${number}`,
@@ -685,14 +676,19 @@ test.serial(
             },
           ],
         })
-        .delay(2 * 60000)
-        .reply(200, {
-          prices: [
+        .reply(async () => {
+          await sleep(2 * 60000)
+          return [
+            200,
             {
-              pair: `symbol${number}/${to}`,
-              price,
+              prices: [
+                {
+                  pair: `symbol${number}/${to}`,
+                  price,
+                },
+              ],
             },
-          ],
+          ]
         })
     }
 

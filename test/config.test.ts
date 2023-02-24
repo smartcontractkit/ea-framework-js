@@ -2,7 +2,7 @@ import test from 'ava'
 import { buildAdapterConfig, SettingsMap, validateAdapterConfig } from '../src/config'
 import { validator } from '../src/validation/utils'
 
-test.afterEach(async (t) => {
+test.afterEach(async () => {
   process.env = {}
 })
 
@@ -102,7 +102,7 @@ test.serial('Test validate function (out of bounds)', async (t) => {
   try {
     validateAdapterConfig(config, customSettings)
     t.fail()
-  } catch (e: any) {
+  } catch (e) {
     t.pass()
   }
 })
@@ -120,7 +120,7 @@ test.serial('Test validate function (decimal)', async (t) => {
   try {
     validateAdapterConfig(config, customSettings)
     t.fail()
-  } catch (e: any) {
+  } catch (e) {
     t.pass()
   }
 })
@@ -138,7 +138,7 @@ test.serial('Test validate function (scientific notation)', async (t) => {
   try {
     validateAdapterConfig(config, customSettings)
     t.pass()
-  } catch (e: any) {
+  } catch (e) {
     t.fail()
   }
 })
