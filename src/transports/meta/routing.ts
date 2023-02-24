@@ -35,14 +35,10 @@ export class RoutingTransport<T extends RoutingTransportGenerics>
   constructor(
     public transports: Record<string, Transport<T>>,
     //  This is public for tests, which sometimes need the underlying transport for things like ticking the clock
-    private options?: {
-      // Route should return to a string key that corresponds to a transport in the transports object
-      defaultTransport?: string
-      customRouter?: (
-        req: AdapterRequest<T['Request']>,
-        adapterConfig: AdapterConfig<T['CustomSettings']>,
-      ) => string
-    },
+    private customRouter?: (
+      req: AdapterRequest<T['Request']>,
+      adapterConfig: AdapterConfig<T['CustomSettings']>,
+    ) => string,
   ) {
     for (const transportName in this.transports) {
       // This is intentional, to keep names to one word only
@@ -51,13 +47,6 @@ export class RoutingTransport<T extends RoutingTransportGenerics>
           `Transport name "${transportName}" names in the RoutingTransport map can only include lowercase letters`,
         )
       }
-    }
-
-    // This could also potentially be solved with types, but inference is hard and adding another generic would be even more cumbersome
-    if (this.options?.defaultTransport && !this.transports[this.options.defaultTransport]) {
-      throw new Error(
-        `Transport "${this.options.defaultTransport}" does not exist in the transports map for this RoutingTransport`,
-      )
     }
   }
 
@@ -96,7 +85,7 @@ export class RoutingTransport<T extends RoutingTransportGenerics>
   }
 
   private defaultRouter(req: AdapterRequest<T['Request']>) {
-    return req.requestContext.data.transport?.toLowerCase() || this.options?.defaultTransport
+    return req.requestContext.data.transport?.toLowerCase()
   }
 
   private resolveTransport(
@@ -104,9 +93,7 @@ export class RoutingTransport<T extends RoutingTransportGenerics>
     adapterConfig: AdapterConfig<T['CustomSettings']>,
   ): Transport<T> {
     logger.debug(`Routing request using `, req.requestContext.data)
-    const key = this.options?.customRouter
-      ? this.options.customRouter(req, adapterConfig)
-      : this.defaultRouter(req)
+    const key = this.customRouter ? this.customRouter(req, adapterConfig) : this.defaultRouter(req)
 
     if (!key) {
       logger.error(

@@ -14,7 +14,10 @@ export const routingTransport = new RoutingTransport<EndpointTypes>({
 })
 ```
 
-By default, the RoutingTransport expects a `transport` input parameter, that will be matched (case insensitive) to the keys of the transport map passed to the `RoutingTransport`'s constructor. You can optionally specify both a default transport to use if the parameter is not provided, as well as a custom router function that allows to implement different logic:
+> **Warning**
+> Be aware that for backwards compatibility, a default transport will likely be desired. This can be achieved by setting a default in the inputParameters.
+
+By default, the RoutingTransport expects a `transport` input parameter, that will be matched (case insensitive) to the keys of the transport map passed to the `RoutingTransport`'s constructor. You can optionally specify a custom router function that allows to implement different logic:
 
 ```typescript
 import { httpTransport } from './endpoint-http'
@@ -25,16 +28,13 @@ export const routingTransport = new RoutingTransport<EndpointTypes>(
     ws: wsTransport,
     rest: httpTransport,
   },
-  {
-    defaultTransport: 'rest',
-    customRouter: (req, adapterConfig) => {
-      // This code is not really a realistic use case, but does show the available context within the custom router
-      if (adapterConfig.SETTING === req.requestContext.data.base) {
-        return 'ws'
-      } else {
-        return 'rest'
-      }
-    },
+  (req, adapterConfig) => {
+    // This code is not really a realistic use case, but does show the available context within the custom router
+    if (adapterConfig.SETTING === req.requestContext.data.base) {
+      return 'ws'
+    } else {
+      return 'rest'
+    }
   },
 )
 ```
