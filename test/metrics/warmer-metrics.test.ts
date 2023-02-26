@@ -73,13 +73,13 @@ test.serial('Test cache warmer active metric', async (t) => {
   let expectedLabel = `{isBatched="true",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`cache_warmer_get_count${expectedLabel}`), 1)
 
-  expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
+  expectedLabel = `{endpoint="test",transport="undefined",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 2)
 
   expectedLabel = `{endpoint="test",transport_type="MockHttpTransport",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap.get(`bg_execute_subscription_set_count${expectedLabel}`), 1)
 
-  expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
+  expectedLabel = `{endpoint="test",transport="undefined",app_name="TEST",app_version="${version}"}`
   const responseTime = metricsMap.get(`bg_execute_duration_seconds${expectedLabel}`)
   if (responseTime !== undefined) {
     t.is(typeof responseTime === 'number', true)
@@ -103,7 +103,7 @@ test.serial('Test cache warmer active metric', async (t) => {
   expectedLabel = `{isBatched="true",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap2.get(`cache_warmer_get_count${expectedLabel}`), 0)
 
-  expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
+  expectedLabel = `{endpoint="test",transport="undefined",app_name="TEST",app_version="${version}"}`
   t.is(metricsMap2.get(`bg_execute_total${expectedLabel}`), 17)
 
   expectedLabel = `{endpoint="test",transport_type="MockHttpTransport",app_name="TEST",app_version="${version}"}`

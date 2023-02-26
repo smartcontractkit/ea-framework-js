@@ -187,10 +187,12 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   t.is(metricsMap.get(`ws_subscription_total{${feed},${basic}}`), 1)
   t.is(metricsMap.get(`ws_message_total{${feed},direction="sent",${basic}}`), 1)
   t.is(metricsMap.get(`ws_message_total{direction="received",${basic}}`), 1)
-  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 2)
+  t.is(metricsMap.get(`bg_execute_total{${endpoint},transport="undefined",${basic}}`), 2)
   t.is(metricsMap.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 1)
 
-  const responseTime = metricsMap.get(`bg_execute_duration_seconds{${endpoint},${basic}}`)
+  const responseTime = metricsMap.get(
+    `bg_execute_duration_seconds{${endpoint},transport="undefined",${basic}}`,
+  )
   if (responseTime !== undefined) {
     t.is(typeof responseTime === 'number', true)
     t.is(responseTime > 0, true)
@@ -225,6 +227,6 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   const metricsMap3 = await t.context.testAdapter.getMetrics()
 
   t.is(metricsMap3.get(`ws_connection_active{${basic}}`), 0)
-  t.is(metricsMap3.get(`bg_execute_total{${endpoint},${basic}}`), 5)
+  t.is(metricsMap3.get(`bg_execute_total{${endpoint},transport="undefined",${basic}}`), 5)
   t.is(metricsMap3.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 0)
 })

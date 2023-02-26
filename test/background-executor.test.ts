@@ -1,8 +1,13 @@
-import FakeTimers from '@sinonjs/fake-timers'
-import test from 'ava'
+import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import untypedTest, { TestFn } from 'ava'
 import { start } from '../src'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../src/adapter'
-import { deferredPromise, NopTransport, NopTransportTypes } from './util'
+import { deferredPromise, NopTransport, NopTransportTypes, TestAdapter } from './util'
+
+const test = untypedTest as TestFn<{
+  testAdapter: TestAdapter
+  clock: InstalledClock
+}>
 
 test('background executor calls transport function with background context', async (t) => {
   const [promise, resolve] = deferredPromise<EndpointContext<NopTransportTypes>>()
@@ -62,4 +67,44 @@ test.serial('background executor ends recursive chain on server close', async (t
   t.is(timesCalled, 1) // The background process closed, so this was never called again
 
   clock.uninstall()
+})
+
+test.only('background executor error does not stop the loop', async (t) => {
+  let iteration = 0
+  const [promise, resolve] = deferredPromise<EndpointContext<NopTransportTypes>>()
+
+  const transport = new (class extends NopTransport {
+    async backgroundExecute(context: EndpointContext<NopTransportTypes>): Promise<void> {
+      if (iteration === 0) {
+        iteration++
+        throw new Error('Forced bg execute error')
+      }
+      resolve(context)
+    }
+  })()
+
+  process.env['METRICS_ENABLED'] = 'true'
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters: {},
+        transport,
+      }),
+      new AdapterEndpoint({
+        name: 'skipped',
+        inputParameters: {},
+        transport: new NopTransport(), // Also add coverage for skipped executors
+      }),
+    ],
+  })
+
+  const testAdapter = await TestAdapter.start(adapter, t.context)
+  const context = await promise
+  t.is(context.endpointName, 'test')
+  const metrics = await testAdapter.getMetrics()
+  const expectedLabel = `{endpoint="test",transport="undefined",app_name="TEST",app_version="${process.env['npm_package_version']}"}`
+  t.is(metrics.get(`bg_execute_errors${expectedLabel}`), 1)
+  t.is(metrics.get(`bg_execute_total${expectedLabel}`), 2)
 })
