@@ -165,17 +165,6 @@ export function assertEqualResponses(
   t.deepEqual(expected, actual)
 }
 
-// Type CamelToSnakeCase<S extends string> = S extends `${infer T}${infer U}`
-//   ? `${T extends Capitalize<T> ? '_' : ''}${Lowercase<T>}${CamelToSnakeCase<U>}`
-//   : S
-
-// type GetMetricsType<S> = S extends Metrics<infer T> ? T : never
-// type MetricsType = GetMetricsType<typeof metrics>
-// type Asd = {
-//   [K in keyof MetricsType]: MetricsType[K] extends Histogram<any> ?
-// }
-// type MetricName = CamelToSnakeCase<keyof MetricsType>
-
 class TestMetrics {
   map = new Map<string, number>()
 

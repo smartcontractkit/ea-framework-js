@@ -34,7 +34,7 @@
     "@types/ws": "8.5.3",
     "@typescript-eslint/eslint-plugin": "5.46.0",
     "@typescript-eslint/parser": "5.46.0",
-    "ava": "4.3.3",
+    "ava": "5.2.0",
     "axios-mock-adapter": "1.21.2",
     "c8": "7.12.0",
     "eslint": "8.29.0",
