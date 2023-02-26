@@ -12,7 +12,6 @@ const test = untypedTest as TestFn<{
 
 const URL = 'http://test-url.com'
 const endpoint = '/price'
-const version = process.env['npm_package_version']
 const axiosMock = new MockAdapter(axios)
 
 test.before(async (t) => {
@@ -68,25 +67,26 @@ test.serial('Test cache warmer active metric', async (t) => {
     },
   })
 
-  const metricsMap = await t.context.testAdapter.getMetrics()
-
-  let expectedLabel = `{isBatched="true",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`cache_warmer_get_count${expectedLabel}`), 1)
-
-  expectedLabel = `{endpoint="test",transport="undefined",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`bg_execute_total${expectedLabel}`), 2)
-
-  expectedLabel = `{endpoint="test",transport_type="MockHttpTransport",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`bg_execute_subscription_set_count${expectedLabel}`), 1)
-
-  expectedLabel = `{endpoint="test",transport="undefined",app_name="TEST",app_version="${version}"}`
-  const responseTime = metricsMap.get(`bg_execute_duration_seconds${expectedLabel}`)
-  if (responseTime !== undefined) {
-    t.is(typeof responseTime === 'number', true)
-    t.is(responseTime > 0, true)
-  } else {
-    t.fail('Response time did not record')
-  }
+  let metrics = await t.context.testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'cache_warmer_get_count',
+    labels: { isBatched: 'true' },
+    expectedValue: 1,
+  })
+  metrics.assert(t, {
+    name: 'bg_execute_total',
+    labels: { endpoint: 'test', transport: 'undefined' },
+    expectedValue: 2,
+  })
+  metrics.assert(t, {
+    name: 'bg_execute_subscription_set_count',
+    labels: { endpoint: 'test', transport_type: 'MockHttpTransport' },
+    expectedValue: 1,
+  })
+  metrics.assertPositiveNumber(t, {
+    name: 'bg_execute_duration_seconds',
+    labels: { endpoint: 'test', transport: 'undefined' },
+  })
 
   // Wait until the cache expires, and the subscription is out
   await runAllUntilTime(t.context.clock, 15000) // The provider response is slower
@@ -98,14 +98,20 @@ test.serial('Test cache warmer active metric', async (t) => {
   })
   t.is(error2?.statusCode, 504)
 
-  const metricsMap2 = await t.context.testAdapter.getMetrics()
-
-  expectedLabel = `{isBatched="true",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap2.get(`cache_warmer_get_count${expectedLabel}`), 0)
-
-  expectedLabel = `{endpoint="test",transport="undefined",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap2.get(`bg_execute_total${expectedLabel}`), 17)
-
-  expectedLabel = `{endpoint="test",transport_type="MockHttpTransport",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap2.get(`bg_execute_subscription_set_count${expectedLabel}`), 0)
+  metrics = await t.context.testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'cache_warmer_get_count',
+    labels: { isBatched: 'true' },
+    expectedValue: 0,
+  })
+  metrics.assert(t, {
+    name: 'bg_execute_total',
+    labels: { endpoint: 'test', transport: 'undefined' },
+    expectedValue: 17,
+  })
+  metrics.assert(t, {
+    name: 'bg_execute_subscription_set_count',
+    labels: { endpoint: 'test', transport_type: 'MockHttpTransport' },
+    expectedValue: 0,
+  })
 })

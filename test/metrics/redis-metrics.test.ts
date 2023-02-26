@@ -45,8 +45,6 @@ class CommandChainMock {
   }
 }
 
-const version = process.env['npm_package_version']
-
 test.before(async (t) => {
   process.env['METRICS_ENABLED'] = 'true'
   // Set unique port between metrics tests to avoid conflicts in metrics servers
@@ -97,7 +95,14 @@ test.serial('Test redis sent command metric', async (t) => {
   }
 
   await t.context.testAdapter.request(data)
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{status="SUCCESS",function_name="exec",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`redis_commands_sent_count${expectedLabel}`), 1)
+
+  const metrics = await t.context.testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'redis_commands_sent_count',
+    labels: {
+      status: 'SUCCESS',
+      function_name: 'exec',
+    },
+    expectedValue: 1,
+  })
 })

@@ -165,19 +165,103 @@ export function assertEqualResponses(
   t.deepEqual(expected, actual)
 }
 
-// Parse metrics scrape into object to use for tests
-export const parsePromMetrics = (data: string): Map<string, number> => {
-  const responseLines = data.split('\n')
-  const metricsMap = new Map<string, number>()
-  responseLines.forEach((line) => {
-    if (!line.startsWith('#') && line !== '') {
-      const metric = line.split(' ')
-      const nameLabel = metric[0]
-      const value = Number(metric[1])
-      metricsMap.set(nameLabel, value)
+// Type CamelToSnakeCase<S extends string> = S extends `${infer T}${infer U}`
+//   ? `${T extends Capitalize<T> ? '_' : ''}${Lowercase<T>}${CamelToSnakeCase<U>}`
+//   : S
+
+// type GetMetricsType<S> = S extends Metrics<infer T> ? T : never
+// type MetricsType = GetMetricsType<typeof metrics>
+// type Asd = {
+//   [K in keyof MetricsType]: MetricsType[K] extends Histogram<any> ?
+// }
+// type MetricName = CamelToSnakeCase<keyof MetricsType>
+
+class TestMetrics {
+  map = new Map<string, number>()
+
+  private replaceQuotes(s: string) {
+    return s.replace(/\\"/g, "'")
+  }
+
+  constructor(data: string) {
+    const lines = data.split('\n')
+    for (const line of lines) {
+      if (
+        line.startsWith('#') ||
+        line.startsWith('nodejs_') ||
+        line.startsWith('process_') ||
+        !line
+      ) {
+        continue
+      }
+
+      const [nameAndLabels, stringValue] = line.split(' ')
+      const [_, name, rawLabels] = nameAndLabels.match(/^([a-z_]+){(.*)}$/) as string[]
+      const sortedLabels = this.replaceQuotes(rawLabels)
+        .split('",')
+        .filter((label) => label !== '' && !label.startsWith('app_'))
+        .sort((a, b) => a.localeCompare(b))
+        .map((s) => `${s}"`)
+        .join(',')
+      const fullName = `${name}|${sortedLabels}`
+
+      this.map.set(fullName, Number(stringValue))
     }
-  })
-  return metricsMap
+  }
+
+  private get(
+    t: ExecutionContext,
+    { name, labels }: { name: string; labels?: Record<string, string> },
+  ): number | undefined {
+    const sortedLabels = labels
+      ? Object.entries(labels)
+          .map(([labelName, value]) => `${labelName}="${this.replaceQuotes(value)}"`)
+          .sort((a, b) => a.localeCompare(b))
+          .join(',')
+      : ''
+
+    const metric = this.map.get(`${name}|${sortedLabels}`)
+    if (metric === undefined) {
+      const sameNameMetrics = [...this.map.keys()]
+        .filter((k) => k.startsWith(name))
+        .map((m) => `\n\t${m}`)
+      const possibleSolutionMessage = sameNameMetrics.length
+        ? `Perhaps you meant one of these: ${sameNameMetrics}`
+        : 'Check the metric name and labels (no other metrics with the same name were found)'
+
+      t.fail(`Metric not found:\n\t${name}|${sortedLabels}\n${possibleSolutionMessage}`)
+    }
+
+    return metric
+  }
+
+  assert(
+    t: ExecutionContext,
+    params: {
+      name: string
+      labels?: Record<string, string>
+      expectedValue: number
+    },
+  ) {
+    const metric = this.get(t, params)
+    t.is(metric, params.expectedValue)
+  }
+
+  assertPositiveNumber(
+    t: ExecutionContext,
+    params: {
+      name: string
+      labels?: Record<string, string>
+    },
+  ) {
+    const value = this.get(t, params)
+    if (value !== undefined) {
+      t.is(typeof value === 'number', true)
+      t.is(value > 0, true)
+    } else {
+      t.fail(`${params.name} did not record`)
+    }
+  }
 }
 
 export class TestAdapter {
@@ -310,14 +394,14 @@ export class TestAdapter {
     return response
   }
 
-  async getMetrics(): Promise<Map<string, number>> {
+  async getMetrics(): Promise<TestMetrics> {
     if (!this.metricsApi) {
       throw new Error(
         'An attempt was made to fetch metrics, but the adapter was started without metrics enabled',
       )
     }
     const response = await this.metricsApi.inject('/metrics')
-    return parsePromMetrics(response.body)
+    return new TestMetrics(response.body)
   }
 
   async getHealth() {

@@ -104,7 +104,21 @@ test.only('background executor error does not stop the loop', async (t) => {
   const context = await promise
   t.is(context.endpointName, 'test')
   const metrics = await testAdapter.getMetrics()
-  const expectedLabel = `{endpoint="test",transport="undefined",app_name="TEST",app_version="${process.env['npm_package_version']}"}`
-  t.is(metrics.get(`bg_execute_errors${expectedLabel}`), 1)
-  t.is(metrics.get(`bg_execute_total${expectedLabel}`), 2)
+
+  metrics.assert(t, {
+    name: 'bg_execute_errors',
+    labels: {
+      endpoint: 'test',
+      transport: 'undefined',
+    },
+    expectedValue: 1,
+  })
+  metrics.assert(t, {
+    name: 'bg_execute_total',
+    labels: {
+      endpoint: 'test',
+      transport: 'undefined',
+    },
+    expectedValue: 2,
+  })
 })

@@ -12,7 +12,6 @@ const test = untypedTest as TestFn<{
 
 const URL = 'http://test-url.com'
 const endpoint = '/price'
-const version = process.env['npm_package_version']
 const axiosMock = new MockAdapter(axios)
 
 test.before(async (t) => {
@@ -58,17 +57,17 @@ test.serial('Test cache warmer active metric', async (t) => {
   const error = await t.context.testAdapter.request({ from, to })
   t.is(error.statusCode, 504)
 
-  const metricsMap = await t.context.testAdapter.getMetrics()
-
-  let expectedLabel = `{endpoint="test",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`transport_polling_failure_count${expectedLabel}`), 1)
-
-  expectedLabel = `{endpoint="test",succeeded="false",app_name="TEST",app_version="${version}"}`
-  const responseTime = metricsMap.get(`transport_polling_duration_seconds${expectedLabel}`)
-  if (responseTime !== undefined) {
-    t.is(typeof responseTime === 'number', true)
-    t.is(responseTime > 0, true)
-  } else {
-    t.fail('Response time did not record')
-  }
+  const metrics = await t.context.testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'transport_polling_failure_count',
+    labels: { endpoint: 'test' },
+    expectedValue: 1,
+  })
+  metrics.assertPositiveNumber(t, {
+    name: 'transport_polling_duration_seconds',
+    labels: {
+      endpoint: 'test',
+      succeeded: 'false',
+    },
+  })
 })
