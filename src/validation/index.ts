@@ -84,7 +84,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     // Run any request transforms that might have been defined in the adapter.
     // This is the last time modifications are supposed to happen to the request.
-    adapter.runRequestTransforms(req)
+    endpoint.runRequestTransforms(req)
 
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {

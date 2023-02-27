@@ -69,6 +69,8 @@ type IncludesMap = Record<string, Record<string, IncludeDetails>>
  * Data Feeds, its InputParameters must extend the basic ones (base/quote).
  */
 export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {
+  includesMap?: IncludesMap
+
   constructor(
     params: AdapterEndpointParams<T> & {
       inputParameters: PriceEndpointInputParameters
@@ -110,8 +112,8 @@ export class PriceAdapter<CustomSettings extends SettingsMap> extends Adapter<Cu
       includes?: IncludesFile
     },
   ) {
-    // Doing this with types would be too complex to maintain
-    if (!params.endpoints.some((e) => e instanceof PriceEndpoint)) {
+    const priceEndpoints = params.endpoints.filter((e) => e instanceof PriceEndpoint)
+    if (!priceEndpoints.length) {
       throw new Error(
         `This PriceAdapter's list of endpoints does not contain a valid PriceEndpoint`,
       )
@@ -141,7 +143,9 @@ export class PriceAdapter<CustomSettings extends SettingsMap> extends Adapter<Cu
         }
       }
 
-      this.requestTransforms?.push(requestTransform)
+      for (const endpoint of priceEndpoints) {
+        endpoint.requestTransforms?.push(requestTransform)
+      }
     }
   }
 

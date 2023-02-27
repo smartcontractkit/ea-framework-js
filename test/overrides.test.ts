@@ -67,11 +67,11 @@ test.beforeEach(async (t) => {
           },
         },
         transport: new OverrideTestTransport(),
+        overrides: {
+          OVER1: 'overriden_1',
+        },
       }),
     ],
-    overrides: {
-      OVER1: 'overriden_1',
-    },
   })
 
   t.context.adapterEndpoint = adapter.endpoints[0]

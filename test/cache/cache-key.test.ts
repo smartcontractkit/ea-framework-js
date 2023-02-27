@@ -17,12 +17,9 @@ test.beforeEach(async (t) => {
     name: 'TEST',
     defaultEndpoint: 'test',
     endpoints: [
-      {
+      new AdapterEndpoint({
         name: 'test',
         inputParameters: {},
-        initialize: async () => {
-          return
-        },
         transport: new (class extends NopTransport {
           override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Request']>) {
             return {
@@ -37,14 +34,10 @@ test.beforeEach(async (t) => {
             }
           }
         })(),
-        validator: new InputValidator({}),
-      },
-      {
+      }),
+      new AdapterEndpoint({
         name: 'test-custom-cache-key',
         inputParameters: {},
-        initialize: async () => {
-          return
-        },
         cacheKeyGenerator: (_) => {
           return `test:custom_cache_key`
         },
@@ -57,8 +50,7 @@ test.beforeEach(async (t) => {
             } as AdapterResponse<NopTransportTypes['Response']>
           }
         })(),
-        validator: new InputValidator({}),
-      },
+      }),
     ],
     envDefaultOverrides: {
       MAX_COMMON_KEY_SIZE: 150,

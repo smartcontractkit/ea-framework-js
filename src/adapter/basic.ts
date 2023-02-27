@@ -1,5 +1,6 @@
 import Redis from 'ioredis'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
+import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
 import {
   AdapterConfig,
   BaseAdapterConfig,
@@ -8,6 +9,7 @@ import {
   SettingsMap,
   validateAdapterConfig,
 } from '../config'
+import { metrics } from '../metrics'
 import {
   buildRateLimitTiersFromConfig,
   getRateLimitingTier,
@@ -16,6 +18,8 @@ import {
 } from '../rate-limiting'
 import { AdapterRequest, AdapterResponse, makeLogger, Merge, SubscriptionSetFactory } from '../util'
 import CensorList, { CensorKeyValue } from '../util/censor/censor-list'
+import { Requester } from '../util/requester'
+import { AdapterTimeoutError } from '../validation/error'
 import { AdapterEndpoint } from './endpoint'
 import {
   AdapterDependencies,
@@ -23,13 +27,7 @@ import {
   AdapterRateLimitingConfig,
   CustomAdapterSettings,
   EndpointGenerics,
-  Overrides,
-  RequestTransform,
 } from './types'
-import { AdapterTimeoutError } from '../validation/error'
-import { Requester } from '../util/requester'
-import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
-import { metrics } from '../metrics'
 
 const logger = makeLogger('Adapter')
 
@@ -46,8 +44,6 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
   envDefaultOverrides?: Partial<BaseAdapterConfig> | undefined
   customSettings?: SettingsMap | undefined
   rateLimiting?: AdapterRateLimitingConfig | undefined
-  overrides?: Record<string, string> | undefined
-  requestTransforms?: RequestTransform[]
   envVarsPrefix?: string
 
   // After initialization
@@ -76,8 +72,6 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     this.envDefaultOverrides = params.envDefaultOverrides
     this.customSettings = params.customSettings
     this.rateLimiting = params.rateLimiting
-    this.overrides = params.overrides
-    this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
     this.bootstrap = params.bootstrap
 
     this.config = buildAdapterConfig({
@@ -371,45 +365,6 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
       }
 
       return response
-    }
-  }
-
-  /**
-   * Default request transform that takes requests and manipulates
-   *
-   * @param adapter - the current adapter
-   * @param req - the current adapter request
-   * @returns the modified (or new) request
-   */
-  symbolOverrider(req: AdapterRequest) {
-    const rawRequestBody = req.body as { data?: { overrides?: Overrides } }
-    const requestOverrides = rawRequestBody.data?.overrides?.[this.name.toLowerCase()]
-    const base = req.requestContext.data['base'] as string
-
-    if (requestOverrides?.[base]) {
-      // Perform overrides specified in the request payload
-      req.requestContext.data['base'] = requestOverrides[base]
-    } else if (this.overrides?.[base]) {
-      // Perform hardcoded adapter overrides
-      req.requestContext.data['base'] = this.overrides[base]
-    }
-
-    return req
-  }
-
-  /**
-   * Takes the incoming request and applies all request transforms in the adapter
-   *
-   * @param req - the current adapter request
-   * @returns the request after passing through all request transforms
-   */
-  runRequestTransforms(req: AdapterRequest): void {
-    if (!this.requestTransforms) {
-      return
-    }
-
-    for (const transform of this.requestTransforms) {
-      transform(req)
     }
   }
 

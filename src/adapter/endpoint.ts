@@ -1,7 +1,7 @@
 import { ResponseCache } from '../cache/response'
 import { AdapterConfig } from '../config'
 import { MetaTransport, Transport } from '../transports'
-import { makeLogger } from '../util'
+import { AdapterRequest, makeLogger } from '../util'
 import { SpecificInputParameters } from '../validation'
 import { InputValidator } from '../validation/input-validator'
 import {
@@ -10,6 +10,8 @@ import {
   CustomInputValidator,
   EndpointGenerics,
   EndpointRateLimitingConfig,
+  Overrides,
+  RequestTransform,
 } from './types'
 
 const logger = makeLogger('AdapterEndpoint')
@@ -25,6 +27,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   validator: InputValidator
   cacheKeyGenerator?: (data: Record<string, unknown>) => string
   customInputValidation?: CustomInputValidator<T>
+  requestTransforms?: RequestTransform[]
+  overrides?: Record<string, string> | undefined
 
   constructor(params: AdapterEndpointParams<T>) {
     this.name = params.name
@@ -35,6 +39,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.validator = new InputValidator(this.inputParameters)
     this.cacheKeyGenerator = params.cacheKeyGenerator
     this.customInputValidation = params.customInputValidation
+    this.overrides = params.overrides
+    this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
   }
 
   /**
@@ -63,5 +69,44 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
 
     logger.debug(`Initializing transport for endpoint "${this.name}"...`)
     await this.transport.initialize(transportDependencies, config, this.name)
+  }
+
+  /**
+   * Takes the incoming request and applies all request transforms in the adapter
+   *
+   * @param req - the current adapter request
+   * @returns the request after passing through all request transforms
+   */
+  runRequestTransforms(req: AdapterRequest): void {
+    if (!this.requestTransforms) {
+      return
+    }
+
+    for (const transform of this.requestTransforms) {
+      transform(req)
+    }
+  }
+
+  /**
+   * Default request transform that takes requests and manipulates
+   *
+   * @param adapter - the current adapter
+   * @param req - the current adapter request
+   * @returns the modified (or new) request
+   */
+  symbolOverrider(req: AdapterRequest) {
+    const rawRequestBody = req.body as { data?: { overrides?: Overrides } }
+    const requestOverrides = rawRequestBody.data?.overrides?.[this.name.toLowerCase()]
+    const base = req.requestContext.data['base'] as string
+
+    if (requestOverrides?.[base]) {
+      // Perform overrides specified in the request payload
+      req.requestContext.data['base'] = requestOverrides[base]
+    } else if (this.overrides?.[base]) {
+      // Perform hardcoded adapter overrides
+      req.requestContext.data['base'] = this.overrides[base]
+    }
+
+    return req
   }
 }

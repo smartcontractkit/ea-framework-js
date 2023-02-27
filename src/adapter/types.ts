@@ -113,13 +113,6 @@ export interface AdapterParams<CustomSettings extends SettingsMap> {
   /** Configuration relevant to outbound (EA --\> DP) communication rate limiting */
   rateLimiting?: AdapterRateLimitingConfig
 
-  /** Overrides for converting the 'base' parameter that are hardcoded into the adapter. */
-  // This must be included in the middleware in order to generate deterministing cache keys for hardcoded overrides
-  overrides?: Record<string, string>
-
-  /** Transforms that will apply to the request before submitting it through the adapter request flow */
-  requestTransforms?: RequestTransform[]
-
   /** Bootstrap function that will run when initializing the adapter */
   bootstrap?: (adapter: Adapter<CustomSettings>) => Promise<void>
 }
@@ -175,4 +168,11 @@ export interface AdapterEndpointParams<T extends EndpointGenerics> {
 
   /** Custom input validation. Void function that should throw AdapterInputError on validation errors */
   customInputValidation?: CustomInputValidator<T>
+
+  /** Transforms that will apply to the request before submitting it through the adapter request flow */
+  requestTransforms?: RequestTransform[]
+
+  /** Overrides for converting the 'base' parameter that are hardcoded into the adapter. */
+  // This must be included in the middleware in order to generate deterministing cache keys for hardcoded overrides
+  overrides?: Record<string, string>
 }
