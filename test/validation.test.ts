@@ -198,6 +198,42 @@ test.serial('wrongly typed object throws 400', async (t) => {
   t.is(error.statusCode, 400)
 })
 
+test.serial('nested array throws 400', async (t) => {
+  t.context.adapterEndpoint.inputParameters = {
+    base: {
+      type: 'array',
+      required: true,
+    },
+  }
+  t.context.adapterEndpoint.validator = new InputValidator(
+    t.context.adapterEndpoint.inputParameters,
+  )
+
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: [1, 'string', true, [2, 3]],
+  })
+  t.is(error.statusCode, 400)
+})
+
+test.serial('array exceeding max length throws 400', async (t) => {
+  t.context.adapterEndpoint.inputParameters = {
+    base: {
+      type: 'array',
+      required: true,
+    },
+  }
+  t.context.adapterEndpoint.validator = new InputValidator(
+    t.context.adapterEndpoint.inputParameters,
+  )
+
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: new Array(25).fill(1),
+  })
+  t.is(error.statusCode, 400)
+})
+
 test.serial('wrongly typed optional param throws 400', async (t) => {
   t.context.adapterEndpoint.inputParameters = {
     base: {
@@ -212,6 +248,45 @@ test.serial('wrongly typed optional param throws 400', async (t) => {
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
     base: 123,
+  })
+  t.is(error.statusCode, 400)
+})
+
+test.serial('nested object throws 400', async (t) => {
+  t.context.adapterEndpoint.inputParameters = {
+    base: {
+      type: 'object',
+      required: true,
+    },
+  }
+  t.context.adapterEndpoint.validator = new InputValidator(
+    t.context.adapterEndpoint.inputParameters,
+  )
+
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: { a: 1, b: 'string', c: true, d: { e: 2, f: 3 } },
+  })
+  t.is(error.statusCode, 400)
+})
+
+test.serial('object exceeding max size throws 400', async (t) => {
+  t.context.adapterEndpoint.inputParameters = {
+    base: {
+      type: 'object',
+      required: true,
+    },
+  }
+  t.context.adapterEndpoint.validator = new InputValidator(
+    t.context.adapterEndpoint.inputParameters,
+  )
+
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: new Array(25).fill(1).reduce((acc, _, i) => {
+      acc[i] = i
+      return acc
+    }, {}),
   })
   t.is(error.statusCode, 400)
 })

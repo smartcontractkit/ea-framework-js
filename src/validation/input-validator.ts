@@ -9,6 +9,8 @@ export type Override = Record<string, string>
 export type OverridesMap = Record<string, Override>
 
 const isNotObject = validator.object()
+const MAX_ARRAY_LENGTH = 20
+const MAX_OBJECT_SIZE = 20
 
 export class InputValidator {
   private aliases: { [key: string]: string[] } = {}
@@ -140,24 +142,60 @@ export class InputValidator {
     }
 
     if (['array', 'object'].includes(type)) {
-      if (
-        type === 'array' &&
-        (!Array.isArray(normalized[key]) || (normalized[key] as unknown[]).length === 0)
-      ) {
-        this.throwInvalid(`${key} parameter must be a non-empty array`)
+      if (type === 'array') {
+        this.validateArray(normalized[key] as unknown[], key)
       }
-      if (
-        type === 'object' &&
-        normalized[key] &&
-        (isNotObject(normalized[key] as Record<string, unknown>) ||
-          Object.keys(normalized[key] as Record<string, unknown>).length === 0)
-      ) {
-        this.throwInvalid(`${key} parameter must be an object with at least one property`)
+      if (type === 'object') {
+        this.validateObject(normalized[key] as Record<string, unknown>, key)
       }
       return
     } else if (typeof normalized[key] !== type) {
       this.throwInvalid(`${key} parameter must be of type ${type}`)
     }
+  }
+
+  private validateArray(data: unknown[], key: string) {
+    if (!Array.isArray(data) || data.length === 0) {
+      this.throwInvalid(`${key} parameter must be a non-empty array`)
+    }
+
+    if (data.length > MAX_ARRAY_LENGTH) {
+      this.throwInvalid(
+        `${key} parameter must be an array of length less than ${MAX_ARRAY_LENGTH}. Received ${data.length} items`,
+      )
+    }
+
+    data.forEach((item, index) => {
+      if (!['string', 'number', 'boolean'].includes(typeof item)) {
+        this.throwInvalid(
+          `${key} parameter must be an array of strings|numbers|booleans, received '${typeof item}' at index ${index}`,
+        )
+      }
+    })
+  }
+
+  private validateObject(data: Record<string, unknown>, key: string) {
+    if (!data || isNotObject(data) || Object.keys(data).length === 0) {
+      this.throwInvalid(`${key} parameter must be a non-empty object`)
+    }
+
+    if (Object.keys(data).length > MAX_OBJECT_SIZE) {
+      this.throwInvalid(
+        `${key} parameter must be an object of size less than ${MAX_OBJECT_SIZE}. Received ${
+          Object.keys(data).length
+        } keys`,
+      )
+    }
+
+    Object.keys(data).forEach((item) => {
+      if (!['string', 'number', 'boolean'].includes(typeof data[item])) {
+        this.throwInvalid(
+          `${key} parameter must be an object with strings|numbers|booleans values, received '${typeof data[
+            item
+          ]}' at key '${item}'`,
+        )
+      }
+    })
   }
 
   private validateDeps(key: string, normalized: NormalizedInput) {
