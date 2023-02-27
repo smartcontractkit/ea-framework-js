@@ -51,7 +51,7 @@ export class ResponseCache<
    *
    * @param results - the entries to write to the cache
    */
-  async write(results: TimestampedProviderResult<T>[]): Promise<void> {
+  async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
     const entries = results.map((r) => {
       const response: AdapterResponse<T['Response']> = {
         ...r.response,
@@ -73,15 +73,14 @@ export class ResponseCache<
       }
 
       return {
-        key: calculateCacheKey(
-          {
-            inputParameters: this.inputParameters,
-            adapterName: this.adapterName,
-            endpointName: this.endpointName,
-            adapterConfig: this.config,
-          },
-          r.params,
-        ),
+        key: calculateCacheKey({
+          transportName,
+          data: r.params,
+          inputParameters: this.inputParameters,
+          adapterName: this.adapterName,
+          endpointName: this.endpointName,
+          adapterConfig: this.config,
+        }),
         value: response,
       } as const
     })

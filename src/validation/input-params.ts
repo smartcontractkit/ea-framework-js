@@ -1,3 +1,5 @@
+import { ReservedInputParameterNames } from '../util'
+
 /* INPUT TYPE VALIDATIONS */
 export type Override = Map<string, Map<string, string>>
 
@@ -14,8 +16,11 @@ export type InputParameter = {
   exclusive?: readonly string[] // Other inputs that cannot be present with this one
 }
 
+// Improve this, it's counting these with endopint and transport as undefined but existing
 export type InputParameters = {
   [name: string]: InputParameter
+} & {
+  [K in ReservedInputParameterNames]?: never
 }
 
 export type SpecificInputParameters<T> = {

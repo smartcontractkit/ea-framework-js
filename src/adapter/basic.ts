@@ -380,7 +380,8 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     replySent: Promise<unknown>,
   ): Promise<Readonly<AdapterResponse>> {
     // Get transport, must be here because it's already checked in the validator
-    const transport = this.endpointsMap[req.requestContext.endpointName].transport
+    const endpoint = this.endpointsMap[req.requestContext.endpointName]
+    const transport = endpoint.transports[req.requestContext.transportName]
 
     // First try to find the response in our cache, keep it ready
     const cachedResponse = await this.findResponseInCache(req)

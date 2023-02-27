@@ -67,6 +67,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       cacheKey: '',
       data: validatedData,
       endpointName: endpoint.name,
+      transportName: endpoint.getTransportNameForRequest(req, adapter.config),
     }
 
     if (adapter.config.METRICS_ENABLED && adapter.config.EXPERIMENTAL_METRICS_ENABLED) {
@@ -98,15 +99,15 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       }
       req.requestContext.cacheKey = cacheKey
     } else {
-      req.requestContext.cacheKey = calculateCacheKey(
-        {
-          adapterName: adapter.name,
-          endpointName: endpoint.name,
-          inputParameters: endpoint.inputParameters,
-          adapterConfig: adapter.config,
-        },
-        req.requestContext.data,
-      )
+      const transportName = endpoint.getTransportNameForRequest(req, adapter.config)
+      req.requestContext.cacheKey = calculateCacheKey({
+        data: req.requestContext.data,
+        adapterName: adapter.name,
+        endpointName: endpoint.name,
+        transportName,
+        inputParameters: endpoint.inputParameters,
+        adapterConfig: adapter.config,
+      })
     }
 
     done()

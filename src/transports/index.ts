@@ -56,6 +56,7 @@ export type TransportDependencies<T extends TransportGenerics> = AdapterDependen
  * @typeParam T - Helper struct type that will be used to pass types to the generic parameters (check [[TransportGenerics]])
  */
 export interface Transport<T extends TransportGenerics> {
+  name: string
   responseCache: ResponseCache<{
     Request: T['Request']
     Response: T['Response']
@@ -72,6 +73,7 @@ export interface Transport<T extends TransportGenerics> {
     dependencies: TransportDependencies<T>,
     config: AdapterConfig<T['CustomSettings']>,
     endpointName: string,
+    transportName: string,
   ) => Promise<void>
 
   /**
@@ -115,20 +117,4 @@ export interface Transport<T extends TransportGenerics> {
    * @returns an empty Promise
    */
   backgroundExecute?: (context: EndpointContext<T>) => Promise<void>
-}
-
-/**
- * Generic interface for a Transport that contains or manages other transports.
- * Some transports, such as the RoutingTransport, do not directly fetch data from a Data Provider, but
- * instead coordinate the execution of other transports for fetching and transforming data.
- * These transports have alternative initialization procedures, which typically involve
- * initializing each downstream transport.
- *
- * @typeParam Params - the structure of the AdapterRequest's body
- * @typeParam Result - the structure of the AdapterResponse's body
- * @typeParam CustomSettings - custom settings for the Adapter, or the default SettingsMap
- */
-
-export interface MetaTransport<T extends TransportGenerics> extends Transport<T> {
-  transports: { [key: string]: Transport<T> }
 }
