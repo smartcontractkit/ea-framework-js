@@ -63,7 +63,10 @@ test.beforeEach(async (t) => {
 
 test.serial('no parameters returns default cache key', async (t) => {
   const response = await t.context.testAdapter.request({})
-  t.is(response.json().result, BaseSettings.DEFAULT_CACHE_KEY.default)
+  t.is(
+    response.json().result,
+    `TEST-test-default_single_transport-${BaseSettings.DEFAULT_CACHE_KEY.default}`,
+  )
 })
 
 test.serial('builds cache key correctly from input params', async (t) => {
@@ -108,7 +111,7 @@ test.serial('builds cache key correctly from input params', async (t) => {
   })
   t.is(
     response.json().result,
-    'TEST-test-{"base":"eth","factor":123,"proper":true,"details":{"asd":"qwe","zxc":432}}',
+    'TEST-test-default_single_transport-{"base":"eth","factor":123,"proper":true,"details":{"asd":"qwe","zxc":432}}',
   )
 })
 
@@ -128,7 +131,7 @@ test.serial('cache key is truncated if over max size', async (t) => {
       .map((s, i) => `----------${i}`)
       .join('|'),
   })
-  t.is(response.json().result.length, 4 + 1 + 4 + 1 + 28) // Adapter Name + separator + Endpoint Name + separator + Hash
+  t.is(response.json().result.length, 4 + 1 + 4 + 1 + 24 + 1 + 28) // Adapter Name + separator + Endpoint Name + separator + Transport Name + Hash
 })
 
 test.serial('custom cache key', async (t) => {

@@ -3,7 +3,12 @@ import { Adapter } from '../adapter'
 import { calculateCacheKey, recordRedisCommandMetric } from '../cache'
 import { getMetricsMeta } from '../metrics/util'
 import { makeLogger } from '../util'
-import { AdapterMiddlewareBuilder, AdapterRequest, AdapterRequestBody } from '../util/types'
+import {
+  AdapterMiddlewareBuilder,
+  AdapterRequest,
+  AdapterRequestBody,
+  AdapterRequestContext,
+} from '../util/types'
 import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
 import { CMD_SENT_STATUS } from '../cache/metrics'
 import { ReplyError as RedisError } from 'ioredis'
@@ -67,8 +72,9 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       cacheKey: '',
       data: validatedData,
       endpointName: endpoint.name,
-      transportName: endpoint.getTransportNameForRequest(req, adapter.config),
-    }
+    } as AdapterRequestContext
+    // We do it afterwards so the custom routers can have a request with a requestContext fulfilled (sans transportName, ofc)
+    req.requestContext.transportName = endpoint.getTransportNameForRequest(req, adapter.config)
 
     if (adapter.config.METRICS_ENABLED && adapter.config.EXPERIMENTAL_METRICS_ENABLED) {
       // Add metrics meta which includes feedId to the request

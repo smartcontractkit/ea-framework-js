@@ -31,6 +31,7 @@ type PriceTestTypes = {
 }
 
 class PriceTestTransport implements Transport<PriceTestTypes> {
+  name!: string
   responseCache!: ResponseCache<{
     Request: PriceTestTypes['Request']
     Response: PriceTestTypes['Response']

@@ -22,6 +22,7 @@ export type NopTransportTypes = {
 }
 
 export class NopTransport implements Transport<NopTransportTypes> {
+  name!: string
   responseCache!: ResponseCache<{
     Request: NopTransportTypes['Request']
     Response: NopTransportTypes['Response']
@@ -31,8 +32,10 @@ export class NopTransport implements Transport<NopTransportTypes> {
     dependencies: TransportDependencies<NopTransportTypes>,
     config: AdapterConfig<NopTransportTypes['CustomSettings']>,
     endpointName: string,
+    transportName: string,
   ): Promise<void> {
     this.responseCache = dependencies.responseCache
+    this.name = transportName
     return
   }
 

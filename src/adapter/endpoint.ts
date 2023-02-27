@@ -1,7 +1,7 @@
 import { ResponseCache } from '../cache/response'
 import { AdapterConfig } from '../config'
 import { Transport } from '../transports'
-import { AdapterRequest, makeLogger } from '../util'
+import { AdapterRequest, AdapterRequestData, makeLogger } from '../util'
 import { SpecificInputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { InputValidator } from '../validation/input-validator'
@@ -151,23 +151,23 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       return DEFAULT_TRANSPORT_NAME
     }
 
-    logger.debug(`Routing request using `, req.requestContext.data)
     // Attempt to get the transport to use from:
     //   1. Custom router (whatever logic the user wrote)
     //   2. Default router (try to get it from the input params)
     //   3. Default transport (if it was specified in the instance params)
-    const transportName =
+    const rawTransportName =
       (this.customRouter && this.customRouter(req, adapterConfig)) ||
       this.defaultRouter(req) ||
       this.defaultTransport
 
-    if (!transportName) {
+    if (!rawTransportName) {
       throw new AdapterError({
         statusCode: 400,
         message: `No result was fetched from a custom router, no transport was specified in the input parameters, and this endpoint does not have a default transport set.`,
       })
     }
 
+    const transportName = rawTransportName.toLowerCase()
     if (!this.transports[transportName]) {
       throw new AdapterError({
         statusCode: 400,
@@ -189,6 +189,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @returns
    */
   private defaultRouter(req: AdapterRequest<T['Request']>) {
-    return req.requestContext.data.transport?.toLowerCase()
+    const rawRequestBody = req.body as unknown as { data: AdapterRequestData }
+    return rawRequestBody.data?.transport
   }
 }

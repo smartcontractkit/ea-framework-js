@@ -25,6 +25,7 @@ type TestTransportGenerics = TransportGenerics & {
 }
 
 class OverrideTestTransport implements Transport<TestTransportGenerics> {
+  name!: string
   responseCache!: ResponseCache<{
     Request: TestTransportGenerics['Request']
     Response: TestTransportGenerics['Response']

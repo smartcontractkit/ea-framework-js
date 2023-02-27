@@ -171,7 +171,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_set_count',
     labels: {
       feed_id,
-      participant_id: `TEST-test-${feed_id}`,
+      participant_id: `TEST-test-default_single_transport-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 9,
@@ -181,7 +181,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_max_age',
     labels: {
       feed_id,
-      participant_id: `TEST-test-${feed_id}`,
+      participant_id: `TEST-test-default_single_transport-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 90000,
@@ -191,7 +191,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_staleness_seconds',
     labels: {
       feed_id,
-      participant_id: `TEST-test-${feed_id}`,
+      participant_id: `TEST-test-default_single_transport-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 0,
@@ -242,7 +242,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_get_count',
     labels: {
       feed_id,
-      participant_id: `TEST-test-${feed_id}`,
+      participant_id: `TEST-test-default_single_transport-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 1,
@@ -252,7 +252,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_get_values',
     labels: {
       feed_id,
-      participant_id: `TEST-test-${feed_id}`,
+      participant_id: `TEST-test-default_single_transport-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 1234,
@@ -262,7 +262,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_staleness_seconds',
     labels: {
       feed_id,
-      participant_id: `TEST-test-${feed_id}`,
+      participant_id: `TEST-test-default_single_transport-${feed_id}`,
       cache_type: 'local',
     },
   })

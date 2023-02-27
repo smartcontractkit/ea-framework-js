@@ -9,7 +9,7 @@ const test = untypedTest as TestFn<{
   clock: InstalledClock
 }>
 
-test('background executor calls transport function with background context', async (t) => {
+test.serial('background executor calls transport function with background context', async (t) => {
   const [promise, resolve] = deferredPromise<EndpointContext<NopTransportTypes>>()
 
   const transport = new (class extends NopTransport {
@@ -69,7 +69,7 @@ test.serial('background executor ends recursive chain on server close', async (t
   clock.uninstall()
 })
 
-test.only('background executor error does not stop the loop', async (t) => {
+test.serial('background executor error does not stop the loop', async (t) => {
   let iteration = 0
   const [promise, resolve] = deferredPromise<EndpointContext<NopTransportTypes>>()
 
@@ -109,7 +109,7 @@ test.only('background executor error does not stop the loop', async (t) => {
     name: 'bg_execute_errors',
     labels: {
       endpoint: 'test',
-      transport: 'undefined',
+      transport: 'default_single_transport',
     },
     expectedValue: 1,
   })
@@ -117,8 +117,8 @@ test.only('background executor error does not stop the loop', async (t) => {
     name: 'bg_execute_total',
     labels: {
       endpoint: 'test',
-      transport: 'undefined',
+      transport: 'default_single_transport',
     },
-    expectedValue: 2,
+    expectedValue: 5,
   })
 })

@@ -742,7 +742,15 @@ test.serial('builds HTTP request queue key correctly from input params', async (
   }
   const data = { base: 'ETH', quote: 'BTC' }
   t.is(
-    calculateHttpRequestKey({ inputParameters: params, adapterConfig, endpointName }, data),
-    'test-{"base":"eth","quote":"btc"}',
+    calculateHttpRequestKey({
+      data,
+      transportName: 'transport',
+      context: {
+        endpointName,
+        adapterConfig,
+        inputParameters: params,
+      },
+    }),
+    'test-transport-{"base":"eth","quote":"btc"}',
   )
 })
