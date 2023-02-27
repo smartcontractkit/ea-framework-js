@@ -237,16 +237,25 @@ export class Requester {
         .labels(dataProviderMetricsLabel(response.status, config.method))
         .inc()
     } catch (e) {
-      if (retries >= this.maxRetries) {
-        logger.trace(`Request failed and no more retries remaining, rejecting promise...`)
-        const err = e as AxiosError
-        const ErrorClass = err.response?.status ? AdapterDataProviderError : AdapterConnectionError
+      const err = e as AxiosError
+      logger.info({
+        msg: 'Request failed',
+        response: {
+          statusCode: err.response?.status,
+          data: err.response?.data,
+          text: err.response?.statusText,
+        },
+      })
 
-        // Record count of failed data provider request
-        metrics
-          .get('dataProviderRequests')
-          .labels(dataProviderMetricsLabel(err.response?.status || 0, config.method))
-          .inc()
+      // Record count of failed data provider request
+      metrics
+        .get('dataProviderRequests')
+        .labels(dataProviderMetricsLabel(err.response?.status || 0, config.method))
+        .inc()
+
+      if (retries >= this.maxRetries) {
+        logger.trace('No more retries remaining, rejecting promise...')
+        const ErrorClass = err.response?.status ? AdapterDataProviderError : AdapterConnectionError
 
         reject(
           new ErrorClass(
@@ -271,7 +280,9 @@ export class Requester {
         delete this.map[key]
       } else {
         const timeToSleep = (2 ** retries + Math.random()) * 1000
-        logger.trace(`Request failed, sleeping for ${timeToSleep}ms...`)
+        logger.info(
+          `${this.maxRetries - retries} retries remaining, sleeping for ${timeToSleep}ms...`,
+        )
         await sleep(timeToSleep)
 
         req.retries++

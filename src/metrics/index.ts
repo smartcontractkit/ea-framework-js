@@ -195,12 +195,17 @@ export const metrics = new Metrics(() => ({
   bgExecuteTotal: new client.Counter({
     name: 'bg_execute_total',
     help: 'The number of background executes performed per endpoint',
-    labelNames: ['endpoint'] as const,
+    labelNames: ['endpoint', 'transport'] as const,
+  }),
+  bgExecuteErrors: new client.Counter({
+    name: 'bg_execute_errors',
+    help: 'The number of background execute errors per endpoint x transport',
+    labelNames: ['endpoint', 'transport'] as const,
   }),
   bgExecuteDurationSeconds: new client.Gauge({
     name: 'bg_execute_duration_seconds',
     help: 'A histogram bucket of the distribution of background execute durations',
-    labelNames: ['endpoint'] as const,
+    labelNames: ['endpoint', 'transport'] as const,
   }),
   cacheDataGetCount: new client.Counter({
     name: 'cache_data_get_count',

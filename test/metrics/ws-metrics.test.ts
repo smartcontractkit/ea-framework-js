@@ -53,7 +53,6 @@ type WebSocketEndpointTypes = {
 
 const BACKGROUND_EXECUTE_MS_WS = 5000
 const URL = 'wss://test-ws.com/asd'
-const version = process.env['npm_package_version']
 
 /**
  * Sets the mocked websocket instance in the provided provider class.
@@ -166,7 +165,7 @@ test.after(async (t) => {
   t.context.clock.uninstall()
 })
 
-test.serial('Test WS connection, subscription, and message metrics', async (t) => {
+test.serial('test WS connection, subscription, and message metrics', async (t) => {
   await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, {
     requestData: {
       base,
@@ -175,28 +174,61 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   })
 
   // Check connection, subscription active, subscription total, and message total metrics when subscribed to feed
-  const metricsMap = await t.context.testAdapter.getMetrics()
+  let metrics = await t.context.testAdapter.getMetrics()
+  const feed_id = '{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}'
+  const subscription_key = `test-${feed_id}`
+  const endpoint = `test`
+  const transport = 'undefined'
+  const transport_type = `WebSocketTransport`
 
-  const basic = `app_name="TEST",app_version="${version}"`
-  const feed = `feed_id="{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}",subscription_key="test-{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}"`
-  const endpoint = `endpoint="test"`
-  const transport = `transport_type="WebSocketTransport"`
-
-  t.is(metricsMap.get(`ws_connection_active{${basic}}`), 1)
-  t.is(metricsMap.get(`ws_subscription_active{${feed},${basic}}`), 1)
-  t.is(metricsMap.get(`ws_subscription_total{${feed},${basic}}`), 1)
-  t.is(metricsMap.get(`ws_message_total{${feed},direction="sent",${basic}}`), 1)
-  t.is(metricsMap.get(`ws_message_total{direction="received",${basic}}`), 1)
-  t.is(metricsMap.get(`bg_execute_total{${endpoint},${basic}}`), 2)
-  t.is(metricsMap.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 1)
-
-  const responseTime = metricsMap.get(`bg_execute_duration_seconds{${endpoint},${basic}}`)
-  if (responseTime !== undefined) {
-    t.is(typeof responseTime === 'number', true)
-    t.is(responseTime > 0, true)
-  } else {
-    t.fail('Response time did not record')
-  }
+  metrics.assert(t, {
+    name: 'ws_connection_active',
+    expectedValue: 1,
+  })
+  metrics.assert(t, {
+    name: 'ws_subscription_active',
+    labels: {
+      feed_id,
+      subscription_key,
+    },
+    expectedValue: 1,
+  })
+  metrics.assert(t, {
+    name: 'ws_subscription_total',
+    labels: {
+      feed_id,
+      subscription_key,
+    },
+    expectedValue: 1,
+  })
+  metrics.assert(t, {
+    name: 'ws_message_total',
+    labels: {
+      feed_id,
+      subscription_key,
+      direction: 'sent',
+    },
+    expectedValue: 1,
+  })
+  metrics.assert(t, {
+    name: 'ws_message_total',
+    labels: { direction: 'received' },
+    expectedValue: 1,
+  })
+  metrics.assert(t, {
+    name: 'bg_execute_total',
+    labels: { endpoint, transport },
+    expectedValue: 2,
+  })
+  metrics.assert(t, {
+    name: 'bg_execute_subscription_set_count',
+    labels: { endpoint, transport_type },
+    expectedValue: 1,
+  })
+  metrics.assertPositiveNumber(t, {
+    name: 'bg_execute_duration_seconds',
+    labels: { endpoint, transport },
+  })
 
   // Wait until the cache expires, and the subscription is out
   await t.context.clock.tickAsync(
@@ -211,20 +243,50 @@ test.serial('Test WS connection, subscription, and message metrics', async (t) =
   t.is(error2?.statusCode, 504)
 
   // Check connection, subscription active, subscription total, and message total metrics when unsubscribed from feed
-  const metricsMap2 = await t.context.testAdapter.getMetrics()
+  metrics = await t.context.testAdapter.getMetrics()
 
-  t.is(metricsMap2.get(`ws_connection_active{${basic}}`), 1)
-  t.is(metricsMap2.get(`ws_subscription_active{${feed},${basic}}`), 0)
-  t.is(metricsMap2.get(`ws_subscription_total{${feed},${basic}}`), 1)
-  t.is(metricsMap2.get(`ws_message_total{${feed},direction="sent",${basic}}`), 2)
-  t.is(metricsMap2.get(`ws_message_total{direction="received",${basic}}`), 1)
+  metrics.assert(t, {
+    name: 'ws_connection_active',
+    expectedValue: 1,
+  })
+  metrics.assert(t, {
+    name: 'ws_subscription_active',
+    labels: { feed_id, subscription_key },
+    expectedValue: 0,
+  })
+  metrics.assert(t, {
+    name: 'ws_subscription_total',
+    labels: { feed_id, subscription_key },
+    expectedValue: 1,
+  })
+  metrics.assert(t, {
+    name: 'ws_message_total',
+    labels: { feed_id, subscription_key, direction: 'sent' },
+    expectedValue: 2,
+  })
+  metrics.assert(t, {
+    name: 'ws_message_total',
+    labels: { direction: 'received' },
+    expectedValue: 1,
+  })
 
   t.context.server.close()
 
   // Check connection metric after connection closed
-  const metricsMap3 = await t.context.testAdapter.getMetrics()
+  metrics = await t.context.testAdapter.getMetrics()
 
-  t.is(metricsMap3.get(`ws_connection_active{${basic}}`), 0)
-  t.is(metricsMap3.get(`bg_execute_total{${endpoint},${basic}}`), 5)
-  t.is(metricsMap3.get(`bg_execute_subscription_set_count{${endpoint},${transport},${basic}}`), 0)
+  metrics.assert(t, {
+    name: 'ws_connection_active',
+    expectedValue: 0,
+  })
+  metrics.assert(t, {
+    name: 'bg_execute_total',
+    labels: { endpoint, transport },
+    expectedValue: 5,
+  })
+  metrics.assert(t, {
+    name: 'bg_execute_subscription_set_count',
+    labels: { endpoint, transport_type },
+    expectedValue: 0,
+  })
 })

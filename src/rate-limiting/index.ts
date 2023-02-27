@@ -1,7 +1,10 @@
 import { AdapterEndpoint, EndpointGenerics } from '../adapter'
 import { AdapterConfig } from '../config'
+import { makeLogger } from '../util'
 
 export * from './simple-counting'
+
+const logger = makeLogger('RateLimitingUtils')
 
 export interface AdapterRateLimitTier {
   rateLimit1s?: number
@@ -115,13 +118,16 @@ export const getRateLimitingTier = (
 
   if (!selectedTier) {
     // Sort the tiers by most to least restrictive
-    const sortedTiers = Object.values(tiers).sort(
-      (t1, t2) => lowestTierLimit(t1) - lowestTierLimit(t2),
+    const sortedTiers = Object.entries(tiers).sort(
+      ([_, t1], [__, t2]) => lowestTierLimit(t1) - lowestTierLimit(t2),
     )
 
-    return sortedTiers[0]
+    const [selectedName, selectedLimits] = sortedTiers[0]
+    logger.info(`There was no rate limiting tier specified, will use lowest one (${selectedName})`)
+    return selectedLimits
   }
 
+  logger.info(`Using specified tier "${selectedTier}"`)
   return tiers[selectedTier]
 }
 

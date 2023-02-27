@@ -100,7 +100,6 @@ const createAdapterEndpoint = (): AdapterEndpoint<RestEndpointTypes> => {
 const from = 'ETH'
 const to = 'USD'
 const price = 1234
-const version = process.env['npm_package_version']
 
 test.before(async (t) => {
   t.context.clock = FakeTimers.install()
@@ -122,7 +121,9 @@ const axiosMock = new MockAdapter(axios, {
   delayResponse: 1,
 })
 
-test.serial('Test http requests total metrics (data provider hit)', async (t) => {
+const feed_id = '{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}'
+
+test.serial('test basic metrics', async (t) => {
   axiosMock
     .onGet(`${URL}/price`, {
       base: from,
@@ -134,78 +135,86 @@ test.serial('Test http requests total metrics (data provider hit)', async (t) =>
 
   await t.context.testAdapter.request({ from, to })
 
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{method="POST",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",status_code="200",type="dataProviderHit",provider_status_code="200",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`http_requests_total${expectedLabel}`), 1)
-})
+  let metrics = await t.context.testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'http_requests_total',
+    labels: {
+      method: 'POST',
+      feed_id,
+      provider_status_code: '200',
+      status_code: '200',
+      type: 'dataProviderHit',
+    },
+    expectedValue: 1,
+  })
+  // Test http request duration metrics
+  metrics.assertPositiveNumber(t, {
+    name: 'http_request_duration_seconds_sum',
+  })
 
-test.serial('Test http request duration metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{app_name="TEST",app_version="${version}"}`
-  const responseTime = metricsMap.get(`http_request_duration_seconds_sum${expectedLabel}`)
-  if (responseTime !== undefined) {
-    t.is(typeof responseTime === 'number', true)
-    t.is(responseTime > 0, true)
-  } else {
-    t.fail('Response time did not record')
-  }
-})
+  // Test data provider requests metrics
+  metrics.assert(t, {
+    name: 'data_provider_requests',
+    labels: {
+      provider_status_code: '200',
+      method: 'GET',
+    },
+    expectedValue: 9,
+  })
+  // Test data provider request duration metrics
+  metrics.assertPositiveNumber(t, {
+    name: 'data_provider_request_duration_seconds_sum',
+  })
 
-test.serial('Test data provider requests metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{provider_status_code="200",method="GET",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`data_provider_requests${expectedLabel}`), 9)
-})
+  // Test cache set count metrics
+  metrics.assert(t, {
+    name: 'cache_data_set_count',
+    labels: {
+      feed_id,
+      participant_id: `TEST-test-${feed_id}`,
+      cache_type: 'local',
+    },
+    expectedValue: 9,
+  })
+  // Test cache max age metrics
+  metrics.assert(t, {
+    name: 'cache_data_max_age',
+    labels: {
+      feed_id,
+      participant_id: `TEST-test-${feed_id}`,
+      cache_type: 'local',
+    },
+    expectedValue: 90000,
+  })
+  // Test cache set staleness metrics
+  metrics.assert(t, {
+    name: 'cache_data_staleness_seconds',
+    labels: {
+      feed_id,
+      participant_id: `TEST-test-${feed_id}`,
+      cache_type: 'local',
+    },
+    expectedValue: 0,
+  })
 
-test.serial('Test data provider request duration metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{app_name="TEST",app_version="${version}"}`
-  const responseTime = metricsMap.get(`data_provider_request_duration_seconds_sum${expectedLabel}`)
-  if (responseTime !== undefined) {
-    t.is(typeof responseTime === 'number', true)
-    t.is(responseTime > 0, true)
-  } else {
-    t.fail('Response time did not record')
-  }
-})
-
-test.serial('Test cache set count metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`cache_data_set_count${expectedLabel}`), 9)
-})
-
-test.serial('Test cache max age metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`cache_data_max_age${expectedLabel}`), 90000)
-})
-
-test.serial('Test cache set staleness metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
-  const staleness = metricsMap.get(`cache_data_staleness_seconds${expectedLabel}`)
-  if (staleness !== undefined) {
-    t.is(typeof staleness === 'number', true)
-    t.is(staleness === 0, true)
-  } else {
-    t.fail('Staleness was not retrieved')
-  }
-})
-
-test.serial('Test provider time delta metric', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`cache_data_max_age${expectedLabel}`), 90000)
-})
-
-test.serial('Test credit spent metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{feed_id="N/A",participant_id="9002",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`rate_limit_credits_spent_total${expectedLabel}`), 9)
-})
-
-test.serial('Test http requests total metrics (cache hit)', async (t) => {
+  // Test provider time delta metric
+  metrics.assert(t, {
+    name: 'provider_time_delta',
+    labels: {
+      feed_id,
+    },
+    expectedValue: 100,
+  })
+  // Test credit spent metrics
+  metrics.assert(t, {
+    name: 'rate_limit_credits_spent_total',
+    labels: {
+      feed_id: 'N/A',
+      participant_id: '9002',
+    },
+    expectedValue: 9,
+  })
+  // Test http requests total metrics (cache hit)
   axiosMock
     .onGet(`${URL}/price`, {
       base: from,
@@ -217,33 +226,46 @@ test.serial('Test http requests total metrics (cache hit)', async (t) => {
 
   await t.context.testAdapter.request({ from, to })
 
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{method="POST",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",status_code="200",type="cacheHit",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`http_requests_total${expectedLabel}`), 1)
-})
-
-test.serial('Test cache get count metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`cache_data_get_count${expectedLabel}`), 1)
-})
-
-test.serial('Test cache get value metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
-  t.is(metricsMap.get(`cache_data_get_values${expectedLabel}`), 1234)
-})
-
-test.serial('Test cache get staleness metrics', async (t) => {
-  const metricsMap = await t.context.testAdapter.getMetrics()
-  const expectedLabel = `{participant_id="TEST-test-{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",feed_id="{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}",cache_type="local",app_name="TEST",app_version="${version}"}`
-  const staleness = metricsMap.get(`cache_data_staleness_seconds${expectedLabel}`)
-  if (staleness !== undefined) {
-    t.is(typeof staleness === 'number', true)
-    t.is(staleness > 0, true)
-  } else {
-    t.fail('Staleness was not retrieved')
-  }
+  metrics = await t.context.testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'http_requests_total',
+    labels: {
+      method: 'POST',
+      feed_id,
+      status_code: '200',
+      type: 'cacheHit',
+    },
+    expectedValue: 1,
+  })
+  // Test cache get count metrics
+  metrics.assert(t, {
+    name: 'cache_data_get_count',
+    labels: {
+      feed_id,
+      participant_id: `TEST-test-${feed_id}`,
+      cache_type: 'local',
+    },
+    expectedValue: 1,
+  })
+  // Test cache get value metrics
+  metrics.assert(t, {
+    name: 'cache_data_get_values',
+    labels: {
+      feed_id,
+      participant_id: `TEST-test-${feed_id}`,
+      cache_type: 'local',
+    },
+    expectedValue: 1234,
+  })
+  // Test cache get staleness metrics
+  metrics.assertPositiveNumber(t, {
+    name: 'cache_data_staleness_seconds',
+    labels: {
+      feed_id,
+      participant_id: `TEST-test-${feed_id}`,
+      cache_type: 'local',
+    },
+  })
 })
 
 test('Rate limit metrics retrieve cost (default)', async (t) => {

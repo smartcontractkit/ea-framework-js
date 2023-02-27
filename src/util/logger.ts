@@ -45,7 +45,9 @@ const baseLogger = pino({
     if (process.env['CORRELATION_ID_ENABLED'] !== 'false') {
       const store = asyncLocalStorage.getStore() as Store
       if (store) {
-        return store
+        return {
+          correlationId: store.correlationId,
+        }
       }
     }
     return {}

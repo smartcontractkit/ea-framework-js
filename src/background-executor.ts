@@ -34,6 +34,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
   const callBackgroundExecute = (
     endpoint: AdapterEndpoint<EndpointGenerics>,
     transport: Transport<TransportGenerics>,
+    transportName?: string,
   ) => {
     const backgroundExecute = transport.backgroundExecute?.bind(transport)
     if (!backgroundExecute) {
@@ -53,12 +54,15 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
         return
       }
       // Count number of background executions per endpoint
-      metrics.get('bgExecuteTotal').labels({ endpoint: endpoint.name }).inc()
+      metrics
+        .get('bgExecuteTotal')
+        .labels({ endpoint: endpoint.name, transport: transportName })
+        .inc()
 
       // Time the duration of the background execute process excluding sleep time
       const metricsTimer = metrics
         .get('bgExecuteDurationSeconds')
-        .labels({ endpoint: endpoint.name })
+        .labels({ endpoint: endpoint.name, transport: transportName })
         .startTimer()
 
       logger.debug(`Calling background execute for endpoint "${endpoint.name}"`)
@@ -74,6 +78,10 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
         )
       } catch (error) {
         logger.error(error, (error as Error).stack)
+        metrics
+          .get('bgExecuteErrors')
+          .labels({ endpoint: endpoint.name, transport: transportName })
+          .inc()
       }
 
       // This background execute loop is no longer the one to determine the sleep between bg execute calls.
@@ -98,8 +106,8 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       logger.debug(
         `Encountered MetaTransport ${transport.constructor.name}, calling backgroundExecute on all transports`,
       )
-      for (const nestedTransport of Object.values(castMeta.transports)) {
-        callBackgroundExecute(endpoint, nestedTransport)
+      for (const [transportName, nestedTransport] of Object.entries(castMeta.transports)) {
+        callBackgroundExecute(endpoint, nestedTransport, transportName)
       }
     } else {
       callBackgroundExecute(endpoint, transport)
