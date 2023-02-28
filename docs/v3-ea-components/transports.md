@@ -16,9 +16,3 @@ If you find that the built-in features of a transport do not meet your endpoint'
 - [Websocket Transport](./transport-types/websocket-transport.md)
 - [SSE Transport](./transport-types/sse-transport.md)
 - [Custom Transport](./transport-types/custom-transport.md)
-
-### Meta Transports
-
-In some cases, an EA endpoint might be reliant on a combination of transports.
-
-- [Routing Transport](./transport-types/routing-transport.md)

@@ -178,19 +178,26 @@ type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
   /** Map of transports that will be used when routing the request through this endpoint */
   transports: Record<string, Transport<T>>
 
-  /** TODO: */
+  /** Custom function to direct an incoming request to the appropriate transport from the transports map */
   customRouter?: (
     req: AdapterRequest<T['Request']>,
     adapterConfig: AdapterConfig<T['CustomSettings']>,
   ) => string
 
-  /** TODO: */
+  /** If no value is returned from the custom router or the default (transport param), which transport to use */
   defaultTransport?: string
 }
 
+/**
+ * Basic interface for the properties that the adapter endpoint will have, taken from the endpoint parameters.
+ * The reason why this is its own type is because the endpoint can be defined with one transport or multiple.
+ */
 export interface AdapterEndpointInterface<T extends EndpointGenerics>
   extends BaseAdapterEndpointParams<T>,
     MultiTransportAdapterEndpointParams<T> {}
 
+/**
+ * Type for the parameters that an adapter endpoint requires. See the comment in the [[AdapterEndpointInterface]] for more details.
+ */
 export type AdapterEndpointParams<T extends EndpointGenerics> = BaseAdapterEndpointParams<T> &
   (SingleTransportAdapterEndpointParams<T> | MultiTransportAdapterEndpointParams<T>)

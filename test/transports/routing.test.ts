@@ -309,7 +309,7 @@ test.beforeEach(async (t) => {
   }
 })
 
-test.serial('routing transport errors on invalid transport', async (t) => {
+test.serial('endpoint routing errors on invalid transport', async (t) => {
   t.is(
     Object.keys(transports).find((s) => s === 'INVALID'),
     undefined,
@@ -323,7 +323,7 @@ test.serial('routing transport errors on invalid transport', async (t) => {
   t.is(error.statusCode, 400)
 })
 
-test.serial('RoutingTransport can route to HttpTransport', async (t) => {
+test.serial('endpoint routing can route to HttpTransport', async (t) => {
   axiosMock
     .onPost(`${restUrl}/price`, {
       pairs: [
@@ -353,7 +353,7 @@ test.serial('RoutingTransport can route to HttpTransport', async (t) => {
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
-test.serial('RoutingTransport can route to WebSocket transport', async (t) => {
+test.serial('endpoint routing can route to WebSocket transport', async (t) => {
   const error = await t.context.testAdapter.request({
     from,
     to,
@@ -364,7 +364,7 @@ test.serial('RoutingTransport can route to WebSocket transport', async (t) => {
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
-test.serial('RoutingTransport can route to SSE transport', async (t) => {
+test.serial('endpoint routing can route to SSE transport', async (t) => {
   axiosMock
     .onPost(`${restUrl}/sub`)
     .reply(200, {

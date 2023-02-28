@@ -119,7 +119,6 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   }
 
   /**
-   * TODO: Move to price endpoint
    * Default request transform that takes requests and manipulates base params
    *
    * @param adapter - the current adapter
@@ -182,11 +181,10 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   }
 
   /**
-   * TODO: improve
+   * Default routing strategy. Will try and use the transport input parameter if present in the request body.
    *
-   * this will try to fetch the transport from the reserved param
-   * @param req - asd
-   * @returns
+   * @param req - The current adapter request
+   * @returns the transport param if present
    */
   private defaultRouter(req: AdapterRequest<T['Request']>) {
     const rawRequestBody = req.body as unknown as { data: AdapterRequestData }
