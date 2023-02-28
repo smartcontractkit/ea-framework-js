@@ -35,7 +35,7 @@ const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
   // The custom router is optional; by default the endpoint will attempt to use
   customRouter: (req, config) => { ... },
   // The default transport is also optional
-  defaultTransprot: 'rest'
+  defaultTransport: 'rest'
 })
 ```
 
