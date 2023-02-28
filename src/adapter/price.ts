@@ -69,8 +69,6 @@ type IncludesMap = Record<string, Record<string, IncludeDetails>>
  * Data Feeds, its InputParameters must extend the basic ones (base/quote).
  */
 export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {
-  includesMap?: IncludesMap
-
   constructor(
     params: AdapterEndpointParams<T> & {
       inputParameters: PriceEndpointInputParameters
