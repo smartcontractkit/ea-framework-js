@@ -33,10 +33,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   customInputValidation?: CustomInputValidator<T>
   requestTransforms?: RequestTransform<T>[]
   overrides?: Record<string, string> | undefined
-  customRouter?: (
-    req: AdapterRequest<T['Request']>,
-    adapterConfig: AdapterConfig<T['CustomSettings']>,
-  ) => string
+  customRouter?: (req: AdapterRequest<T['Request']>, adapterConfig: T['Config']) => string
   defaultTransport?: string
 
   constructor(params: AdapterEndpointParams<T>) {
@@ -81,7 +78,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   async initialize(
     adapterName: string,
     dependencies: AdapterDependencies,
-    config: AdapterConfig<T['CustomSettings']>,
+    config: T['Config'],
   ): Promise<void> {
     const responseCache = new ResponseCache({
       dependencies,
@@ -143,7 +140,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
 
   getTransportNameForRequest(
     req: AdapterRequest<T['Request']>,
-    adapterConfig: AdapterConfig<T['CustomSettings']>,
+    adapterConfig: T['Config'],
   ): string {
     // If there's only one transport, return it
     if (this.transports[DEFAULT_TRANSPORT_NAME]) {

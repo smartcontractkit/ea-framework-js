@@ -1,7 +1,7 @@
 import type EventSource from 'eventsource'
 import Redis from 'ioredis'
 import { Cache } from '../cache'
-import { AdapterConfig, BaseAdapterConfig, SettingsMap } from '../config'
+import { BaseAdapterConfig, ProcessedConfig, SettingsMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
 import { AdapterRequest, SingleNumberResultResponse, SubscriptionSetFactory } from '../util'
@@ -51,7 +51,7 @@ export interface EndpointContext<T extends EndpointGenerics> {
   inputParameters: InputParameters
 
   /** Initialized config for the adapter that the Transport can access */
-  adapterConfig: AdapterConfig<T['CustomSettings']>
+  adapterConfig: T['Config']
 }
 
 /**
@@ -81,7 +81,7 @@ export type Overrides = {
 /**
  * Main structure of an External Adapter
  */
-export interface AdapterParams<CustomSettings extends SettingsMap> {
+export interface AdapterParams<T extends ProcessedConfig = ProcessedConfig> {
   /** Name of the adapter */
   name: Uppercase<string>
 
@@ -99,17 +99,14 @@ export interface AdapterParams<CustomSettings extends SettingsMap> {
    */
   endpoints: AdapterEndpoint<any>[] // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  /** Map of overrides to the default config values for an Adapter */
-  envDefaultOverrides?: Partial<BaseAdapterConfig>
-
-  /** List of custom env vars for this particular adapter (e.g. RPC_URL) */
-  customSettings?: SettingsMap
-
   /** Configuration relevant to outbound (EA --\> DP) communication rate limiting */
   rateLimiting?: AdapterRateLimitingConfig
 
   /** Bootstrap function that will run when initializing the adapter */
-  bootstrap?: (adapter: Adapter<CustomSettings>) => Promise<void>
+  bootstrap?: (adapter: Adapter<T>) => Promise<void>
+
+  /** TODO: complete */
+  processedConfig: T
 }
 
 /**
@@ -136,7 +133,7 @@ export type PriceEndpointGenerics = TransportGenerics & { Response: SingleNumber
 
 export type CustomInputValidator<T extends EndpointGenerics> = (
   input: AdapterRequest<T['Request']>,
-  config: AdapterConfig<T['CustomSettings']>,
+  config: T['Config'],
 ) => AdapterError | undefined
 
 /**
@@ -179,10 +176,7 @@ type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
   transports: Record<string, Transport<T>>
 
   /** Custom function to direct an incoming request to the appropriate transport from the transports map */
-  customRouter?: (
-    req: AdapterRequest<T['Request']>,
-    adapterConfig: AdapterConfig<T['CustomSettings']>,
-  ) => string
+  customRouter?: (req: AdapterRequest<T['Request']>, adapterConfig: T['Config']) => string
 
   /** If no value is returned from the custom router or the default (transport param), which transport to use */
   defaultTransport?: string

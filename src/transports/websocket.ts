@@ -1,6 +1,5 @@
 import WebSocket, { ClientOptions, RawData } from 'ws'
 import { EndpointContext } from '../adapter'
-import { AdapterConfig } from '../config'
 import { metrics } from '../metrics'
 import { makeLogger, sleep } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
@@ -122,7 +121,7 @@ export class WebSocketTransport<
     super()
   }
 
-  getSubscriptionTtlFromConfig(config: AdapterConfig<T['CustomSettings']>): number {
+  getSubscriptionTtlFromConfig(config: T['Config']): number {
     return config.WS_SUBSCRIPTION_TTL
   }
 

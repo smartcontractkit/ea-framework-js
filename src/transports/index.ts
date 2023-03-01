@@ -1,6 +1,6 @@
 import { AdapterDependencies, EndpointContext } from '../adapter'
 import { ResponseCache } from '../cache/response'
-import { AdapterConfig, SettingsMap } from '../config'
+import { BaseAdapterConfig } from '../config'
 import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/types'
 
 export * from './http'
@@ -29,7 +29,7 @@ export type TransportGenerics = {
   /**
    * Type for any custom settings used for this Transport
    */
-  CustomSettings: SettingsMap
+  Config: BaseAdapterConfig
 }
 
 /**
@@ -71,7 +71,7 @@ export interface Transport<T extends TransportGenerics> {
    */
   initialize: (
     dependencies: TransportDependencies<T>,
-    config: AdapterConfig<T['CustomSettings']>,
+    config: T['Config'],
     endpointName: string,
     transportName: string,
   ) => Promise<void>
@@ -84,10 +84,7 @@ export interface Transport<T extends TransportGenerics> {
    * @param config - common configuration for the Adapter as a whole
    * @returns an empty Promise
    */
-  registerRequest?: (
-    req: AdapterRequest<T['Request']>,
-    config: AdapterConfig<T['CustomSettings']>,
-  ) => Promise<void>
+  registerRequest?: (req: AdapterRequest<T['Request']>, config: T['Config']) => Promise<void>
 
   /**
    * Performs a synchronous fetch/processing of information within the lifecycle of an incoming request.
@@ -103,7 +100,7 @@ export interface Transport<T extends TransportGenerics> {
    */
   foregroundExecute?: (
     req: AdapterRequest<T['Request']>,
-    config: AdapterConfig<T['CustomSettings']>,
+    config: T['Config'],
   ) => Promise<AdapterResponse<{
     Data: T['Response']['Data']
     Result: T['Response']['Result']

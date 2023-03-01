@@ -1,14 +1,13 @@
 import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { EndpointContext } from '../adapter'
-import { AdapterConfig } from '../config'
-import { makeLogger, sleep } from '../util'
-import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
-import { Requester } from '../util/requester'
-import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
 import { TransportDependencies, TransportGenerics } from '.'
-import { SubscriptionTransport } from './abstract/subscription'
-import { metrics, retrieveCost } from '../metrics'
+import { EndpointContext } from '../adapter'
 import { calculateHttpRequestKey } from '../cache'
+import { metrics, retrieveCost } from '../metrics'
+import { makeLogger, sleep } from '../util'
+import { Requester } from '../util/requester'
+import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
+import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
+import { SubscriptionTransport } from './abstract/subscription'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
 
@@ -64,7 +63,7 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
    */
   prepareRequests: (
     params: T['Request']['Params'][],
-    config: AdapterConfig<T['CustomSettings']>,
+    config: T['Config'],
   ) => ProviderRequestConfig<T> | ProviderRequestConfig<T>[]
 
   /**
@@ -84,7 +83,7 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
   parseResponse: (
     params: T['Request']['Params'][],
     res: AxiosResponse<T['Provider']['ResponseBody']>,
-    config: AdapterConfig<T['CustomSettings']>,
+    config: T['Config'],
   ) => ProviderResult<T>[]
 }
 
@@ -110,7 +109,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
   override async initialize(
     dependencies: TransportDependencies<T>,
-    config: AdapterConfig<T['CustomSettings']>,
+    config: T['Config'],
     endpointName: string,
     transportName: string,
   ): Promise<void> {
@@ -118,7 +117,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     this.requester = dependencies.requester
   }
 
-  getSubscriptionTtlFromConfig(config: AdapterConfig<T['CustomSettings']>): number {
+  getSubscriptionTtlFromConfig(config: T['Config']): number {
     return config.WARMUP_SUBSCRIPTION_TTL
   }
 

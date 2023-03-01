@@ -1,13 +1,12 @@
 import { AxiosRequestConfig } from 'axios'
 import EventSource from 'eventsource'
 import { EndpointContext } from '../adapter'
-import { AdapterConfig } from '../config'
+import { calculateHttpRequestKey } from '../cache'
 import { makeLogger, sleep } from '../util'
+import { Requester } from '../util/requester'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportDependencies, TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
-import { Requester } from '../util/requester'
-import { calculateHttpRequestKey } from '../cache'
 
 const logger = makeLogger('SSETransport')
 
@@ -75,13 +74,13 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
     super()
   }
 
-  getSubscriptionTtlFromConfig(config: AdapterConfig<T['CustomSettings']>): number {
+  getSubscriptionTtlFromConfig(config: T['Config']): number {
     return config.SSE_SUBSCRIPTION_TTL
   }
 
   override async initialize(
     dependencies: TransportDependencies<T>,
-    config: AdapterConfig<T['CustomSettings']>,
+    config: T['Config'],
     endpointName: string,
     transportName: string,
   ): Promise<void> {

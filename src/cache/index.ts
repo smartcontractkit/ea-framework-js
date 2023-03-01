@@ -1,6 +1,5 @@
 import crypto from 'crypto'
 import { EndpointContext, EndpointGenerics } from '../adapter'
-import { AdapterConfig } from '../config'
 import { AdapterResponse, makeLogger, sleep } from '../util'
 import { InputParameters } from '../validation'
 import { CacheTypes as CacheType } from './metrics'
@@ -76,7 +75,7 @@ export const calculateCacheKey = <T extends EndpointGenerics>({
   inputParameters: InputParameters
   adapterName: string
   endpointName: string
-  adapterConfig: AdapterConfig<T['CustomSettings']>
+  adapterConfig: T['Config']
   transportName: string
 }): string => {
   const calculatedKey = calculateKey({
@@ -122,7 +121,7 @@ const calculateKey = <T extends EndpointGenerics>({
   data: unknown
   endpointName: string
   transportName: string
-  adapterConfig: AdapterConfig<T['CustomSettings']>
+  adapterConfig: T['Config']
   inputParameters: InputParameters
 }) => {
   const paramsKey = Object.keys(inputParameters).length
@@ -137,7 +136,7 @@ export const calculateFeedId = <T extends EndpointGenerics>(
     adapterConfig,
   }: {
     inputParameters: InputParameters
-    adapterConfig: AdapterConfig<T['CustomSettings']>
+    adapterConfig: T['Config']
   },
   data: unknown,
 ): string => {

@@ -3,7 +3,7 @@ import { AddressInfo } from 'net'
 import { join } from 'path'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
-import { AdapterConfig, SettingsMap } from './config'
+import { AdapterConfig, ProcessedConfig } from './config'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
 import { AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
@@ -54,7 +54,7 @@ export const getMTLSOptions = (config: AdapterConfig) => {
  * @param dependencies - an optional object with adapter dependencies to inject
  * @returns a Promise that resolves to the http.Server listening for connections
  */
-export const start = async <T extends SettingsMap = SettingsMap>(
+export const start = async <T extends ProcessedConfig = ProcessedConfig>(
   adapter: Adapter<T>,
   dependencies?: Partial<AdapterDependencies>,
 ): Promise<{
@@ -73,14 +73,20 @@ export const start = async <T extends SettingsMap = SettingsMap>(
   let api: FastifyInstance | undefined = undefined
   let metricsApi: FastifyInstance | undefined = undefined
 
-  if (adapter.config.METRICS_ENABLED && adapter.config.EXPERIMENTAL_METRICS_ENABLED) {
-    metricsApi = setupMetricsServer(adapter.name, adapter.config as AdapterConfig)
+  if (
+    adapter.processedConfig.config.METRICS_ENABLED &&
+    adapter.processedConfig.config.EXPERIMENTAL_METRICS_ENABLED
+  ) {
+    metricsApi = setupMetricsServer(adapter.name, adapter.processedConfig.config)
   }
 
   // Optional Promise to indicate that the API is shutting down (for us to close background executors)
   let apiShutdownPromise
 
-  if (adapter.config.EA_MODE === 'reader' || adapter.config.EA_MODE === 'reader-writer') {
+  if (
+    adapter.processedConfig.config.EA_MODE === 'reader' ||
+    adapter.processedConfig.config.EA_MODE === 'reader-writer'
+  ) {
     // Main REST API server to handle incoming requests
     api = await buildRestApi(adapter as unknown as Adapter)
 
@@ -92,7 +98,10 @@ export const start = async <T extends SettingsMap = SettingsMap>(
     logger.info('REST API is disabled; this instance will not process incoming requests.')
   }
 
-  if (adapter.config.EA_MODE === 'writer' || adapter.config.EA_MODE === 'reader-writer') {
+  if (
+    adapter.processedConfig.config.EA_MODE === 'writer' ||
+    adapter.processedConfig.config.EA_MODE === 'reader-writer'
+  ) {
     // Start background loop that will take care of calling any async Transports
     logger.info('Starting background execution loop')
     callBackgroundExecutes(adapter as unknown as Adapter, apiShutdownPromise)
@@ -105,7 +114,7 @@ export const start = async <T extends SettingsMap = SettingsMap>(
   return { api, metricsApi }
 }
 
-export const expose = async <T extends SettingsMap = SettingsMap>(
+export const expose = async <T extends ProcessedConfig = ProcessedConfig>(
   adapter: Adapter<T>,
   dependencies?: Partial<AdapterDependencies>,
 ): Promise<FastifyInstance | undefined> => {
@@ -114,7 +123,7 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
   const exposeApp = async (app: FastifyInstance | undefined, port: number) => {
     if (app) {
       try {
-        await app.listen({ port, host: adapter.config.EA_HOST })
+        await app.listen({ port, host: adapter.processedConfig.config.EA_HOST })
       } catch (err) {
         logger.fatal(`There was an error when starting the server: ${err}`)
         process.exit()
@@ -125,22 +134,24 @@ export const expose = async <T extends SettingsMap = SettingsMap>(
   }
 
   // Start listening for incoming requests
-  await exposeApp(api, adapter.config.EA_PORT)
-  await exposeApp(metricsApi, adapter.config.METRICS_PORT)
+  await exposeApp(api, adapter.processedConfig.config.EA_PORT)
+  await exposeApp(metricsApi, adapter.processedConfig.config.METRICS_PORT)
 
   // We return only the main API to maintain backwards compatibility
   return api
 }
 
 async function buildRestApi(adapter: Adapter) {
-  const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(adapter.config)
+  const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(
+    adapter.processedConfig.config,
+  )
   const app = fastify({
     ...mTLSOptions,
-    bodyLimit: adapter.config.MAX_PAYLOAD_SIZE_LIMIT,
+    bodyLimit: adapter.processedConfig.config.MAX_PAYLOAD_SIZE_LIMIT,
   })
 
   // Add healthcheck endpoint before middlewares to bypass them
-  app.get(join(adapter.config.BASE_URL, 'health'), (req, res) => {
+  app.get(join(adapter.processedConfig.config.BASE_URL, 'health'), (req, res) => {
     res.status(200).send({ message: 'OK', version: VERSION })
   })
 
@@ -156,12 +167,12 @@ async function buildRestApi(adapter: Adapter) {
   app.register(async (router) => {
     // Set up "middlewares" (hooks in fastify)
     router.addHook<AdapterRouteGeneric>('preHandler', validatorMiddleware(adapter))
-    if (adapter.config['CORRELATION_ID_ENABLED']) {
+    if (adapter.processedConfig.config.CORRELATION_ID_ENABLED) {
       router.addHook<AdapterRouteGeneric>('onRequest', loggingContextMiddleware)
     }
 
     router.route<AdapterRouteGeneric>({
-      url: adapter.config.BASE_URL,
+      url: adapter.processedConfig.config.BASE_URL,
       method: 'POST',
       handler: async (req, reply) => {
         const response = await adapter.handleRequest(req, reply as unknown as Promise<unknown>)
@@ -169,7 +180,10 @@ async function buildRestApi(adapter: Adapter) {
       },
     })
 
-    if (adapter.config.METRICS_ENABLED && adapter.config.EXPERIMENTAL_METRICS_ENABLED) {
+    if (
+      adapter.processedConfig.config.METRICS_ENABLED &&
+      adapter.processedConfig.config.EXPERIMENTAL_METRICS_ENABLED
+    ) {
       router.addHook<AdapterRouteGeneric>('onResponse', buildMetricsMiddleware)
     }
   })

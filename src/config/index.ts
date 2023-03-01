@@ -1,3 +1,4 @@
+import CensorList, { CensorKeyValue } from '../util/censor/censor-list'
 import { validator } from '../validation/utils'
 
 export const BaseSettings = {
@@ -344,26 +345,6 @@ export const buildAdapterConfig = <
   return vars as AdapterConfig<CustomSettings>
 }
 
-export const validateAdapterConfig = <
-  CustomSettings extends CustomSettingsType<CustomSettings> = EmptySettings,
->(
-  adapterConfig: AdapterConfig<CustomSettings>,
-  customSettings = {} as SettingsMap,
-): void => {
-  const validationErrors: string[] = []
-  Object.entries(BaseSettings as SettingsMap)
-    .concat(Object.entries((customSettings as SettingsMap) || {}))
-    .forEach(([name, setting]) => {
-      validateSetting(name, (adapterConfig as AdapterConfig)[name], setting, validationErrors)
-    })
-
-  if (validationErrors.length > 0) {
-    throw new Error(
-      `Validation failed for the following variables:\n ${validationErrors.join('\n')}`,
-    )
-  }
-}
-
 const validateSetting = (
   key: string,
   value: SettingValueType | undefined,
@@ -521,9 +502,94 @@ export type AdapterConfigFromSettings<T extends SettingsMap> = {
 
 export type BaseAdapterConfig = AdapterConfigFromSettings<BaseSettingsType>
 export type AdapterConfig<T extends CustomSettingsType<T> = SettingsMap> =
-  AdapterConfigFromSettings<T> & BaseAdapterConfig
+  AdapterConfigFromSettings<T> & BaseAdapterConfig & ConfigObjectSpecifier
 
 export type CustomSettingsType<T = SettingsMap> = Record<keyof T, Setting>
 export type EmptySettings = Record<string, never>
 export type SettingsMap = Record<string, Setting>
 export type ValidationErrorMessage = string | undefined
+
+/**
+ * TODO: Improve docs
+ * This class will hold the processed config type, and the basic settings
+ * The idea is that you can no longer use a straight object, but have to build a config
+ * Then in the generics we can simply pass the type of this, and it will hopefully allow for simpler generics
+ * name is placeholder
+ */
+export class ProcessedConfig<T extends SettingsMap = SettingsMap> {
+  config!: AdapterConfig<T>
+
+  constructor(
+    private settings: T,
+    private options?: {
+      /** Map of overrides to the default config values for an Adapter */
+      envDefaultOverrides?: Partial<BaseAdapterConfig>
+
+      /** TODO: complete */
+      envVarsPrefix: string
+    },
+  ) {}
+
+  initialize() {
+    this.config = buildAdapterConfig({
+      customSettings: this.settings,
+      overrides: this.options?.envDefaultOverrides,
+      envVarsPrefix: this.options?.envVarsPrefix,
+    })
+  }
+
+  validate(): void {
+    const validationErrors: string[] = []
+    Object.entries(BaseSettings as SettingsMap)
+      .concat(Object.entries(this.settings || {}))
+      .forEach(([name, setting]) => {
+        validateSetting(
+          name,
+          (this.config as Record<string, ValidSettingValue>)[name],
+          setting,
+          validationErrors,
+        )
+      })
+
+    if (validationErrors.length > 0) {
+      throw new Error(
+        `Validation failed for the following variables:\n ${validationErrors.join('\n')}`,
+      )
+    }
+  }
+
+  /**
+   * Creates a list of key/value pairs that need to be censored in the logs
+   * using the sensitive flag in the adapter config
+   */
+  buildCensorList() {
+    const censorList: CensorKeyValue[] = Object.entries(BaseSettings as SettingsMap)
+      .concat(Object.entries((this.settings as SettingsMap) || {}))
+      .filter(
+        ([name, setting]) =>
+          setting &&
+          setting.type === 'string' &&
+          setting.sensitive &&
+          (this.config as Record<string, ValidSettingValue>)[name],
+      )
+      .map(([name]) => ({
+        key: name,
+        // Escaping potential special characters in values before creating regex
+        value: new RegExp(
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          ((this.config as AdapterConfig)[name]! as string).replace(
+            /[-[\]{}()*+?.,\\^$|#\s]/g,
+            '\\$&',
+          ),
+          'gi',
+        ),
+      }))
+    CensorList.set(censorList)
+  }
+}
+
+type ConfigObjectSpecifier = {
+  __reserved_settings: never
+}
+type ValidSettingValue = string | number | boolean
+export type GenericConfigStructure = BaseAdapterConfig & ConfigObjectSpecifier

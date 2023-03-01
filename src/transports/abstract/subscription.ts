@@ -1,10 +1,9 @@
+import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
 import { ResponseCache } from '../../cache/response'
-import { AdapterConfig } from '../../config'
+import { metrics } from '../../metrics'
 import { makeLogger, SubscriptionSet } from '../../util'
 import { AdapterRequest } from '../../util/types'
-import { Transport, TransportDependencies, TransportGenerics } from '..'
-import { metrics } from '../../metrics'
 
 const logger = makeLogger('SubscriptionTransport')
 
@@ -25,7 +24,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
 
   async initialize(
     dependencies: TransportDependencies<T>,
-    config: AdapterConfig<T['CustomSettings']>,
+    config: T['Config'],
     endpointName: string,
     name: string,
   ): Promise<void> {
@@ -35,10 +34,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     this.name = name
   }
 
-  async registerRequest(
-    req: AdapterRequest<T['Request']>,
-    _: AdapterConfig<T['CustomSettings']>,
-  ): Promise<void> {
+  async registerRequest(req: AdapterRequest<T['Request']>, _: T['Config']): Promise<void> {
     logger.debug(
       `Adding entry to subscription set (ttl ${this.subscriptionTtl}): [${req.requestContext.cacheKey}] = ${req.requestContext.data}`,
     )
@@ -82,5 +78,5 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
    *
    * @param config - the config for this adapter
    */
-  abstract getSubscriptionTtlFromConfig(config: AdapterConfig<T['CustomSettings']>): number
+  abstract getSubscriptionTtlFromConfig(config: T['Config']): number
 }

@@ -1,7 +1,6 @@
 import { TransportGenerics } from '.'
 import { EndpointContext } from '../adapter'
 import { calculateFeedId } from '../cache'
-import { AdapterConfig } from '../config'
 import { metrics } from '../metrics'
 import { InputParameters } from '../validation'
 
@@ -17,7 +16,7 @@ export const messageSubsLabels = <T extends TransportGenerics>(
   context: {
     inputParameters: InputParameters
     endpointName: string
-    adapterConfig: AdapterConfig<T['CustomSettings']>
+    adapterConfig: T['Config']
   },
   params: T['Request']['Params'],
 ) => {
