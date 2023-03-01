@@ -22,22 +22,21 @@ only being responsible to route to the transport. An EA that supports both WS an
 - **HttpTransport**
   Use for sending HTTP requests to the DP
 
-If a single endpoint supports multiple transports, these transports should be wrapped in a **RoutingTransport**. An
-example implementation:
+If a single endpoint supports multiple transports, these transports should be passed to the endpoint like so:
 
 ```typescript
-export const routingTransport = new RoutingTransport<CryptoEndpointTypes>(
-  {
-    HTTP: httpTransport,
-    WS: wsTransport,
+const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+  inputParameters,
+  name: 'price', // /price
+  transports: {
+    rest: httpTransport,
+    ws: wsTransport,
   },
-  (req) => {
-    if (req.requestContext.data.endpoint === 'crypto-ws') {
-      return 'WS'
-    }
-    return 'HTTP'
-  },
-)
+  // The custom router is optional; by default the endpoint will attempt to use
+  customRouter: (req, config) => { ... },
+  // The default transport is also optional
+  defaultTransport: 'rest'
+})
 ```
 
 The structure you end up with can look something like this:
@@ -50,11 +49,8 @@ adapter
 |  └─ includes.json // Includes file (e.x. inverses)
 ├─ endpoints
 │  ├─ crypto // Input: {"endpoint": "crypto"} or {"endpoint": "crypto-ws"} (if added as an alias)
-│  │  └─ RoutingTransport // A single routing transport that wraps multiple
-│  │     │                // underlying transports to ensure types and
-│  │     │                // input params stay consistent.
-│  │     ├─ HttpTransport
-│  │     └─ WebSocketTransport
+│  │  ├─ HttpTransport
+│  │  └─ WebSocketTransport
 │  └─ volume // Input: {"endpoint": "volume"}
 │     └─ HttpTransport
 └─ index // References endpoints, rate limit tiers, custom settings, etc.
@@ -195,14 +191,13 @@ export const wsTransport = new WebSocketTransport<EndpointTypes>({
 
 # Endpoint
 
-A v3 Endpoint is the same as a v2 Endpoint in that it routes based on the `endpoint` input parameter. However, as
-explained earlier, through the use of a RoutingTransport, a single v3 Endpoint can support multiple transports.
+A v3 Endpoint is the same as a v2 Endpoint in that it routes based on the `endpoint` input parameter. The endpoint can take either a single transport, or a map of transports with an optional router function and default transport.
 
 ```typescript
 export const endpoint = new PriceEndpoint<EndpointTypes>({
   name: 'crypto', // The name of this endpoint. { "endpoint": "crypto" }
   aliases: ['crypto-ws', 'price'], // Aliases for the endpoint
-  transport: routingTransport, // The transport this endpoint is referencing
+  transport: httpTransport, // The transport this endpoint is referencing
   inputParameters: endpointInputParams, // Input parameters used for this endpoint
 })
 ```

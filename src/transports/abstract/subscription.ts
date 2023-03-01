@@ -21,15 +21,18 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   }>
   subscriptionSet!: SubscriptionSet<T['Request']['Params']>
   subscriptionTtl!: number
+  name!: string
 
   async initialize(
     dependencies: TransportDependencies<T>,
     config: AdapterConfig<T['CustomSettings']>,
     endpointName: string,
+    name: string,
   ): Promise<void> {
     this.responseCache = dependencies.responseCache
     this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName)
     this.subscriptionTtl = this.getSubscriptionTtlFromConfig(config) // Will be implemented by subclasses
+    this.name = name
   }
 
   async registerRequest(

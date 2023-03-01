@@ -32,6 +32,9 @@ export type AdapterRequestContext<T = AdapterRequestData> = {
   /** Name of the endpoint this payload should be directed to */
   endpointName: string
 
+  /** Name of the endpoint this payload should be directed to */
+  transportName: string
+
   /** Precalculated cache key used to get and set corresponding values from the cache and subscription sets */
   cacheKey: string
 
@@ -90,11 +93,18 @@ export interface AdapterMetricsMeta {
 }
 
 /**
+ * Input params that can always be present in an incoming request
+ */
+type CommonAdapterRequestParams = {
+  endpoint?: string
+  transport?: string
+}
+export type ReservedInputParameterNames = keyof CommonAdapterRequestParams
+
+/**
  * Basic shape for the data within the request body
  */
-export type AdapterRequestData = Record<string, unknown> & {
-  endpoint?: string
-}
+export type AdapterRequestData = Record<string, unknown> & CommonAdapterRequestParams
 
 export type ProviderResultGenerics = {
   Request: RequestGenerics

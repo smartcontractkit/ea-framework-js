@@ -40,8 +40,6 @@ yarn # Install yarn dependencies
       - [WebSocket](./docs/v3-ea-components/transport-types/websocket-transport.md)
       - [SSE](./docs/v3-ea-components/transport-types/sse-transport.md)
       - [Custom](./docs/v3-ea-components/transport-types/custom-transport.md)
-    - Meta
-      - [Routing](./docs/v3-ea-components/transport-types/routing-transport.md)
 
 ## Testing
 

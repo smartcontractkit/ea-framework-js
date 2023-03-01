@@ -25,6 +25,7 @@ type TestTransportGenerics = TransportGenerics & {
 }
 
 class OverrideTestTransport implements Transport<TestTransportGenerics> {
+  name!: string
   responseCache!: ResponseCache<{
     Request: TestTransportGenerics['Request']
     Response: TestTransportGenerics['Response']
@@ -67,11 +68,11 @@ test.beforeEach(async (t) => {
           },
         },
         transport: new OverrideTestTransport(),
+        overrides: {
+          OVER1: 'overriden_1',
+        },
       }),
     ],
-    overrides: {
-      OVER1: 'overriden_1',
-    },
   })
 
   t.context.adapterEndpoint = adapter.endpoints[0]

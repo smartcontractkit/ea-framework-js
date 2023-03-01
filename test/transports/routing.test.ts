@@ -1,5 +1,6 @@
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
+import MockAdapter from 'axios-mock-adapter'
 import { Server, WebSocket } from 'mock-socket'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { SettingsMap } from '../../src/config'
@@ -11,13 +12,10 @@ import {
   WebSocketClassProvider,
   WebSocketTransport,
 } from '../../src/transports'
-import { RoutingTransport } from '../../src/transports/meta'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
-import MockAdapter from 'axios-mock-adapter'
 
 const test = untypedTest as TestFn<{
-  endpoint: AdapterEndpoint<BaseEndpointTypes>
   testAdapter: TestAdapter
 }>
 
@@ -33,7 +31,6 @@ interface ProviderResponseBody {
 interface AdapterRequestParams {
   from: string
   to: string
-  transport: string
 }
 
 interface ProviderMessage {
@@ -89,11 +86,6 @@ const inputParameters = {
     required: true,
     type: 'string',
   },
-  transport: {
-    description: 'which transport to route to',
-    required: true,
-    type: 'string',
-  },
 } satisfies InputParameters
 
 class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
@@ -110,7 +102,7 @@ class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
         message(message) {
           return [
             {
-              params: { from: 'ETH', to: 'USD', transport: 'WEBSOCKET' },
+              params: { from: 'ETH', to: 'USD' },
               response: {
                 data: { price: message.value },
                 result: message.value,
@@ -259,7 +251,7 @@ class MockSseTransport extends SseTransport<SSETypes> {
           parseResponse: (evt: MessageEvent) => {
             return [
               {
-                params: { from: 'ETH', to: 'USD', transport: 'SSE' },
+                params: { from: 'ETH', to: 'USD' },
                 response: {
                   data: { price: evt.data.price },
                   result: evt.data.price,
@@ -284,20 +276,17 @@ const transports = {
   sse: new MockSseTransport(),
 } as const satisfies Record<string, Transport<BaseEndpointTypes>>
 
-// Route function is used to select an adapter based on the supplied string, transport
-const routingTransport = new RoutingTransport<BaseEndpointTypes>(transports)
-
 test.beforeEach(async (t) => {
-  const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+  const sampleEndpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transport: routingTransport,
+    transports,
   })
 
-  const adapter = new Adapter<typeof CustomSettings>({
+  const sampleAdapter = new Adapter<typeof CustomSettings>({
     name: 'TEST',
     defaultEndpoint: 'price',
-    endpoints: [endpoint],
+    endpoints: [sampleEndpoint],
     rateLimiting: {
       tiers: {
         default: {
@@ -313,15 +302,14 @@ test.beforeEach(async (t) => {
     },
   })
 
-  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+  const testAdapter = await TestAdapter.startWithMockedCache(sampleAdapter, t.context)
 
   t.context = {
     testAdapter,
-    endpoint,
   }
 })
 
-test.serial('routing transport errors on invalid transport', async (t) => {
+test.serial('endpoint routing errors on invalid transport', async (t) => {
   t.is(
     Object.keys(transports).find((s) => s === 'INVALID'),
     undefined,
@@ -335,7 +323,7 @@ test.serial('routing transport errors on invalid transport', async (t) => {
   t.is(error.statusCode, 400)
 })
 
-test.serial('RoutingTransport can route to HttpTransport', async (t) => {
+test.serial('endpoint routing can route to HttpTransport', async (t) => {
   axiosMock
     .onPost(`${restUrl}/price`, {
       pairs: [
@@ -365,7 +353,7 @@ test.serial('RoutingTransport can route to HttpTransport', async (t) => {
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
-test.serial('RoutingTransport can route to WebSocket transport', async (t) => {
+test.serial('endpoint routing can route to WebSocket transport', async (t) => {
   const error = await t.context.testAdapter.request({
     from,
     to,
@@ -376,7 +364,7 @@ test.serial('RoutingTransport can route to WebSocket transport', async (t) => {
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
-test.serial('RoutingTransport can route to SSE transport', async (t) => {
+test.serial('endpoint routing can route to SSE transport', async (t) => {
   axiosMock
     .onPost(`${restUrl}/sub`)
     .reply(200, {
@@ -403,13 +391,11 @@ test.serial('RoutingTransport can route to SSE transport', async (t) => {
 })
 
 test.serial('custom router is applied to get valid transport to route to', async (t) => {
-  const transport = new RoutingTransport<BaseEndpointTypes>(transports, () => {
-    return 'batch'
-  })
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transport,
+    transports,
+    customRouter: () => 'batch',
   })
 
   const adapter = new Adapter<typeof CustomSettings>({
@@ -463,13 +449,11 @@ test.serial('custom router is applied to get valid transport to route to', async
 })
 
 test.serial('custom router returns invalid transport and request fails', async (t) => {
-  const transport = new RoutingTransport<BaseEndpointTypes>(transports, () => {
-    return 'qweqwe'
-  })
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transport,
+    transports,
+    customRouter: () => 'qweqwe',
   })
 
   const adapter = new Adapter<typeof CustomSettings>({
@@ -517,21 +501,17 @@ test.serial('custom router returns invalid transport and request fails', async (
     transport: 'BATCH',
   })
   t.is(error.statusCode, 400)
-  t.is(error.json().error.message, 'No transport found for qweqwe')
+  t.is(
+    error.json().error.message,
+    'No transport found for key "qweqwe", must be one of ["websocket","batch","sse"]',
+  )
 })
 
 test.serial('missing transport in input params with no default fails request', async (t) => {
-  const transport = new RoutingTransport<BaseEndpointTypes>(transports)
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
-    inputParameters: {
-      ...inputParameters,
-      transport: {
-        ...inputParameters.transport,
-        required: false,
-      },
-    },
+    inputParameters,
     name: 'price', // /price
-    transport,
+    transports,
   })
 
   const adapter = new Adapter<typeof CustomSettings>({
@@ -580,23 +560,16 @@ test.serial('missing transport in input params with no default fails request', a
   t.is(error.statusCode, 400)
   t.is(
     error.json().error.message,
-    'No transport was specified in the input parameters, and this endpoint does not have a default set.',
+    'No result was fetched from a custom router, no transport was specified in the input parameters, and this endpoint does not have a default transport set.',
   )
 })
 
 test.serial('missing transport in input params with default succeeds', async (t) => {
-  const transport = new RoutingTransport<BaseEndpointTypes>(transports)
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
-    inputParameters: {
-      ...inputParameters,
-      transport: {
-        ...inputParameters.transport,
-        default: 'batch',
-        required: false,
-      },
-    },
+    inputParameters,
     name: 'price', // /price
-    transport,
+    transports,
+    defaultTransport: 'batch',
   })
 
   const adapter = new Adapter<typeof CustomSettings>({
@@ -654,8 +627,12 @@ test.serial('transport creation fails if transport names are not acceptable', as
   for (const name of invalidNames) {
     t.throws(
       () =>
-        new RoutingTransport<BaseEndpointTypes>({
-          [name]: transports.batch,
+        new AdapterEndpoint<BaseEndpointTypes>({
+          name: 'test',
+          inputParameters,
+          transports: {
+            [name]: transports.batch,
+          },
         }),
     )
   }

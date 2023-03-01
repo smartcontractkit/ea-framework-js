@@ -178,7 +178,7 @@ test.serial('test WS connection, subscription, and message metrics', async (t) =
   const feed_id = '{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}'
   const subscription_key = `test-${feed_id}`
   const endpoint = `test`
-  const transport = 'undefined'
+  const transport = 'default_single_transport'
   const transport_type = `WebSocketTransport`
 
   metrics.assert(t, {

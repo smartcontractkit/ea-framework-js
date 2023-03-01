@@ -12,7 +12,7 @@ export const test = untypedTest as TestFn<{
 
 export class BasicCacheSetterTransport extends NopTransport {
   override async foregroundExecute(req: AdapterRequest): Promise<void> {
-    await this.responseCache.write([
+    await this.responseCache.write(this.name, [
       {
         params: req.requestContext.data,
         response: {
@@ -31,7 +31,7 @@ export class BasicCacheSetterTransport extends NopTransport {
 
 export class DifferentResultTransport extends NopTransport {
   override async foregroundExecute(req: AdapterRequest): Promise<void> {
-    await this.responseCache.write([
+    await this.responseCache.write(this.name, [
       {
         params: req.requestContext.data,
         response: {
@@ -84,7 +84,7 @@ export const cacheTests = () => {
       factor: 111,
     }
 
-    const cacheKey = 'TEST-test-{"base":"qweqwe","factor":111}'
+    const cacheKey = 'TEST-test-default_single_transport-{"base":"qweqwe","factor":111}'
 
     // Inject values directly into the cache
     const injectedEntry = {
@@ -105,7 +105,7 @@ export const cacheTests = () => {
       factor: 24637,
     }
 
-    const cacheKey = 'TEST-test-{"base":"sdfghj","factor":24637}'
+    const cacheKey = 'TEST-test-default_single_transport-{"base":"sdfghj","factor":24637}'
 
     // Inject values directly into the cache
     const injectedEntry = {

@@ -1,6 +1,6 @@
 import { Adapter, AdapterEndpoint, EndpointContext, EndpointGenerics } from './adapter'
 import { metrics } from './metrics'
-import { MetaTransport, Transport, TransportGenerics } from './transports'
+import { Transport, TransportGenerics } from './transports'
 import { asyncLocalStorage, makeLogger } from './util'
 
 const logger = makeLogger('BackgroundExecutor')
@@ -98,19 +98,8 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
   }
 
   for (const endpoint of adapter.endpoints) {
-    const { transport } = endpoint
-
-    // Check if transport is a MetaTransport by casting and checking a known property (transports)
-    const castMeta = transport as MetaTransport<TransportGenerics>
-    if (castMeta.transports) {
-      logger.debug(
-        `Encountered MetaTransport ${transport.constructor.name}, calling backgroundExecute on all transports`,
-      )
-      for (const [transportName, nestedTransport] of Object.entries(castMeta.transports)) {
-        callBackgroundExecute(endpoint, nestedTransport, transportName)
-      }
-    } else {
-      callBackgroundExecute(endpoint, transport)
+    for (const [transportName, transport] of Object.entries(endpoint.transports)) {
+      callBackgroundExecute(endpoint, transport, transportName)
     }
   }
 }

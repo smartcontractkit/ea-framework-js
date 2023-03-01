@@ -112,8 +112,9 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     dependencies: TransportDependencies<T>,
     config: AdapterConfig<T['CustomSettings']>,
     endpointName: string,
+    transportName: string,
   ): Promise<void> {
-    await super.initialize(dependencies, config, endpointName)
+    await super.initialize(dependencies, config, endpointName, transportName)
     this.requester = dependencies.requester
   }
 
@@ -191,7 +192,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     }
 
     logger.debug('Setting adapter responses in cache')
-    await this.responseCache.write(results)
+    await this.responseCache.write(this.name, results)
 
     if (msUntilNextExecution) {
       // If we got this, it means that the queue was unable to accomomdate this request.
@@ -217,7 +218,11 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
       //   - there should be a limit on the amount of subscriptions in the set
       // Use cache key to avoid coalescing requests across different endpoints
       const requesterResult = await this.requester.request<T['Provider']['ResponseBody']>(
-        calculateHttpRequestKey(context, requestConfig.params),
+        calculateHttpRequestKey({
+          context,
+          data: requestConfig.params,
+          transportName: this.name,
+        }),
         requestConfig.request,
       )
 

@@ -3,7 +3,12 @@ import { Adapter } from '../adapter'
 import { calculateCacheKey, recordRedisCommandMetric } from '../cache'
 import { getMetricsMeta } from '../metrics/util'
 import { makeLogger } from '../util'
-import { AdapterMiddlewareBuilder, AdapterRequest, AdapterRequestBody } from '../util/types'
+import {
+  AdapterMiddlewareBuilder,
+  AdapterRequest,
+  AdapterRequestBody,
+  AdapterRequestContext,
+} from '../util/types'
 import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
 import { CMD_SENT_STATUS } from '../cache/metrics'
 import { ReplyError as RedisError } from 'ioredis'
@@ -54,20 +59,13 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     const validatedData = endpoint.validator.validateInput(requestBody.data)
 
-    // Custom input validation defined in the EA
-    const error =
-      endpoint.customInputValidation &&
-      endpoint.customInputValidation(validatedData, adapter.config)
-
-    if (error) {
-      throw error
-    }
-
     req.requestContext = {
       cacheKey: '',
       data: validatedData,
       endpointName: endpoint.name,
-    }
+    } as AdapterRequestContext
+    // We do it afterwards so the custom routers can have a request with a requestContext fulfilled (sans transportName, ofc)
+    req.requestContext.transportName = endpoint.getTransportNameForRequest(req, adapter.config)
 
     if (adapter.config.METRICS_ENABLED && adapter.config.EXPERIMENTAL_METRICS_ENABLED) {
       // Add metrics meta which includes feedId to the request
@@ -82,9 +80,17 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       req.requestContext = { ...req.requestContext, meta: { metrics } }
     }
 
+    // Custom input validation defined in the EA
+    const error =
+      endpoint.customInputValidation && endpoint.customInputValidation(req, adapter.config)
+
+    if (error) {
+      throw error
+    }
+
     // Run any request transforms that might have been defined in the adapter.
     // This is the last time modifications are supposed to happen to the request.
-    adapter.runRequestTransforms(req)
+    endpoint.runRequestTransforms(req)
 
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {
@@ -98,15 +104,15 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       }
       req.requestContext.cacheKey = cacheKey
     } else {
-      req.requestContext.cacheKey = calculateCacheKey(
-        {
-          adapterName: adapter.name,
-          endpointName: endpoint.name,
-          inputParameters: endpoint.inputParameters,
-          adapterConfig: adapter.config,
-        },
-        req.requestContext.data,
-      )
+      const transportName = endpoint.getTransportNameForRequest(req, adapter.config)
+      req.requestContext.cacheKey = calculateCacheKey({
+        data: req.requestContext.data,
+        adapterName: adapter.name,
+        endpointName: endpoint.name,
+        transportName,
+        inputParameters: endpoint.inputParameters,
+        adapterConfig: adapter.config,
+      })
     }
 
     done()

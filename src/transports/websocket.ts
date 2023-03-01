@@ -174,7 +174,7 @@ export class WebSocketTransport<
           this.lastMessageReceivedAt = Date.now()
 
           logger.trace(`Writing ${results.length} responses to cache`)
-          await this.responseCache.write(results)
+          await this.responseCache.write(this.name, results)
         }
 
         // Do this after writing so we get the values to the cache ASAP

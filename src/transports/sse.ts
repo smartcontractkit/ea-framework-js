@@ -83,8 +83,9 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
     dependencies: TransportDependencies<T>,
     config: AdapterConfig<T['CustomSettings']>,
     endpointName: string,
+    transportName: string,
   ): Promise<void> {
-    super.initialize(dependencies, config, endpointName)
+    super.initialize(dependencies, config, endpointName, transportName)
     this.requester = dependencies.requester
     if (dependencies.eventSource) {
       this.EventSource = dependencies.eventSource
@@ -117,7 +118,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
             }
             return result
           })
-          this.responseCache.write(results)
+          this.responseCache.write(this.name, results)
         }
       }
 
@@ -136,14 +137,28 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
 
     if (subscriptions.new.length) {
       const subscribeRequest = this.config.prepareSubscriptionRequest(subscriptions.new, context)
-      makeRequest(calculateHttpRequestKey(context, subscriptions.new), subscribeRequest)
+      makeRequest(
+        calculateHttpRequestKey({
+          context,
+          transportName: this.name,
+          data: subscriptions.new,
+        }),
+        subscribeRequest,
+      )
     }
     if (subscriptions.stale.length) {
       const unsubscribeRequest = this.config.prepareUnsubscriptionRequest(
         subscriptions.stale,
         context,
       )
-      makeRequest(calculateHttpRequestKey(context, subscriptions.stale), unsubscribeRequest)
+      makeRequest(
+        calculateHttpRequestKey({
+          context,
+          transportName: this.name,
+          data: subscriptions.stale,
+        }),
+        unsubscribeRequest,
+      )
     }
     if (
       this.config.prepareKeepAliveRequest &&
@@ -151,7 +166,14 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
       Date.now() - this.timeOfLastReq > context.adapterConfig.SSE_KEEPALIVE_SLEEP
     ) {
       const prepareKeepAliveRequest = this.config.prepareKeepAliveRequest(context)
-      makeRequest(calculateHttpRequestKey(context, subscriptions.desired), prepareKeepAliveRequest)
+      makeRequest(
+        calculateHttpRequestKey({
+          context,
+          transportName: this.name,
+          data: subscriptions.desired,
+        }),
+        prepareKeepAliveRequest,
+      )
     }
 
     // The background execute loop no longer sleeps between executions, so we have to do it here

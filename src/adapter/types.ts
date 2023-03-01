@@ -4,12 +4,7 @@ import { Cache } from '../cache'
 import { AdapterConfig, BaseAdapterConfig, SettingsMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
-import {
-  AdapterRequest,
-  RequestGenerics,
-  SingleNumberResultResponse,
-  SubscriptionSetFactory,
-} from '../util'
+import { AdapterRequest, SingleNumberResultResponse, SubscriptionSetFactory } from '../util'
 import { Requester } from '../util/requester'
 import { InputParameters, SpecificInputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
@@ -70,8 +65,8 @@ export interface AdapterRateLimitingConfig {
 /**
  * Type to perform arbitrary modifications on an adapter request
  */
-export type RequestTransform<T extends RequestGenerics = RequestGenerics> = (
-  req: AdapterRequest<T>,
+export type RequestTransform<T extends EndpointGenerics> = (
+  req: AdapterRequest<T['Request']>,
 ) => void
 
 /**
@@ -113,13 +108,6 @@ export interface AdapterParams<CustomSettings extends SettingsMap> {
   /** Configuration relevant to outbound (EA --\> DP) communication rate limiting */
   rateLimiting?: AdapterRateLimitingConfig
 
-  /** Overrides for converting the 'base' parameter that are hardcoded into the adapter. */
-  // This must be included in the middleware in order to generate deterministing cache keys for hardcoded overrides
-  overrides?: Record<string, string>
-
-  /** Transforms that will apply to the request before submitting it through the adapter request flow */
-  requestTransforms?: RequestTransform[]
-
   /** Bootstrap function that will run when initializing the adapter */
   bootstrap?: (adapter: Adapter<CustomSettings>) => Promise<void>
 }
@@ -147,22 +135,19 @@ export type EndpointGenerics = TransportGenerics
 export type PriceEndpointGenerics = TransportGenerics & { Response: SingleNumberResultResponse }
 
 export type CustomInputValidator<T extends EndpointGenerics> = (
-  input: T['Request']['Params'],
+  input: AdapterRequest<T['Request']>,
   config: AdapterConfig<T['CustomSettings']>,
 ) => AdapterError | undefined
 
 /**
  * Structure to describe a specific endpoint in an [[Adapter]]
  */
-export interface AdapterEndpointParams<T extends EndpointGenerics> {
+export interface BaseAdapterEndpointParams<T extends EndpointGenerics> {
   /** Name that will be used to match input params to this endpoint (case insensitive) */
   name: string
 
   /** List of alternative endpoint names that will resolve to this same transport (case insensitive) */
   aliases?: string[]
-
-  /** Transport that will be used to handle data processing and communication for this endpoint */
-  transport: Transport<T>
 
   /** Specification of what the body of a request hitting this endpoint should look like (used for validation) */
   inputParameters: SpecificInputParameters<T['Request']['Params']>
@@ -175,4 +160,44 @@ export interface AdapterEndpointParams<T extends EndpointGenerics> {
 
   /** Custom input validation. Void function that should throw AdapterInputError on validation errors */
   customInputValidation?: CustomInputValidator<T>
+
+  /** Transforms that will apply to the request before submitting it through the adapter request flow */
+  requestTransforms?: RequestTransform<T>[]
+
+  /** Overrides for converting the 'base' parameter that are hardcoded into the adapter. */
+  // This must be included in the middleware in order to generate deterministing cache keys for hardcoded overrides
+  overrides?: Record<string, string>
 }
+
+type SingleTransportAdapterEndpointParams<T extends EndpointGenerics> = {
+  /** Transport that will be used to handle data processing and communication for this endpoint */
+  transport: Transport<T>
+}
+
+type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
+  /** Map of transports that will be used when routing the request through this endpoint */
+  transports: Record<string, Transport<T>>
+
+  /** Custom function to direct an incoming request to the appropriate transport from the transports map */
+  customRouter?: (
+    req: AdapterRequest<T['Request']>,
+    adapterConfig: AdapterConfig<T['CustomSettings']>,
+  ) => string
+
+  /** If no value is returned from the custom router or the default (transport param), which transport to use */
+  defaultTransport?: string
+}
+
+/**
+ * Basic interface for the properties that the adapter endpoint will have, taken from the endpoint parameters.
+ * The reason why this is its own type is because the endpoint can be defined with one transport or multiple.
+ */
+export interface AdapterEndpointInterface<T extends EndpointGenerics>
+  extends BaseAdapterEndpointParams<T>,
+    MultiTransportAdapterEndpointParams<T> {}
+
+/**
+ * Type for the parameters that an adapter endpoint requires. See the comment in the [[AdapterEndpointInterface]] for more details.
+ */
+export type AdapterEndpointParams<T extends EndpointGenerics> = BaseAdapterEndpointParams<T> &
+  (SingleTransportAdapterEndpointParams<T> | MultiTransportAdapterEndpointParams<T>)

@@ -1,9 +1,9 @@
+import crypto from 'crypto'
 import { EndpointContext, EndpointGenerics } from '../adapter'
-import { AdapterConfig, SettingsMap } from '../config'
+import { AdapterConfig } from '../config'
 import { AdapterResponse, makeLogger, sleep } from '../util'
 import { InputParameters } from '../validation'
 import { CacheTypes as CacheType } from './metrics'
-import crypto from 'crypto'
 
 export * from './factory'
 export * from './local'
@@ -64,41 +64,71 @@ export interface Cache<T = unknown> {
 }
 
 // Uses calculateKey to generate a unique key from the endpoint name, data, and input parameters
-export const calculateCacheKey = <T extends EndpointGenerics>(
-  {
-    inputParameters,
-    adapterName,
-    endpointName,
+export const calculateCacheKey = <T extends EndpointGenerics>({
+  data,
+  inputParameters,
+  adapterName,
+  endpointName,
+  adapterConfig,
+  transportName,
+}: {
+  data: unknown
+  inputParameters: InputParameters
+  adapterName: string
+  endpointName: string
+  adapterConfig: AdapterConfig<T['CustomSettings']>
+  transportName: string
+}): string => {
+  const calculatedKey = calculateKey({
+    data,
     adapterConfig,
-  }: {
-    inputParameters: InputParameters
-    adapterName: string
-    endpointName: string
-    adapterConfig: AdapterConfig<T['CustomSettings']>
-  },
-  data: unknown,
-): string => {
-  if (Object.keys(inputParameters).length === 0) {
-    logger.trace(`Using default cache key ${adapterConfig.DEFAULT_CACHE_KEY}`)
-    return adapterConfig.DEFAULT_CACHE_KEY
-  }
-  const cacheKey = `${adapterName}-${endpointName}-${calculateKey(data, adapterConfig)}`
+    endpointName,
+    transportName,
+    inputParameters,
+  })
+  const cacheKey = `${adapterName}-${calculatedKey}`
   logger.trace(`Generated cache key for request: "${cacheKey}"`)
   return cacheKey
 }
 
 // Used to coalesce HTTP requests within the same endpoint
-export const calculateHttpRequestKey = <T extends EndpointGenerics>(
-  context: EndpointContext<T>,
-  data: unknown,
-): string => {
-  if (Object.keys(context.inputParameters).length === 0) {
-    logger.trace(`Using default cache key ${context.adapterConfig.DEFAULT_CACHE_KEY}`)
-    return `${context.endpointName}-${context.adapterConfig.DEFAULT_CACHE_KEY}`
-  }
-  const key = `${context.endpointName}-${calculateKey(data, context.adapterConfig)}`
+export const calculateHttpRequestKey = <T extends EndpointGenerics>({
+  data,
+  context,
+  transportName,
+}: {
+  context: EndpointContext<T>
+  data: unknown
+  transportName: string
+}): string => {
+  const key = calculateKey({
+    data,
+    transportName,
+    adapterConfig: context.adapterConfig,
+    endpointName: context.endpointName,
+    inputParameters: context.inputParameters,
+  })
   logger.trace(`Generated HTTP request queue key: "${key}"`)
   return key
+}
+
+const calculateKey = <T extends EndpointGenerics>({
+  data,
+  endpointName,
+  transportName,
+  adapterConfig,
+  inputParameters,
+}: {
+  data: unknown
+  endpointName: string
+  transportName: string
+  adapterConfig: AdapterConfig<T['CustomSettings']>
+  inputParameters: InputParameters
+}) => {
+  const paramsKey = Object.keys(inputParameters).length
+    ? calculateParamsKey(data, adapterConfig.MAX_COMMON_KEY_SIZE)
+    : adapterConfig.DEFAULT_CACHE_KEY
+  return `${endpointName}-${transportName}-${paramsKey}`
 }
 
 export const calculateFeedId = <T extends EndpointGenerics>(
@@ -115,14 +145,14 @@ export const calculateFeedId = <T extends EndpointGenerics>(
     logger.trace(`Cannot generate Feed ID without input parameters`)
     return 'N/A'
   }
-  return calculateKey(data, adapterConfig)
+  return calculateParamsKey(data, adapterConfig.MAX_COMMON_KEY_SIZE)
 }
 
 /**
  * Calculates a unique key from the provided data.
  *
  * @param data - the request data/body, i.e. the adapter input params
- * @param adapterConfig - the config for this Adapter
+ * @param maxSize - the max length for the cache key params section
  * @returns the calculated unique key
  *
  * @example
@@ -131,10 +161,7 @@ export const calculateFeedId = <T extends EndpointGenerics>(
  * // equals `{"base":"eth","quote":"btc"}`
  * ```
  */
-export const calculateKey = <CustomSettings extends SettingsMap>(
-  data: unknown,
-  adapterConfig: AdapterConfig<CustomSettings>,
-): string => {
+const calculateParamsKey = (data: unknown, maxSize: number): string => {
   if (data && typeof data !== 'object') {
     throw new Error('Data to calculate cache key should be an object')
   }
@@ -146,7 +173,7 @@ export const calculateKey = <CustomSettings extends SettingsMap>(
     return value
   })
 
-  if (cacheKey.length > adapterConfig.MAX_COMMON_KEY_SIZE) {
+  if (cacheKey.length > maxSize) {
     logger.debug(
       `Generated cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be hashed`,
     )
