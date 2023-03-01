@@ -59,15 +59,6 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     const validatedData = endpoint.validator.validateInput(requestBody.data)
 
-    // Custom input validation defined in the EA
-    const error =
-      endpoint.customInputValidation &&
-      endpoint.customInputValidation(validatedData, adapter.config)
-
-    if (error) {
-      throw error
-    }
-
     req.requestContext = {
       cacheKey: '',
       data: validatedData,
@@ -87,6 +78,14 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
         validatedData,
       )
       req.requestContext = { ...req.requestContext, meta: { metrics } }
+    }
+
+    // Custom input validation defined in the EA
+    const error =
+      endpoint.customInputValidation && endpoint.customInputValidation(req, adapter.config)
+
+    if (error) {
+      throw error
     }
 
     // Run any request transforms that might have been defined in the adapter.

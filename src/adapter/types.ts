@@ -135,7 +135,7 @@ export type EndpointGenerics = TransportGenerics
 export type PriceEndpointGenerics = TransportGenerics & { Response: SingleNumberResultResponse }
 
 export type CustomInputValidator<T extends EndpointGenerics> = (
-  input: T['Request']['Params'],
+  input: AdapterRequest<T['Request']>,
   config: AdapterConfig<T['CustomSettings']>,
 ) => AdapterError | undefined
 
