@@ -65,6 +65,11 @@ const buildAdapter = async (
         inputParameters: priceEndpointInputParameters,
         transport: new PriceTestTransport(mockResponse),
       }),
+      new AdapterEndpoint({
+        name: 'basicEndpoint',
+        inputParameters: priceEndpointInputParameters,
+        transport: new PriceTestTransport(mockResponse),
+      }),
     ],
     includes,
   })
@@ -274,6 +279,55 @@ test('does not invert result if inverse pair sent directly', async (t) => {
   })
   t.is(response.statusCode, 200)
   t.is(response.json().result, 1 / 1234)
+})
+
+test('basic adapter endpoints bypass includes logic successfully', async (t) => {
+  const includes = [
+    {
+      from: 'ETH',
+      to: 'BTC',
+      includes: [
+        {
+          from: 'BTC',
+          to: 'ETH',
+          inverse: true,
+        },
+      ],
+    },
+  ]
+
+  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
+    result: 1234,
+    data: null,
+    statusCode: 200,
+    timestamps: {
+      providerDataRequestedUnixMs: 0,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
+    },
+  }
+
+  const data = {
+    base: 'ETH',
+    quote: 'BTC',
+  }
+
+  const testAdapter = await buildAdapter(
+    t.context,
+    (req) => {
+      t.deepEqual(req.requestContext.data, data)
+
+      return mockResponse
+    },
+    includes,
+  )
+
+  const response = await testAdapter.request({
+    ...data,
+    endpoint: 'basicEndpoint',
+  })
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, mockResponse.result)
 })
 
 test('crypto price endpoint has common aliases', async (t) => {
