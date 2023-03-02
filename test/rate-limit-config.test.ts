@@ -163,17 +163,8 @@ test('throws error if explicit allocation exceeds 100%', async (t) => {
 })
 
 test('uses most restrictive tier if none is specified in settings', async (t) => {
-  const processedConfig = new ProcessedConfig(
-    {},
-    {
-      envDefaultOverrides: {
-        RATE_LIMIT_API_TIER: 'asdasdasd',
-      },
-    },
-  )
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',

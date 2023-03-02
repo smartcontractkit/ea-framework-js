@@ -10,6 +10,7 @@ test.serial('Test config validator', async (t) => {
   process.env['MAX_COMMON_KEY_SIZE'] = '1000'
   try {
     const config = new ProcessedConfig({})
+    config.initialize()
     config.validate()
     t.fail()
   } catch (e: unknown) {
@@ -20,6 +21,7 @@ test.serial('Test config validator', async (t) => {
 test.serial('Test good enum config', async (t) => {
   process.env['CACHE_TYPE'] = 'local'
   const config = new ProcessedConfig({})
+  config.initialize()
   config.validate()
   t.is(config.config.CACHE_TYPE, 'local')
 })
@@ -28,6 +30,7 @@ test.serial('Test bad enum config', async (t) => {
   process.env['CACHE_TYPE'] = 'test'
   try {
     const config = new ProcessedConfig({})
+    config.initialize()
     config.validate()
     t.fail()
   } catch (e: unknown) {
@@ -44,6 +47,7 @@ test.serial('Test custom settings', async (t) => {
     },
   } satisfies SettingsMap
   const config = new ProcessedConfig(customSettings)
+  config.initialize()
   config.validate()
   t.is(config.config.CUSTOM_KEY, 'test')
 })
@@ -58,6 +62,7 @@ test.serial('Test missing custom settings (required)', async (t) => {
   }
   try {
     const config = new ProcessedConfig(customSettings)
+    config.initialize()
     config.validate()
     t.fail()
   } catch (e: unknown) {
@@ -75,6 +80,7 @@ test.serial('Test custom settings (overlap base)', async (t) => {
   }
   try {
     const config = new ProcessedConfig(customSettings)
+    config.initialize()
     config.validate()
     t.fail()
   } catch (e: unknown) {
@@ -86,6 +92,7 @@ test.serial('Test prefix settings', async (t) => {
   process.env['TEST_PREFIX_BASE_URL'] = 'TEST_BASE_URL'
   const envVarsPrefix = 'TEST_PREFIX'
   const config = new ProcessedConfig({}, { envVarsPrefix })
+  config.initialize()
   t.is(config.config['BASE_URL'], 'TEST_BASE_URL')
 })
 
@@ -99,6 +106,7 @@ test.serial('Test validate function (out of bounds)', async (t) => {
     },
   }
   const config = new ProcessedConfig(customSettings)
+  config.initialize()
   try {
     config.validate()
     t.fail()
@@ -117,6 +125,7 @@ test.serial('Test validate function (decimal)', async (t) => {
     },
   }
   const config = new ProcessedConfig(customSettings)
+  config.initialize()
   try {
     config.validate()
     t.fail()
@@ -135,6 +144,7 @@ test.serial('Test validate function (scientific notation)', async (t) => {
     },
   }
   const config = new ProcessedConfig(customSettings)
+  config.initialize()
   try {
     config.validate()
     t.pass()
