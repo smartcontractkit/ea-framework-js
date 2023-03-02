@@ -9,7 +9,7 @@ import {
   priceEndpointInputParameters,
 } from '../src/adapter'
 import { ResponseCache } from '../src/cache/response'
-import { SettingsMap } from '../src/config'
+import { BaseAdapterConfig } from '../src/config'
 import { Transport } from '../src/transports'
 import { AdapterRequest, AdapterResponse } from '../src/util'
 import { NopTransport, TestAdapter } from './util'
@@ -27,7 +27,7 @@ type PriceTestTypes = {
     Data: null
     Result: number
   }
-  CustomSettings: SettingsMap
+  Config: BaseAdapterConfig
 }
 
 class PriceTestTransport implements Transport<PriceTestTypes> {

@@ -106,7 +106,7 @@ export interface AdapterParams<T extends ProcessedConfig = ProcessedConfig> {
   bootstrap?: (adapter: Adapter<T>) => Promise<void>
 
   /** TODO: complete */
-  processedConfig: T
+  processedConfig?: T
 }
 
 /**

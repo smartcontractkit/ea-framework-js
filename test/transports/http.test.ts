@@ -1,15 +1,15 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosResponse } from 'axios'
+import MockAdapter from 'axios-mock-adapter'
 import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { calculateHttpRequestKey } from '../../src/cache'
-import { buildAdapterConfig, SettingsMap } from '../../src/config'
+import { BaseAdapterConfig, buildAdapterConfig, ProcessedConfig } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse, sleep } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { assertEqualResponses, MockCache, runAllUntil, runAllUntilTime, TestAdapter } from '../util'
-import MockAdapter from 'axios-mock-adapter'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
@@ -61,7 +61,7 @@ type HttpTransportTypes = {
     Params: AdapterRequestParams
   }
   Response: SingleNumberResultResponse
-  CustomSettings: SettingsMap
+  Config: BaseAdapterConfig
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
@@ -203,9 +203,19 @@ test.serial(
     const rateLimit1m = 4
     const transport = new MockHttpTransport(true)
 
+    const processedConfig = new ProcessedConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          WARMUP_SUBSCRIPTION_TTL: 100_000, // Over 1 minute, below 2 minutes
+        },
+      },
+    )
+
     const adapter = new Adapter({
       name: 'TEST',
       defaultEndpoint: 'test',
+      processedConfig,
       endpoints: [
         new AdapterEndpoint({
           name: 'test',
@@ -220,9 +230,6 @@ test.serial(
           },
         },
       },
-      envDefaultOverrides: {
-        WARMUP_SUBSCRIPTION_TTL: 100_000, // Over 1 minute, below 2 minutes
-      },
     })
 
     // Start the adapter
@@ -235,7 +242,8 @@ test.serial(
 
     // Advance the clock a few minutes and check that the amount of calls is as expected
     await runAllUntilTime(t.context.clock, 3 * 60 * 1000) // 4m
-    const expected = rateLimit1m * Math.ceil(adapter.config.WARMUP_SUBSCRIPTION_TTL / 60_000)
+    const expected =
+      rateLimit1m * Math.ceil(adapter.processedConfig.config.WARMUP_SUBSCRIPTION_TTL / 60_000)
     t.is(transport.backgroundExecuteCalls, expected)
   },
 )
@@ -246,9 +254,19 @@ test.serial(
     const rateLimit1s = 1
     const transport = new MockHttpTransport(true)
 
+    const processedConfig = new ProcessedConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          WARMUP_SUBSCRIPTION_TTL: 100000,
+        },
+      },
+    )
+
     const adapter = new Adapter({
       name: 'TEST',
       defaultEndpoint: 'test',
+      processedConfig,
       endpoints: [
         new AdapterEndpoint({
           name: 'test',
@@ -262,9 +280,6 @@ test.serial(
             rateLimit1s,
           },
         },
-      },
-      envDefaultOverrides: {
-        WARMUP_SUBSCRIPTION_TTL: 100000,
       },
     })
 
@@ -289,8 +304,18 @@ test.serial(
     const transportA = new MockHttpTransport(true)
     const transportB = new MockHttpTransport(true)
 
+    const processedConfig = new ProcessedConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          WARMUP_SUBSCRIPTION_TTL: 100000,
+        },
+      },
+    )
+
     const adapter = new Adapter({
       name: 'TEST',
+      processedConfig,
       endpoints: [
         new AdapterEndpoint({
           name: 'A',
@@ -309,9 +334,6 @@ test.serial(
             rateLimit1s,
           },
         },
-      },
-      envDefaultOverrides: {
-        WARMUP_SUBSCRIPTION_TTL: 100000,
       },
     })
 
@@ -380,8 +402,18 @@ test.serial(
         ],
       })
 
+    const processedConfig = new ProcessedConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          WARMUP_SUBSCRIPTION_TTL: 100000,
+        },
+      },
+    )
+
     const adapter = new Adapter({
       name: 'TEST',
+      processedConfig,
       endpoints: [
         new AdapterEndpoint({
           name: 'A',
@@ -400,9 +432,6 @@ test.serial(
             rateLimit1s,
           },
         },
-      },
-      envDefaultOverrides: {
-        WARMUP_SUBSCRIPTION_TTL: 100000,
       },
     })
 
@@ -445,7 +474,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
   })
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
+  const mockCache = new MockCache(adapter.processedConfig.config.CACHE_MAX_ITEMS)
 
   // Start the adapter
   const testAdapter = await TestAdapter.start(adapter, t.context, {
@@ -501,7 +530,9 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
           }) || [],
       })
     }
-    override async backgroundExecute(context: EndpointContext<HttpTransportTypes>): Promise<void> {
+    override async backgroundExecute(
+      context: EndpointContext<HttpVolumeTransportTypes>,
+    ): Promise<void> {
       const entries = await this.subscriptionSet.getAll()
       if (entries.length) {
         this.backgroundExecuteCalls++
@@ -645,9 +676,22 @@ test.serial(
     //   - Queued
     const numbers = [1, 2, 3, 4]
 
+    const processedConfig = new ProcessedConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          // These mean the first request will be queued and immediately fired,
+          // the second will be queued, and the third will replace the second in the queue.
+          MAX_HTTP_REQUEST_QUEUE_LENGTH: 1,
+          RATE_LIMIT_CAPACITY_MINUTE: 1,
+        },
+      },
+    )
+
     const adapter = new Adapter({
       name: 'TEST',
       defaultEndpoint: 'test',
+      processedConfig,
       endpoints: numbers.map(
         (n) =>
           new AdapterEndpoint({
@@ -656,13 +700,6 @@ test.serial(
             transport: new MockHttpTransport(true),
           }),
       ),
-
-      envDefaultOverrides: {
-        // These mean the first request will be queued and immediately fired,
-        // the second will be queued, and the third will replace the second in the queue.
-        MAX_HTTP_REQUEST_QUEUE_LENGTH: 1,
-        RATE_LIMIT_CAPACITY_MINUTE: 1,
-      },
     })
 
     // Mock valid responses for the requests we'll send

@@ -1,8 +1,8 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { Server, WebSocket } from 'mock-socket'
-import { Adapter, AdapterEndpoint, AdapterParams } from '../../src/adapter'
-import { SettingsMap } from '../../src/config'
+import { Adapter, AdapterEndpoint } from '../../src/adapter'
+import { BaseAdapterConfig, ProcessedConfig } from '../../src/config'
 import {
   WebSocketClassProvider,
   WebsocketReverseMappingTransport,
@@ -73,7 +73,7 @@ type WebSocketTypes = {
     Params: AdapterRequestParams
   }
   Response: SingleNumberResultResponse
-  CustomSettings: SettingsMap
+  Config: BaseAdapterConfig
   Provider: {
     WsMessage: ProviderMessage
   }
@@ -81,7 +81,7 @@ type WebSocketTypes = {
 
 const BACKGROUND_EXECUTE_MS_WS = 5000
 
-const createAdapter = (adapterParams?: Partial<AdapterParams<SettingsMap>>): Adapter => {
+const createAdapter = (envDefaultOverrides: Record<string, string | number | symbol>): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => URL,
     handlers: {
@@ -118,15 +118,21 @@ const createAdapter = (adapterParams?: Partial<AdapterParams<SettingsMap>>): Ada
     inputParameters,
   })
 
+  const processedConfig = new ProcessedConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
+        ...envDefaultOverrides,
+      },
+    },
+  )
+
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
     endpoints: [webSocketEndpoint],
-    ...adapterParams,
-    envDefaultOverrides: {
-      BACKGROUND_EXECUTE_MS_WS,
-      ...adapterParams?.envDefaultOverrides,
-    },
+    processedConfig,
   })
 
   return adapter
@@ -163,9 +169,7 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
   })
 
   const adapter = createAdapter({
-    envDefaultOverrides: {
-      WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
-    },
+    WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
   })
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
@@ -183,8 +187,8 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
 
   // Wait until the cache expires, and the subscription is out
   const duration =
-    Math.ceil(CACHE_MAX_AGE / adapter.config.WS_SUBSCRIPTION_TTL) *
-      adapter.config.WS_SUBSCRIPTION_TTL +
+    Math.ceil(CACHE_MAX_AGE / adapter.processedConfig.config.WS_SUBSCRIPTION_TTL) *
+      adapter.processedConfig.config.WS_SUBSCRIPTION_TTL +
     1
   await runAllUntilTime(t.context.clock, duration)
 
@@ -261,13 +265,20 @@ test.serial('reconnects when url changed', async (t) => {
     inputParameters,
   })
 
+  const processedConfig = new ProcessedConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        WS_SUBSCRIPTION_TTL: 20000,
+      },
+    },
+  )
+
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
+    processedConfig,
     endpoints: [webSocketEndpoint],
-    envDefaultOverrides: {
-      WS_SUBSCRIPTION_TTL: 20000,
-    },
   })
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
@@ -315,10 +326,8 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
   })
 
   const adapter = createAdapter({
-    envDefaultOverrides: {
-      WS_SUBSCRIPTION_TTL: 30000,
-      WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
-    },
+    WS_SUBSCRIPTION_TTL: 30000,
+    WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
   })
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
@@ -403,14 +412,21 @@ test.serial(
       inputParameters,
     })
 
+    const processedConfig = new ProcessedConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          BACKGROUND_EXECUTE_MS_WS,
+          WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+        },
+      },
+    )
+
     const adapter = new Adapter({
       name: 'TEST',
       defaultEndpoint: 'test',
+      processedConfig,
       endpoints: [webSocketEndpoint],
-      envDefaultOverrides: {
-        BACKGROUND_EXECUTE_MS_WS,
-        WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
-      },
     })
 
     const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
@@ -428,8 +444,8 @@ test.serial(
 
     // Wait until the cache expires, and the subscription is out
     const duration =
-      Math.ceil(CACHE_MAX_AGE / adapter.config.WS_SUBSCRIPTION_TTL) *
-        adapter.config.WS_SUBSCRIPTION_TTL +
+      Math.ceil(CACHE_MAX_AGE / adapter.processedConfig.config.WS_SUBSCRIPTION_TTL) *
+        adapter.processedConfig.config.WS_SUBSCRIPTION_TTL +
       1
     await runAllUntilTime(t.context.clock, duration)
 
@@ -447,7 +463,7 @@ test.serial(
 )
 
 const createReverseMappingAdapter = (
-  adapterParams?: Partial<AdapterParams<SettingsMap>>,
+  envDefaultOverrides?: Record<string, string | number | symbol>,
 ): Adapter => {
   const websocketTransport: WebsocketReverseMappingTransport<WebSocketTypes, string> =
     new WebsocketReverseMappingTransport<WebSocketTypes, string>({
@@ -494,15 +510,21 @@ const createReverseMappingAdapter = (
     inputParameters,
   })
 
+  const processedConfig = new ProcessedConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
+        ...envDefaultOverrides,
+      },
+    },
+  )
+
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
+    processedConfig,
     endpoints: [webSocketEndpoint],
-    ...adapterParams,
-    envDefaultOverrides: {
-      BACKGROUND_EXECUTE_MS_WS,
-      ...adapterParams?.envDefaultOverrides,
-    },
   })
 
   return adapter
@@ -531,9 +553,7 @@ test.serial('can set reverse mapping and read from it', async (t) => {
   })
 
   const adapter = createReverseMappingAdapter({
-    envDefaultOverrides: {
-      WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
-    },
+    WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
   })
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)

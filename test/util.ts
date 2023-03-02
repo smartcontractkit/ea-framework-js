@@ -6,7 +6,7 @@ import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
 import { Cache, LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
-import { AdapterConfig, SettingsMap } from '../src/config'
+import { BaseAdapterConfig, ProcessedConfig } from '../src/config'
 import { Transport, TransportDependencies } from '../src/transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse } from '../src/util'
 
@@ -18,7 +18,7 @@ export type NopTransportTypes = {
     Data: null
     Result: null
   }
-  CustomSettings: SettingsMap
+  Config: BaseAdapterConfig
 }
 
 export class NopTransport implements Transport<NopTransportTypes> {
@@ -30,7 +30,7 @@ export class NopTransport implements Transport<NopTransportTypes> {
 
   async initialize(
     dependencies: TransportDependencies<NopTransportTypes>,
-    config: AdapterConfig<NopTransportTypes['CustomSettings']>,
+    config: NopTransportTypes['Config'],
     endpointName: string,
     transportName: string,
   ): Promise<void> {
@@ -256,13 +256,13 @@ class TestMetrics {
   }
 }
 
-export class TestAdapter {
+export class TestAdapter<T extends ProcessedConfig = ProcessedConfig> {
   mockCache?: MockCache
 
   // eslint-disable-next-line max-params
   constructor(
     public api: FastifyInstance,
-    public adapter: Adapter,
+    public adapter: Adapter<T>,
     public metricsApi?: FastifyInstance,
     public clock?: InstalledClock,
     cache?: Cache,
@@ -272,33 +272,33 @@ export class TestAdapter {
     }
   }
 
-  static async startWithMockedCache(
-    adapter: Adapter,
+  static async startWithMockedCache<T extends ProcessedConfig>(
+    adapter: Adapter<T>,
     context: ExecutionContext<{
       clock?: InstalledClock
-      testAdapter: TestAdapter
+      testAdapter: TestAdapter<T>
     }>['context'],
     dependencies?: Partial<AdapterDependencies>,
   ) {
     // Create mocked cache so we can listen when values are set
     // This is a more reliable method than expecting precise clock timings
-    const mockCache = new MockCache(adapter.config.CACHE_MAX_ITEMS)
+    const mockCache = new MockCache(adapter.processedConfig.config.CACHE_MAX_ITEMS)
 
     return TestAdapter.start(adapter, context, {
       cache: mockCache,
       ...dependencies,
     }) as Promise<
-      TestAdapter & {
+      TestAdapter<T> & {
         mockCache: MockCache
       }
     >
   }
 
-  static async start(
-    adapter: Adapter,
+  static async start<T extends ProcessedConfig>(
+    adapter: Adapter<T>,
     context: ExecutionContext<{
       clock?: InstalledClock
-      testAdapter: TestAdapter
+      testAdapter: TestAdapter<T>
     }>['context'],
     dependencies?: Partial<AdapterDependencies>,
   ) {

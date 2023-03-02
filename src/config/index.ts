@@ -526,7 +526,7 @@ export class ProcessedConfig<T extends SettingsMap = SettingsMap> {
       envDefaultOverrides?: Partial<BaseAdapterConfig>
 
       /** TODO: complete */
-      envVarsPrefix: string
+      envVarsPrefix?: string
     },
   ) {}
 

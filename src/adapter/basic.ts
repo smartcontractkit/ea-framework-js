@@ -56,7 +56,7 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
     this.name = params.name
     this.defaultEndpoint = params.defaultEndpoint?.toLowerCase()
     this.endpoints = params.endpoints
-    this.processedConfig = params.processedConfig
+    this.processedConfig = params.processedConfig || (new ProcessedConfig({}) as T)
     this.rateLimiting = params.rateLimiting
     this.bootstrap = params.bootstrap
 
