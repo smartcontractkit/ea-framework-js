@@ -16,36 +16,34 @@ export class SimpleCountingRateLimiter implements RateLimiter {
   latestSecondInterval = 0
   requestsThisSecond = 0
   latestMinuteInterval = 0
-  requestsThisMinute = 0
   perSecondLimit!: number
-  perMinuteLimit!: number
 
   initialize<T extends EndpointGenerics>(
     endpoints: AdapterEndpoint<T>[],
     limits?: AdapterRateLimitTier,
   ) {
-    // Translate the hourly limit into reqs per minute
-    const perHourLimit = (limits?.rateLimit1h || Infinity) / 60
-    this.perMinuteLimit = Math.min(limits?.rateLimit1m || Infinity, perHourLimit)
-    this.perSecondLimit = limits?.rateLimit1s || Infinity
-    logger.debug(
-      `Using rate limiting settings: perMinute = ${this.perMinuteLimit} | perSecond: = ${this.perSecondLimit}`,
+    // Translate the limit per hour and minutes into requirements per seconds
+    const perHourLimit = (limits?.rateLimit1h || Infinity) / 3600
+    const perMinuteLimit = Math.min((limits?.rateLimit1m || Infinity) / 60, perHourLimit)
+    this.perSecondLimit = Number(
+      Math.min(limits?.rateLimit1s || Infinity, perMinuteLimit).toFixed(2),
     )
+
+    logger.debug(`Using rate limiting settings: perSecond: = ${this.perSecondLimit}`)
 
     return this
   }
 
   msUntilNextExecution(): number {
     // If the limit is set to infinity, there was no tier limit specified
-    if (this.perSecondLimit === Infinity && this.perMinuteLimit === Infinity) {
+    if (this.perSecondLimit === Infinity) {
       return 0
     }
 
     const now = Date.now()
     const nearestSecondInterval = Math.floor(now / 1000)
-    const nearestMinuteInterval = Math.floor(now / (1000 * 60))
     const nextSecondInterval = (nearestSecondInterval + 1) * 1000
-    const nextMinuteInterval = (nearestMinuteInterval + 1) * 1000 * 60
+    const nextLimitInterval = (nearestSecondInterval + this.perSecondLimit) * 1000
 
     // This should always run to completion, even if it doesn't look atomic; therefore the
     // Ops should be "thread safe". Thank JS and its infinite single threaded dumbness.
@@ -57,30 +55,16 @@ export class SimpleCountingRateLimiter implements RateLimiter {
       this.requestsThisSecond = 0
     }
 
-    if (nearestMinuteInterval !== this.latestMinuteInterval) {
-      logger.trace(
-        `Clearing latest second minute, # of requests logged was: ${this.requestsThisMinute} `,
-      )
-      this.latestMinuteInterval = nearestMinuteInterval
-      this.requestsThisMinute = 0
-    }
-
-    const timeToWaitForNextSecond =
-      this.requestsThisSecond + 1 < this.perSecondLimit ? 0 : nextSecondInterval - now
-    const timeToWaitForNextMinute =
-      this.requestsThisMinute + 1 < this.perMinuteLimit ? 0 : nextMinuteInterval - now
-    const timeToWait = Math.max(timeToWaitForNextSecond, timeToWaitForNextMinute)
+    const timeToWait =
+      this.requestsThisSecond + 1 < this.perSecondLimit ? 0 : nextLimitInterval - now
 
     if (timeToWait === 0) {
       this.requestsThisSecond++
-      this.requestsThisMinute++
-      logger.trace(
-        `Request under limits, counted +1 (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute})`,
-      )
-      return 0
+      logger.trace(`Request under limits, counted +1 (S = ${this.requestsThisSecond})`)
+      return nextSecondInterval - now
     } else {
       logger.trace(
-        `Capacity for provider requests has been reached this interval (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute}), need to wait ${timeToWait}ms`,
+        `Capacity for provider requests has been reached this interval (S = ${this.requestsThisSecond} , need to wait ${timeToWait}ms`,
       )
       return timeToWait
     }

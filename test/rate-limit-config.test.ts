@@ -155,7 +155,7 @@ test('uses most restrictive tier if none is specified in settings', async (t) =>
             t.true(dependencies.rateLimiter instanceof SimpleCountingRateLimiter)
             t.is(
               (dependencies.rateLimiter as unknown as Record<string, number>)['perSecondLimit'],
-              123,
+              16.67,
             )
           }
         })(),
