@@ -3,7 +3,7 @@ import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosRequestConfig } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
 import { SSEConfig, SseTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
@@ -102,7 +102,7 @@ const BACKGROUND_EXECUTE_MS_SSE = 5000
 // Disable retries to make the testing flow easier
 process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 
-const processedConfig = new ProcessedConfig(
+const config = new AdapterConfig(
   {},
   {
     envDefaultOverrides: {
@@ -115,7 +115,7 @@ const processedConfig = new ProcessedConfig(
 const adapter = new Adapter({
   name: 'TEST',
   defaultEndpoint: 'test',
-  processedConfig,
+  config,
   endpoints: [sseEndpoint],
 })
 

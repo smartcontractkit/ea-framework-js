@@ -1,11 +1,11 @@
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { CacheFactory, LocalCache } from '../../src/cache'
-import { ProcessedConfig } from '../../src/config'
+import { AdapterConfig } from '../../src/config'
 import { NopTransport, TestAdapter } from '../util'
 import { BasicCacheSetterTransport, cacheTests, test } from './helper'
 
 test.beforeEach(async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -17,7 +17,7 @@ test.beforeEach(async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -41,7 +41,7 @@ test.beforeEach(async (t) => {
     ],
   })
 
-  const cache = new LocalCache(adapter.processedConfig.settings.CACHE_MAX_ITEMS)
+  const cache = new LocalCache(adapter.config.settings.CACHE_MAX_ITEMS)
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }

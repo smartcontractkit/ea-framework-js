@@ -2,7 +2,7 @@ import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { Server, WebSocket } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
 import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
@@ -127,7 +127,7 @@ process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 
 process.env['WS_SUBSCRIPTION_TTL'] = '10000'
 
-const processedConfig = new ProcessedConfig(
+const config = new AdapterConfig(
   {},
   {
     envDefaultOverrides: {
@@ -140,7 +140,7 @@ const processedConfig = new ProcessedConfig(
 const adapter = new Adapter({
   name: 'TEST',
   defaultEndpoint: 'test',
-  processedConfig,
+  config,
   endpoints: [webSocketEndpoint],
 })
 
@@ -239,8 +239,8 @@ test.serial('test WS connection, subscription, and message metrics', async (t) =
 
   // Wait until the cache expires, and the subscription is out
   await t.context.clock.tickAsync(
-    Math.ceil(CACHE_MAX_AGE / adapter.processedConfig.settings.WS_SUBSCRIPTION_TTL) *
-      adapter.processedConfig.settings.WS_SUBSCRIPTION_TTL *
+    Math.ceil(CACHE_MAX_AGE / adapter.config.settings.WS_SUBSCRIPTION_TTL) *
+      adapter.config.settings.WS_SUBSCRIPTION_TTL *
       2 +
       1,
   )

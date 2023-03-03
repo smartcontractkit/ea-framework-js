@@ -45,7 +45,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
     const context: EndpointContext<EndpointGenerics> = {
       endpointName: endpoint.name,
       inputParameters: endpoint.inputParameters,
-      adapterSettings: adapter.processedConfig.settings,
+      adapterSettings: adapter.config.settings,
     }
 
     const handler = async () => {

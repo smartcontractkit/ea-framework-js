@@ -1,5 +1,5 @@
 import test from 'ava'
-import { ProcessedConfig, SettingsDefinitionMap } from '../src/config'
+import { AdapterConfig, SettingsDefinitionMap } from '../src/config'
 import { validator } from '../src/validation/utils'
 
 test.afterEach(async () => {
@@ -9,7 +9,7 @@ test.afterEach(async () => {
 test.serial('Test config validator', async (t) => {
   process.env['MAX_COMMON_KEY_SIZE'] = '1000'
   try {
-    const config = new ProcessedConfig({})
+    const config = new AdapterConfig({})
     config.initialize()
     config.validate()
     t.fail()
@@ -20,7 +20,7 @@ test.serial('Test config validator', async (t) => {
 
 test.serial('Test good enum config', async (t) => {
   process.env['CACHE_TYPE'] = 'local'
-  const config = new ProcessedConfig({})
+  const config = new AdapterConfig({})
   config.initialize()
   config.validate()
   t.is(config.settings.CACHE_TYPE, 'local')
@@ -29,7 +29,7 @@ test.serial('Test good enum config', async (t) => {
 test.serial('Test bad enum config', async (t) => {
   process.env['CACHE_TYPE'] = 'test'
   try {
-    const config = new ProcessedConfig({})
+    const config = new AdapterConfig({})
     config.initialize()
     config.validate()
     t.fail()
@@ -46,7 +46,7 @@ test.serial('Test custom settings', async (t) => {
       type: 'string',
     },
   } satisfies SettingsDefinitionMap
-  const config = new ProcessedConfig(customSettings)
+  const config = new AdapterConfig(customSettings)
   config.initialize()
   config.validate()
   t.is(config.settings.CUSTOM_KEY, 'test')
@@ -61,7 +61,7 @@ test.serial('Test missing custom settings (required)', async (t) => {
     },
   }
   try {
-    const config = new ProcessedConfig(customSettings)
+    const config = new AdapterConfig(customSettings)
     config.initialize()
     config.validate()
     t.fail()
@@ -79,7 +79,7 @@ test.serial('Test custom settings (overlap base)', async (t) => {
     },
   }
   try {
-    const config = new ProcessedConfig(customSettings)
+    const config = new AdapterConfig(customSettings)
     config.initialize()
     config.validate()
     t.fail()
@@ -91,7 +91,7 @@ test.serial('Test custom settings (overlap base)', async (t) => {
 test.serial('Test prefix settings', async (t) => {
   process.env['TEST_PREFIX_BASE_URL'] = 'TEST_BASE_URL'
   const envVarsPrefix = 'TEST_PREFIX'
-  const config = new ProcessedConfig({}, { envVarsPrefix })
+  const config = new AdapterConfig({}, { envVarsPrefix })
   config.initialize()
   t.is(config.settings['BASE_URL'], 'TEST_BASE_URL')
 })
@@ -105,7 +105,7 @@ test.serial('Test validate function (out of bounds)', async (t) => {
       validate: validator.integer({ min: 1, max: 10 }),
     },
   }
-  const config = new ProcessedConfig(customSettings)
+  const config = new AdapterConfig(customSettings)
   config.initialize()
   try {
     config.validate()
@@ -124,7 +124,7 @@ test.serial('Test validate function (decimal)', async (t) => {
       validate: validator.integer({ min: 1, max: 10 }),
     },
   }
-  const config = new ProcessedConfig(customSettings)
+  const config = new AdapterConfig(customSettings)
   config.initialize()
   try {
     config.validate()
@@ -143,7 +143,7 @@ test.serial('Test validate function (scientific notation)', async (t) => {
       validate: validator.integer({ min: 2_000_000, max: 5_000_000 }),
     },
   }
-  const config = new ProcessedConfig(customSettings)
+  const config = new AdapterConfig(customSettings)
   config.initialize()
   try {
     config.validate()

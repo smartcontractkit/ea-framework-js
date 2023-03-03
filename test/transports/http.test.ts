@@ -5,7 +5,7 @@ import MockAdapter from 'axios-mock-adapter'
 import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { calculateHttpRequestKey } from '../../src/cache'
-import { BaseAdapterSettings, buildAdapterSettings, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, buildAdapterSettings, AdapterConfig } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse, sleep } from '../../src/util'
 import { InputParameters } from '../../src/validation'
@@ -203,7 +203,7 @@ test.serial(
     const rateLimit1m = 4
     const transport = new MockHttpTransport(true)
 
-    const processedConfig = new ProcessedConfig(
+    const config = new AdapterConfig(
       {},
       {
         envDefaultOverrides: {
@@ -215,7 +215,7 @@ test.serial(
     const adapter = new Adapter({
       name: 'TEST',
       defaultEndpoint: 'test',
-      processedConfig,
+      config,
       endpoints: [
         new AdapterEndpoint({
           name: 'test',
@@ -243,7 +243,7 @@ test.serial(
     // Advance the clock a few minutes and check that the amount of calls is as expected
     await runAllUntilTime(t.context.clock, 3 * 60 * 1000) // 4m
     const expected =
-      rateLimit1m * Math.ceil(adapter.processedConfig.settings.WARMUP_SUBSCRIPTION_TTL / 60_000)
+      rateLimit1m * Math.ceil(adapter.config.settings.WARMUP_SUBSCRIPTION_TTL / 60_000)
     t.is(transport.backgroundExecuteCalls, expected)
   },
 )
@@ -254,7 +254,7 @@ test.serial(
     const rateLimit1s = 1
     const transport = new MockHttpTransport(true)
 
-    const processedConfig = new ProcessedConfig(
+    const config = new AdapterConfig(
       {},
       {
         envDefaultOverrides: {
@@ -266,7 +266,7 @@ test.serial(
     const adapter = new Adapter({
       name: 'TEST',
       defaultEndpoint: 'test',
-      processedConfig,
+      config,
       endpoints: [
         new AdapterEndpoint({
           name: 'test',
@@ -304,7 +304,7 @@ test.serial(
     const transportA = new MockHttpTransport(true)
     const transportB = new MockHttpTransport(true)
 
-    const processedConfig = new ProcessedConfig(
+    const config = new AdapterConfig(
       {},
       {
         envDefaultOverrides: {
@@ -315,7 +315,7 @@ test.serial(
 
     const adapter = new Adapter({
       name: 'TEST',
-      processedConfig,
+      config,
       endpoints: [
         new AdapterEndpoint({
           name: 'A',
@@ -402,7 +402,7 @@ test.serial(
         ],
       })
 
-    const processedConfig = new ProcessedConfig(
+    const config = new AdapterConfig(
       {},
       {
         envDefaultOverrides: {
@@ -413,7 +413,7 @@ test.serial(
 
     const adapter = new Adapter({
       name: 'TEST',
-      processedConfig,
+      config,
       endpoints: [
         new AdapterEndpoint({
           name: 'A',
@@ -474,7 +474,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
   })
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.processedConfig.settings.CACHE_MAX_ITEMS)
+  const mockCache = new MockCache(adapter.config.settings.CACHE_MAX_ITEMS)
 
   // Start the adapter
   const testAdapter = await TestAdapter.start(adapter, t.context, {
@@ -676,7 +676,7 @@ test.serial(
     //   - Queued
     const numbers = [1, 2, 3, 4]
 
-    const processedConfig = new ProcessedConfig(
+    const config = new AdapterConfig(
       {},
       {
         envDefaultOverrides: {
@@ -691,7 +691,7 @@ test.serial(
     const adapter = new Adapter({
       name: 'TEST',
       defaultEndpoint: 'test',
-      processedConfig,
+      config,
       endpoints: numbers.map(
         (n) =>
           new AdapterEndpoint({

@@ -522,7 +522,7 @@ export type ValidationErrorMessage = string | undefined
  * Then in the generics we can simply pass the type of this, and it will hopefully allow for simpler generics
  * name is placeholder
  */
-export class ProcessedConfig<T extends SettingsDefinitionMap = SettingsDefinitionMap> {
+export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionMap> {
   settings!: AdapterSettings<T>
 
   constructor(

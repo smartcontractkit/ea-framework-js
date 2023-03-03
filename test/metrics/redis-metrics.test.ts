@@ -2,7 +2,7 @@ import untypedTest, { TestFn } from 'ava'
 import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache, LocalCache, RedisCache } from '../../src/cache'
-import { ProcessedConfig } from '../../src/config'
+import { AdapterConfig } from '../../src/config'
 import { BasicCacheSetterTransport } from '../cache/helper'
 import { NopTransport, TestAdapter } from '../util'
 
@@ -50,7 +50,7 @@ test.before(async (t) => {
   process.env['METRICS_ENABLED'] = 'true'
   // Set unique port between metrics tests to avoid conflicts in metrics servers
   process.env['METRICS_PORT'] = '9091'
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -62,7 +62,7 @@ test.before(async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',

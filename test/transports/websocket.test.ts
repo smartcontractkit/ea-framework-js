@@ -2,7 +2,7 @@ import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { Server, WebSocket } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
 import {
   WebSocketClassProvider,
   WebsocketReverseMappingTransport,
@@ -118,7 +118,7 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
     inputParameters,
   })
 
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -132,7 +132,7 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
     name: 'TEST',
     defaultEndpoint: 'test',
     endpoints: [webSocketEndpoint],
-    processedConfig,
+    config,
   })
 
   return adapter
@@ -187,8 +187,8 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
 
   // Wait until the cache expires, and the subscription is out
   const duration =
-    Math.ceil(CACHE_MAX_AGE / adapter.processedConfig.settings.WS_SUBSCRIPTION_TTL) *
-      adapter.processedConfig.settings.WS_SUBSCRIPTION_TTL +
+    Math.ceil(CACHE_MAX_AGE / adapter.config.settings.WS_SUBSCRIPTION_TTL) *
+      adapter.config.settings.WS_SUBSCRIPTION_TTL +
     1
   await runAllUntilTime(t.context.clock, duration)
 
@@ -265,7 +265,7 @@ test.serial('reconnects when url changed', async (t) => {
     inputParameters,
   })
 
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -277,7 +277,7 @@ test.serial('reconnects when url changed', async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
-    processedConfig,
+    config,
     endpoints: [webSocketEndpoint],
   })
 
@@ -412,7 +412,7 @@ test.serial(
       inputParameters,
     })
 
-    const processedConfig = new ProcessedConfig(
+    const config = new AdapterConfig(
       {},
       {
         envDefaultOverrides: {
@@ -425,7 +425,7 @@ test.serial(
     const adapter = new Adapter({
       name: 'TEST',
       defaultEndpoint: 'test',
-      processedConfig,
+      config,
       endpoints: [webSocketEndpoint],
     })
 
@@ -444,8 +444,8 @@ test.serial(
 
     // Wait until the cache expires, and the subscription is out
     const duration =
-      Math.ceil(CACHE_MAX_AGE / adapter.processedConfig.settings.WS_SUBSCRIPTION_TTL) *
-        adapter.processedConfig.settings.WS_SUBSCRIPTION_TTL +
+      Math.ceil(CACHE_MAX_AGE / adapter.config.settings.WS_SUBSCRIPTION_TTL) *
+        adapter.config.settings.WS_SUBSCRIPTION_TTL +
       1
     await runAllUntilTime(t.context.clock, duration)
 
@@ -510,7 +510,7 @@ const createReverseMappingAdapter = (
     inputParameters,
   })
 
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -523,7 +523,7 @@ const createReverseMappingAdapter = (
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
-    processedConfig,
+    config,
     endpoints: [webSocketEndpoint],
   })
 

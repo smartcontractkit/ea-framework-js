@@ -1,12 +1,12 @@
 import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { CacheFactory, RedisCache } from '../../src/cache'
-import { ProcessedConfig } from '../../src/config'
+import { AdapterConfig } from '../../src/config'
 import { NopTransport, RedisMock, TestAdapter } from '../util'
 import { BasicCacheSetterTransport, buildDiffResultAdapter, cacheTests, test } from './helper'
 
 test.beforeEach(async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -18,7 +18,7 @@ test.beforeEach(async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',

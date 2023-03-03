@@ -4,7 +4,7 @@ import axios, { AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import Redis, { ScanStream } from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { assertEqualResponses, runAllUntilTime, TestAdapter } from '../util'
@@ -111,7 +111,7 @@ const buildAdapter = () => {
     },
   })
 
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -124,7 +124,7 @@ const buildAdapter = () => {
   return new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',

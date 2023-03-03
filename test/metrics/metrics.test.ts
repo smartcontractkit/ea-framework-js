@@ -3,7 +3,7 @@ import untypedTest, { TestFn } from 'ava'
 import axios from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
 import { retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { TestAdapter } from '../util'
@@ -104,7 +104,7 @@ const price = 1234
 test.before(async (t) => {
   t.context.clock = FakeTimers.install()
   process.env['METRICS_ENABLED'] = 'true'
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -115,7 +115,7 @@ test.before(async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
-    processedConfig,
+    config,
     endpoints: [createAdapterEndpoint()],
   })
 

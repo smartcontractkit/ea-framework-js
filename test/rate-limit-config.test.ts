@@ -1,7 +1,7 @@
 import test from 'ava'
 import { start } from '../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../src/adapter'
-import { ProcessedConfig } from '../src/config'
+import { AdapterConfig } from '../src/config'
 import {
   buildRateLimitTiersFromConfig,
   highestRateLimitTiers,
@@ -31,7 +31,7 @@ test('empty tiers in rate limiting fails on startup', async (t) => {
 })
 
 test('selected tier is not a valid option', async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -41,7 +41,7 @@ test('selected tier is not a valid option', async (t) => {
   )
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -67,7 +67,7 @@ test('selected tier is not a valid option', async (t) => {
 })
 
 test('throws error if explicit allocation leaves no room for implicitly allocated endpoints', async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -79,7 +79,7 @@ test('throws error if explicit allocation leaves no room for implicitly allocate
     async () =>
       new Adapter({
         name: 'TEST',
-        processedConfig,
+        config,
         endpoints: [
           new AdapterEndpoint({
             name: 'test',
@@ -114,7 +114,7 @@ test('throws error if explicit allocation leaves no room for implicitly allocate
 })
 
 test('throws error if explicit allocation exceeds 100%', async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -126,7 +126,7 @@ test('throws error if explicit allocation exceeds 100%', async (t) => {
     async () =>
       new Adapter({
         name: 'TEST',
-        processedConfig,
+        config,
         endpoints: [
           new AdapterEndpoint({
             name: 'test',
@@ -224,7 +224,7 @@ test('uses unlimited tier if none is specified in settings', async (t) => {
 })
 
 test('uses specified tier if present in settings', async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -234,7 +234,7 @@ test('uses specified tier if present in settings', async (t) => {
   )
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -273,7 +273,7 @@ test('uses specified tier if present in settings', async (t) => {
 test('test build rate limits from env vars (second, minute)', async (t) => {
   process.env['RATE_LIMIT_CAPACITY_SECOND'] = '1'
   process.env['RATE_LIMIT_CAPACITY_MINUTE'] = '60'
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -283,7 +283,7 @@ test('test build rate limits from env vars (second, minute)', async (t) => {
   )
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -302,7 +302,7 @@ test('test build rate limits from env vars (second, minute)', async (t) => {
       },
     },
   })
-  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.settings)
+  const tiers = buildRateLimitTiersFromConfig(adapter.config.settings)
   t.is(tiers?.rateLimit1m, 60)
   t.is(tiers?.rateLimit1s, 1)
   t.is(tiers?.rateLimit1h, undefined)
@@ -311,7 +311,7 @@ test('test build rate limits from env vars (second, minute)', async (t) => {
 test('test build rate limits from env vars (second, capacity)', async (t) => {
   process.env['RATE_LIMIT_CAPACITY_SECOND'] = '1'
   process.env['RATE_LIMIT_CAPACITY'] = '60'
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -321,7 +321,7 @@ test('test build rate limits from env vars (second, capacity)', async (t) => {
   )
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -340,7 +340,7 @@ test('test build rate limits from env vars (second, capacity)', async (t) => {
       },
     },
   })
-  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.settings)
+  const tiers = buildRateLimitTiersFromConfig(adapter.config.settings)
   t.is(tiers?.rateLimit1m, 60)
   t.is(tiers?.rateLimit1s, 1)
   t.is(tiers?.rateLimit1h, undefined)
@@ -350,7 +350,7 @@ test('test build rate limits from env vars (second, minute, capacity)', async (t
   process.env['RATE_LIMIT_CAPACITY_MINUTE'] = '100'
   process.env['RATE_LIMIT_CAPACITY'] = '60'
   process.env['RATE_LIMIT_CAPACITY_SECOND'] = '1'
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -360,7 +360,7 @@ test('test build rate limits from env vars (second, minute, capacity)', async (t
   )
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -379,7 +379,7 @@ test('test build rate limits from env vars (second, minute, capacity)', async (t
       },
     },
   })
-  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.settings)
+  const tiers = buildRateLimitTiersFromConfig(adapter.config.settings)
   t.is(tiers?.rateLimit1m, 100)
   t.is(tiers?.rateLimit1s, 1)
   t.is(tiers?.rateLimit1h, undefined)
@@ -389,7 +389,7 @@ test('test build rate limits from env vars (capacity)', async (t) => {
   process.env['RATE_LIMIT_CAPACITY_MINUTE'] = undefined
   process.env['RATE_LIMIT_CAPACITY'] = '60'
   process.env['RATE_LIMIT_CAPACITY_SECOND'] = undefined
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -399,7 +399,7 @@ test('test build rate limits from env vars (capacity)', async (t) => {
   )
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -418,7 +418,7 @@ test('test build rate limits from env vars (capacity)', async (t) => {
       },
     },
   })
-  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.settings)
+  const tiers = buildRateLimitTiersFromConfig(adapter.config.settings)
   t.is(tiers?.rateLimit1m, 60)
 })
 

@@ -6,7 +6,7 @@ import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
 import { Cache, LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
-import { BaseAdapterSettings, ProcessedConfig } from '../src/config'
+import { BaseAdapterSettings, AdapterConfig } from '../src/config'
 import { Transport, TransportDependencies } from '../src/transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse } from '../src/util'
 
@@ -256,7 +256,7 @@ class TestMetrics {
   }
 }
 
-export class TestAdapter<T extends ProcessedConfig = ProcessedConfig> {
+export class TestAdapter<T extends AdapterConfig = AdapterConfig> {
   mockCache?: MockCache
 
   // eslint-disable-next-line max-params
@@ -272,7 +272,7 @@ export class TestAdapter<T extends ProcessedConfig = ProcessedConfig> {
     }
   }
 
-  static async startWithMockedCache<T extends ProcessedConfig>(
+  static async startWithMockedCache<T extends AdapterConfig>(
     adapter: Adapter<T>,
     context: ExecutionContext<{
       clock?: InstalledClock
@@ -282,7 +282,7 @@ export class TestAdapter<T extends ProcessedConfig = ProcessedConfig> {
   ) {
     // Create mocked cache so we can listen when values are set
     // This is a more reliable method than expecting precise clock timings
-    const mockCache = new MockCache(adapter.processedConfig.settings.CACHE_MAX_ITEMS)
+    const mockCache = new MockCache(adapter.config.settings.CACHE_MAX_ITEMS)
 
     return TestAdapter.start(adapter, context, {
       cache: mockCache,
@@ -294,7 +294,7 @@ export class TestAdapter<T extends ProcessedConfig = ProcessedConfig> {
     >
   }
 
-  static async start<T extends ProcessedConfig>(
+  static async start<T extends AdapterConfig>(
     adapter: Adapter<T>,
     context: ExecutionContext<{
       clock?: InstalledClock

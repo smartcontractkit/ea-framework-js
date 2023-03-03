@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache } from '../../src/cache'
-import { BaseSettingsDefinition, ProcessedConfig } from '../../src/config'
+import { BaseSettingsDefinition, AdapterConfig } from '../../src/config'
 import { AdapterRequest, AdapterResponse } from '../../src/util'
 import { InputValidator } from '../../src/validation/input-validator'
 import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
@@ -13,7 +13,7 @@ const test = untypedTest as TestFn<{
 }>
 
 test.beforeEach(async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -24,7 +24,7 @@ test.beforeEach(async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',

@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import { expose, start } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
-import { ProcessedConfig } from '../src/config'
+import { AdapterConfig } from '../src/config'
 import { NopTransport, TestAdapter } from './util'
 
 const test = untypedTest as TestFn<{
@@ -32,7 +32,7 @@ test('health endpoint returns health OK', async (t) => {
 })
 
 test('MTLS_ENABLED with no TLS params should error', async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -42,7 +42,7 @@ test('MTLS_ENABLED with no TLS params should error', async (t) => {
   )
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -62,7 +62,7 @@ test('MTLS_ENABLED with no TLS params should error', async (t) => {
 })
 
 test('MTLS_ENABLED connection with incorrect params should error', async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -75,7 +75,7 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
   )
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -92,7 +92,7 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
 })
 
 test('Adapter writer mode api disabled', async (t) => {
-  const processedConfig = new ProcessedConfig(
+  const config = new AdapterConfig(
     {},
     {
       envDefaultOverrides: {
@@ -103,7 +103,7 @@ test('Adapter writer mode api disabled', async (t) => {
 
   const adapter = new Adapter({
     name: 'TEST',
-    processedConfig,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',

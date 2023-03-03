@@ -3,7 +3,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Server, WebSocket } from 'mock-socket'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
-import { ProcessedConfig, SettingsDefinitionMap } from '../../src/config'
+import { AdapterConfig, SettingsDefinitionMap } from '../../src/config'
 import {
   HttpTransport,
   SSEConfig,
@@ -16,7 +16,7 @@ import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
-  testAdapter: TestAdapter<typeof processedConfig>
+  testAdapter: TestAdapter<typeof adapterConfig>
 }>
 
 interface ProviderRequestBody {
@@ -48,7 +48,7 @@ const settings = {
   },
 } satisfies SettingsDefinitionMap
 
-const processedConfig = new ProcessedConfig(settings)
+const adapterConfig = new AdapterConfig(settings)
 
 const restUrl = 'http://test-url.com'
 const websocketUrl = 'wss://test-ws.com/asd'
@@ -64,7 +64,7 @@ type BaseEndpointTypes = {
     }
     Result: number
   }
-  Settings: typeof processedConfig.settings
+  Settings: typeof adapterConfig.settings
 }
 
 type WebSocketTypes = BaseEndpointTypes & {
@@ -285,7 +285,7 @@ test.beforeEach(async (t) => {
     transports,
   })
 
-  const customConfig = new ProcessedConfig(settings, {
+  const customConfig = new AdapterConfig(settings, {
     envDefaultOverrides: {
       LOG_LEVEL: 'debug',
       METRICS_ENABLED: false,
@@ -297,7 +297,7 @@ test.beforeEach(async (t) => {
   const sampleAdapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',
-    processedConfig: customConfig,
+    config: customConfig,
     endpoints: [sampleEndpoint],
     rateLimiting: {
       tiers: {
@@ -404,7 +404,7 @@ test.serial('custom router is applied to get valid transport to route to', async
     customRouter: () => 'batch',
   })
 
-  const customConfig = new ProcessedConfig(settings, {
+  const customConfig = new AdapterConfig(settings, {
     envDefaultOverrides: {
       LOG_LEVEL: 'debug',
       METRICS_ENABLED: false,
@@ -416,7 +416,7 @@ test.serial('custom router is applied to get valid transport to route to', async
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',
-    processedConfig: customConfig,
+    config: customConfig,
     endpoints: [endpoint],
     rateLimiting: {
       tiers: {
@@ -466,7 +466,7 @@ test.serial('custom router returns invalid transport and request fails', async (
     customRouter: () => 'qweqwe',
   })
 
-  const customConfig = new ProcessedConfig(settings, {
+  const customConfig = new AdapterConfig(settings, {
     envDefaultOverrides: {
       LOG_LEVEL: 'debug',
       METRICS_ENABLED: false,
@@ -479,7 +479,7 @@ test.serial('custom router returns invalid transport and request fails', async (
     name: 'TEST',
     defaultEndpoint: 'price',
     endpoints: [endpoint],
-    processedConfig: customConfig,
+    config: customConfig,
     rateLimiting: {
       tiers: {
         default: {
@@ -528,7 +528,7 @@ test.serial('missing transport in input params with no default fails request', a
     transports,
   })
 
-  const customConfig = new ProcessedConfig(settings, {
+  const customConfig = new AdapterConfig(settings, {
     envDefaultOverrides: {
       LOG_LEVEL: 'debug',
       METRICS_ENABLED: false,
@@ -540,7 +540,7 @@ test.serial('missing transport in input params with no default fails request', a
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',
-    processedConfig: customConfig,
+    config: customConfig,
     endpoints: [endpoint],
     rateLimiting: {
       tiers: {
@@ -590,7 +590,7 @@ test.serial('missing transport in input params with default succeeds', async (t)
     defaultTransport: 'batch',
   })
 
-  const customConfig = new ProcessedConfig(settings, {
+  const customConfig = new AdapterConfig(settings, {
     envDefaultOverrides: {
       LOG_LEVEL: 'debug',
       METRICS_ENABLED: false,
@@ -603,7 +603,7 @@ test.serial('missing transport in input params with default succeeds', async (t)
     name: 'TEST',
     defaultEndpoint: 'price',
     endpoints: [endpoint],
-    processedConfig: customConfig,
+    config: customConfig,
     rateLimiting: {
       tiers: {
         default: {

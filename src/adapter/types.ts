@@ -1,7 +1,7 @@
 import type EventSource from 'eventsource'
 import Redis from 'ioredis'
 import { Cache } from '../cache'
-import { BaseAdapterSettings, ProcessedConfig, SettingsDefinitionMap } from '../config'
+import { BaseAdapterSettings, AdapterConfig, SettingsDefinitionMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
 import { AdapterRequest, SingleNumberResultResponse, SubscriptionSetFactory } from '../util'
@@ -81,7 +81,7 @@ export type Overrides = {
 /**
  * Main structure of an External Adapter
  */
-export interface AdapterParams<T extends ProcessedConfig = ProcessedConfig> {
+export interface AdapterParams<T extends AdapterConfig = AdapterConfig> {
   /** Name of the adapter */
   name: Uppercase<string>
 
@@ -106,7 +106,7 @@ export interface AdapterParams<T extends ProcessedConfig = ProcessedConfig> {
   bootstrap?: (adapter: Adapter<T>) => Promise<void>
 
   /** TODO: complete */
-  processedConfig?: T
+  config?: T
 }
 
 /**
