@@ -516,26 +516,28 @@ export type SettingsDefinitionMap = Record<string, SettingDefinition>
 export type ValidationErrorMessage = string | undefined
 
 /**
- * TODO: Improve docs
- * This class will hold the processed config type, and the basic settings
- * The idea is that you can no longer use a straight object, but have to build a config
- * Then in the generics we can simply pass the type of this, and it will hopefully allow for simpler generics
- * name is placeholder
+ * This class will hold the processed config type, and the basic settings.
+ * The idea is that you can no longer use a straight object, but have to build a config,
+ * then in the generics we can simply pass the type of this, and it will hopefully allow for simpler generics
  */
 export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionMap> {
   settings!: AdapterSettings<T>
 
   constructor(
+    /** Map of setting definitions to validate and use to get setting values */
     private settingsDefinition: T,
     private options?: {
       /** Map of overrides to the default config values for an Adapter */
       envDefaultOverrides?: Partial<BaseAdapterSettings>
 
-      /** TODO: complete */
+      /** Optional prefix that all adapter variables will be expected to have */
       envVarsPrefix?: string
     },
   ) {}
 
+  /**
+   * Performs some basic validation of the definition structure, and pull data from environment variables
+   */
   initialize() {
     this.settings = buildAdapterSettings({
       customSettings: this.settingsDefinition,
@@ -544,6 +546,9 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
     })
   }
 
+  /**
+   * Performs validation of each setting, checking to see that they match their definition
+   */
   validate(): void {
     const validationErrors: string[] = []
     Object.entries(BaseSettingsDefinition as SettingsDefinitionMap)

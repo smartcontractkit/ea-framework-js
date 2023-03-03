@@ -105,7 +105,7 @@ export interface AdapterParams<T extends AdapterConfig = AdapterConfig> {
   /** Bootstrap function that will run when initializing the adapter */
   bootstrap?: (adapter: Adapter<T>) => Promise<void>
 
-  /** TODO: complete */
+  /** The custom [[AdapterConfig]] to use. If not provided, the default configuration will be used instead */
   config?: T
 }
 
