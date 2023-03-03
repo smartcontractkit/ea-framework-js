@@ -403,7 +403,7 @@ export class Adapter<T extends AdapterConfig = AdapterConfig>
     // Observe the idle time taken for polling response
     const metricsTimer = metrics
       .get('transportPollingDurationSeconds')
-      .labels({ endpoint: req.requestContext.endpointName })
+      .labels({ adapter_endpoint: req.requestContext.endpointName })
       .startTimer()
 
     logger.debug('Transport is set up, polling cache for response...')
@@ -426,7 +426,7 @@ export class Adapter<T extends AdapterConfig = AdapterConfig>
     // Record polling mechanism failure to return response
     metrics
       .get('transportPollingFailureCount')
-      .labels({ endpoint: req.requestContext.endpointName })
+      .labels({ adapter_endpoint: req.requestContext.endpointName })
       .inc()
 
     logger.debug('Ran out of polling attempts, returning timeout')

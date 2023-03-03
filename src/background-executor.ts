@@ -56,13 +56,13 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       // Count number of background executions per endpoint
       metrics
         .get('bgExecuteTotal')
-        .labels({ endpoint: endpoint.name, transport: transportName })
+        .labels({ adapter_endpoint: endpoint.name, transport: transportName })
         .inc()
 
       // Time the duration of the background execute process excluding sleep time
       const metricsTimer = metrics
         .get('bgExecuteDurationSeconds')
-        .labels({ endpoint: endpoint.name, transport: transportName })
+        .labels({ adapter_endpoint: endpoint.name, transport: transportName })
         .startTimer()
 
       logger.debug(`Calling background execute for endpoint "${endpoint.name}"`)
@@ -80,7 +80,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
         logger.error(error, (error as Error).stack)
         metrics
           .get('bgExecuteErrors')
-          .labels({ endpoint: endpoint.name, transport: transportName })
+          .labels({ adapter_endpoint: endpoint.name, transport: transportName })
           .inc()
       }
 

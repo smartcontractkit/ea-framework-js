@@ -108,7 +108,7 @@ test.serial('background executor error does not stop the loop', async (t) => {
   metrics.assert(t, {
     name: 'bg_execute_errors',
     labels: {
-      endpoint: 'test',
+      adapter_endpoint: 'test',
       transport: 'default_single_transport',
     },
     expectedValue: 1,
@@ -116,7 +116,7 @@ test.serial('background executor error does not stop the loop', async (t) => {
   metrics.assert(t, {
     name: 'bg_execute_total',
     labels: {
-      endpoint: 'test',
+      adapter_endpoint: 'test',
       transport: 'default_single_transport',
     },
     expectedValue: 5,

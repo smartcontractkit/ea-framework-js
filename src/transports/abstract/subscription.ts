@@ -56,7 +56,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     // this.constructor.name will resolve to the instance name, not the class one (i.e., will use the implementing class' name)
     metrics
       .get('bgExecuteSubscriptionSetCount')
-      .labels({ endpoint: context.endpointName, transport_type: this.constructor.name })
+      .labels({ adapter_endpoint: context.endpointName, transport_type: this.constructor.name })
       .set(entries.length)
 
     await this.backgroundHandler(context, entries)

@@ -184,7 +184,7 @@ test.serial('test WS connection, subscription, and message metrics', async (t) =
   let metrics = await t.context.testAdapter.getMetrics()
   const feed_id = '{\\"base\\":\\"eth\\",\\"quote\\":\\"usd\\"}'
   const subscription_key = `test-${feed_id}`
-  const endpoint = `test`
+  const adapter_endpoint = `test`
   const transport = 'default_single_transport'
   const transport_type = `WebSocketTransport`
 
@@ -224,17 +224,17 @@ test.serial('test WS connection, subscription, and message metrics', async (t) =
   })
   metrics.assert(t, {
     name: 'bg_execute_total',
-    labels: { endpoint, transport },
+    labels: { adapter_endpoint, transport },
     expectedValue: 2,
   })
   metrics.assert(t, {
     name: 'bg_execute_subscription_set_count',
-    labels: { endpoint, transport_type },
+    labels: { adapter_endpoint, transport_type },
     expectedValue: 1,
   })
   metrics.assertPositiveNumber(t, {
     name: 'bg_execute_duration_seconds',
-    labels: { endpoint, transport },
+    labels: { adapter_endpoint, transport },
   })
 
   // Wait until the cache expires, and the subscription is out
@@ -288,12 +288,12 @@ test.serial('test WS connection, subscription, and message metrics', async (t) =
   })
   metrics.assert(t, {
     name: 'bg_execute_total',
-    labels: { endpoint, transport },
+    labels: { adapter_endpoint, transport },
     expectedValue: 5,
   })
   metrics.assert(t, {
     name: 'bg_execute_subscription_set_count',
-    labels: { endpoint, transport_type },
+    labels: { adapter_endpoint, transport_type },
     expectedValue: 0,
   })
 })

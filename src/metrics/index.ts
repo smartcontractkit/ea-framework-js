@@ -192,22 +192,22 @@ export const metrics = new Metrics(() => ({
   bgExecuteSubscriptionSetCount: new client.Gauge({
     name: 'bg_execute_subscription_set_count',
     help: 'The number of active subscriptions in background execute',
-    labelNames: ['endpoint', 'transport_type'] as const,
+    labelNames: ['adapter_endpoint', 'transport_type'] as const,
   }),
   bgExecuteTotal: new client.Counter({
     name: 'bg_execute_total',
     help: 'The number of background executes performed per endpoint',
-    labelNames: ['endpoint', 'transport'] as const,
+    labelNames: ['adapter_endpoint', 'transport'] as const,
   }),
   bgExecuteErrors: new client.Counter({
     name: 'bg_execute_errors',
     help: 'The number of background execute errors per endpoint x transport',
-    labelNames: ['endpoint', 'transport'] as const,
+    labelNames: ['adapter_endpoint', 'transport'] as const,
   }),
   bgExecuteDurationSeconds: new client.Gauge({
     name: 'bg_execute_duration_seconds',
     help: 'A histogram bucket of the distribution of background execute durations',
-    labelNames: ['endpoint', 'transport'] as const,
+    labelNames: ['adapter_endpoint', 'transport'] as const,
   }),
   cacheDataGetCount: new client.Counter({
     name: 'cache_data_get_count',
@@ -290,12 +290,12 @@ export const metrics = new Metrics(() => ({
   transportPollingFailureCount: new client.Counter({
     name: 'transport_polling_failure_count',
     help: 'The number of times the polling mechanism ran out of attempts and failed to return a response',
-    labelNames: ['endpoint'] as const,
+    labelNames: ['adapter_endpoint'] as const,
   }),
   transportPollingDurationSeconds: new client.Gauge({
     name: 'transport_polling_duration_seconds',
     help: 'A histogram bucket of the distribution of transport polling idle time durations',
-    labelNames: ['endpoint', 'succeeded'] as const,
+    labelNames: ['adapter_endpoint', 'succeeded'] as const,
   }),
   rateLimitCreditsSpentTotal: new client.Counter({
     name: 'rate_limit_credits_spent_total',
