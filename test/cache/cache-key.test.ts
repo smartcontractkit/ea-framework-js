@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache } from '../../src/cache'
-import { BaseSettings } from '../../src/config'
+import { BaseSettingsDefinition, AdapterConfig } from '../../src/config'
 import { AdapterRequest, AdapterResponse } from '../../src/util'
 import { InputValidator } from '../../src/validation/input-validator'
 import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
@@ -13,9 +13,18 @@ const test = untypedTest as TestFn<{
 }>
 
 test.beforeEach(async (t) => {
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        MAX_COMMON_KEY_SIZE: 150,
+      },
+    },
+  )
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -52,9 +61,6 @@ test.beforeEach(async (t) => {
         })(),
       }),
     ],
-    envDefaultOverrides: {
-      MAX_COMMON_KEY_SIZE: 150,
-    },
   })
 
   t.context.adapterEndpoint = adapter.endpoints[0]
@@ -65,7 +71,7 @@ test.serial('no parameters returns default cache key', async (t) => {
   const response = await t.context.testAdapter.request({})
   t.is(
     response.json().result,
-    `TEST-test-default_single_transport-${BaseSettings.DEFAULT_CACHE_KEY.default}`,
+    `TEST-test-default_single_transport-${BaseSettingsDefinition.DEFAULT_CACHE_KEY.default}`,
   )
 })
 

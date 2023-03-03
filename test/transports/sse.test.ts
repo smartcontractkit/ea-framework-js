@@ -1,13 +1,13 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosRequestConfig } from 'axios'
+import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { SettingsMap } from '../../src/config'
+import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
 import { SSEConfig, SseTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
-import MockAdapter from 'axios-mock-adapter'
 const { MockEvent, EventSource } = require('mocksse') // eslint-disable-line
 
 const URL = 'http://test.com'
@@ -39,7 +39,7 @@ type StreamEndpointTypes = {
     Params: AdapterRequestParams
   }
   Response: SingleNumberResultResponse
-  CustomSettings: SettingsMap
+  Settings: BaseAdapterSettings
   Provider: {
     RequestBody: never
   }
@@ -102,14 +102,21 @@ const BACKGROUND_EXECUTE_MS_SSE = 5000
 // Disable retries to make the testing flow easier
 process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 
+const config = new AdapterConfig(
+  {},
+  {
+    envDefaultOverrides: {
+      CACHE_MAX_AGE,
+      BACKGROUND_EXECUTE_MS_SSE,
+    },
+  },
+)
+
 const adapter = new Adapter({
   name: 'TEST',
   defaultEndpoint: 'test',
+  config,
   endpoints: [sseEndpoint],
-  envDefaultOverrides: {
-    CACHE_MAX_AGE,
-    BACKGROUND_EXECUTE_MS_SSE,
-  },
 })
 
 const mockSSE = () => {

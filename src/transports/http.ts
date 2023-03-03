@@ -1,14 +1,13 @@
 import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { EndpointContext } from '../adapter'
-import { AdapterConfig } from '../config'
-import { makeLogger, sleep } from '../util'
-import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
-import { Requester } from '../util/requester'
-import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
 import { TransportDependencies, TransportGenerics } from '.'
-import { SubscriptionTransport } from './abstract/subscription'
-import { metrics, retrieveCost } from '../metrics'
+import { EndpointContext } from '../adapter'
 import { calculateHttpRequestKey } from '../cache'
+import { metrics, retrieveCost } from '../metrics'
+import { makeLogger, sleep } from '../util'
+import { Requester } from '../util/requester'
+import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
+import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
+import { SubscriptionTransport } from './abstract/subscription'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
 
@@ -59,12 +58,12 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
    *     to consolidate many of them since the parseResponse method is called independently for each of them.
    *
    * @param params - the list of non-expired input parameters sent to this Adapter
-   * @param config - the config for this Adapter
+   * @param adapterSettings - the config for this Adapter
    * @returns one or multiple request configs
    */
   prepareRequests: (
     params: T['Request']['Params'][],
-    config: AdapterConfig<T['CustomSettings']>,
+    adapterSettings: T['Settings'],
   ) => ProviderRequestConfig<T> | ProviderRequestConfig<T>[]
 
   /**
@@ -78,13 +77,13 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
    *
    * @param params - the list of input parameters that should be fulfilled by this incoming provider response
    * @param res - the response from the data provider
-   * @param config - the config for this Adapter
+   * @param adapterSettings - the config for this Adapter
    * @returns a list of ProviderResults
    */
   parseResponse: (
     params: T['Request']['Params'][],
     res: AxiosResponse<T['Provider']['ResponseBody']>,
-    config: AdapterConfig<T['CustomSettings']>,
+    adapterSettings: T['Settings'],
   ) => ProviderResult<T>[]
 }
 
@@ -110,16 +109,16 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
   override async initialize(
     dependencies: TransportDependencies<T>,
-    config: AdapterConfig<T['CustomSettings']>,
+    adapterSettings: T['Settings'],
     endpointName: string,
     transportName: string,
   ): Promise<void> {
-    await super.initialize(dependencies, config, endpointName, transportName)
+    await super.initialize(dependencies, adapterSettings, endpointName, transportName)
     this.requester = dependencies.requester
   }
 
-  getSubscriptionTtlFromConfig(config: AdapterConfig<T['CustomSettings']>): number {
-    return config.WARMUP_SUBSCRIPTION_TTL
+  getSubscriptionTtlFromConfig(adapterSettings: T['Settings']): number {
+    return adapterSettings.WARMUP_SUBSCRIPTION_TTL
   }
 
   async backgroundHandler(
@@ -128,14 +127,14 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
   ): Promise<void> {
     if (!entries.length) {
       logger.debug(
-        `No entries in subscription set, sleeping for ${context.adapterConfig.BACKGROUND_EXECUTE_MS_HTTP}ms...`,
+        `No entries in subscription set, sleeping for ${context.adapterSettings.BACKGROUND_EXECUTE_MS_HTTP}ms...`,
       )
       if (this.WARMER_ACTIVE) {
         // Decrement count when warmer changed from having entries to having none
         metrics.get('cacheWarmerCount').labels({ isBatched: 'true' }).dec()
         this.WARMER_ACTIVE = false
       }
-      await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_HTTP)
+      await sleep(context.adapterSettings.BACKGROUND_EXECUTE_MS_HTTP)
       return
     } else if (this.WARMER_ACTIVE === false) {
       // Increment count when warmer changed from having no entries to having some
@@ -144,7 +143,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     }
 
     logger.trace(`Have ${entries.length} entries in batch, preparing requests...`)
-    const rawRequests = this.config.prepareRequests(entries, context.adapterConfig)
+    const rawRequests = this.config.prepareRequests(entries, context.adapterSettings)
     const requests = Array.isArray(rawRequests) ? rawRequests : [rawRequests]
 
     // We're awaiting these promises because although we have request coalescing, new entries
@@ -159,17 +158,17 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
     // These logs will surface warnings that operators should take action on, in case the execution of all
     // requests is taking too long so that entries could have expired within this timeframe
-    if (duration > context.adapterConfig.WARMUP_SUBSCRIPTION_TTL) {
+    if (duration > context.adapterSettings.WARMUP_SUBSCRIPTION_TTL) {
       logger.warn(
         `Background execution of all HTTP requests in a batch took ${duration},\
-         which is longer than the subscription TTL (${context.adapterConfig.WARMUP_SUBSCRIPTION_TTL}).\
+         which is longer than the subscription TTL (${context.adapterSettings.WARMUP_SUBSCRIPTION_TTL}).\
          This might be due to insufficient speed on the selected API tier, please check metrics and logs to confirm and consider moving to a faster tier.`,
       )
     }
-    if (duration > context.adapterConfig.CACHE_MAX_AGE) {
+    if (duration > context.adapterSettings.CACHE_MAX_AGE) {
       logger.warn(
         `Background execution of all HTTP requests in a batch took ${duration},\
-         which is longer than the max cache age (${context.adapterConfig.CACHE_MAX_AGE}).\
+         which is longer than the max cache age (${context.adapterSettings.CACHE_MAX_AGE}).\
          This might be due to insufficient speed on the selected API tier, please check metrics and logs to confirm and consider moving to a faster tier.`,
       )
     }
@@ -228,7 +227,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
       // Parse responses and apply timestamps
       const results = this.config
-        .parseResponse(requestConfig.params, requesterResult.response, context.adapterConfig)
+        .parseResponse(requestConfig.params, requesterResult.response, context.adapterSettings)
         .map((r) => {
           const result = r as TimestampedProviderResult<T>
           const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>

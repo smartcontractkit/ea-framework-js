@@ -1,6 +1,5 @@
 import WebSocket, { ClientOptions, RawData } from 'ws'
 import { EndpointContext } from '../adapter'
-import { AdapterConfig } from '../config'
 import { metrics } from '../metrics'
 import { makeLogger, sleep } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
@@ -122,8 +121,8 @@ export class WebSocketTransport<
     super()
   }
 
-  getSubscriptionTtlFromConfig(config: AdapterConfig<T['CustomSettings']>): number {
-    return config.WS_SUBSCRIPTION_TTL
+  getSubscriptionTtlFromConfig(adapterSettings: T['Settings']): number {
+    return adapterSettings.WS_SUBSCRIPTION_TTL
   }
 
   connectionClosed(): boolean {
@@ -247,7 +246,7 @@ export class WebSocketTransport<
     // No new subs && connection -> unsubs only
     if (!subscriptions.new.length && !this.wsConnection) {
       logger.debug('No entries in subscription set and no established connection, skipping')
-      await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_WS)
+      await sleep(context.adapterSettings.BACKGROUND_EXECUTE_MS_WS)
       return
     }
 
@@ -264,14 +263,14 @@ export class WebSocketTransport<
     const timeSinceLastActivity = Math.min(timeSinceLastMessage, timeSinceConnectionOpened)
     const connectionUnresponsive =
       timeSinceLastActivity > 0 &&
-      timeSinceLastActivity > context.adapterConfig.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
+      timeSinceLastActivity > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
     let connectionClosed = this.connectionClosed()
 
     // Check if we should close the current connection
     if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
       const reason = urlChanged
         ? `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`
-        : `Last message was received ${timeSinceLastMessage} ago, exceeding the threshold of ${context.adapterConfig.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}ms, closing connection...`
+        : `Last message was received ${timeSinceLastMessage} ago, exceeding the threshold of ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}ms, closing connection...`
       logger.info(reason)
 
       // Check if connection was opened very recently; if so, wait a bit before continuing.
@@ -328,9 +327,9 @@ export class WebSocketTransport<
 
     // The background execute loop no longer sleeps between executions, so we have to do it here
     logger.trace(
-      `Websocket handler complete, sleeping for ${context.adapterConfig.BACKGROUND_EXECUTE_MS_WS}ms...`,
+      `Websocket handler complete, sleeping for ${context.adapterSettings.BACKGROUND_EXECUTE_MS_WS}ms...`,
     )
-    await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_WS)
+    await sleep(context.adapterSettings.BACKGROUND_EXECUTE_MS_WS)
 
     return
   }

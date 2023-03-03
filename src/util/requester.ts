@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { makeLogger, sleep } from '.'
-import { AdapterConfig } from '../config'
+import { AdapterSettings } from '../config'
 import { dataProviderMetricsLabel, metrics } from '../metrics'
 import { RateLimiter } from '../rate-limiting'
 import {
@@ -98,10 +98,10 @@ export class Requester {
   private maxRetries: number
   private timeout: number
 
-  constructor(private rateLimiter: RateLimiter, config: AdapterConfig) {
-    this.maxRetries = config.RETRY
-    this.timeout = config.API_TIMEOUT
-    this.queue = new UniqueLinkedList<QueuedRequest>(config.MAX_HTTP_REQUEST_QUEUE_LENGTH)
+  constructor(private rateLimiter: RateLimiter, adapterSettings: AdapterSettings) {
+    this.maxRetries = adapterSettings.RETRY
+    this.timeout = adapterSettings.API_TIMEOUT
+    this.queue = new UniqueLinkedList<QueuedRequest>(adapterSettings.MAX_HTTP_REQUEST_QUEUE_LENGTH)
   }
 
   /**

@@ -1,7 +1,7 @@
 import type EventSource from 'eventsource'
 import Redis from 'ioredis'
 import { Cache } from '../cache'
-import { AdapterConfig, BaseAdapterConfig, SettingsMap } from '../config'
+import { BaseAdapterSettings, AdapterConfig, SettingsDefinitionMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
 import { AdapterRequest, SingleNumberResultResponse, SubscriptionSetFactory } from '../util'
@@ -11,9 +11,9 @@ import { AdapterError } from '../validation/error'
 import { Adapter } from './basic'
 import { AdapterEndpoint } from './endpoint'
 
-export type CustomAdapterSettings = SettingsMap & NegatedAdapterSettings
+export type CustomAdapterSettings = SettingsDefinitionMap & NegatedAdapterSettings
 type NegatedAdapterSettings = {
-  [K in keyof BaseAdapterConfig]?: never
+  [K in keyof BaseAdapterSettings]?: never
 }
 
 /**
@@ -51,7 +51,7 @@ export interface EndpointContext<T extends EndpointGenerics> {
   inputParameters: InputParameters
 
   /** Initialized config for the adapter that the Transport can access */
-  adapterConfig: AdapterConfig<T['CustomSettings']>
+  adapterSettings: T['Settings']
 }
 
 /**
@@ -81,7 +81,7 @@ export type Overrides = {
 /**
  * Main structure of an External Adapter
  */
-export interface AdapterParams<CustomSettings extends SettingsMap> {
+export interface AdapterParams<T extends AdapterConfig = AdapterConfig> {
   /** Name of the adapter */
   name: Uppercase<string>
 
@@ -99,17 +99,14 @@ export interface AdapterParams<CustomSettings extends SettingsMap> {
    */
   endpoints: AdapterEndpoint<any>[] // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  /** Map of overrides to the default config values for an Adapter */
-  envDefaultOverrides?: Partial<BaseAdapterConfig>
-
-  /** List of custom env vars for this particular adapter (e.g. RPC_URL) */
-  customSettings?: SettingsMap
-
   /** Configuration relevant to outbound (EA --\> DP) communication rate limiting */
   rateLimiting?: AdapterRateLimitingConfig
 
   /** Bootstrap function that will run when initializing the adapter */
-  bootstrap?: (adapter: Adapter<CustomSettings>) => Promise<void>
+  bootstrap?: (adapter: Adapter<T>) => Promise<void>
+
+  /** The custom [[AdapterConfig]] to use. If not provided, the default configuration will be used instead */
+  config?: T
 }
 
 /**
@@ -136,7 +133,7 @@ export type PriceEndpointGenerics = TransportGenerics & { Response: SingleNumber
 
 export type CustomInputValidator<T extends EndpointGenerics> = (
   input: AdapterRequest<T['Request']>,
-  config: AdapterConfig<T['CustomSettings']>,
+  adapterSettings: T['Settings'],
 ) => AdapterError | undefined
 
 /**
@@ -179,10 +176,7 @@ type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
   transports: Record<string, Transport<T>>
 
   /** Custom function to direct an incoming request to the appropriate transport from the transports map */
-  customRouter?: (
-    req: AdapterRequest<T['Request']>,
-    adapterConfig: AdapterConfig<T['CustomSettings']>,
-  ) => string
+  customRouter?: (req: AdapterRequest<T['Request']>, settings: T['Settings']) => string
 
   /** If no value is returned from the custom router or the default (transport param), which transport to use */
   defaultTransport?: string
