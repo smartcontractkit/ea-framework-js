@@ -1,7 +1,7 @@
 import Redis from 'ioredis'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
-import { BaseAdapterConfig, BaseSettings, ProcessedConfig } from '../config'
+import { BaseAdapterSettings, BaseSettingsDefinition, ProcessedConfig } from '../config'
 import { metrics } from '../metrics'
 import {
   buildRateLimitTiersFromConfig,
@@ -32,7 +32,7 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
   name: Uppercase<string>
   defaultEndpoint?: string | undefined
   endpoints: AdapterEndpoint<EndpointGenerics>[]
-  envDefaultOverrides?: Partial<BaseAdapterConfig> | undefined
+  envDefaultOverrides?: Partial<BaseAdapterSettings> | undefined
   rateLimiting?: AdapterRateLimitingConfig | undefined
   envVarsPrefix?: string
 
@@ -100,7 +100,7 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
       }
 
       logger.debug(`Initializing endpoint "${endpoint.name}"...`)
-      await endpoint.initialize(this.name, this.dependencies, this.processedConfig.config)
+      await endpoint.initialize(this.name, this.dependencies, this.processedConfig.settings)
     }
 
     // Build list of key/values that need to be redacted in logs
@@ -169,27 +169,27 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
    */
   private logConfigWarnings() {
     if (
-      this.processedConfig.config.LOG_LEVEL.toUpperCase() === 'DEBUG' ||
-      this.processedConfig.config.LOG_LEVEL.toUpperCase() === 'TRACE'
+      this.processedConfig.settings.LOG_LEVEL.toUpperCase() === 'DEBUG' ||
+      this.processedConfig.settings.LOG_LEVEL.toUpperCase() === 'TRACE'
     ) {
       logger.warn(
-        `LOG_LEVEL has been set to ${this.processedConfig.config.LOG_LEVEL.toUpperCase()}. Setting higher log levels results in increased memory usage and potentially slower performance.`,
+        `LOG_LEVEL has been set to ${this.processedConfig.settings.LOG_LEVEL.toUpperCase()}. Setting higher log levels results in increased memory usage and potentially slower performance.`,
       )
     }
-    if (this.processedConfig.config.DEBUG === true) {
+    if (this.processedConfig.settings.DEBUG === true) {
       logger.warn(`The adapter is running with DEBUG mode on.`)
     }
-    if (this.processedConfig.config.METRICS_ENABLED === false) {
+    if (this.processedConfig.settings.METRICS_ENABLED === false) {
       logger.warn(
         `METRICS_ENABLED has been set to false. Metrics should not be disabled in a production environment.`,
       )
     }
     if (
-      this.processedConfig.config.MAX_PAYLOAD_SIZE_LIMIT !==
-      BaseSettings.MAX_PAYLOAD_SIZE_LIMIT.default
+      this.processedConfig.settings.MAX_PAYLOAD_SIZE_LIMIT !==
+      BaseSettingsDefinition.MAX_PAYLOAD_SIZE_LIMIT.default
     ) {
       logger.warn(
-        `MAX_PAYLOAD_SIZE_LIMIT has been set to ${this.processedConfig.config.MAX_PAYLOAD_SIZE_LIMIT}. This setting should only be set when absolutely necessary.`,
+        `MAX_PAYLOAD_SIZE_LIMIT has been set to ${this.processedConfig.settings.MAX_PAYLOAD_SIZE_LIMIT}. This setting should only be set when absolutely necessary.`,
       )
     }
   }
@@ -205,26 +205,26 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
     const dependencies = inputDependencies || {}
 
     if (!dependencies.redisClient) {
-      if (this.processedConfig.config.CACHE_TYPE === 'redis') {
-        const maxCooldown = this.processedConfig.config.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
+      if (this.processedConfig.settings.CACHE_TYPE === 'redis') {
+        const maxCooldown = this.processedConfig.settings.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
         const redisOptions = {
           enableAutoPipelining: true, // This will make multiple commands be batch automatically
-          host: this.processedConfig.config.CACHE_REDIS_HOST,
-          port: this.processedConfig.config.CACHE_REDIS_PORT,
-          password: this.processedConfig.config.CACHE_REDIS_PASSWORD,
-          path: this.processedConfig.config.CACHE_REDIS_PATH, // If set, port and host are ignored
-          timeout: this.processedConfig.config.CACHE_REDIS_TIMEOUT,
+          host: this.processedConfig.settings.CACHE_REDIS_HOST,
+          port: this.processedConfig.settings.CACHE_REDIS_PORT,
+          password: this.processedConfig.settings.CACHE_REDIS_PASSWORD,
+          path: this.processedConfig.settings.CACHE_REDIS_PATH, // If set, port and host are ignored
+          timeout: this.processedConfig.settings.CACHE_REDIS_TIMEOUT,
           retryStrategy(times: number): number {
             metrics.get('redisRetriesCount').inc()
             logger.warn(`Redis reconnect attempt #${times}`)
             return Math.min(times * 100, maxCooldown) // Next reconnect attempt time
           },
-          connectTimeout: this.processedConfig.config.CACHE_REDIS_CONNECTION_TIMEOUT,
+          connectTimeout: this.processedConfig.settings.CACHE_REDIS_CONNECTION_TIMEOUT,
           maxRetriesPerRequest: 30, // Limits the number of retries before the adapter shuts down
         }
-        if (this.processedConfig.config.CACHE_REDIS_URL) {
+        if (this.processedConfig.settings.CACHE_REDIS_URL) {
           dependencies.redisClient = new Redis(
-            this.processedConfig.config.CACHE_REDIS_URL,
+            this.processedConfig.settings.CACHE_REDIS_URL,
             redisOptions,
           )
         } else {
@@ -240,20 +240,20 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
     if (!dependencies.cache) {
       dependencies.cache = CacheFactory.buildCache(
         {
-          cacheType: this.processedConfig.config.CACHE_TYPE,
-          maxSizeForLocalCache: this.processedConfig.config.CACHE_MAX_ITEMS,
+          cacheType: this.processedConfig.settings.CACHE_TYPE,
+          maxSizeForLocalCache: this.processedConfig.settings.CACHE_MAX_ITEMS,
         },
         dependencies.redisClient,
       )
     }
 
     const rateLimitingTier = getRateLimitingTier(
-      this.processedConfig.config,
+      this.processedConfig.settings,
       this.rateLimiting?.tiers,
     )
 
     const highestTierValue = highestRateLimitTiers(this.rateLimiting?.tiers)
-    const rateLimitTierFromConfig = buildRateLimitTiersFromConfig(this.processedConfig.config)
+    const rateLimitTierFromConfig = buildRateLimitTiersFromConfig(this.processedConfig.settings)
     const perSecRateLimit = rateLimitTierFromConfig?.rateLimit1s || 0
     const perMinuteRateLimit = (rateLimitTierFromConfig?.rateLimit1m || 0) * 60
 
@@ -265,7 +265,7 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
 
     if (perMinuteRateLimit > highestTierValue) {
       logger.warn(`The configured ${
-        this.processedConfig.config.RATE_LIMIT_CAPACITY_MINUTE
+        this.processedConfig.settings.RATE_LIMIT_CAPACITY_MINUTE
           ? 'RATE_LIMIT_CAPACITY_MINUTE'
           : 'RATE_LIMIT_CAPACITY'
       }
@@ -280,13 +280,16 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
     }
     if (!dependencies.subscriptionSetFactory) {
       dependencies.subscriptionSetFactory = new SubscriptionSetFactory(
-        this.processedConfig.config,
+        this.processedConfig.settings,
         this.name,
         dependencies.redisClient,
       )
     }
     if (!dependencies.requester) {
-      dependencies.requester = new Requester(dependencies.rateLimiter, this.processedConfig.config)
+      dependencies.requester = new Requester(
+        dependencies.rateLimiter,
+        this.processedConfig.settings,
+      )
     }
 
     return dependencies as AdapterDependencies
@@ -305,13 +308,13 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
 
     if (response) {
       if (
-        this.processedConfig.config.METRICS_ENABLED &&
-        this.processedConfig.config.EXPERIMENTAL_METRICS_ENABLED
+        this.processedConfig.settings.METRICS_ENABLED &&
+        this.processedConfig.settings.EXPERIMENTAL_METRICS_ENABLED
       ) {
         const label = cacheMetricsLabel(
           req.requestContext.cacheKey,
           req.requestContext.meta?.metrics?.feedId || 'N/A',
-          this.processedConfig.config.CACHE_TYPE,
+          this.processedConfig.settings.CACHE_TYPE,
         )
 
         // Record cache staleness and cache get count and value
@@ -366,7 +369,7 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
           // `await` is required to catch the error, you'll get an unhandled promise rejection otherwise
           // Disable non-null assertion operator because we already checked for the existence of registerRequest
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          return await transport.registerRequest!(req, this.processedConfig.config)
+          return await transport.registerRequest!(req, this.processedConfig.settings)
         } catch (err) {
           logger.error(`Error registering request: ${err}`)
           requestRegistrationError = err as Error
@@ -392,7 +395,7 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
     // If there was no cached response, execute the foregroundExecute if defined
     const immediateResponse =
       transport.foregroundExecute &&
-      (await transport.foregroundExecute(req, this.processedConfig.config))
+      (await transport.foregroundExecute(req, this.processedConfig.settings))
     if (immediateResponse) {
       logger.debug('Got immediate response from transport, sending as response')
       return immediateResponse
@@ -418,8 +421,8 @@ export class Adapter<T extends ProcessedConfig = ProcessedConfig>
       this.dependencies.cache as Cache<AdapterResponse>,
       req.requestContext.cacheKey,
       {
-        maxRetries: this.processedConfig.config.CACHE_POLLING_MAX_RETRIES,
-        sleep: this.processedConfig.config.CACHE_POLLING_SLEEP_MS,
+        maxRetries: this.processedConfig.settings.CACHE_POLLING_MAX_RETRIES,
+        sleep: this.processedConfig.settings.CACHE_POLLING_SLEEP_MS,
       },
     )
 

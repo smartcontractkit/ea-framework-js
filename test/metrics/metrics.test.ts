@@ -3,7 +3,7 @@ import untypedTest, { TestFn } from 'ava'
 import axios from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterConfig, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, ProcessedConfig } from '../../src/config'
 import { retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { TestAdapter } from '../util'
@@ -39,7 +39,7 @@ type RestEndpointTypes = {
     }
     Result: number
   }
-  Config: BaseAdapterConfig
+  Settings: BaseAdapterSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody

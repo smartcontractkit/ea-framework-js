@@ -3,7 +3,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Server, WebSocket } from 'mock-socket'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
-import { ProcessedConfig, SettingsMap } from '../../src/config'
+import { ProcessedConfig, SettingsDefinitionMap } from '../../src/config'
 import {
   HttpTransport,
   SSEConfig,
@@ -46,7 +46,7 @@ const settings = {
     required: false,
     sensitive: false,
   },
-} satisfies SettingsMap
+} satisfies SettingsDefinitionMap
 
 const processedConfig = new ProcessedConfig(settings)
 
@@ -64,7 +64,7 @@ type BaseEndpointTypes = {
     }
     Result: number
   }
-  Config: typeof processedConfig.config
+  Settings: typeof processedConfig.settings
 }
 
 type WebSocketTypes = BaseEndpointTypes & {

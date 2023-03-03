@@ -1,7 +1,7 @@
 import * as client from 'prom-client'
 import { HttpRequestType, requestDurationBuckets } from './constants'
 import { AdapterRequest, makeLogger } from '../util'
-import { AdapterConfig } from '../config'
+import { AdapterSettings } from '../config'
 import fastify, { FastifyReply, HookHandlerDoneFunction } from 'fastify'
 import { join } from 'path'
 import { AdapterError } from '../validation/error'
@@ -9,15 +9,17 @@ import { getMTLSOptions, httpsOptions } from '../index'
 
 const logger = makeLogger('Metrics')
 
-export function setupMetricsServer(name: string, config: AdapterConfig) {
-  const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(config)
+export function setupMetricsServer(name: string, adapterSettings: AdapterSettings) {
+  const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(adapterSettings)
   const metricsApp = fastify({
     ...mTLSOptions,
     logger: false,
   })
-  const metricsPort = config.METRICS_PORT
-  const endpoint = config.METRICS_USE_BASE_URL ? join(config.BASE_URL, 'metrics') : '/metrics'
-  const eaHost = config.EA_HOST
+  const metricsPort = adapterSettings.METRICS_PORT
+  const endpoint = adapterSettings.METRICS_USE_BASE_URL
+    ? join(adapterSettings.BASE_URL, 'metrics')
+    : '/metrics'
+  const eaHost = adapterSettings.EA_HOST
   logger.info(`Metrics endpoint: http://${eaHost}:${metricsPort}${endpoint}`)
 
   setupMetrics(name)

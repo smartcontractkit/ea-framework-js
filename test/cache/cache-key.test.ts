@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache } from '../../src/cache'
-import { BaseSettings, ProcessedConfig } from '../../src/config'
+import { BaseSettingsDefinition, ProcessedConfig } from '../../src/config'
 import { AdapterRequest, AdapterResponse } from '../../src/util'
 import { InputValidator } from '../../src/validation/input-validator'
 import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
@@ -71,7 +71,7 @@ test.serial('no parameters returns default cache key', async (t) => {
   const response = await t.context.testAdapter.request({})
   t.is(
     response.json().result,
-    `TEST-test-default_single_transport-${BaseSettings.DEFAULT_CACHE_KEY.default}`,
+    `TEST-test-default_single_transport-${BaseSettingsDefinition.DEFAULT_CACHE_KEY.default}`,
   )
 })
 

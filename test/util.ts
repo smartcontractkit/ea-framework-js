@@ -6,7 +6,7 @@ import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
 import { Cache, LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
-import { BaseAdapterConfig, ProcessedConfig } from '../src/config'
+import { BaseAdapterSettings, ProcessedConfig } from '../src/config'
 import { Transport, TransportDependencies } from '../src/transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse } from '../src/util'
 
@@ -18,7 +18,7 @@ export type NopTransportTypes = {
     Data: null
     Result: null
   }
-  Config: BaseAdapterConfig
+  Settings: BaseAdapterSettings
 }
 
 export class NopTransport implements Transport<NopTransportTypes> {
@@ -30,7 +30,7 @@ export class NopTransport implements Transport<NopTransportTypes> {
 
   async initialize(
     dependencies: TransportDependencies<NopTransportTypes>,
-    config: NopTransportTypes['Config'],
+    adapterSettings: NopTransportTypes['Settings'],
     endpointName: string,
     transportName: string,
   ): Promise<void> {
@@ -282,7 +282,7 @@ export class TestAdapter<T extends ProcessedConfig = ProcessedConfig> {
   ) {
     // Create mocked cache so we can listen when values are set
     // This is a more reliable method than expecting precise clock timings
-    const mockCache = new MockCache(adapter.processedConfig.config.CACHE_MAX_ITEMS)
+    const mockCache = new MockCache(adapter.processedConfig.settings.CACHE_MAX_ITEMS)
 
     return TestAdapter.start(adapter, context, {
       cache: mockCache,

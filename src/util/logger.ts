@@ -1,5 +1,5 @@
 import pino from 'pino'
-import { BaseSettings } from '../config'
+import { BaseSettingsDefinition } from '../config'
 import { AdapterRequest } from './types'
 import { FastifyReply, HookHandlerDoneFunction } from 'fastify'
 import { randomUUID } from 'crypto'
@@ -25,7 +25,7 @@ const debugTransport = {
 
 // Base logger, shouldn't be used because we want layers to be specified
 const baseLogger = pino({
-  level: process.env['LOG_LEVEL']?.toLowerCase() || BaseSettings.LOG_LEVEL.default,
+  level: process.env['LOG_LEVEL']?.toLowerCase() || BaseSettingsDefinition.LOG_LEVEL.default,
   formatters: {
     level(label) {
       return { level: label }

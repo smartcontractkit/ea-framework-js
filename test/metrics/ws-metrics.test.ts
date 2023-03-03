@@ -2,7 +2,7 @@ import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { Server, WebSocket } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterConfig, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, ProcessedConfig } from '../../src/config'
 import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
@@ -45,7 +45,7 @@ type WebSocketEndpointTypes = {
     }
     Result: number
   }
-  Config: BaseAdapterConfig
+  Settings: BaseAdapterSettings
   Provider: {
     WsMessage: ProviderMessage
   }
@@ -239,8 +239,8 @@ test.serial('test WS connection, subscription, and message metrics', async (t) =
 
   // Wait until the cache expires, and the subscription is out
   await t.context.clock.tickAsync(
-    Math.ceil(CACHE_MAX_AGE / adapter.processedConfig.config.WS_SUBSCRIPTION_TTL) *
-      adapter.processedConfig.config.WS_SUBSCRIPTION_TTL *
+    Math.ceil(CACHE_MAX_AGE / adapter.processedConfig.settings.WS_SUBSCRIPTION_TTL) *
+      adapter.processedConfig.settings.WS_SUBSCRIPTION_TTL *
       2 +
       1,
   )

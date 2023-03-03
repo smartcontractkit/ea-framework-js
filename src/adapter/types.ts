@@ -1,7 +1,7 @@
 import type EventSource from 'eventsource'
 import Redis from 'ioredis'
 import { Cache } from '../cache'
-import { BaseAdapterConfig, ProcessedConfig, SettingsMap } from '../config'
+import { BaseAdapterSettings, ProcessedConfig, SettingsDefinitionMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics } from '../transports'
 import { AdapterRequest, SingleNumberResultResponse, SubscriptionSetFactory } from '../util'
@@ -11,9 +11,9 @@ import { AdapterError } from '../validation/error'
 import { Adapter } from './basic'
 import { AdapterEndpoint } from './endpoint'
 
-export type CustomAdapterSettings = SettingsMap & NegatedAdapterSettings
+export type CustomAdapterSettings = SettingsDefinitionMap & NegatedAdapterSettings
 type NegatedAdapterSettings = {
-  [K in keyof BaseAdapterConfig]?: never
+  [K in keyof BaseAdapterSettings]?: never
 }
 
 /**
@@ -51,7 +51,7 @@ export interface EndpointContext<T extends EndpointGenerics> {
   inputParameters: InputParameters
 
   /** Initialized config for the adapter that the Transport can access */
-  adapterConfig: T['Config']
+  adapterSettings: T['Settings']
 }
 
 /**
@@ -133,7 +133,7 @@ export type PriceEndpointGenerics = TransportGenerics & { Response: SingleNumber
 
 export type CustomInputValidator<T extends EndpointGenerics> = (
   input: AdapterRequest<T['Request']>,
-  config: T['Config'],
+  adapterSettings: T['Settings'],
 ) => AdapterError | undefined
 
 /**
@@ -176,7 +176,7 @@ type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
   transports: Record<string, Transport<T>>
 
   /** Custom function to direct an incoming request to the appropriate transport from the transports map */
-  customRouter?: (req: AdapterRequest<T['Request']>, adapterConfig: T['Config']) => string
+  customRouter?: (req: AdapterRequest<T['Request']>, settings: T['Settings']) => string
 
   /** If no value is returned from the custom router or the default (transport param), which transport to use */
   defaultTransport?: string

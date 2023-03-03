@@ -1,5 +1,5 @@
 import { AdapterDependencies } from '../adapter'
-import { AdapterConfig } from '../config'
+import { AdapterSettings } from '../config'
 import {
   AdapterResponse,
   RequestGenerics,
@@ -24,17 +24,17 @@ export class ResponseCache<
   inputParameters: InputParameters
   adapterName: string
   endpointName: string
-  config: AdapterConfig
+  adapterSettings: AdapterSettings
 
   constructor({
     inputParameters,
     adapterName,
     endpointName,
-    config,
+    adapterSettings,
     dependencies,
   }: {
     dependencies: AdapterDependencies
-    config: AdapterConfig
+    adapterSettings: AdapterSettings
     adapterName: string
     endpointName: string
     inputParameters: InputParameters
@@ -43,7 +43,7 @@ export class ResponseCache<
     this.inputParameters = inputParameters
     this.adapterName = adapterName
     this.endpointName = endpointName
-    this.config = config
+    this.adapterSettings = adapterSettings
   }
 
   /**
@@ -58,13 +58,16 @@ export class ResponseCache<
         statusCode: (r.response as TimestampedProviderErrorResponse).statusCode || 200,
       }
 
-      if (this.config.METRICS_ENABLED && this.config.EXPERIMENTAL_METRICS_ENABLED) {
+      if (
+        this.adapterSettings.METRICS_ENABLED &&
+        this.adapterSettings.EXPERIMENTAL_METRICS_ENABLED
+      ) {
         response.meta = {
           metrics: {
             feedId: calculateFeedId(
               {
                 inputParameters: this.inputParameters,
-                adapterConfig: this.config,
+                adapterSettings: this.adapterSettings,
               },
               r.params,
             ),
@@ -79,13 +82,13 @@ export class ResponseCache<
           inputParameters: this.inputParameters,
           adapterName: this.adapterName,
           endpointName: this.endpointName,
-          adapterConfig: this.config,
+          adapterSettings: this.adapterSettings,
         }),
         value: response,
       } as const
     })
 
-    const ttl = this.config.CACHE_MAX_AGE
+    const ttl = this.adapterSettings.CACHE_MAX_AGE
     await this.cache.setMany(entries, ttl)
 
     const now = Date.now()

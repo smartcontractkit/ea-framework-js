@@ -68,19 +68,19 @@ export const calculateCacheKey = <T extends EndpointGenerics>({
   inputParameters,
   adapterName,
   endpointName,
-  adapterConfig,
+  adapterSettings,
   transportName,
 }: {
   data: unknown
   inputParameters: InputParameters
   adapterName: string
   endpointName: string
-  adapterConfig: T['Config']
+  adapterSettings: T['Settings']
   transportName: string
 }): string => {
   const calculatedKey = calculateKey({
     data,
-    adapterConfig,
+    adapterSettings,
     endpointName,
     transportName,
     inputParameters,
@@ -103,7 +103,7 @@ export const calculateHttpRequestKey = <T extends EndpointGenerics>({
   const key = calculateKey({
     data,
     transportName,
-    adapterConfig: context.adapterConfig,
+    adapterSettings: context.adapterSettings,
     endpointName: context.endpointName,
     inputParameters: context.inputParameters,
   })
@@ -115,28 +115,28 @@ const calculateKey = <T extends EndpointGenerics>({
   data,
   endpointName,
   transportName,
-  adapterConfig,
+  adapterSettings,
   inputParameters,
 }: {
   data: unknown
   endpointName: string
   transportName: string
-  adapterConfig: T['Config']
+  adapterSettings: T['Settings']
   inputParameters: InputParameters
 }) => {
   const paramsKey = Object.keys(inputParameters).length
-    ? calculateParamsKey(data, adapterConfig.MAX_COMMON_KEY_SIZE)
-    : adapterConfig.DEFAULT_CACHE_KEY
+    ? calculateParamsKey(data, adapterSettings.MAX_COMMON_KEY_SIZE)
+    : adapterSettings.DEFAULT_CACHE_KEY
   return `${endpointName}-${transportName}-${paramsKey}`
 }
 
 export const calculateFeedId = <T extends EndpointGenerics>(
   {
     inputParameters,
-    adapterConfig,
+    adapterSettings,
   }: {
     inputParameters: InputParameters
-    adapterConfig: T['Config']
+    adapterSettings: T['Settings']
   },
   data: unknown,
 ): string => {
@@ -144,7 +144,7 @@ export const calculateFeedId = <T extends EndpointGenerics>(
     logger.trace(`Cannot generate Feed ID without input parameters`)
     return 'N/A'
   }
-  return calculateParamsKey(data, adapterConfig.MAX_COMMON_KEY_SIZE)
+  return calculateParamsKey(data, adapterSettings.MAX_COMMON_KEY_SIZE)
 }
 
 /**

@@ -16,7 +16,7 @@ export const messageSubsLabels = <T extends TransportGenerics>(
   context: {
     inputParameters: InputParameters
     endpointName: string
-    adapterConfig: T['Config']
+    adapterSettings: T['Settings']
   },
   params: T['Request']['Params'],
 ) => {

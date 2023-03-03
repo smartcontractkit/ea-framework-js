@@ -24,17 +24,17 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
 
   async initialize(
     dependencies: TransportDependencies<T>,
-    config: T['Config'],
+    adapterSettings: T['Settings'],
     endpointName: string,
     name: string,
   ): Promise<void> {
     this.responseCache = dependencies.responseCache
     this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName)
-    this.subscriptionTtl = this.getSubscriptionTtlFromConfig(config) // Will be implemented by subclasses
+    this.subscriptionTtl = this.getSubscriptionTtlFromConfig(adapterSettings) // Will be implemented by subclasses
     this.name = name
   }
 
-  async registerRequest(req: AdapterRequest<T['Request']>, _: T['Config']): Promise<void> {
+  async registerRequest(req: AdapterRequest<T['Request']>, _: T['Settings']): Promise<void> {
     logger.debug(
       `Adding entry to subscription set (ttl ${this.subscriptionTtl}): [${req.requestContext.cacheKey}] = ${req.requestContext.data}`,
     )
@@ -76,7 +76,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   /**
    * Helper method to be defined in subclasses, for each of them to carry their own TTL definition in the EA config.
    *
-   * @param config - the config for this adapter
+   * @param adapterSettings - the config for this adapter
    */
-  abstract getSubscriptionTtlFromConfig(config: T['Config']): number
+  abstract getSubscriptionTtlFromConfig(adapterSettings: T['Settings']): number
 }

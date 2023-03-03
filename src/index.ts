@@ -3,7 +3,7 @@ import { AddressInfo } from 'net'
 import { join } from 'path'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
-import { AdapterConfig, ProcessedConfig } from './config'
+import { AdapterSettings, ProcessedConfig } from './config'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
 import { AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
@@ -24,21 +24,21 @@ export interface httpsOptions {
   }
 }
 
-export const getMTLSOptions = (config: AdapterConfig) => {
+export const getMTLSOptions = (adapterSettings: AdapterSettings) => {
   if (
-    config.MTLS_ENABLED &&
-    (!config.TLS_PRIVATE_KEY || !config.TLS_PUBLIC_KEY || !config.TLS_CA)
+    adapterSettings.MTLS_ENABLED &&
+    (!adapterSettings.TLS_PRIVATE_KEY || !adapterSettings.TLS_PUBLIC_KEY || !adapterSettings.TLS_CA)
   ) {
     throw new Error(
       `TLS_PRIVATE_KEY , TLS_PUBLIC_KEY and  TLS_CA environment variables are required when MTLS_ENABLED is set to true.`,
     )
-  } else if (config.MTLS_ENABLED) {
+  } else if (adapterSettings.MTLS_ENABLED) {
     return {
       https: {
-        key: config.TLS_PRIVATE_KEY,
-        cert: config.TLS_PUBLIC_KEY,
-        ca: config.TLS_CA,
-        passphrase: config.TLS_PASSPHRASE,
+        key: adapterSettings.TLS_PRIVATE_KEY,
+        cert: adapterSettings.TLS_PUBLIC_KEY,
+        ca: adapterSettings.TLS_CA,
+        passphrase: adapterSettings.TLS_PASSPHRASE,
         requestCert: true,
       },
     }
@@ -74,18 +74,18 @@ export const start = async <T extends ProcessedConfig = ProcessedConfig>(
   let metricsApi: FastifyInstance | undefined = undefined
 
   if (
-    adapter.processedConfig.config.METRICS_ENABLED &&
-    adapter.processedConfig.config.EXPERIMENTAL_METRICS_ENABLED
+    adapter.processedConfig.settings.METRICS_ENABLED &&
+    adapter.processedConfig.settings.EXPERIMENTAL_METRICS_ENABLED
   ) {
-    metricsApi = setupMetricsServer(adapter.name, adapter.processedConfig.config)
+    metricsApi = setupMetricsServer(adapter.name, adapter.processedConfig.settings)
   }
 
   // Optional Promise to indicate that the API is shutting down (for us to close background executors)
   let apiShutdownPromise
 
   if (
-    adapter.processedConfig.config.EA_MODE === 'reader' ||
-    adapter.processedConfig.config.EA_MODE === 'reader-writer'
+    adapter.processedConfig.settings.EA_MODE === 'reader' ||
+    adapter.processedConfig.settings.EA_MODE === 'reader-writer'
   ) {
     // Main REST API server to handle incoming requests
     api = await buildRestApi(adapter as unknown as Adapter)
@@ -99,8 +99,8 @@ export const start = async <T extends ProcessedConfig = ProcessedConfig>(
   }
 
   if (
-    adapter.processedConfig.config.EA_MODE === 'writer' ||
-    adapter.processedConfig.config.EA_MODE === 'reader-writer'
+    adapter.processedConfig.settings.EA_MODE === 'writer' ||
+    adapter.processedConfig.settings.EA_MODE === 'reader-writer'
   ) {
     // Start background loop that will take care of calling any async Transports
     logger.info('Starting background execution loop')
@@ -123,7 +123,7 @@ export const expose = async <T extends ProcessedConfig = ProcessedConfig>(
   const exposeApp = async (app: FastifyInstance | undefined, port: number) => {
     if (app) {
       try {
-        await app.listen({ port, host: adapter.processedConfig.config.EA_HOST })
+        await app.listen({ port, host: adapter.processedConfig.settings.EA_HOST })
       } catch (err) {
         logger.fatal(`There was an error when starting the server: ${err}`)
         process.exit()
@@ -134,8 +134,8 @@ export const expose = async <T extends ProcessedConfig = ProcessedConfig>(
   }
 
   // Start listening for incoming requests
-  await exposeApp(api, adapter.processedConfig.config.EA_PORT)
-  await exposeApp(metricsApi, adapter.processedConfig.config.METRICS_PORT)
+  await exposeApp(api, adapter.processedConfig.settings.EA_PORT)
+  await exposeApp(metricsApi, adapter.processedConfig.settings.METRICS_PORT)
 
   // We return only the main API to maintain backwards compatibility
   return api
@@ -143,15 +143,15 @@ export const expose = async <T extends ProcessedConfig = ProcessedConfig>(
 
 async function buildRestApi(adapter: Adapter) {
   const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(
-    adapter.processedConfig.config,
+    adapter.processedConfig.settings,
   )
   const app = fastify({
     ...mTLSOptions,
-    bodyLimit: adapter.processedConfig.config.MAX_PAYLOAD_SIZE_LIMIT,
+    bodyLimit: adapter.processedConfig.settings.MAX_PAYLOAD_SIZE_LIMIT,
   })
 
   // Add healthcheck endpoint before middlewares to bypass them
-  app.get(join(adapter.processedConfig.config.BASE_URL, 'health'), (req, res) => {
+  app.get(join(adapter.processedConfig.settings.BASE_URL, 'health'), (req, res) => {
     res.status(200).send({ message: 'OK', version: VERSION })
   })
 
@@ -167,12 +167,12 @@ async function buildRestApi(adapter: Adapter) {
   app.register(async (router) => {
     // Set up "middlewares" (hooks in fastify)
     router.addHook<AdapterRouteGeneric>('preHandler', validatorMiddleware(adapter))
-    if (adapter.processedConfig.config.CORRELATION_ID_ENABLED) {
+    if (adapter.processedConfig.settings.CORRELATION_ID_ENABLED) {
       router.addHook<AdapterRouteGeneric>('onRequest', loggingContextMiddleware)
     }
 
     router.route<AdapterRouteGeneric>({
-      url: adapter.processedConfig.config.BASE_URL,
+      url: adapter.processedConfig.settings.BASE_URL,
       method: 'POST',
       handler: async (req, reply) => {
         const response = await adapter.handleRequest(req, reply as unknown as Promise<unknown>)
@@ -181,8 +181,8 @@ async function buildRestApi(adapter: Adapter) {
     })
 
     if (
-      adapter.processedConfig.config.METRICS_ENABLED &&
-      adapter.processedConfig.config.EXPERIMENTAL_METRICS_ENABLED
+      adapter.processedConfig.settings.METRICS_ENABLED &&
+      adapter.processedConfig.settings.EXPERIMENTAL_METRICS_ENABLED
     ) {
       router.addHook<AdapterRouteGeneric>('onResponse', buildMetricsMiddleware)
     }

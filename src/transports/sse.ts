@@ -74,17 +74,17 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
     super()
   }
 
-  getSubscriptionTtlFromConfig(config: T['Config']): number {
-    return config.SSE_SUBSCRIPTION_TTL
+  getSubscriptionTtlFromConfig(adapterSettings: T['Settings']): number {
+    return adapterSettings.SSE_SUBSCRIPTION_TTL
   }
 
   override async initialize(
     dependencies: TransportDependencies<T>,
-    config: T['Config'],
+    adapterSettings: T['Settings'],
     endpointName: string,
     transportName: string,
   ): Promise<void> {
-    super.initialize(dependencies, config, endpointName, transportName)
+    super.initialize(dependencies, adapterSettings, endpointName, transportName)
     this.requester = dependencies.requester
     if (dependencies.eventSource) {
       this.EventSource = dependencies.eventSource
@@ -162,7 +162,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
     if (
       this.config.prepareKeepAliveRequest &&
       subscriptions.desired.length &&
-      Date.now() - this.timeOfLastReq > context.adapterConfig.SSE_KEEPALIVE_SLEEP
+      Date.now() - this.timeOfLastReq > context.adapterSettings.SSE_KEEPALIVE_SLEEP
     ) {
       const prepareKeepAliveRequest = this.config.prepareKeepAliveRequest(context)
       makeRequest(
@@ -177,9 +177,9 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
 
     // The background execute loop no longer sleeps between executions, so we have to do it here
     logger.trace(
-      `SSE handler complete, sleeping for ${context.adapterConfig.BACKGROUND_EXECUTE_MS_SSE}ms...`,
+      `SSE handler complete, sleeping for ${context.adapterSettings.BACKGROUND_EXECUTE_MS_SSE}ms...`,
     )
-    await sleep(context.adapterConfig.BACKGROUND_EXECUTE_MS_SSE)
+    await sleep(context.adapterSettings.BACKGROUND_EXECUTE_MS_SSE)
 
     return
   }

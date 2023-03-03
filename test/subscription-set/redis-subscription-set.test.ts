@@ -4,7 +4,7 @@ import axios, { AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import Redis, { ScanStream } from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterConfig, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, ProcessedConfig } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { assertEqualResponses, runAllUntilTime, TestAdapter } from '../util'
@@ -73,7 +73,7 @@ type BatchEndpointTypes = {
     Params: AdapterRequestParams
   }
   Response: SingleNumberResultResponse
-  Config: BaseAdapterConfig
+  Settings: BaseAdapterSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody

@@ -41,7 +41,7 @@ test.beforeEach(async (t) => {
     ],
   })
 
-  const cache = new LocalCache(adapter.processedConfig.config.CACHE_MAX_ITEMS)
+  const cache = new LocalCache(adapter.processedConfig.settings.CACHE_MAX_ITEMS)
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }

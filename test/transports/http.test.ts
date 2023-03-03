@@ -5,7 +5,7 @@ import MockAdapter from 'axios-mock-adapter'
 import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { calculateHttpRequestKey } from '../../src/cache'
-import { BaseAdapterConfig, buildAdapterConfig, ProcessedConfig } from '../../src/config'
+import { BaseAdapterSettings, buildAdapterSettings, ProcessedConfig } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse, sleep } from '../../src/util'
 import { InputParameters } from '../../src/validation'
@@ -61,7 +61,7 @@ type HttpTransportTypes = {
     Params: AdapterRequestParams
   }
   Response: SingleNumberResultResponse
-  Config: BaseAdapterConfig
+  Settings: BaseAdapterSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
@@ -243,7 +243,7 @@ test.serial(
     // Advance the clock a few minutes and check that the amount of calls is as expected
     await runAllUntilTime(t.context.clock, 3 * 60 * 1000) // 4m
     const expected =
-      rateLimit1m * Math.ceil(adapter.processedConfig.config.WARMUP_SUBSCRIPTION_TTL / 60_000)
+      rateLimit1m * Math.ceil(adapter.processedConfig.settings.WARMUP_SUBSCRIPTION_TTL / 60_000)
     t.is(transport.backgroundExecuteCalls, expected)
   },
 )
@@ -474,7 +474,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
   })
   // Create mocked cache so we can listen when values are set
   // This is a more reliable method than expecting precise clock timings
-  const mockCache = new MockCache(adapter.processedConfig.config.CACHE_MAX_ITEMS)
+  const mockCache = new MockCache(adapter.processedConfig.settings.CACHE_MAX_ITEMS)
 
   // Start the adapter
   const testAdapter = await TestAdapter.start(adapter, t.context, {
@@ -766,7 +766,7 @@ test.serial(
 
 test.serial('builds HTTP request queue key correctly from input params', async (t) => {
   const endpointName = 'test'
-  const adapterConfig = buildAdapterConfig({})
+  const adapterSettings = buildAdapterSettings({})
   const params: InputParameters = {
     base: {
       type: 'string',
@@ -784,7 +784,7 @@ test.serial('builds HTTP request queue key correctly from input params', async (
       transportName: 'transport',
       context: {
         endpointName,
-        adapterConfig,
+        adapterSettings,
         inputParameters: params,
       },
     }),

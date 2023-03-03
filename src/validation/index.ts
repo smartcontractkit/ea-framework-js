@@ -67,19 +67,19 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     // We do it afterwards so the custom routers can have a request with a requestContext fulfilled (sans transportName, ofc)
     req.requestContext.transportName = endpoint.getTransportNameForRequest(
       req,
-      adapter.processedConfig.config,
+      adapter.processedConfig.settings,
     )
 
     if (
-      adapter.processedConfig.config.METRICS_ENABLED &&
-      adapter.processedConfig.config.EXPERIMENTAL_METRICS_ENABLED
+      adapter.processedConfig.settings.METRICS_ENABLED &&
+      adapter.processedConfig.settings.EXPERIMENTAL_METRICS_ENABLED
     ) {
       // Add metrics meta which includes feedId to the request
       // Perform prior to overrides to maintain consistent Feed IDs across adapters
       const metrics = getMetricsMeta(
         {
           inputParameters: endpoint.inputParameters,
-          adapterConfig: adapter.processedConfig.config,
+          adapterSettings: adapter.processedConfig.settings,
         },
         validatedData,
       )
@@ -89,7 +89,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     // Custom input validation defined in the EA
     const error =
       endpoint.customInputValidation &&
-      endpoint.customInputValidation(req, adapter.processedConfig.config)
+      endpoint.customInputValidation(req, adapter.processedConfig.settings)
 
     if (error) {
       throw error
@@ -103,22 +103,25 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     if (endpoint.cacheKeyGenerator) {
       let cacheKey
       cacheKey = endpoint.cacheKeyGenerator(req.requestContext.data)
-      if (cacheKey.length > adapter.processedConfig.config.MAX_COMMON_KEY_SIZE) {
+      if (cacheKey.length > adapter.processedConfig.settings.MAX_COMMON_KEY_SIZE) {
         errorCatcherLogger.warn(
           `Generated custom cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be truncated`,
         )
-        cacheKey = cacheKey.slice(0, adapter.processedConfig.config.MAX_COMMON_KEY_SIZE)
+        cacheKey = cacheKey.slice(0, adapter.processedConfig.settings.MAX_COMMON_KEY_SIZE)
       }
       req.requestContext.cacheKey = cacheKey
     } else {
-      const transportName = endpoint.getTransportNameForRequest(req, adapter.processedConfig.config)
+      const transportName = endpoint.getTransportNameForRequest(
+        req,
+        adapter.processedConfig.settings,
+      )
       req.requestContext.cacheKey = calculateCacheKey({
         data: req.requestContext.data,
         adapterName: adapter.name,
         endpointName: endpoint.name,
         transportName,
         inputParameters: endpoint.inputParameters,
-        adapterConfig: adapter.processedConfig.config,
+        adapterSettings: adapter.processedConfig.settings,
       })
     }
 

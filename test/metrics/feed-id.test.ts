@@ -1,18 +1,18 @@
 import untypedTest, { TestFn } from 'ava'
 import { calculateFeedId } from '../../src/cache'
-import { AdapterConfig, buildAdapterConfig } from '../../src/config'
+import { AdapterSettings, buildAdapterSettings } from '../../src/config'
 import { InputParameters } from '../../src/validation'
 
 const feedIdTest = untypedTest as TestFn<{
   inputParameters: InputParameters
   endpointName: string
-  adapterConfig: AdapterConfig
+  adapterSettings: AdapterSettings
 }>
 
 feedIdTest.beforeEach(async (t) => {
   t.context.endpointName = 'TEST'
   t.context.inputParameters = {}
-  t.context.adapterConfig = buildAdapterConfig({})
+  t.context.adapterSettings = buildAdapterSettings({})
 })
 
 feedIdTest.serial('no parameters returns N/A', async (t) => {

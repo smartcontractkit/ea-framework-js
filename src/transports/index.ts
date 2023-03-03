@@ -1,6 +1,6 @@
 import { AdapterDependencies, EndpointContext } from '../adapter'
 import { ResponseCache } from '../cache/response'
-import { BaseAdapterConfig } from '../config'
+import { BaseAdapterSettings } from '../config'
 import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/types'
 
 export * from './http'
@@ -29,7 +29,7 @@ export type TransportGenerics = {
   /**
    * Type for any custom settings used for this Transport
    */
-  Config: BaseAdapterConfig
+  Settings: BaseAdapterSettings
 }
 
 /**
@@ -66,12 +66,12 @@ export interface Transport<T extends TransportGenerics> {
    * Initializes the transport in the Adapter context.
    *
    * @param dependencies - Adapter dependencies (e.g. cache instance)
-   * @param config - Adapter config containing env vars
+   * @param adapterSettings - Adapter config containing env vars
    * @returns an empty Promise
    */
   initialize: (
     dependencies: TransportDependencies<T>,
-    config: T['Config'],
+    adapterSettings: T['Settings'],
     endpointName: string,
     transportName: string,
   ) => Promise<void>
@@ -81,10 +81,13 @@ export interface Transport<T extends TransportGenerics> {
    * This means things like adding the request to a subscription set.
    *
    * @param req - the incoming AdapterRequest
-   * @param config - common configuration for the Adapter as a whole
+   * @param adapterSettings - common configuration for the Adapter as a whole
    * @returns an empty Promise
    */
-  registerRequest?: (req: AdapterRequest<T['Request']>, config: T['Config']) => Promise<void>
+  registerRequest?: (
+    req: AdapterRequest<T['Request']>,
+    adapterSettings: T['Settings'],
+  ) => Promise<void>
 
   /**
    * Performs a synchronous fetch/processing of information within the lifecycle of an incoming request.
@@ -94,13 +97,13 @@ export interface Transport<T extends TransportGenerics> {
    * to perform as much of the work as possible (or all of it) in the backgroundExecute method.
    *
    * @param req - the incoming AdapterRequest
-   * @param config - common configuration for the Adapter as a whole
+   * @param adapterSettings - common configuration for the Adapter as a whole
    * @returns a Promise that _optionally_ returns an AdapterResponse, if the Transport has the capability of
    *   immediately fetching data and returning it without the background process.
    */
   foregroundExecute?: (
     req: AdapterRequest<T['Request']>,
-    config: T['Config'],
+    adapterSettings: T['Settings'],
   ) => Promise<AdapterResponse<{
     Data: T['Response']['Data']
     Result: T['Response']['Result']

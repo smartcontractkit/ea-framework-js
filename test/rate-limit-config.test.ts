@@ -302,7 +302,7 @@ test('test build rate limits from env vars (second, minute)', async (t) => {
       },
     },
   })
-  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.config)
+  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.settings)
   t.is(tiers?.rateLimit1m, 60)
   t.is(tiers?.rateLimit1s, 1)
   t.is(tiers?.rateLimit1h, undefined)
@@ -340,7 +340,7 @@ test('test build rate limits from env vars (second, capacity)', async (t) => {
       },
     },
   })
-  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.config)
+  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.settings)
   t.is(tiers?.rateLimit1m, 60)
   t.is(tiers?.rateLimit1s, 1)
   t.is(tiers?.rateLimit1h, undefined)
@@ -379,7 +379,7 @@ test('test build rate limits from env vars (second, minute, capacity)', async (t
       },
     },
   })
-  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.config)
+  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.settings)
   t.is(tiers?.rateLimit1m, 100)
   t.is(tiers?.rateLimit1s, 1)
   t.is(tiers?.rateLimit1h, undefined)
@@ -418,7 +418,7 @@ test('test build rate limits from env vars (capacity)', async (t) => {
       },
     },
   })
-  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.config)
+  const tiers = buildRateLimitTiersFromConfig(adapter.processedConfig.settings)
   t.is(tiers?.rateLimit1m, 60)
 })
 
