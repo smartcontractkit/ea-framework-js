@@ -3,7 +3,7 @@ import Redis from 'ioredis'
 import { Cache } from '../cache'
 import { BaseAdapterSettings, AdapterConfig, SettingsDefinitionMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
-import { Transport, TransportGenerics } from '../transports'
+import { Transport, TransportGenerics, TransportRoutes } from '../transports'
 import { AdapterRequest, SingleNumberResultResponse, SubscriptionSetFactory } from '../util'
 import { Requester } from '../util/requester'
 import { InputParameters, SpecificInputParameters } from '../validation'
@@ -173,7 +173,7 @@ type SingleTransportAdapterEndpointParams<T extends EndpointGenerics> = {
 
 type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
   /** Map of transports that will be used when routing the request through this endpoint */
-  transports: Record<string, Transport<T>>
+  transportRoutes: TransportRoutes<T>
 
   /** Custom function to direct an incoming request to the appropriate transport from the transports map */
   customRouter?: (req: AdapterRequest<T['Request']>, settings: T['Settings']) => string

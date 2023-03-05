@@ -98,7 +98,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
   }
 
   for (const endpoint of adapter.endpoints) {
-    for (const [transportName, transport] of Object.entries(endpoint.transports)) {
+    for (const [transportName, transport] of endpoint.transportRoutes.entries()) {
       callBackgroundExecute(endpoint, transport, transportName)
     }
   }

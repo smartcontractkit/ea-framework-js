@@ -1,4 +1,4 @@
-import { AdapterDependencies, EndpointContext } from '../adapter'
+import { AdapterDependencies, DEFAULT_TRANSPORT_NAME, EndpointContext } from '../adapter'
 import { ResponseCache } from '../cache/response'
 import { BaseAdapterSettings } from '../config'
 import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/types'
@@ -117,4 +117,34 @@ export interface Transport<T extends TransportGenerics> {
    * @returns an empty Promise
    */
   backgroundExecute?: (context: EndpointContext<T>) => Promise<void>
+}
+
+export class TransportRoutes<T extends TransportGenerics> {
+  private map: Record<string, Transport<T>> = {}
+
+  register<T2 extends T>(name: string, transport: Transport<T2>) {
+    // This is intentional, to keep names to one word only
+    if (name !== DEFAULT_TRANSPORT_NAME && !/^[a-z]+$/.test(name)) {
+      throw new Error(
+        `Transport name "${name}" is invalid. Names in the AdapterEndpoint transports map can only include lowercase letters.`,
+      )
+    }
+    if (this.map[name]) {
+      throw new Error(`Transport with name "${name}" is already registered in this map`)
+    }
+    this.map[name] = transport as unknown as Transport<T>
+    return this
+  }
+
+  get(name: string) {
+    return this.map[name]
+  }
+
+  routeNames() {
+    return Object.keys(this.map)
+  }
+
+  entries() {
+    return Object.entries(this.map)
+  }
 }
