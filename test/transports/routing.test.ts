@@ -3,7 +3,11 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Server, WebSocket } from 'mock-socket'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
-import { AdapterConfig, SettingsDefinitionMap } from '../../src/config'
+import {
+  AdapterConfig,
+  SettingsDefinitionFromConfig,
+  SettingsDefinitionMap,
+} from '../../src/config'
 import {
   HttpTransport,
   SSEConfig,
@@ -16,7 +20,7 @@ import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
-  testAdapter: TestAdapter<typeof adapterConfig>
+  testAdapter: TestAdapter<SettingsDefinitionFromConfig<typeof adapterConfig>>
 }>
 
 interface ProviderRequestBody {

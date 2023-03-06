@@ -1,7 +1,12 @@
 import Redis from 'ioredis'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
-import { BaseAdapterSettings, BaseSettingsDefinition, AdapterConfig } from '../config'
+import {
+  AdapterConfig,
+  BaseAdapterSettings,
+  BaseSettingsDefinition,
+  SettingsDefinitionMap,
+} from '../config'
 import { metrics } from '../metrics'
 import {
   buildRateLimitTiersFromConfig,
@@ -25,8 +30,8 @@ const logger = makeLogger('Adapter')
 /**
  * Main class to represent an External Adapter
  */
-export class Adapter<T extends AdapterConfig = AdapterConfig>
-  implements Omit<AdapterParams<T>, 'bootstrap'>
+export class Adapter<CustomSettings extends SettingsDefinitionMap = SettingsDefinitionMap>
+  implements Omit<AdapterParams<CustomSettings>, 'bootstrap'>
 {
   // Adapter params
   name: Uppercase<string>
@@ -46,19 +51,19 @@ export class Adapter<T extends AdapterConfig = AdapterConfig>
   dependencies!: AdapterDependencies
 
   /** Configuration params for various adapter properties */
-  config: T
+  config: AdapterConfig<CustomSettings>
 
   /** Bootstrap function that will run when initializing the adapter */
-  private readonly bootstrap?: (adapter: Adapter<T>) => Promise<void>
+  private readonly bootstrap?: (adapter: Adapter<CustomSettings>) => Promise<void>
 
-  constructor(params: AdapterParams<T>) {
+  constructor(params: AdapterParams<CustomSettings>) {
     // Copy over params
     this.name = params.name
     this.defaultEndpoint = params.defaultEndpoint?.toLowerCase()
     this.endpoints = params.endpoints
     this.rateLimiting = params.rateLimiting
     this.bootstrap = params.bootstrap
-    this.config = params.config || (new AdapterConfig({}) as T)
+    this.config = params.config || (new AdapterConfig({}) as AdapterConfig<CustomSettings>)
 
     this.config.initialize()
     this.normalizeEndpointNames()

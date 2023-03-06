@@ -433,7 +433,7 @@ type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
     ? C['options'][number]
     : never
   : never
-type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
+export type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
 export type SettingDefinition =
   | {
       type: 'string'
@@ -521,13 +521,17 @@ export type Settings<T extends SettingsDefinitionMap> = {
 }
 
 export type BaseAdapterSettings = Settings<BaseSettingsDefinitionType>
-export type AdapterSettings<T extends CustomSettingsDefinition<T> = SettingsDefinitionMap> =
-  Settings<T> & BaseAdapterSettings & SettingsObjectSpecifier
+export type AdapterSettings<T extends CustomSettingsDefinition<T> = object> = Settings<T> &
+  BaseAdapterSettings &
+  SettingsObjectSpecifier
 
 export type CustomSettingsDefinition<T = SettingsDefinitionMap> = Record<keyof T, SettingDefinition>
 export type EmptySettingsDefinitionMap = Record<string, never>
 export type SettingsDefinitionMap = Record<string, SettingDefinition>
 export type ValidationErrorMessage = string | undefined
+export type SettingsDefinitionFromConfig<T> = T extends AdapterConfig<infer Definition>
+  ? Definition
+  : never
 
 /**
  * This class will hold the processed config type, and the basic settings.
@@ -604,7 +608,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
         // Escaping potential special characters in values before creating regex
         value: new RegExp(
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          ((this.settings as AdapterSettings)[name]! as string).replace(
+          ((this.settings as Record<string, ValidSettingValue>)[name]! as string).replace(
             /[-[\]{}()*+?.,\\^$|#\s]/g,
             '\\$&',
           ),
