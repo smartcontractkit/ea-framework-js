@@ -1,23 +1,24 @@
 import test from 'ava'
 import { start } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
-import { SettingsMap } from '../src/config'
+import { AdapterConfig, SettingsDefinitionMap } from '../src/config'
 import CensorList from '../src/util/censor/censor-list'
 import { censor, colorFactory, COLORS } from '../src/util/logger'
 import { NopTransport } from './util'
 
 test.before(async () => {
-  const customSettings: SettingsMap = {
+  const customSettings = {
     API_KEY: {
       description: 'Test custom env var',
       type: 'string',
       sensitive: true,
     },
-  }
+  } satisfies SettingsDefinitionMap
   process.env['API_KEY'] = 'mock-api-key'
+  const config = new AdapterConfig(customSettings)
   const adapter = new Adapter({
     name: 'TEST',
-    customSettings,
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',

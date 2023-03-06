@@ -1,6 +1,6 @@
-import { AdapterDependencies, EndpointContext } from '../adapter'
+import { AdapterDependencies, DEFAULT_TRANSPORT_NAME, EndpointContext } from '../adapter'
 import { ResponseCache } from '../cache/response'
-import { AdapterConfig, SettingsMap } from '../config'
+import { BaseAdapterSettings } from '../config'
 import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/types'
 
 export * from './http'
@@ -29,7 +29,7 @@ export type TransportGenerics = {
   /**
    * Type for any custom settings used for this Transport
    */
-  CustomSettings: SettingsMap
+  Settings: BaseAdapterSettings
 }
 
 /**
@@ -66,12 +66,12 @@ export interface Transport<T extends TransportGenerics> {
    * Initializes the transport in the Adapter context.
    *
    * @param dependencies - Adapter dependencies (e.g. cache instance)
-   * @param config - Adapter config containing env vars
+   * @param adapterSettings - Adapter config containing env vars
    * @returns an empty Promise
    */
   initialize: (
     dependencies: TransportDependencies<T>,
-    config: AdapterConfig<T['CustomSettings']>,
+    adapterSettings: T['Settings'],
     endpointName: string,
     transportName: string,
   ) => Promise<void>
@@ -81,12 +81,12 @@ export interface Transport<T extends TransportGenerics> {
    * This means things like adding the request to a subscription set.
    *
    * @param req - the incoming AdapterRequest
-   * @param config - common configuration for the Adapter as a whole
+   * @param adapterSettings - common configuration for the Adapter as a whole
    * @returns an empty Promise
    */
   registerRequest?: (
     req: AdapterRequest<T['Request']>,
-    config: AdapterConfig<T['CustomSettings']>,
+    adapterSettings: T['Settings'],
   ) => Promise<void>
 
   /**
@@ -97,13 +97,13 @@ export interface Transport<T extends TransportGenerics> {
    * to perform as much of the work as possible (or all of it) in the backgroundExecute method.
    *
    * @param req - the incoming AdapterRequest
-   * @param config - common configuration for the Adapter as a whole
+   * @param adapterSettings - common configuration for the Adapter as a whole
    * @returns a Promise that _optionally_ returns an AdapterResponse, if the Transport has the capability of
    *   immediately fetching data and returning it without the background process.
    */
   foregroundExecute?: (
     req: AdapterRequest<T['Request']>,
-    config: AdapterConfig<T['CustomSettings']>,
+    adapterSettings: T['Settings'],
   ) => Promise<AdapterResponse<{
     Data: T['Response']['Data']
     Result: T['Response']['Result']
@@ -117,4 +117,34 @@ export interface Transport<T extends TransportGenerics> {
    * @returns an empty Promise
    */
   backgroundExecute?: (context: EndpointContext<T>) => Promise<void>
+}
+
+export class TransportRoutes<T extends TransportGenerics> {
+  private map: Record<string, Transport<T>> = {}
+
+  register<T2 extends T>(name: string, transport: Transport<T2>) {
+    // This is intentional, to keep names to one word only
+    if (name !== DEFAULT_TRANSPORT_NAME && !/^[a-z]+$/.test(name)) {
+      throw new Error(
+        `Transport name "${name}" is invalid. Names in the AdapterEndpoint transports map can only include lowercase letters.`,
+      )
+    }
+    if (this.map[name]) {
+      throw new Error(`Transport with name "${name}" is already registered in this map`)
+    }
+    this.map[name] = transport as unknown as Transport<T>
+    return this
+  }
+
+  get(name: string) {
+    return this.map[name]
+  }
+
+  routeNames() {
+    return Object.keys(this.map)
+  }
+
+  entries() {
+    return Object.entries(this.map)
+  }
 }

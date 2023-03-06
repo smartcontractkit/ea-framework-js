@@ -1,10 +1,9 @@
+import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
 import { ResponseCache } from '../../cache/response'
-import { AdapterConfig } from '../../config'
+import { metrics } from '../../metrics'
 import { makeLogger, SubscriptionSet } from '../../util'
 import { AdapterRequest } from '../../util/types'
-import { Transport, TransportDependencies, TransportGenerics } from '..'
-import { metrics } from '../../metrics'
 
 const logger = makeLogger('SubscriptionTransport')
 
@@ -25,20 +24,17 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
 
   async initialize(
     dependencies: TransportDependencies<T>,
-    config: AdapterConfig<T['CustomSettings']>,
+    adapterSettings: T['Settings'],
     endpointName: string,
     name: string,
   ): Promise<void> {
     this.responseCache = dependencies.responseCache
     this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName)
-    this.subscriptionTtl = this.getSubscriptionTtlFromConfig(config) // Will be implemented by subclasses
+    this.subscriptionTtl = this.getSubscriptionTtlFromConfig(adapterSettings) // Will be implemented by subclasses
     this.name = name
   }
 
-  async registerRequest(
-    req: AdapterRequest<T['Request']>,
-    _: AdapterConfig<T['CustomSettings']>,
-  ): Promise<void> {
+  async registerRequest(req: AdapterRequest<T['Request']>, _: T['Settings']): Promise<void> {
     logger.debug(
       `Adding entry to subscription set (ttl ${this.subscriptionTtl}): [${req.requestContext.cacheKey}] = ${req.requestContext.data}`,
     )
@@ -60,7 +56,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     // this.constructor.name will resolve to the instance name, not the class one (i.e., will use the implementing class' name)
     metrics
       .get('bgExecuteSubscriptionSetCount')
-      .labels({ endpoint: context.endpointName, transport_type: this.constructor.name })
+      .labels({ adapter_endpoint: context.endpointName, transport_type: this.constructor.name })
       .set(entries.length)
 
     await this.backgroundHandler(context, entries)
@@ -80,7 +76,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   /**
    * Helper method to be defined in subclasses, for each of them to carry their own TTL definition in the EA config.
    *
-   * @param config - the config for this adapter
+   * @param adapterSettings - the config for this adapter
    */
-  abstract getSubscriptionTtlFromConfig(config: AdapterConfig<T['CustomSettings']>): number
+  abstract getSubscriptionTtlFromConfig(adapterSettings: T['Settings']): number
 }

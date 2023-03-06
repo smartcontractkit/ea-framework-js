@@ -1,6 +1,6 @@
 import { ResponseCache } from '../cache/response'
-import { AdapterConfig } from '../config'
-import { Transport } from '../transports'
+import { AdapterSettings } from '../config'
+import { TransportRoutes } from '../transports'
 import { AdapterRequest, AdapterRequestData, makeLogger } from '../util'
 import { SpecificInputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
@@ -17,7 +17,7 @@ import {
 } from './types'
 
 const logger = makeLogger('AdapterEndpoint')
-const DEFAULT_TRANSPORT_NAME = 'default_single_transport'
+export const DEFAULT_TRANSPORT_NAME = 'default_single_transport'
 
 /**
  * Main class to represent an endpoint within an External Adapter
@@ -25,7 +25,7 @@ const DEFAULT_TRANSPORT_NAME = 'default_single_transport'
 export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpointInterface<T> {
   name: string
   aliases?: string[] | undefined
-  transports: Record<string, Transport<T>>
+  transportRoutes: TransportRoutes<T>
   inputParameters: SpecificInputParameters<T['Request']['Params']>
   rateLimiting?: EndpointRateLimitingConfig | undefined
   validator: InputValidator
@@ -33,34 +33,22 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   customInputValidation?: CustomInputValidator<T>
   requestTransforms?: RequestTransform<T>[]
   overrides?: Record<string, string> | undefined
-  customRouter?: (
-    req: AdapterRequest<T['Request']>,
-    adapterConfig: AdapterConfig<T['CustomSettings']>,
-  ) => string
+  customRouter?: (req: AdapterRequest<T['Request']>, settings: T['Settings']) => string
   defaultTransport?: string
 
   constructor(params: AdapterEndpointParams<T>) {
     this.name = params.name
     this.aliases = params.aliases
     // These ifs are annoying but it's to make it type safe
-    if ('transports' in params) {
-      this.transports = params.transports
+    if ('transportRoutes' in params) {
+      this.transportRoutes = params.transportRoutes
       this.customRouter = params.customRouter
       this.defaultTransport = params.defaultTransport
-
-      // Validate transport names
-      for (const transportName in this.transports) {
-        // This is intentional, to keep names to one word only
-        if (!/^[a-z]+$/.test(transportName)) {
-          throw new Error(
-            `Transport name "${transportName}" is invalid. Names in the AdapterEndpoint transports map can only include lowercase letters.`,
-          )
-        }
-      }
     } else {
-      this.transports = {
-        [DEFAULT_TRANSPORT_NAME]: params.transport,
-      }
+      this.transportRoutes = new TransportRoutes<T>().register(
+        DEFAULT_TRANSPORT_NAME,
+        params.transport,
+      )
     }
 
     this.inputParameters = params.inputParameters
@@ -76,16 +64,16 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * Performs all necessary initialization processes that are async or need async initialized dependencies
    *
    * @param dependencies - all dependencies initialized at the adapter level
-   * @param config - configuration for the adapter
+   * @param adapterSettings - configuration for the adapter
    */
   async initialize(
     adapterName: string,
     dependencies: AdapterDependencies,
-    config: AdapterConfig<T['CustomSettings']>,
+    adapterSettings: T['Settings'],
   ): Promise<void> {
     const responseCache = new ResponseCache({
       dependencies,
-      config: config as AdapterConfig,
+      adapterSettings: adapterSettings as AdapterSettings,
       adapterName,
       endpointName: this.name,
       inputParameters: this.inputParameters,
@@ -97,8 +85,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     }
 
     logger.debug(`Initializing transports for endpoint "${this.name}"...`)
-    for (const [transportName, transport] of Object.entries(this.transports)) {
-      await transport.initialize(transportDependencies, config, this.name, transportName)
+    for (const [transportName, transport] of this.transportRoutes.entries()) {
+      await transport.initialize(transportDependencies, adapterSettings, this.name, transportName)
     }
   }
 
@@ -141,12 +129,9 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     return req
   }
 
-  getTransportNameForRequest(
-    req: AdapterRequest<T['Request']>,
-    adapterConfig: AdapterConfig<T['CustomSettings']>,
-  ): string {
+  getTransportNameForRequest(req: AdapterRequest<T['Request']>, settings: T['Settings']): string {
     // If there's only one transport, return it
-    if (this.transports[DEFAULT_TRANSPORT_NAME]) {
+    if (this.transportRoutes.get(DEFAULT_TRANSPORT_NAME)) {
       return DEFAULT_TRANSPORT_NAME
     }
 
@@ -155,7 +140,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     //   2. Default router (try to get it from the input params)
     //   3. Default transport (if it was specified in the instance params)
     const rawTransportName =
-      (this.customRouter && this.customRouter(req, adapterConfig)) ||
+      (this.customRouter && this.customRouter(req, settings)) ||
       this.defaultRouter(req) ||
       this.defaultTransport
 
@@ -167,11 +152,11 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     }
 
     const transportName = rawTransportName.toLowerCase()
-    if (!this.transports[transportName]) {
+    if (!this.transportRoutes.get(transportName)) {
       throw new AdapterError({
         statusCode: 400,
         message: `No transport found for key "${transportName}", must be one of ${JSON.stringify(
-          Object.keys(this.transports),
+          this.transportRoutes.routeNames(),
         )}`,
       })
     }

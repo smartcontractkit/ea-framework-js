@@ -1,13 +1,13 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosResponse } from 'axios'
+import MockAdapter from 'axios-mock-adapter'
 import Redis, { ScanStream } from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
-import { SettingsMap } from '../../src/config'
+import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { assertEqualResponses, runAllUntilTime, TestAdapter } from '../util'
-import MockAdapter from 'axios-mock-adapter'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -73,7 +73,7 @@ type BatchEndpointTypes = {
     Params: AdapterRequestParams
   }
   Response: SingleNumberResultResponse
-  CustomSettings: SettingsMap
+  Settings: BaseAdapterSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
@@ -111,9 +111,20 @@ const buildAdapter = () => {
     },
   })
 
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        CACHE_MAX_AGE: 1000,
+        CACHE_POLLING_MAX_RETRIES: 0,
+      },
+    },
+  )
+
   return new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -121,10 +132,6 @@ const buildAdapter = () => {
         transport: batchTransport,
       }),
     ],
-    envDefaultOverrides: {
-      CACHE_MAX_AGE: 1000,
-      CACHE_POLLING_MAX_RETRIES: 0,
-    },
   })
 }
 

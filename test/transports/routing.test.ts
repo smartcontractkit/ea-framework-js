@@ -3,12 +3,12 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Server, WebSocket } from 'mock-socket'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
-import { SettingsMap } from '../../src/config'
+import { AdapterConfig, SettingsDefinitionMap } from '../../src/config'
 import {
   HttpTransport,
   SSEConfig,
   SseTransport,
-  Transport,
+  TransportRoutes,
   WebSocketClassProvider,
   WebSocketTransport,
 } from '../../src/transports'
@@ -16,7 +16,7 @@ import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
-  testAdapter: TestAdapter
+  testAdapter: TestAdapter<typeof adapterConfig>
 }>
 
 interface ProviderRequestBody {
@@ -38,7 +38,7 @@ interface ProviderMessage {
   value: number
 }
 
-const CustomSettings: SettingsMap = {
+const settings = {
   TEST_SETTING: {
     type: 'string',
     description: 'test setting',
@@ -46,7 +46,9 @@ const CustomSettings: SettingsMap = {
     required: false,
     sensitive: false,
   },
-}
+} satisfies SettingsDefinitionMap
+
+const adapterConfig = new AdapterConfig(settings)
 
 const restUrl = 'http://test-url.com'
 const websocketUrl = 'wss://test-ws.com/asd'
@@ -62,7 +64,7 @@ type BaseEndpointTypes = {
     }
     Result: number
   }
-  CustomSettings: SettingsMap
+  Settings: typeof adapterConfig.settings
 }
 
 type WebSocketTypes = BaseEndpointTypes & {
@@ -270,22 +272,31 @@ class MockSseTransport extends SseTransport<SSETypes> {
   }
 }
 
-const transports = {
-  websocket: new MockWebSocketTransport(),
-  batch: new MockHttpTransport(),
-  sse: new MockSseTransport(),
-} as const satisfies Record<string, Transport<BaseEndpointTypes>>
+const transports = new TransportRoutes<BaseEndpointTypes>()
+  .register('websocket', new MockWebSocketTransport())
+  .register('batch', new MockHttpTransport())
+  .register('sse', new MockSseTransport())
 
 test.beforeEach(async (t) => {
   const sampleEndpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transports,
+    transportRoutes: transports,
   })
 
-  const sampleAdapter = new Adapter<typeof CustomSettings>({
+  const customConfig = new AdapterConfig(settings, {
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const sampleAdapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',
+    config: customConfig,
     endpoints: [sampleEndpoint],
     rateLimiting: {
       tiers: {
@@ -293,12 +304,6 @@ test.beforeEach(async (t) => {
           rateLimit1s: 5,
         },
       },
-    },
-    envDefaultOverrides: {
-      LOG_LEVEL: 'debug',
-      METRICS_ENABLED: false,
-      CACHE_POLLING_SLEEP_MS: 10,
-      CACHE_POLLING_MAX_RETRIES: 0,
     },
   })
 
@@ -349,7 +354,7 @@ test.serial('endpoint routing can route to HttpTransport', async (t) => {
   })
 
   t.is(error.statusCode, 504)
-  const internalTransport = transports['batch'] as MockHttpTransport
+  const internalTransport = transports.get('batch') as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -360,7 +365,7 @@ test.serial('endpoint routing can route to WebSocket transport', async (t) => {
     transport: 'WEBSOCKET',
   })
   t.is(error?.statusCode, 504)
-  const internalTransport = transports['websocket'] as MockWebSocketTransport
+  const internalTransport = transports.get('websocket') as MockWebSocketTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -386,7 +391,7 @@ test.serial('endpoint routing can route to SSE transport', async (t) => {
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports['sse'] as MockSseTransport
+  const internalTransport = transports.get('sse') as MockSseTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -394,13 +399,23 @@ test.serial('custom router is applied to get valid transport to route to', async
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transports,
+    transportRoutes: transports,
     customRouter: () => 'batch',
   })
 
-  const adapter = new Adapter<typeof CustomSettings>({
+  const customConfig = new AdapterConfig(settings, {
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',
+    config: customConfig,
     endpoints: [endpoint],
     rateLimiting: {
       tiers: {
@@ -408,12 +423,6 @@ test.serial('custom router is applied to get valid transport to route to', async
           rateLimit1s: 5,
         },
       },
-    },
-    envDefaultOverrides: {
-      LOG_LEVEL: 'debug',
-      METRICS_ENABLED: false,
-      CACHE_POLLING_SLEEP_MS: 10,
-      CACHE_POLLING_MAX_RETRIES: 0,
     },
   })
 
@@ -444,7 +453,7 @@ test.serial('custom router is applied to get valid transport to route to', async
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports['batch'] as MockHttpTransport
+  const internalTransport = transports.get('batch') as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -452,26 +461,30 @@ test.serial('custom router returns invalid transport and request fails', async (
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transports,
+    transportRoutes: transports,
     customRouter: () => 'qweqwe',
   })
 
-  const adapter = new Adapter<typeof CustomSettings>({
+  const customConfig = new AdapterConfig(settings, {
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',
     endpoints: [endpoint],
+    config: customConfig,
     rateLimiting: {
       tiers: {
         default: {
           rateLimit1s: 5,
         },
       },
-    },
-    envDefaultOverrides: {
-      LOG_LEVEL: 'debug',
-      METRICS_ENABLED: false,
-      CACHE_POLLING_SLEEP_MS: 10,
-      CACHE_POLLING_MAX_RETRIES: 0,
     },
   })
 
@@ -511,12 +524,22 @@ test.serial('missing transport in input params with no default fails request', a
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transports,
+    transportRoutes: transports,
   })
 
-  const adapter = new Adapter<typeof CustomSettings>({
+  const customConfig = new AdapterConfig(settings, {
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',
+    config: customConfig,
     endpoints: [endpoint],
     rateLimiting: {
       tiers: {
@@ -524,12 +547,6 @@ test.serial('missing transport in input params with no default fails request', a
           rateLimit1s: 5,
         },
       },
-    },
-    envDefaultOverrides: {
-      LOG_LEVEL: 'debug',
-      METRICS_ENABLED: false,
-      CACHE_POLLING_SLEEP_MS: 10,
-      CACHE_POLLING_MAX_RETRIES: 0,
     },
   })
 
@@ -568,26 +585,30 @@ test.serial('missing transport in input params with default succeeds', async (t)
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transports,
+    transportRoutes: transports,
     defaultTransport: 'batch',
   })
 
-  const adapter = new Adapter<typeof CustomSettings>({
+  const customConfig = new AdapterConfig(settings, {
+    envDefaultOverrides: {
+      LOG_LEVEL: 'debug',
+      METRICS_ENABLED: false,
+      CACHE_POLLING_SLEEP_MS: 10,
+      CACHE_POLLING_MAX_RETRIES: 0,
+    },
+  })
+
+  const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',
     endpoints: [endpoint],
+    config: customConfig,
     rateLimiting: {
       tiers: {
         default: {
           rateLimit1s: 5,
         },
       },
-    },
-    envDefaultOverrides: {
-      LOG_LEVEL: 'debug',
-      METRICS_ENABLED: false,
-      CACHE_POLLING_SLEEP_MS: 10,
-      CACHE_POLLING_MAX_RETRIES: 0,
     },
   })
 
@@ -617,7 +638,7 @@ test.serial('missing transport in input params with default succeeds', async (t)
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports['batch'] as MockHttpTransport
+  const internalTransport = transports.get('batch') as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -627,12 +648,13 @@ test.serial('transport creation fails if transport names are not acceptable', as
   for (const name of invalidNames) {
     t.throws(
       () =>
-        new AdapterEndpoint<BaseEndpointTypes>({
+        new AdapterEndpoint({
           name: 'test',
           inputParameters,
-          transports: {
-            [name]: transports.batch,
-          },
+          transportRoutes: new TransportRoutes<BaseEndpointTypes>().register(
+            name,
+            transports.get('batch'),
+          ),
         }),
     )
   }

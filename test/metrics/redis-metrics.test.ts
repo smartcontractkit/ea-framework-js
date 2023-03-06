@@ -2,6 +2,7 @@ import untypedTest, { TestFn } from 'ava'
 import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache, LocalCache, RedisCache } from '../../src/cache'
+import { AdapterConfig } from '../../src/config'
 import { BasicCacheSetterTransport } from '../cache/helper'
 import { NopTransport, TestAdapter } from '../util'
 
@@ -49,9 +50,19 @@ test.before(async (t) => {
   process.env['METRICS_ENABLED'] = 'true'
   // Set unique port between metrics tests to avoid conflicts in metrics servers
   process.env['METRICS_PORT'] = '9091'
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        CACHE_POLLING_SLEEP_MS: 10,
+        CACHE_POLLING_MAX_RETRIES: 3,
+      },
+    },
+  )
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -73,10 +84,6 @@ test.before(async (t) => {
         transport: new NopTransport(),
       }),
     ],
-    envDefaultOverrides: {
-      CACHE_POLLING_SLEEP_MS: 10,
-      CACHE_POLLING_MAX_RETRIES: 3,
-    },
   })
 
   const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis

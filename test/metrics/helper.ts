@@ -1,6 +1,6 @@
 import { AxiosResponse } from 'axios'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { SettingsMap } from '../../src/config'
+import { BaseAdapterSettings } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 
@@ -44,7 +44,7 @@ type HttpEndpointTypes = {
     Params: AdapterRequestParams
   }
   Response: SingleNumberResultResponse
-  CustomSettings: SettingsMap
+  Settings: BaseAdapterSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody

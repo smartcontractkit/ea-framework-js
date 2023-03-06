@@ -1,4 +1,4 @@
-import { SettingsMap } from '../config'
+import { AdapterConfig } from '../config'
 import { AdapterRequest, AdapterRequestContext, AdapterResponse, RequestGenerics } from '../util'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams, PriceEndpointGenerics } from './index'
@@ -102,11 +102,11 @@ type PriceAdapterRequest<T extends RequestGenerics> = AdapterRequest<T> & {
 /**
  * A PriceAdapter is a specific kind of Adapter that includes at least one PriceEnpoint.
  */
-export class PriceAdapter<CustomSettings extends SettingsMap> extends Adapter<CustomSettings> {
+export class PriceAdapter<T extends AdapterConfig> extends Adapter<T> {
   includesMap?: IncludesMap
 
   constructor(
-    params: AdapterParams<CustomSettings> & {
+    params: AdapterParams<T> & {
       includes?: IncludesFile
     },
   ) {

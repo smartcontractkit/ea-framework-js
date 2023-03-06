@@ -1,13 +1,24 @@
 import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { CacheFactory, RedisCache } from '../../src/cache'
+import { AdapterConfig } from '../../src/config'
 import { NopTransport, RedisMock, TestAdapter } from '../util'
 import { BasicCacheSetterTransport, buildDiffResultAdapter, cacheTests, test } from './helper'
 
 test.beforeEach(async (t) => {
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        CACHE_POLLING_SLEEP_MS: 10,
+        CACHE_POLLING_MAX_RETRIES: 3,
+      },
+    },
+  )
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
+    config,
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
@@ -29,10 +40,6 @@ test.beforeEach(async (t) => {
         transport: new NopTransport(),
       }),
     ],
-    envDefaultOverrides: {
-      CACHE_POLLING_SLEEP_MS: 10,
-      CACHE_POLLING_MAX_RETRIES: 3,
-    },
   })
 
   const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis

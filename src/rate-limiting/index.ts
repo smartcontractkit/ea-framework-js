@@ -1,5 +1,5 @@
 import { AdapterEndpoint, EndpointGenerics } from '../adapter'
-import { AdapterConfig } from '../config'
+import { AdapterSettings } from '../config'
 import { makeLogger } from '../util'
 
 export * from './simple-counting'
@@ -80,20 +80,20 @@ export const lowestTierLimit = (limits?: AdapterRateLimitTier) => {
 /**
  * Validates rate limiting tiers specified for the adapter, and returns the one to use.
  *
- * @param config - the adapter config containing the env vars
+ * @param adapterSettings - the adapter config containing the env vars
  * @param tiers - the adapter config listing the different available API tiers
  * @returns the specified API tier, or a default one if none are specified
  */
 export const getRateLimitingTier = (
-  config: AdapterConfig,
+  adapterSettings: AdapterSettings,
   tiers?: Record<string, AdapterRateLimitTier>,
 ): AdapterRateLimitTier | undefined => {
   if (
-    config.RATE_LIMIT_CAPACITY ||
-    config.RATE_LIMIT_CAPACITY_MINUTE ||
-    config.RATE_LIMIT_CAPACITY_SECOND
+    adapterSettings.RATE_LIMIT_CAPACITY ||
+    adapterSettings.RATE_LIMIT_CAPACITY_MINUTE ||
+    adapterSettings.RATE_LIMIT_CAPACITY_SECOND
   ) {
-    return buildRateLimitTiersFromConfig(config)
+    return buildRateLimitTiersFromConfig(adapterSettings)
   }
   if (!tiers) {
     return
@@ -105,7 +105,7 @@ export const getRateLimitingTier = (
   }
 
   // Check that the tier set in the AdapterConfig is a valid one
-  const selectedTier = config.RATE_LIMIT_API_TIER
+  const selectedTier = adapterSettings.RATE_LIMIT_API_TIER
   if (selectedTier && !tiers[selectedTier]) {
     const validTiersString = Object.keys(tiers)
       .map((t) => `"${t}"`)
@@ -133,14 +133,14 @@ export const getRateLimitingTier = (
 
 // Creates adapter rate limit tier using the configs specified in env vars
 export const buildRateLimitTiersFromConfig = (
-  config: AdapterConfig,
+  adapterSettings: AdapterSettings,
 ): AdapterRateLimitTier | undefined => {
-  const rateLimit1s = config.RATE_LIMIT_CAPACITY_SECOND
+  const rateLimit1s = adapterSettings.RATE_LIMIT_CAPACITY_SECOND
   let rateLimit1m
-  if (config.RATE_LIMIT_CAPACITY_MINUTE) {
-    rateLimit1m = config.RATE_LIMIT_CAPACITY_MINUTE
-  } else if (config.RATE_LIMIT_CAPACITY) {
-    rateLimit1m = config.RATE_LIMIT_CAPACITY
+  if (adapterSettings.RATE_LIMIT_CAPACITY_MINUTE) {
+    rateLimit1m = adapterSettings.RATE_LIMIT_CAPACITY_MINUTE
+  } else if (adapterSettings.RATE_LIMIT_CAPACITY) {
+    rateLimit1m = adapterSettings.RATE_LIMIT_CAPACITY
   }
   return {
     rateLimit1s,

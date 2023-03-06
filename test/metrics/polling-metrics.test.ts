@@ -60,13 +60,13 @@ test.serial('Test cache warmer active metric', async (t) => {
   const metrics = await t.context.testAdapter.getMetrics()
   metrics.assert(t, {
     name: 'transport_polling_failure_count',
-    labels: { endpoint: 'test' },
+    labels: { adapter_endpoint: 'test' },
     expectedValue: 1,
   })
   metrics.assertPositiveNumber(t, {
     name: 'transport_polling_duration_seconds',
     labels: {
-      endpoint: 'test',
+      adapter_endpoint: 'test',
       succeeded: 'false',
     },
   })

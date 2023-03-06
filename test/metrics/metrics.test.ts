@@ -1,12 +1,12 @@
+import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
+import axios from 'axios'
+import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { SettingsMap } from '../../src/config'
+import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
 import { retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { TestAdapter } from '../util'
-import MockAdapter from 'axios-mock-adapter'
-import axios from 'axios'
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -39,7 +39,7 @@ type RestEndpointTypes = {
     }
     Result: number
   }
-  CustomSettings: SettingsMap
+  Settings: BaseAdapterSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
@@ -104,13 +104,19 @@ const price = 1234
 test.before(async (t) => {
   t.context.clock = FakeTimers.install()
   process.env['METRICS_ENABLED'] = 'true'
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        RATE_LIMIT_CAPACITY_SECOND: 10,
+      },
+    },
+  )
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
+    config,
     endpoints: [createAdapterEndpoint()],
-    envDefaultOverrides: {
-      RATE_LIMIT_CAPACITY_SECOND: 10,
-    },
   })
 
   t.context.testAdapter = await TestAdapter.start(adapter, t.context)

@@ -45,7 +45,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
     const context: EndpointContext<EndpointGenerics> = {
       endpointName: endpoint.name,
       inputParameters: endpoint.inputParameters,
-      adapterConfig: adapter.config,
+      adapterSettings: adapter.config.settings,
     }
 
     const handler = async () => {
@@ -56,13 +56,13 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       // Count number of background executions per endpoint
       metrics
         .get('bgExecuteTotal')
-        .labels({ endpoint: endpoint.name, transport: transportName })
+        .labels({ adapter_endpoint: endpoint.name, transport: transportName })
         .inc()
 
       // Time the duration of the background execute process excluding sleep time
       const metricsTimer = metrics
         .get('bgExecuteDurationSeconds')
-        .labels({ endpoint: endpoint.name, transport: transportName })
+        .labels({ adapter_endpoint: endpoint.name, transport: transportName })
         .startTimer()
 
       logger.debug(`Calling background execute for endpoint "${endpoint.name}"`)
@@ -80,7 +80,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
         logger.error(error, (error as Error).stack)
         metrics
           .get('bgExecuteErrors')
-          .labels({ endpoint: endpoint.name, transport: transportName })
+          .labels({ adapter_endpoint: endpoint.name, transport: transportName })
           .inc()
       }
 
@@ -98,7 +98,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
   }
 
   for (const endpoint of adapter.endpoints) {
-    for (const [transportName, transport] of Object.entries(endpoint.transports)) {
+    for (const [transportName, transport] of endpoint.transportRoutes.entries()) {
       callBackgroundExecute(endpoint, transport, transportName)
     }
   }

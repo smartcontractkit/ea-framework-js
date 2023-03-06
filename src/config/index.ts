@@ -1,6 +1,7 @@
+import CensorList, { CensorKeyValue } from '../util/censor/censor-list'
 import { validator } from '../validation/utils'
 
-export const BaseSettings = {
+export const BaseSettingsDefinition = {
   // V2 compat
   // ADAPTER_URL: {
   //   description: 'The URL of another adapter from which data needs to be retrieved',
@@ -311,28 +312,30 @@ export const BaseSettings = {
     default: 1000,
     validate: validator.integer({ min: 1, max: 10000 }),
   },
-} as const satisfies SettingsMap
+} as const satisfies SettingsDefinitionMap
 
-export const buildAdapterConfig = <
-  CustomSettings extends CustomSettingsType<CustomSettings> = EmptySettings,
+export const buildAdapterSettings = <
+  CustomSettings extends CustomSettingsDefinition<CustomSettings> = EmptySettingsDefinitionMap,
 >({
-  overrides = {} as Partial<BaseAdapterConfig>,
-  customSettings = {} as SettingsMap,
+  overrides = {} as Partial<BaseAdapterSettings>,
+  customSettings = {} as SettingsDefinitionMap,
   envVarsPrefix = '' as string,
-}): AdapterConfig<CustomSettings> => {
+}): AdapterSettings<CustomSettings> => {
   const vars = {} as Record<string, SettingValueType | undefined>
 
   // Iterate base adapter env vars
-  for (const [key, config] of Object.entries(BaseSettings) as Array<
-    [keyof BaseAdapterConfig, Setting]
+  for (const [key, config] of Object.entries(BaseSettingsDefinition) as Array<
+    [keyof BaseAdapterSettings, SettingDefinition]
   >) {
     const value = getEnv(key as string, config, envVarsPrefix) ?? overrides?.[key] ?? config.default
     vars[key] = value
   }
 
   // Iterate custom vars
-  for (const [key, config] of Object.entries(customSettings) as Array<[string, Setting]>) {
-    if ((BaseSettings as Record<string, unknown>)[key as string]) {
+  for (const [key, config] of Object.entries(customSettings) as Array<
+    [string, SettingDefinition]
+  >) {
+    if ((BaseSettingsDefinition as Record<string, unknown>)[key as string]) {
       throw new Error(
         `Custom env var "${key}" declared, but a base framework env var with that name already exists.`,
       )
@@ -341,42 +344,22 @@ export const buildAdapterConfig = <
     vars[key] = value
   }
 
-  return vars as AdapterConfig<CustomSettings>
-}
-
-export const validateAdapterConfig = <
-  CustomSettings extends CustomSettingsType<CustomSettings> = EmptySettings,
->(
-  adapterConfig: AdapterConfig<CustomSettings>,
-  customSettings = {} as SettingsMap,
-): void => {
-  const validationErrors: string[] = []
-  Object.entries(BaseSettings as SettingsMap)
-    .concat(Object.entries((customSettings as SettingsMap) || {}))
-    .forEach(([name, setting]) => {
-      validateSetting(name, (adapterConfig as AdapterConfig)[name], setting, validationErrors)
-    })
-
-  if (validationErrors.length > 0) {
-    throw new Error(
-      `Validation failed for the following variables:\n ${validationErrors.join('\n')}`,
-    )
-  }
+  return vars as AdapterSettings<CustomSettings>
 }
 
 const validateSetting = (
   key: string,
   value: SettingValueType | undefined,
-  config: Setting,
+  settingsDefinition: SettingDefinition,
   validationErrors: string[],
 ) => {
   // Check if a required setting has been provided
-  if (config.required && (value === null || value === undefined)) {
+  if (settingsDefinition.required && (value === null || value === undefined)) {
     validationErrors.push(`${key}: Value is required, but none was provided`)
-  } else if (value && config.validate) {
+  } else if (value && settingsDefinition.validate) {
     // Cast validate to unknown because TS can't select one of multiple variants of the validate function signature
     const validationRes = (
-      config.validate as unknown as (value?: SettingValueType) => ValidationErrorMessage
+      settingsDefinition.validate as unknown as (value?: SettingValueType) => ValidationErrorMessage
     )(value)
     if (validationRes) {
       validationErrors.push(`${key}: ${validationRes}`)
@@ -396,14 +379,18 @@ const getEnvName = (name: string, prefix = ''): string => {
 
 const isEnvNameValid = (name: string) => /^[_a-z0-9]+$/i.test(name)
 
-export const getEnv = (name: string, config: Setting, prefix = ''): SettingValueType | null => {
+export const getEnv = (
+  name: string,
+  settingsDefinition: SettingDefinition,
+  prefix = '',
+): SettingValueType | null => {
   const value = process.env[getEnvName(name, prefix)]
 
   if (!value || value === '' || value === '""') {
     return null
   }
 
-  switch (config.type) {
+  switch (settingsDefinition.type) {
     case 'string':
       return value
     case 'number':
@@ -411,9 +398,9 @@ export const getEnv = (name: string, config: Setting, prefix = ''): SettingValue
     case 'boolean':
       return value === 'true'
     case 'enum':
-      if (!config.options?.includes(value)) {
+      if (!settingsDefinition.options?.includes(value)) {
         throw new Error(
-          `Env var "${name}" has value "${value}" which is not included in the valid options (${config.options})`,
+          `Env var "${name}" has value "${value}" which is not included in the valid options (${settingsDefinition.options})`,
         )
       }
       return value
@@ -421,7 +408,7 @@ export const getEnv = (name: string, config: Setting, prefix = ''): SettingValue
 }
 
 type SettingValueType = string | number | boolean
-type SettingType<C extends Setting> = C['type'] extends 'string'
+type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
   ? string
   : C['type'] extends 'number'
   ? number
@@ -432,8 +419,8 @@ type SettingType<C extends Setting> = C['type'] extends 'string'
     ? C['options'][number]
     : never
   : never
-type BaseSettingsType = typeof BaseSettings
-export type Setting =
+type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
+export type SettingDefinition =
   | {
       type: 'string'
       description: string
@@ -501,7 +488,7 @@ export type Setting =
       required: true
     }
 
-export type AdapterConfigFromSettings<T extends SettingsMap> = {
+export type Settings<T extends SettingsDefinitionMap> = {
   -readonly [K in keyof T as T[K] extends {
     default: SettingValueType
   }
@@ -519,11 +506,103 @@ export type AdapterConfigFromSettings<T extends SettingsMap> = {
     : K]?: SettingType<T[K]> | undefined
 }
 
-export type BaseAdapterConfig = AdapterConfigFromSettings<BaseSettingsType>
-export type AdapterConfig<T extends CustomSettingsType<T> = SettingsMap> =
-  AdapterConfigFromSettings<T> & BaseAdapterConfig
+export type BaseAdapterSettings = Settings<BaseSettingsDefinitionType>
+export type AdapterSettings<T extends CustomSettingsDefinition<T> = SettingsDefinitionMap> =
+  Settings<T> & BaseAdapterSettings & SettingsObjectSpecifier
 
-export type CustomSettingsType<T = SettingsMap> = Record<keyof T, Setting>
-export type EmptySettings = Record<string, never>
-export type SettingsMap = Record<string, Setting>
+export type CustomSettingsDefinition<T = SettingsDefinitionMap> = Record<keyof T, SettingDefinition>
+export type EmptySettingsDefinitionMap = Record<string, never>
+export type SettingsDefinitionMap = Record<string, SettingDefinition>
 export type ValidationErrorMessage = string | undefined
+
+/**
+ * This class will hold the processed config type, and the basic settings.
+ * The idea is that you can no longer use a straight object, but have to build a config,
+ * then in the generics we can simply pass the type of this, and it will hopefully allow for simpler generics
+ */
+export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionMap> {
+  settings!: AdapterSettings<T>
+
+  constructor(
+    /** Map of setting definitions to validate and use to get setting values */
+    private settingsDefinition: T,
+    private options?: {
+      /** Map of overrides to the default config values for an Adapter */
+      envDefaultOverrides?: Partial<BaseAdapterSettings>
+
+      /** Optional prefix that all adapter variables will be expected to have */
+      envVarsPrefix?: string
+    },
+  ) {}
+
+  /**
+   * Performs some basic validation of the definition structure, and pull data from environment variables
+   */
+  initialize() {
+    this.settings = buildAdapterSettings({
+      customSettings: this.settingsDefinition,
+      overrides: this.options?.envDefaultOverrides,
+      envVarsPrefix: this.options?.envVarsPrefix,
+    })
+  }
+
+  /**
+   * Performs validation of each setting, checking to see that they match their definition
+   */
+  validate(): void {
+    const validationErrors: string[] = []
+    Object.entries(BaseSettingsDefinition as SettingsDefinitionMap)
+      .concat(Object.entries(this.settingsDefinition || {}))
+      .forEach(([name, setting]) => {
+        validateSetting(
+          name,
+          (this.settings as Record<string, ValidSettingValue>)[name],
+          setting,
+          validationErrors,
+        )
+      })
+
+    if (validationErrors.length > 0) {
+      throw new Error(
+        `Validation failed for the following variables:\n ${validationErrors.join('\n')}`,
+      )
+    }
+  }
+
+  /**
+   * Creates a list of key/value pairs that need to be censored in the logs
+   * using the sensitive flag in the adapter config
+   */
+  buildCensorList() {
+    const censorList: CensorKeyValue[] = Object.entries(
+      BaseSettingsDefinition as SettingsDefinitionMap,
+    )
+      .concat(Object.entries((this.settingsDefinition as SettingsDefinitionMap) || {}))
+      .filter(
+        ([name, setting]) =>
+          setting &&
+          setting.type === 'string' &&
+          setting.sensitive &&
+          (this.settings as Record<string, ValidSettingValue>)[name],
+      )
+      .map(([name]) => ({
+        key: name,
+        // Escaping potential special characters in values before creating regex
+        value: new RegExp(
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          ((this.settings as AdapterSettings)[name]! as string).replace(
+            /[-[\]{}()*+?.,\\^$|#\s]/g,
+            '\\$&',
+          ),
+          'gi',
+        ),
+      }))
+    CensorList.set(censorList)
+  }
+}
+
+type SettingsObjectSpecifier = {
+  __reserved_settings: never
+}
+type ValidSettingValue = string | number | boolean
+export type GenericConfigStructure = BaseAdapterSettings & SettingsObjectSpecifier

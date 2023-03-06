@@ -1,14 +1,7 @@
 import Redis from 'ioredis'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
-import {
-  AdapterConfig,
-  BaseAdapterConfig,
-  BaseSettings,
-  buildAdapterConfig,
-  SettingsMap,
-  validateAdapterConfig,
-} from '../config'
+import { BaseAdapterSettings, BaseSettingsDefinition, AdapterConfig } from '../config'
 import { metrics } from '../metrics'
 import {
   buildRateLimitTiersFromConfig,
@@ -16,8 +9,7 @@ import {
   highestRateLimitTiers,
   SimpleCountingRateLimiter,
 } from '../rate-limiting'
-import { AdapterRequest, AdapterResponse, makeLogger, Merge, SubscriptionSetFactory } from '../util'
-import CensorList, { CensorKeyValue } from '../util/censor/censor-list'
+import { AdapterRequest, AdapterResponse, makeLogger, SubscriptionSetFactory } from '../util'
 import { Requester } from '../util/requester'
 import { AdapterTimeoutError } from '../validation/error'
 import { AdapterEndpoint } from './endpoint'
@@ -25,7 +17,6 @@ import {
   AdapterDependencies,
   AdapterParams,
   AdapterRateLimitingConfig,
-  CustomAdapterSettings,
   EndpointGenerics,
 } from './types'
 
@@ -34,15 +25,14 @@ const logger = makeLogger('Adapter')
 /**
  * Main class to represent an External Adapter
  */
-export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
-  implements Omit<AdapterParams<CustomSettings>, 'bootstrap'>
+export class Adapter<T extends AdapterConfig = AdapterConfig>
+  implements Omit<AdapterParams<T>, 'bootstrap'>
 {
   // Adapter params
   name: Uppercase<string>
   defaultEndpoint?: string | undefined
-  endpoints: AdapterEndpoint<Merge<EndpointGenerics, { CustomSettings: CustomSettings }>>[]
-  envDefaultOverrides?: Partial<BaseAdapterConfig> | undefined
-  customSettings?: SettingsMap | undefined
+  endpoints: AdapterEndpoint<EndpointGenerics>[]
+  envDefaultOverrides?: Partial<BaseAdapterSettings> | undefined
   rateLimiting?: AdapterRateLimitingConfig | undefined
   envVarsPrefix?: string
 
@@ -50,36 +40,27 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
   initialized = false
 
   /** Object containing alias translations for all endpoints */
-  endpointsMap: Record<
-    string,
-    AdapterEndpoint<Merge<EndpointGenerics, { CustomSettings: CustomSettings }>>
-  > = {}
+  endpointsMap: Record<string, AdapterEndpoint<EndpointGenerics>> = {}
 
   /** Initialized dependencies that the adapter will use */
   dependencies!: AdapterDependencies
 
   /** Configuration params for various adapter properties */
-  config: AdapterConfig<CustomSettings>
+  config: T
 
   /** Bootstrap function that will run when initializing the adapter */
-  private readonly bootstrap?: (adapter: Adapter<CustomSettings>) => Promise<void>
+  private readonly bootstrap?: (adapter: Adapter<T>) => Promise<void>
 
-  constructor(params: AdapterParams<CustomSettings>) {
+  constructor(params: AdapterParams<T>) {
     // Copy over params
     this.name = params.name
     this.defaultEndpoint = params.defaultEndpoint?.toLowerCase()
     this.endpoints = params.endpoints
-    this.envDefaultOverrides = params.envDefaultOverrides
-    this.customSettings = params.customSettings
     this.rateLimiting = params.rateLimiting
     this.bootstrap = params.bootstrap
+    this.config = params.config || (new AdapterConfig({}) as T)
 
-    this.config = buildAdapterConfig({
-      overrides: this.envDefaultOverrides,
-      customSettings: this.customSettings,
-      envVarsPrefix: this.envVarsPrefix,
-    })
-
+    this.config.initialize()
     this.normalizeEndpointNames()
     this.calculateRateLimitAllocations()
   }
@@ -97,7 +78,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     metrics.initialize()
 
     // Building configs during initialization to avoid validation errors during construction
-    validateAdapterConfig(this.config, this.customSettings)
+    this.config.validate()
 
     // Log warnings for risks associated with certain configs and values
     this.logConfigWarnings()
@@ -119,12 +100,12 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
       }
 
       logger.debug(`Initializing endpoint "${endpoint.name}"...`)
-      await endpoint.initialize(this.name, this.dependencies, this.config)
+      await endpoint.initialize(this.name, this.dependencies, this.config.settings)
     }
 
     // Build list of key/values that need to be redacted in logs
     // Populates the static array in CensorList to use in censor-transport
-    this.buildCensorList()
+    this.config.buildCensorList()
 
     logger.debug('Adapter initialization complete.')
     this.initialized = true
@@ -183,58 +164,32 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
   }
 
   /**
-   * Creates a list of key/value pairs that need to be censored in the logs
-   * using the sensitive flag in the adapter config
-   */
-  private buildCensorList() {
-    const censorList: CensorKeyValue[] = Object.entries(BaseSettings as SettingsMap)
-      .concat(Object.entries((this.customSettings as SettingsMap) || {}))
-      .filter(
-        ([name, setting]) =>
-          setting &&
-          setting.type === 'string' &&
-          setting.sensitive &&
-          this.config[name as keyof AdapterConfig<CustomSettings>],
-      )
-      .map(([name]) => ({
-        key: name,
-        // Escaping potential special characters in values before creating regex
-        value: new RegExp(
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          ((this.config as AdapterConfig)[name]! as string).replace(
-            /[-[\]{}()*+?.,\\^$|#\s]/g,
-            '\\$&',
-          ),
-          'gi',
-        ),
-      }))
-    CensorList.set(censorList)
-  }
-
-  /**
    * Logs a warning for certain configs if set to particular values.
    * Used to warn stakeholders of potential risks.
    */
   private logConfigWarnings() {
     if (
-      this.config.LOG_LEVEL.toUpperCase() === 'DEBUG' ||
-      this.config.LOG_LEVEL.toUpperCase() === 'TRACE'
+      this.config.settings.LOG_LEVEL.toUpperCase() === 'DEBUG' ||
+      this.config.settings.LOG_LEVEL.toUpperCase() === 'TRACE'
     ) {
       logger.warn(
-        `LOG_LEVEL has been set to ${this.config.LOG_LEVEL.toUpperCase()}. Setting higher log levels results in increased memory usage and potentially slower performance.`,
+        `LOG_LEVEL has been set to ${this.config.settings.LOG_LEVEL.toUpperCase()}. Setting higher log levels results in increased memory usage and potentially slower performance.`,
       )
     }
-    if (this.config.DEBUG === true) {
+    if (this.config.settings.DEBUG === true) {
       logger.warn(`The adapter is running with DEBUG mode on.`)
     }
-    if (this.config.METRICS_ENABLED === false) {
+    if (this.config.settings.METRICS_ENABLED === false) {
       logger.warn(
         `METRICS_ENABLED has been set to false. Metrics should not be disabled in a production environment.`,
       )
     }
-    if (this.config.MAX_PAYLOAD_SIZE_LIMIT !== BaseSettings.MAX_PAYLOAD_SIZE_LIMIT.default) {
+    if (
+      this.config.settings.MAX_PAYLOAD_SIZE_LIMIT !==
+      BaseSettingsDefinition.MAX_PAYLOAD_SIZE_LIMIT.default
+    ) {
       logger.warn(
-        `MAX_PAYLOAD_SIZE_LIMIT has been set to ${this.config.MAX_PAYLOAD_SIZE_LIMIT}. This setting should only be set when absolutely necessary.`,
+        `MAX_PAYLOAD_SIZE_LIMIT has been set to ${this.config.settings.MAX_PAYLOAD_SIZE_LIMIT}. This setting should only be set when absolutely necessary.`,
       )
     }
   }
@@ -250,25 +205,25 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     const dependencies = inputDependencies || {}
 
     if (!dependencies.redisClient) {
-      if (this.config.CACHE_TYPE === 'redis') {
-        const maxCooldown = this.config.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
+      if (this.config.settings.CACHE_TYPE === 'redis') {
+        const maxCooldown = this.config.settings.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
         const redisOptions = {
           enableAutoPipelining: true, // This will make multiple commands be batch automatically
-          host: this.config.CACHE_REDIS_HOST,
-          port: this.config.CACHE_REDIS_PORT,
-          password: this.config.CACHE_REDIS_PASSWORD,
-          path: this.config.CACHE_REDIS_PATH, // If set, port and host are ignored
-          timeout: this.config.CACHE_REDIS_TIMEOUT,
+          host: this.config.settings.CACHE_REDIS_HOST,
+          port: this.config.settings.CACHE_REDIS_PORT,
+          password: this.config.settings.CACHE_REDIS_PASSWORD,
+          path: this.config.settings.CACHE_REDIS_PATH, // If set, port and host are ignored
+          timeout: this.config.settings.CACHE_REDIS_TIMEOUT,
           retryStrategy(times: number): number {
             metrics.get('redisRetriesCount').inc()
             logger.warn(`Redis reconnect attempt #${times}`)
             return Math.min(times * 100, maxCooldown) // Next reconnect attempt time
           },
-          connectTimeout: this.config.CACHE_REDIS_CONNECTION_TIMEOUT,
+          connectTimeout: this.config.settings.CACHE_REDIS_CONNECTION_TIMEOUT,
           maxRetriesPerRequest: 30, // Limits the number of retries before the adapter shuts down
         }
-        if (this.config.CACHE_REDIS_URL) {
-          dependencies.redisClient = new Redis(this.config.CACHE_REDIS_URL, redisOptions)
+        if (this.config.settings.CACHE_REDIS_URL) {
+          dependencies.redisClient = new Redis(this.config.settings.CACHE_REDIS_URL, redisOptions)
         } else {
           dependencies.redisClient = new Redis(redisOptions)
         }
@@ -281,18 +236,18 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
 
     if (!dependencies.cache) {
       dependencies.cache = CacheFactory.buildCache(
-        { cacheType: this.config.CACHE_TYPE, maxSizeForLocalCache: this.config.CACHE_MAX_ITEMS },
+        {
+          cacheType: this.config.settings.CACHE_TYPE,
+          maxSizeForLocalCache: this.config.settings.CACHE_MAX_ITEMS,
+        },
         dependencies.redisClient,
       )
     }
 
-    const rateLimitingTier = getRateLimitingTier(
-      this.config as AdapterConfig,
-      this.rateLimiting?.tiers,
-    )
+    const rateLimitingTier = getRateLimitingTier(this.config.settings, this.rateLimiting?.tiers)
 
     const highestTierValue = highestRateLimitTiers(this.rateLimiting?.tiers)
-    const rateLimitTierFromConfig = buildRateLimitTiersFromConfig(this.config as AdapterConfig)
+    const rateLimitTierFromConfig = buildRateLimitTiersFromConfig(this.config.settings)
     const perSecRateLimit = rateLimitTierFromConfig?.rateLimit1s || 0
     const perMinuteRateLimit = (rateLimitTierFromConfig?.rateLimit1m || 0) * 60
 
@@ -304,7 +259,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
 
     if (perMinuteRateLimit > highestTierValue) {
       logger.warn(`The configured ${
-        this.config.RATE_LIMIT_CAPACITY_MINUTE
+        this.config.settings.RATE_LIMIT_CAPACITY_MINUTE
           ? 'RATE_LIMIT_CAPACITY_MINUTE'
           : 'RATE_LIMIT_CAPACITY'
       }
@@ -319,13 +274,13 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     }
     if (!dependencies.subscriptionSetFactory) {
       dependencies.subscriptionSetFactory = new SubscriptionSetFactory(
-        this.config as AdapterConfig,
+        this.config.settings,
         this.name,
         dependencies.redisClient,
       )
     }
     if (!dependencies.requester) {
-      dependencies.requester = new Requester(dependencies.rateLimiter, this.config as AdapterConfig)
+      dependencies.requester = new Requester(dependencies.rateLimiter, this.config.settings)
     }
 
     return dependencies as AdapterDependencies
@@ -343,11 +298,14 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     )
 
     if (response) {
-      if (this.config.METRICS_ENABLED && this.config.EXPERIMENTAL_METRICS_ENABLED) {
+      if (
+        this.config.settings.METRICS_ENABLED &&
+        this.config.settings.EXPERIMENTAL_METRICS_ENABLED
+      ) {
         const label = cacheMetricsLabel(
           req.requestContext.cacheKey,
           req.requestContext.meta?.metrics?.feedId || 'N/A',
-          this.config.CACHE_TYPE,
+          this.config.settings.CACHE_TYPE,
         )
 
         // Record cache staleness and cache get count and value
@@ -381,7 +339,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
   ): Promise<Readonly<AdapterResponse>> {
     // Get transport, must be here because it's already checked in the validator
     const endpoint = this.endpointsMap[req.requestContext.endpointName]
-    const transport = endpoint.transports[req.requestContext.transportName]
+    const transport = endpoint.transportRoutes.get(req.requestContext.transportName)
 
     // First try to find the response in our cache, keep it ready
     const cachedResponse = await this.findResponseInCache(req)
@@ -402,7 +360,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
           // `await` is required to catch the error, you'll get an unhandled promise rejection otherwise
           // Disable non-null assertion operator because we already checked for the existence of registerRequest
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          return await transport.registerRequest!(req, this.config)
+          return await transport.registerRequest!(req, this.config.settings)
         } catch (err) {
           logger.error(`Error registering request: ${err}`)
           requestRegistrationError = err as Error
@@ -427,7 +385,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
 
     // If there was no cached response, execute the foregroundExecute if defined
     const immediateResponse =
-      transport.foregroundExecute && (await transport.foregroundExecute(req, this.config))
+      transport.foregroundExecute && (await transport.foregroundExecute(req, this.config.settings))
     if (immediateResponse) {
       logger.debug('Got immediate response from transport, sending as response')
       return immediateResponse
@@ -445,7 +403,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     // Observe the idle time taken for polling response
     const metricsTimer = metrics
       .get('transportPollingDurationSeconds')
-      .labels({ endpoint: req.requestContext.endpointName })
+      .labels({ adapter_endpoint: req.requestContext.endpointName })
       .startTimer()
 
     logger.debug('Transport is set up, polling cache for response...')
@@ -453,8 +411,8 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
       this.dependencies.cache as Cache<AdapterResponse>,
       req.requestContext.cacheKey,
       {
-        maxRetries: this.config.CACHE_POLLING_MAX_RETRIES,
-        sleep: this.config.CACHE_POLLING_SLEEP_MS,
+        maxRetries: this.config.settings.CACHE_POLLING_MAX_RETRIES,
+        sleep: this.config.settings.CACHE_POLLING_SLEEP_MS,
       },
     )
 
@@ -468,7 +426,7 @@ export class Adapter<CustomSettings extends CustomAdapterSettings = SettingsMap>
     // Record polling mechanism failure to return response
     metrics
       .get('transportPollingFailureCount')
-      .labels({ endpoint: req.requestContext.endpointName })
+      .labels({ adapter_endpoint: req.requestContext.endpointName })
       .inc()
 
     logger.debug('Ran out of polling attempts, returning timeout')
