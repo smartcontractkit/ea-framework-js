@@ -1,7 +1,7 @@
 import { Adapter, AdapterEndpoint, EndpointContext, EndpointGenerics } from './adapter'
 import { metrics } from './metrics'
 import { Transport, TransportGenerics } from './transports'
-import { asyncLocalStorage, makeLogger } from './util'
+import { asyncLocalStorage, makeLogger, timeoutPromise } from './util'
 
 const logger = makeLogger('BackgroundExecutor')
 
@@ -53,6 +53,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
         logger.info('Server closed, stopping recursive backgroundExecute handler chain')
         return
       }
+
       // Count number of background executions per endpoint
       metrics
         .get('bgExecuteTotal')
@@ -68,13 +69,17 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       logger.debug(`Calling background execute for endpoint "${endpoint.name}"`)
 
       try {
-        await asyncLocalStorage.run(
-          {
-            correlationId: `Endpoint: ${endpoint.name} - Transport: ${transport.constructor.name}`,
-          },
-          () => {
-            return backgroundExecute(context)
-          },
+        await timeoutPromise(
+          'Background Execute',
+          asyncLocalStorage.run(
+            {
+              correlationId: `Endpoint: ${endpoint.name} - Transport: ${transport.constructor.name}`,
+            },
+            () => {
+              return backgroundExecute(context)
+            },
+          ),
+          adapter.config.settings.BACKGROUND_EXECUTE_TIMEOUT,
         )
       } catch (error) {
         logger.error(error, (error as Error).stack)

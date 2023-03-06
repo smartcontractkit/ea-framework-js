@@ -2,7 +2,8 @@ import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { Server, WebSocket } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
+import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
+import { metrics as eaMetrics } from '../../src/metrics'
 import {
   WebSocketClassProvider,
   WebsocketReverseMappingTransport,
@@ -10,7 +11,7 @@ import {
 } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { runAllUntilTime, TestAdapter } from '../util'
+import { runAllUntil, runAllUntilTime, TestAdapter } from '../util'
 
 interface AdapterRequestParams {
   base: string
@@ -357,24 +358,27 @@ test.serial(
   async (t) => {
     const base = 'ETH'
     const quote = 'DOGE'
+    process.env['METRICS_ENABLED'] = 'true'
+
+    let execution = 0
+    let reexecuted = false
 
     // Mock WS
     mockWebSocketProvider(WebSocketClassProvider)
     const mockWsServer = new Server(URL, { mock: false })
-    mockWsServer.on('connection', (socket) => {
-      socket.send(
-        JSON.stringify({
-          pair: `${base}/${quote}`,
-          value: price,
-        }),
-      )
-    })
 
     const transport = new WebSocketTransport<WebSocketTypes>({
       url: () => URL,
       handlers: {
         async open() {
           return new Promise((res, rej) => {
+            if (execution === 0) {
+              execution++
+              setTimeout(res, 15_000)
+            } else {
+              reexecuted = true
+              res()
+            }
             rej(new Error('Error from open handler'))
           })
         },
@@ -431,36 +435,139 @@ test.serial(
 
     const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
-      requestData: { base, quote },
-      expectedResponse: {
-        data: {
-          result: price,
-        },
-        result: price,
-        statusCode: 200,
-      },
-    })
+    const response = await testAdapter.request({ base, quote })
+    t.is(response.statusCode, 504)
 
-    // Wait until the cache expires, and the subscription is out
-    const duration =
-      Math.ceil(CACHE_MAX_AGE / adapter.config.settings.WS_SUBSCRIPTION_TTL) *
-        adapter.config.settings.WS_SUBSCRIPTION_TTL +
-      1
+    // Wait until the open handler fails once, the background execute should abort and then reexecute
+    const duration = adapter.config.settings.WS_CONNECTION_OPEN_TIMEOUT + 5000
     await runAllUntilTime(t.context.clock, duration)
 
-    // Now that the cache is out and the subscription no longer there, this should time out
-    const error = await testAdapter.request({
-      base,
-      quote,
+    const metrics = await testAdapter.getMetrics()
+    metrics.assert(t, {
+      name: 'bg_execute_errors',
+      labels: {
+        adapter_endpoint: 'test',
+        transport: 'default_single_transport',
+      },
+      expectedValue: 1,
     })
-    t.is(error.statusCode, 504)
 
-    testAdapter.api.close()
+    // Check that eventually we execute again
+    await runAllUntil(t.context.clock, () => reexecuted)
+
+    process.env['METRICS_ENABLED'] = 'false'
+    await testAdapter.api.close()
     mockWsServer.close()
     await t.context.clock.runAllAsync()
   },
 )
+
+test.serial('does not hang the background execution if the open handler hangs', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  process.env['METRICS_ENABLED'] = 'true'
+  eaMetrics.clear()
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(URL, { mock: false })
+
+  let execution = 0
+  let reexecuted = false
+
+  const transport = new WebSocketTransport<WebSocketTypes>({
+    url: () => URL,
+    handlers: {
+      async open() {
+        return new Promise((res, rej) => {
+          if (execution === 0) {
+            execution++
+            setTimeout(res, 15_000)
+          } else {
+            reexecuted = true
+            res()
+          }
+        })
+      },
+
+      message(message) {
+        const [curBase, curQuote] = message.pair.split('/')
+        return [
+          {
+            params: { base: curBase, quote: curQuote },
+            response: {
+              data: {
+                result: message.value,
+              },
+              result: message.value,
+            },
+          },
+        ]
+      },
+    },
+    builders: {
+      subscribeMessage: (params: AdapterRequestParams) => ({
+        request: 'subscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+      unsubscribeMessage: (params: AdapterRequestParams) => ({
+        request: 'unsubscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+    },
+  })
+
+  const webSocketEndpoint = new AdapterEndpoint({
+    name: 'TEST',
+    transport: transport,
+    inputParameters,
+  })
+
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
+        WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+        WS_SUBSCRIPTION_TTL: 999_999,
+      },
+    },
+  )
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [webSocketEndpoint],
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  const response = await testAdapter.request({ base, quote })
+  t.is(response.statusCode, 504)
+
+  // Wait until the open handler fails once, the background execute should abort and then reexecute
+  const duration = adapter.config.settings.WS_CONNECTION_OPEN_TIMEOUT + 5000
+  await runAllUntilTime(t.context.clock, duration)
+
+  const metrics = await testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'bg_execute_errors',
+    labels: {
+      adapter_endpoint: 'test',
+      transport: 'default_single_transport',
+    },
+    expectedValue: 1,
+  })
+
+  // Check that eventually we execute again
+  await runAllUntil(t.context.clock, () => reexecuted)
+
+  process.env['METRICS_ENABLED'] = 'false'
+  await testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runAllAsync()
+})
 
 const createReverseMappingAdapter = (
   envDefaultOverrides?: Record<string, string | number | symbol>,
