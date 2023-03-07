@@ -30,8 +30,8 @@ const logger = makeLogger('Adapter')
 /**
  * Main class to represent an External Adapter
  */
-export class Adapter<CustomSettings extends SettingsDefinitionMap = SettingsDefinitionMap>
-  implements Omit<AdapterParams<CustomSettings>, 'bootstrap'>
+export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = SettingsDefinitionMap>
+  implements Omit<AdapterParams<CustomSettingsDefinition>, 'bootstrap'>
 {
   // Adapter params
   name: Uppercase<string>
@@ -51,19 +51,20 @@ export class Adapter<CustomSettings extends SettingsDefinitionMap = SettingsDefi
   dependencies!: AdapterDependencies
 
   /** Configuration params for various adapter properties */
-  config: AdapterConfig<CustomSettings>
+  config: AdapterConfig<CustomSettingsDefinition>
 
   /** Bootstrap function that will run when initializing the adapter */
-  private readonly bootstrap?: (adapter: Adapter<CustomSettings>) => Promise<void>
+  private readonly bootstrap?: (adapter: Adapter<CustomSettingsDefinition>) => Promise<void>
 
-  constructor(params: AdapterParams<CustomSettings>) {
+  constructor(params: AdapterParams<CustomSettingsDefinition>) {
     // Copy over params
     this.name = params.name
     this.defaultEndpoint = params.defaultEndpoint?.toLowerCase()
     this.endpoints = params.endpoints
     this.rateLimiting = params.rateLimiting
     this.bootstrap = params.bootstrap
-    this.config = params.config || (new AdapterConfig({}) as AdapterConfig<CustomSettings>)
+    this.config =
+      params.config || (new AdapterConfig({}) as AdapterConfig<CustomSettingsDefinition>)
 
     this.config.initialize()
     this.normalizeEndpointNames()
