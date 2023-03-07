@@ -164,7 +164,7 @@ Consider the following example. Adapter sends a request with following informati
 ```typescript
     subscribeMessage: (params) => ({
               action: 'subscribe',
-              symbols: [`${params.base}${params.quote.}`], // ETHUSD
+              symbols: [`${params.base}${params.quote}`], // ETHUSD
     })
 ```
 and Data Provider responds with the message
@@ -198,9 +198,6 @@ export  const wsTransport = new WebsocketReverseMappingTransport<EndpointTypes, 
                  result: message.price,
                  data: {
                    result: message.price,
-                 },
-                 timestamps: {
-                   providerIndicatedTimeUnixMs: message.ts,
                  },
              },
           },
