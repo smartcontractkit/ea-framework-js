@@ -6,7 +6,7 @@ import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
 import { Cache, LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
-import { BaseAdapterSettings, AdapterConfig } from '../src/config'
+import { BaseAdapterSettings, SettingsDefinitionMap } from '../src/config'
 import { Transport, TransportDependencies } from '../src/transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse } from '../src/util'
 
@@ -256,7 +256,7 @@ class TestMetrics {
   }
 }
 
-export class TestAdapter<T extends AdapterConfig = AdapterConfig> {
+export class TestAdapter<T extends SettingsDefinitionMap = SettingsDefinitionMap> {
   mockCache?: MockCache
 
   // eslint-disable-next-line max-params
@@ -272,11 +272,11 @@ export class TestAdapter<T extends AdapterConfig = AdapterConfig> {
     }
   }
 
-  static async startWithMockedCache<T extends AdapterConfig>(
+  static async startWithMockedCache<T extends SettingsDefinitionMap = SettingsDefinitionMap>(
     adapter: Adapter<T>,
     context: ExecutionContext<{
       clock?: InstalledClock
-      testAdapter: TestAdapter<T>
+      testAdapter: TestAdapter<any>
     }>['context'],
     dependencies?: Partial<AdapterDependencies>,
   ) {
@@ -294,7 +294,7 @@ export class TestAdapter<T extends AdapterConfig = AdapterConfig> {
     >
   }
 
-  static async start<T extends AdapterConfig>(
+  static async start<T extends SettingsDefinitionMap = SettingsDefinitionMap>(
     adapter: Adapter<T>,
     context: ExecutionContext<{
       clock?: InstalledClock
