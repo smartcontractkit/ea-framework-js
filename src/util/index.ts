@@ -90,3 +90,35 @@ export class DoubleLinkedList {
     return this.remove(this.head)
   }
 }
+
+class PromiseTimeoutError extends Error {}
+
+/**
+ * Waits for the provided promise to finish up to a specified amount of time, at which point
+ * an error is thrown if the promise hasn't finished yet. Note that this cannot abort the execution
+ * of the provided promise, as the underlying node structure cannot cancel the thread.
+ *
+ * @param promise - the promise to wait for
+ * @param timeout - the maximum amount of time to wait for the promise to finish
+ * @returns the result of the promise
+ */
+export const timeoutPromise = <T>(
+  label: string,
+  promise: Promise<T>,
+  timeout: number,
+): Promise<T> => {
+  let timer: NodeJS.Timeout
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new PromiseTimeoutError(`The promise "${label}" took longer than ${timeout} ms to execute, unblocking execution.
+      (NOTE: the original promise is not cancelled from this error, it will continue to execute in the background)`),
+          ),
+        timeout,
+      )
+    }),
+  ]).finally(() => clearTimeout(timer))
+}
