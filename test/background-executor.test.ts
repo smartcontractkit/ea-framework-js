@@ -3,8 +3,8 @@ import untypedTest, { TestFn } from 'ava'
 import { start } from '../src'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../src/adapter'
 import { metrics as eaMetrics } from '../src/metrics'
-import { sleep } from '../src/util'
-import { deferredPromise, NopTransport, NopTransportTypes, TestAdapter } from './util'
+import { deferredPromise, sleep } from '../src/util'
+import { NopTransport, NopTransportTypes, TestAdapter } from './util'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter

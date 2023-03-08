@@ -2,12 +2,13 @@ import { InstalledClock } from '@sinonjs/fake-timers'
 import { ExecutionContext } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { ReplyError } from 'ioredis'
+import { WebSocket } from 'mock-socket'
 import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
 import { Cache, LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
 import { BaseAdapterSettings, SettingsDefinitionMap } from '../src/config'
-import { Transport, TransportDependencies } from '../src/transports'
+import { Transport, TransportDependencies, WebSocketClassProvider } from '../src/transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse } from '../src/util'
 
 export type NopTransportTypes = {
@@ -44,15 +45,6 @@ export class NopTransport implements Transport<NopTransportTypes> {
   ): Promise<void | AdapterResponse<NopTransportTypes['Response']>> {
     return
   }
-}
-
-type Resolve<T> = (value: T) => void
-export const deferredPromise = <T>(): [Promise<T>, Resolve<T>] => {
-  let resolve!: Resolve<T>
-  const promise = new Promise<T>((r) => {
-    resolve = r
-  })
-  return [promise, resolve]
 }
 
 export class MockCache extends LocalCache {
@@ -417,4 +409,34 @@ export async function waitUntilResolved<T>(
   }
 
   return result
+}
+
+/**
+ * Sets the mocked websocket instance in the provided provider class.
+ * We need this here, because the tests will connect using their instance of WebSocketClassProvider;
+ * fetching from this library to the \@chainlink/ea-bootstrap package would access _another_ instance
+ * of the same constructor. Although it should be a singleton, dependencies are different so that
+ * means that the static classes themselves are also different.
+ *
+ * @param provider - singleton WebSocketClassProvider
+ */
+export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): void => {
+  // Extend mock WebSocket class to bypass protocol headers error
+  class MockWebSocket extends WebSocket {
+    constructor(url: string, protocol: string | string[] | Record<string, string> | undefined) {
+      super(url, protocol instanceof Object ? undefined : protocol)
+    }
+    // This is part of the 'ws' node library but not the common interface, but it's used in our WS transport
+    removeAllListeners() {
+      for (const eventType in this.listeners) {
+        // We have to manually check because the mock-socket library shares this instance, and adds the server listeners to the same obj
+        if (!eventType.startsWith('server')) {
+          delete this.listeners[eventType]
+        }
+      }
+    }
+  }
+
+  // Need to disable typing, the mock-socket impl does not implement the ws interface fully
+  provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
 }

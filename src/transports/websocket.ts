@@ -1,7 +1,7 @@
 import WebSocket, { ClientOptions, RawData } from 'ws'
 import { EndpointContext } from '../adapter'
 import { metrics } from '../metrics'
-import { makeLogger, sleep, timeoutPromise } from '../util'
+import { deferredPromise, makeLogger, sleep, timeoutPromise } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
@@ -215,29 +215,21 @@ export class WebSocketTransport<
     context: EndpointContext<T>,
     url: string,
     options?: WebSocket.ClientOptions | undefined,
-  ): Promise<void> {
-    const connectionBuilder = () =>
-      new Promise<WebSocket>((resolve, reject) => {
-        const ctor = WebSocketClassProvider.get()
-        const connection = new ctor(url, undefined, options)
-        const handlers = this.buildConnectionHandlers(context, connection, resolve)
-        connection.addEventListener(
-          'open',
-          this.rejectionHandler<WebSocket.Event>(reject, handlers.open),
-        )
-        connection.addEventListener(
-          'message',
-          this.rejectionHandler<WebSocket.MessageEvent>(reject, handlers.message),
-        )
-        connection.addEventListener('error', handlers.error)
-        connection.addEventListener('close', handlers.close)
-      })
+  ): Promise<WebSocket> {
+    const [promise, resolve, reject] = deferredPromise()
+    const ctor = WebSocketClassProvider.get()
+    const connection = new ctor(url, undefined, options)
+    const handlers = this.buildConnectionHandlers(context, connection, resolve)
+    connection.addEventListener(
+      'open',
+      this.rejectionHandler<WebSocket.Event>(reject, handlers.open),
+    )
 
     // Attempt to establish the connection
     try {
-      this.wsConnection = await timeoutPromise(
+      await timeoutPromise(
         'WS Open Handler',
-        connectionBuilder(),
+        promise,
         context.adapterSettings.WS_CONNECTION_OPEN_TIMEOUT,
       )
 
@@ -247,6 +239,17 @@ export class WebSocketTransport<
       logger.error(`There was an error connecting to the provider websocket`)
       throw e
     }
+
+    // Now that the connection is established, we can clean up listeners and set the proper ones
+    connection.removeAllListeners()
+    connection.addEventListener(
+      'message',
+      this.rejectionHandler<WebSocket.MessageEvent>(reject, handlers.message),
+    )
+    connection.addEventListener('error', handlers.error)
+    connection.addEventListener('close', handlers.close)
+
+    return connection
   }
 
   async sendMessages(context: EndpointContext<T>, subscribes: unknown[], unsubscribes: unknown[]) {
@@ -254,6 +257,11 @@ export class WebSocketTransport<
     const serializedUnsubscribes = unsubscribes.map(this.serializeMessage)
 
     const messages = serializedSubscribes.concat(serializedUnsubscribes)
+
+    if (messages.length > 0) {
+      logger.debug(`There are ${messages.length} messages to send`)
+    }
+
     for (const message of messages) {
       this.wsConnection?.send(message)
     }
@@ -328,7 +336,7 @@ export class WebSocketTransport<
       this.providerDataStreamEstablished = Date.now()
 
       // Connect to the provider
-      await this.establishWsConnection(context, urlFromConfig, options)
+      this.wsConnection = await this.establishWsConnection(context, urlFromConfig, options)
 
       // Now that we successfully opened the connection, we can reset the variables
       connectionClosed = false

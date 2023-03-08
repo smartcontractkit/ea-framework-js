@@ -1,6 +1,6 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import { Server, WebSocket } from 'mock-socket'
+import { Server } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
@@ -11,7 +11,7 @@ import {
 } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { runAllUntil, runAllUntilTime, TestAdapter } from '../util'
+import { mockWebSocketProvider, runAllUntil, runAllUntilTime, TestAdapter } from '../util'
 
 interface AdapterRequestParams {
   base: string
@@ -40,27 +40,6 @@ interface ProviderMessage {
 }
 
 const URL = 'wss://test-ws.com/asd'
-
-/**
- * Sets the mocked websocket instance in the provided provider class.
- * We need this here, because the tests will connect using their instance of WebSocketClassProvider;
- * fetching from this library to the \@chainlink/ea-bootstrap package would access _another_ instance
- * of the same constructor. Although it should be a singleton, dependencies are different so that
- * means that the static classes themselves are also different.
- *
- * @param provider - singleton WebSocketClassProvider
- */
-export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): void => {
-  // Extend mock WebSocket class to bypass protocol headers error
-  class MockWebSocket extends WebSocket {
-    constructor(url: string, protocol: string | string[] | Record<string, string> | undefined) {
-      super(url, protocol instanceof Object ? undefined : protocol)
-    }
-  }
-
-  // Need to disable typing, the mock-socket impl does not implement the ws interface fully
-  provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
-}
 
 const CACHE_MAX_AGE = 1000
 
