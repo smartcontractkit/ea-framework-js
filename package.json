@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/external-adapter-framework",
-  "version": "0.27.2",
+  "version": "0.27.3",
   "main": "dist/index.js",
   "license": "MIT",
   "dependencies": {
