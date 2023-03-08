@@ -218,6 +218,13 @@ export const BaseSettingsDefinition = {
     default: 120000,
     validate: validator.integer({ min: 1000, max: 180000 }),
   },
+  WS_CONNECTION_OPEN_TIMEOUT: {
+    description:
+      'The maximum amount of time in milliseconds to wait for the websocket connection to open (including custom open handler)',
+    type: 'number',
+    default: 10_000,
+    validate: validator.integer({ min: 500, max: 30_000 }),
+  },
   // WS_TIME_UNTIL_HANDLE_NEXT_MESSAGE_OVERRIDE: {
   //   description: 'Time to wait until adapter should handle next WS message',
   //   type: 'number',
@@ -311,6 +318,13 @@ export const BaseSettingsDefinition = {
     type: 'number',
     default: 1000,
     validate: validator.integer({ min: 1, max: 10000 }),
+  },
+  BACKGROUND_EXECUTE_TIMEOUT: {
+    description:
+      'The maximum amount of time in milliseconds to wait for a background execute to finish',
+    type: 'number',
+    default: 90_000,
+    validate: validator.integer({ min: 1000, max: 180_000 }),
   },
 } as const satisfies SettingsDefinitionMap
 
@@ -419,7 +433,7 @@ type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
     ? C['options'][number]
     : never
   : never
-type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
+export type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
 export type SettingDefinition =
   | {
       type: 'string'
@@ -507,13 +521,17 @@ export type Settings<T extends SettingsDefinitionMap> = {
 }
 
 export type BaseAdapterSettings = Settings<BaseSettingsDefinitionType>
-export type AdapterSettings<T extends CustomSettingsDefinition<T> = SettingsDefinitionMap> =
-  Settings<T> & BaseAdapterSettings & SettingsObjectSpecifier
+export type AdapterSettings<T extends CustomSettingsDefinition<T> = object> = Settings<T> &
+  BaseAdapterSettings &
+  SettingsObjectSpecifier
 
 export type CustomSettingsDefinition<T = SettingsDefinitionMap> = Record<keyof T, SettingDefinition>
 export type EmptySettingsDefinitionMap = Record<string, never>
 export type SettingsDefinitionMap = Record<string, SettingDefinition>
 export type ValidationErrorMessage = string | undefined
+export type SettingsDefinitionFromConfig<T> = T extends AdapterConfig<infer Definition>
+  ? Definition
+  : never
 
 /**
  * This class will hold the processed config type, and the basic settings.
@@ -590,7 +608,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
         // Escaping potential special characters in values before creating regex
         value: new RegExp(
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          ((this.settings as AdapterSettings)[name]! as string).replace(
+          ((this.settings as Record<string, ValidSettingValue>)[name]! as string).replace(
             /[-[\]{}()*+?.,\\^$|#\s]/g,
             '\\$&',
           ),

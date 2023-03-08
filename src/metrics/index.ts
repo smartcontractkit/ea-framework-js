@@ -25,6 +25,7 @@ export function setupMetricsServer(name: string, adapterSettings: AdapterSetting
   setupMetrics(name)
 
   metricsApp.get(endpoint, async (_, res) => {
+    logger.trace('Metrics endpoint hit')
     res.type('txt')
     res.send(await client.register.metrics())
   })
@@ -91,6 +92,11 @@ export class Metrics<T extends Record<string, unknown>> {
       throw new Error(`Metric "${name as string}" was not initialized before use`)
     }
     return metric
+  }
+
+  clear() {
+    client.register.clear()
+    this.metrics = undefined
   }
 }
 
@@ -271,6 +277,11 @@ export const metrics = new Metrics(() => ({
     name: 'ws_connection_errors',
     help: 'The number of connection errors',
     labelNames: ['url', 'message'] as const,
+  }),
+  wsConnectionClosures: new client.Counter({
+    name: 'ws_connection_closures',
+    help: 'The number of connection closures',
+    labelNames: ['url', 'code'] as const,
   }),
   wsSubscriptionActive: new client.Gauge({
     name: 'ws_subscription_active',

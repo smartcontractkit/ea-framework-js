@@ -3,7 +3,7 @@ import { AddressInfo } from 'net'
 import { join } from 'path'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
-import { AdapterSettings, AdapterConfig } from './config'
+import { AdapterSettings, SettingsDefinitionMap } from './config'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
 import { AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
@@ -54,7 +54,7 @@ export const getMTLSOptions = (adapterSettings: AdapterSettings) => {
  * @param dependencies - an optional object with adapter dependencies to inject
  * @returns a Promise that resolves to the http.Server listening for connections
  */
-export const start = async <T extends AdapterConfig = AdapterConfig>(
+export const start = async <T extends SettingsDefinitionMap>(
   adapter: Adapter<T>,
   dependencies?: Partial<AdapterDependencies>,
 ): Promise<{
@@ -114,7 +114,7 @@ export const start = async <T extends AdapterConfig = AdapterConfig>(
   return { api, metricsApi }
 }
 
-export const expose = async <T extends AdapterConfig = AdapterConfig>(
+export const expose = async <T extends SettingsDefinitionMap>(
   adapter: Adapter<T>,
   dependencies?: Partial<AdapterDependencies>,
 ): Promise<FastifyInstance | undefined> => {

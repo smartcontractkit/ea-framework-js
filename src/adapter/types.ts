@@ -1,7 +1,7 @@
 import type EventSource from 'eventsource'
 import Redis from 'ioredis'
 import { Cache } from '../cache'
-import { BaseAdapterSettings, AdapterConfig, SettingsDefinitionMap } from '../config'
+import { AdapterConfig, BaseAdapterSettings, SettingsDefinitionMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics, TransportRoutes } from '../transports'
 import { AdapterRequest, SingleNumberResultResponse, SubscriptionSetFactory } from '../util'
@@ -81,7 +81,7 @@ export type Overrides = {
 /**
  * Main structure of an External Adapter
  */
-export interface AdapterParams<T extends AdapterConfig = AdapterConfig> {
+export interface AdapterParams<CustomSettingsDefinition extends SettingsDefinitionMap> {
   /** Name of the adapter */
   name: Uppercase<string>
 
@@ -103,10 +103,10 @@ export interface AdapterParams<T extends AdapterConfig = AdapterConfig> {
   rateLimiting?: AdapterRateLimitingConfig
 
   /** Bootstrap function that will run when initializing the adapter */
-  bootstrap?: (adapter: Adapter<T>) => Promise<void>
+  bootstrap?: (adapter: Adapter<CustomSettingsDefinition>) => Promise<void>
 
   /** The custom [[AdapterConfig]] to use. If not provided, the default configuration will be used instead */
-  config?: T
+  config?: AdapterConfig<CustomSettingsDefinition>
 }
 
 /**
