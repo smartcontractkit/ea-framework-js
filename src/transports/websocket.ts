@@ -48,6 +48,7 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
     /**
      * Handles when the WS is successfully opened.
      * Optional since logic is not always needed on connection.
+     * Note: any listeners set in this method will be cleared after its execution.
      *
      * @param wsConnection - the WebSocket with an established connection
      * @returns an empty Promise, or void
