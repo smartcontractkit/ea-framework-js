@@ -112,7 +112,7 @@ export type WebsocketTransportGenerics = TransportGenerics & {
 export class WebSocketTransport<
   T extends WebsocketTransportGenerics,
 > extends StreamingTransport<T> {
-  wsConnection!: WebSocket
+  wsConnection?: WebSocket
   currentUrl = ''
   lastMessageReceivedAt = 0
   connectionOpenedAt = 0
@@ -138,6 +138,7 @@ export class WebSocketTransport<
 
   buildConnectionHandlers(
     context: EndpointContext<T>,
+    connection: WebSocket,
     connectionReadyResolve: (value: WebSocket) => void,
   ) {
     return {
@@ -145,7 +146,7 @@ export class WebSocketTransport<
       open: async (event: WebSocket.Event) => {
         logger.debug(`Opened websocket connection. (event type ${event.type})`)
         if (this.config.handlers.open) {
-          await this.config.handlers.open(this.wsConnection, context)
+          await this.config.handlers.open(connection, context)
           logger.debug('Successfully executed connection opened handler')
         }
         connectionReadyResolve(event.target)
@@ -218,9 +219,8 @@ export class WebSocketTransport<
     const connectionBuilder = () =>
       new Promise<WebSocket>((resolve, reject) => {
         const ctor = WebSocketClassProvider.get()
-        const handlers = this.buildConnectionHandlers(context, resolve)
-
         const connection = new ctor(url, undefined, options)
+        const handlers = this.buildConnectionHandlers(context, connection, resolve)
         connection.addEventListener(
           'open',
           this.rejectionHandler<WebSocket.Event>(reject, handlers.open),
@@ -255,7 +255,7 @@ export class WebSocketTransport<
 
     const messages = serializedSubscribes.concat(serializedUnsubscribes)
     for (const message of messages) {
-      this.wsConnection.send(message)
+      this.wsConnection?.send(message)
     }
   }
 
@@ -305,7 +305,7 @@ export class WebSocketTransport<
         )
         await sleep(1000 - timeSinceConnectionOpened)
       }
-      this.wsConnection.close()
+      this.wsConnection?.close()
       connectionClosed = true
 
       // If the connection was closed, the new subscriptions should be the desired ones
