@@ -170,7 +170,9 @@ export class WebSocketTransport<
         })
         if (Array.isArray(results)) {
           // Updating the last message received time here, to only care about messages we use
-          this.lastMessageReceivedAt = Date.now()
+          if (results.length > 0) {
+            this.lastMessageReceivedAt = Date.now()
+          }
 
           logger.trace(`Writing ${results.length} responses to cache`)
           await this.responseCache.write(this.name, results)
@@ -297,6 +299,14 @@ export class WebSocketTransport<
       timeSinceLastActivity > 0 &&
       timeSinceLastActivity > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
     let connectionClosed = this.connectionClosed()
+    logger.trace(`WS conn staleness info: 
+      now: ${now} |
+      timeSinceLastMessage: ${timeSinceLastMessage} |
+      timeSinceConnectionOpened: ${timeSinceConnectionOpened} |
+      timeSinceLastActivity: ${timeSinceLastActivity} |
+      subscriptionUnresponsiveTtl: ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}
+      connectionUnresponsive: ${connectionUnresponsive} |
+      `)
 
     // Check if we should close the current connection
     if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
