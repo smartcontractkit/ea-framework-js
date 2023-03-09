@@ -1,7 +1,7 @@
 import WebSocket, { ClientOptions, RawData } from 'ws'
 import { EndpointContext } from '../adapter'
 import { metrics } from '../metrics'
-import { makeLogger, sleep, timeoutPromise } from '../util'
+import { deferredPromise, makeLogger, sleep, timeoutPromise } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
@@ -48,6 +48,7 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
     /**
      * Handles when the WS is successfully opened.
      * Optional since logic is not always needed on connection.
+     * Note: any listeners set in this method will be cleared after its execution.
      *
      * @param wsConnection - the WebSocket with an established connection
      * @returns an empty Promise, or void
@@ -112,7 +113,7 @@ export type WebsocketTransportGenerics = TransportGenerics & {
 export class WebSocketTransport<
   T extends WebsocketTransportGenerics,
 > extends StreamingTransport<T> {
-  wsConnection!: WebSocket
+  wsConnection?: WebSocket
   currentUrl = ''
   lastMessageReceivedAt = 0
   connectionOpenedAt = 0
@@ -138,6 +139,7 @@ export class WebSocketTransport<
 
   buildConnectionHandlers(
     context: EndpointContext<T>,
+    connection: WebSocket,
     connectionReadyResolve: (value: WebSocket) => void,
   ) {
     return {
@@ -145,7 +147,7 @@ export class WebSocketTransport<
       open: async (event: WebSocket.Event) => {
         logger.debug(`Opened websocket connection. (event type ${event.type})`)
         if (this.config.handlers.open) {
-          await this.config.handlers.open(this.wsConnection, context)
+          await this.config.handlers.open(connection, context)
           logger.debug('Successfully executed connection opened handler')
         }
         connectionReadyResolve(event.target)
@@ -168,7 +170,9 @@ export class WebSocketTransport<
         })
         if (Array.isArray(results)) {
           // Updating the last message received time here, to only care about messages we use
-          this.lastMessageReceivedAt = Date.now()
+          if (results.length > 0) {
+            this.lastMessageReceivedAt = Date.now()
+          }
 
           logger.trace(`Writing ${results.length} responses to cache`)
           await this.responseCache.write(this.name, results)
@@ -214,30 +218,21 @@ export class WebSocketTransport<
     context: EndpointContext<T>,
     url: string,
     options?: WebSocket.ClientOptions | undefined,
-  ): Promise<void> {
-    const connectionBuilder = () =>
-      new Promise<WebSocket>((resolve, reject) => {
-        const ctor = WebSocketClassProvider.get()
-        const handlers = this.buildConnectionHandlers(context, resolve)
-
-        const connection = new ctor(url, undefined, options)
-        connection.addEventListener(
-          'open',
-          this.rejectionHandler<WebSocket.Event>(reject, handlers.open),
-        )
-        connection.addEventListener(
-          'message',
-          this.rejectionHandler<WebSocket.MessageEvent>(reject, handlers.message),
-        )
-        connection.addEventListener('error', handlers.error)
-        connection.addEventListener('close', handlers.close)
-      })
+  ): Promise<WebSocket> {
+    const [promise, resolve, reject] = deferredPromise()
+    const ctor = WebSocketClassProvider.get()
+    const connection = new ctor(url, undefined, options)
+    const handlers = this.buildConnectionHandlers(context, connection, resolve)
+    connection.addEventListener(
+      'open',
+      this.rejectionHandler<WebSocket.Event>(reject, handlers.open),
+    )
 
     // Attempt to establish the connection
     try {
-      this.wsConnection = await timeoutPromise(
+      await timeoutPromise(
         'WS Open Handler',
-        connectionBuilder(),
+        promise,
         context.adapterSettings.WS_CONNECTION_OPEN_TIMEOUT,
       )
 
@@ -247,6 +242,17 @@ export class WebSocketTransport<
       logger.error(`There was an error connecting to the provider websocket`)
       throw e
     }
+
+    // Now that the connection is established, we can clean up listeners and set the proper ones
+    connection.removeAllListeners()
+    connection.addEventListener(
+      'message',
+      this.rejectionHandler<WebSocket.MessageEvent>(reject, handlers.message),
+    )
+    connection.addEventListener('error', handlers.error)
+    connection.addEventListener('close', handlers.close)
+
+    return connection
   }
 
   async sendMessages(context: EndpointContext<T>, subscribes: unknown[], unsubscribes: unknown[]) {
@@ -254,8 +260,13 @@ export class WebSocketTransport<
     const serializedUnsubscribes = unsubscribes.map(this.serializeMessage)
 
     const messages = serializedSubscribes.concat(serializedUnsubscribes)
+
+    if (messages.length > 0) {
+      logger.debug(`There are ${messages.length} messages to send`)
+    }
+
     for (const message of messages) {
-      this.wsConnection.send(message)
+      this.wsConnection?.send(message)
     }
   }
 
@@ -288,6 +299,14 @@ export class WebSocketTransport<
       timeSinceLastActivity > 0 &&
       timeSinceLastActivity > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
     let connectionClosed = this.connectionClosed()
+    logger.trace(`WS conn staleness info: 
+      now: ${now} |
+      timeSinceLastMessage: ${timeSinceLastMessage} |
+      timeSinceConnectionOpened: ${timeSinceConnectionOpened} |
+      timeSinceLastActivity: ${timeSinceLastActivity} |
+      subscriptionUnresponsiveTtl: ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}
+      connectionUnresponsive: ${connectionUnresponsive} |
+      `)
 
     // Check if we should close the current connection
     if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
@@ -305,7 +324,7 @@ export class WebSocketTransport<
         )
         await sleep(1000 - timeSinceConnectionOpened)
       }
-      this.wsConnection.close()
+      this.wsConnection?.close()
       connectionClosed = true
 
       // If the connection was closed, the new subscriptions should be the desired ones
@@ -328,7 +347,7 @@ export class WebSocketTransport<
       this.providerDataStreamEstablished = Date.now()
 
       // Connect to the provider
-      await this.establishWsConnection(context, urlFromConfig, options)
+      this.wsConnection = await this.establishWsConnection(context, urlFromConfig, options)
 
       // Now that we successfully opened the connection, we can reset the variables
       connectionClosed = false

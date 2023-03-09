@@ -14,48 +14,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  add-labels: # Load the dependencies cache for all jobs
-    name: Add PR labels
-    runs-on: ubuntu-latest
-    if: github.event.action == 'opened'
-    steps:
-      - uses: actions/checkout@v3
-      - name: Calculate labels
-        id: calc-labels
-        run: |
-          shopt -s nocasematch
-          HR=${{ github.head_ref || github.ref }}
-          echo "Calculating labels based on branch: $HR"
-          LABELS=""
-          if [[ $HR == release/*  ]]; then
-            LABELS="release, major"
-          elif [[ $HR == feature/*  ]]; then
-            LABELS="feature, minor"
-          elif [[ $HR == improvement/*  ]]; then
-            LABELS="improvement, patch"
-          elif [[ $HR == bugfix/*  ]]; then
-            LABELS="bugfix, patch"
-          elif [[ $HR == hotfix/* || $HR == fix/* ]]; then
-            LABELS="hotfix, patch"
-          elif [[ $HR == chore/*  ]]; then
-            LABELS="chore, patch"
-          elif [[ $HR == docs/*  ]]; then
-            LABELS="docs, none"
-          elif [[ $HR == bump-version/*  ]]; then
-            LABELS="version-bump"
-          else
-            # Add a no-op label so we trigger the validation
-            LABELS="needs-label"
-            echo "Could not determine labels based on branch name: $HR"
-          fi
-          # Below is a direct instruction to the set-output action, evaluated as a bash command
-          echo "LABELS=$LABELS" >> $GITHUB_OUTPUT
-      - uses: andymckay/labeler@master # This is the external step used in the official GHA docs
-        with:
-          add-labels: ${{ steps.calc-labels.outputs.LABELS }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   validate-labels:
     name: Validate PR labels
     if: always()

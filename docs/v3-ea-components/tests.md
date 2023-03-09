@@ -167,6 +167,13 @@ export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): 
     constructor(url: string, protocol: string | string[] | Record<string, string> | undefined) {
       super(url, protocol instanceof Object ? undefined : protocol)
     }
+    removeAllListeners() {
+      for (const eventType in this.listeners) {
+        if (!eventType.startsWith('server')) {
+          delete this.listeners[eventType]
+        }
+      }
+    }
     // Mock WebSocket does not come with built on function which adapter handlers could be using for ws
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     on(_: Event) {

@@ -1,6 +1,6 @@
-export * from './types'
 export * from './logger'
 export * from './subscription-set/subscription-set'
+export * from './types'
 
 /**
  * Sleeps for the provided number of milliseconds
@@ -121,4 +121,22 @@ export const timeoutPromise = <T>(
       )
     }),
   ]).finally(() => clearTimeout(timer))
+}
+
+type DeferredResolve<T> = (value: T) => void
+type DeferredReject = (reason?: unknown) => void
+/**
+ * This function will create a promise, and synchronously return both the promise itself and
+ * the resolve and reject callbacks so that they can be used and passed around individually.
+ *
+ * @returns all the deconstructed elements of a promise, to handle in synchronous-ish logic
+ */
+export const deferredPromise = <T>(): [Promise<T>, DeferredResolve<T>, DeferredReject] => {
+  let resolve!: DeferredResolve<T>
+  let reject!: DeferredReject
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return [promise, resolve, reject]
 }

@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
-import { Server, WebSocket } from 'mock-socket'
+import { Server } from 'mock-socket'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import {
   AdapterConfig,
@@ -17,7 +17,7 @@ import {
   WebSocketTransport,
 } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { TestAdapter } from '../util'
+import { mockWebSocketProvider, TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter<SettingsDefinitionFromConfig<typeof adapterConfig>>
@@ -134,18 +134,6 @@ class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
     this.backgroundExecuteCalls++
     return super.backgroundExecute(context)
   }
-}
-
-const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): void => {
-  // Extend mock WebSocket class to bypass protocol headers error
-  class MockWebSocket extends WebSocket {
-    constructor(url: string, protocol: string | string[] | Record<string, string> | undefined) {
-      super(url, protocol instanceof Object ? undefined : protocol)
-    }
-  }
-
-  // Need to disable typing, the mock-socket impl does not implement the ws interface fully
-  provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 mockWebSocketProvider(WebSocketClassProvider)
