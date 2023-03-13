@@ -245,7 +245,6 @@ test.serial(
 
     // Advance the clock a few minutes and check that the amount of calls is as expected
     const timeToSleep = 3 * 60 * 1000 // 3m
-    sleep(timeToSleep)
     await runAllUntilTime(t.context.clock, timeToSleep)
 
     /**
@@ -841,9 +840,6 @@ test.serial(
         to,
       })
       t.is(error.statusCode, 504)
-
-      // Fire off a promise so that the method below has somewhere to stop that's not the requester's 1min sleep
-      sleep(3000)
 
       // Advance the clock by some ms, but less than the limit per second
       await runAllUntilTime(t.context.clock, 2000)
