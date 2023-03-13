@@ -326,6 +326,12 @@ export const BaseSettingsDefinition = {
     default: 90_000,
     validate: validator.integer({ min: 1000, max: 180_000 }),
   },
+  RATE_LIMITING_STRATEGY: {
+    description: 'The rate limiting strategy to use for outbound requests',
+    type: 'enum',
+    options: ['counting', 'fixed'],
+    default: 'counting',
+  },
 } as const satisfies SettingsDefinitionMap
 
 export const buildAdapterSettings = <

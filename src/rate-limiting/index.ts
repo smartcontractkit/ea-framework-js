@@ -25,12 +25,16 @@ export interface RateLimiter {
    */
   initialize<T extends EndpointGenerics>(
     endpoints: AdapterEndpoint<T>[],
-    limits: AdapterRateLimitTier,
+    limits?: AdapterRateLimitTier,
   ): this
 
   /**
-   * This method will check using whatever strategy is implemented to determine if
-   * this request can be processed. If so, it returns true; if not, returns false.
+   * TODO: complete
+   */
+  waitForRateLimit(): Promise<void>
+
+  /**
+   * TODO: complete
    */
   msUntilNextExecution(): number
 }

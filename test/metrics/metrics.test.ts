@@ -3,7 +3,7 @@ import untypedTest, { TestFn } from 'ava'
 import axios from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
+import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
 import { retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { TestAdapter } from '../util'
@@ -165,7 +165,7 @@ test.serial('test basic metrics', async (t) => {
       provider_status_code: '200',
       method: 'GET',
     },
-    expectedValue: 9,
+    expectedValue: 10,
   })
   // Test data provider request duration metrics
   metrics.assertPositiveNumber(t, {
@@ -180,7 +180,7 @@ test.serial('test basic metrics', async (t) => {
       participant_id: `TEST-test-default_single_transport-${feed_id}`,
       cache_type: 'local',
     },
-    expectedValue: 9,
+    expectedValue: 10,
   })
   // Test cache max age metrics
   metrics.assert(t, {
@@ -218,7 +218,7 @@ test.serial('test basic metrics', async (t) => {
       feed_id: 'N/A',
       participant_id: '9002',
     },
-    expectedValue: 9,
+    expectedValue: 10,
   })
   // Test http requests total metrics (cache hit)
   axiosMock

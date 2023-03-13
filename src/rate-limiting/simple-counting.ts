@@ -1,6 +1,6 @@
 import { AdapterRateLimitTier, RateLimiter } from '.'
 import { AdapterEndpoint, EndpointGenerics } from './../adapter'
-import { makeLogger } from './../util'
+import { makeLogger, sleep } from './../util'
 
 const logger = makeLogger('SimpleCountingRateLimiter')
 
@@ -35,12 +35,7 @@ export class SimpleCountingRateLimiter implements RateLimiter {
     return this
   }
 
-  msUntilNextExecution(): number {
-    // If the limit is set to infinity, there was no tier limit specified
-    if (this.perSecondLimit === Infinity && this.perMinuteLimit === Infinity) {
-      return 0
-    }
-
+  private updateIntervals() {
     const now = Date.now()
     const nearestSecondInterval = Math.floor(now / 1000)
     const nearestMinuteInterval = Math.floor(now / (1000 * 60))
@@ -65,24 +60,51 @@ export class SimpleCountingRateLimiter implements RateLimiter {
       this.requestsThisMinute = 0
     }
 
+    return {
+      now,
+      nextSecondInterval,
+      nextMinuteInterval,
+    }
+  }
+
+  msUntilNextExecution(): number {
+    // If the limit is set to infinity, there was no tier limit specified
+    if (this.perSecondLimit === Infinity && this.perMinuteLimit === Infinity) {
+      return 0
+    }
+
+    const { now, nextSecondInterval, nextMinuteInterval } = this.updateIntervals()
+
     const timeToWaitForNextSecond =
-      this.requestsThisSecond + 1 < this.perSecondLimit ? 0 : nextSecondInterval - now
+      this.requestsThisSecond < this.perSecondLimit ? 0 : nextSecondInterval - now
     const timeToWaitForNextMinute =
-      this.requestsThisMinute + 1 < this.perMinuteLimit ? 0 : nextMinuteInterval - now
+      this.requestsThisMinute < this.perMinuteLimit ? 0 : nextMinuteInterval - now
     const timeToWait = Math.max(timeToWaitForNextSecond, timeToWaitForNextMinute)
 
+    return timeToWait
+  }
+
+  async waitForRateLimit(): Promise<void> {
+    const timeToWait = this.msUntilNextExecution()
+
     if (timeToWait === 0) {
-      this.requestsThisSecond++
-      this.requestsThisMinute++
       logger.trace(
-        `Request under limits, counted +1 (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute})`,
+        `Request under limits, current count: (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute})`,
       )
-      return 0
     } else {
       logger.trace(
         `Capacity for provider requests has been reached this interval (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute}), need to wait ${timeToWait}ms`,
       )
-      return timeToWait
+      await sleep(timeToWait)
+      this.updateIntervals()
     }
+
+    this.requestsThisSecond++
+    this.requestsThisMinute++
+    logger.trace(
+      `Request is now ready to go, updated count: (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute})`,
+    )
+
+    return
   }
 }
