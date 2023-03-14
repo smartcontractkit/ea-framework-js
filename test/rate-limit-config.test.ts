@@ -180,6 +180,14 @@ test('uses most restrictive tier if none is specified in settings', async (t) =>
         })(),
       }),
     ],
+    config: new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          RATE_LIMITING_STRATEGY: 'counting',
+        },
+      },
+    ),
     rateLimiting: {
       tiers: {
         asd: {
@@ -218,6 +226,14 @@ test('uses unlimited tier if none is specified in settings', async (t) => {
         })(),
       }),
     ],
+    config: new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          RATE_LIMITING_STRATEGY: 'counting',
+        },
+      },
+    ),
   })
 
   await start(adapter)
@@ -229,6 +245,7 @@ test('uses specified tier if present in settings', async (t) => {
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
+        RATE_LIMITING_STRATEGY: 'counting',
       },
     },
   )
@@ -278,6 +295,7 @@ test('test build rate limits from env vars (second, minute)', async (t) => {
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
+        RATE_LIMITING_STRATEGY: 'counting',
       },
     },
   )
@@ -316,6 +334,7 @@ test('test build rate limits from env vars (second, capacity)', async (t) => {
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
+        RATE_LIMITING_STRATEGY: 'counting',
       },
     },
   )
@@ -355,6 +374,7 @@ test('test build rate limits from env vars (second, minute, capacity)', async (t
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
+        RATE_LIMITING_STRATEGY: 'counting',
       },
     },
   )
@@ -394,6 +414,7 @@ test('test build rate limits from env vars (capacity)', async (t) => {
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
+        RATE_LIMITING_STRATEGY: 'counting',
       },
     },
   )

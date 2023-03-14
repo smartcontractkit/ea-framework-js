@@ -330,7 +330,7 @@ export const BaseSettingsDefinition = {
     description: 'The rate limiting strategy to use for outbound requests',
     type: 'enum',
     options: ['counting', 'fixed'],
-    default: 'counting',
+    default: 'fixed',
   },
 } as const satisfies SettingsDefinitionMap
 

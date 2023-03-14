@@ -165,7 +165,7 @@ test.serial('test basic metrics', async (t) => {
       provider_status_code: '200',
       method: 'GET',
     },
-    expectedValue: 10,
+    expectedValue: 2,
   })
   // Test data provider request duration metrics
   metrics.assertPositiveNumber(t, {
@@ -180,7 +180,7 @@ test.serial('test basic metrics', async (t) => {
       participant_id: `TEST-test-default_single_transport-${feed_id}`,
       cache_type: 'local',
     },
-    expectedValue: 10,
+    expectedValue: 2,
   })
   // Test cache max age metrics
   metrics.assert(t, {
@@ -218,7 +218,7 @@ test.serial('test basic metrics', async (t) => {
       feed_id: 'N/A',
       participant_id: '9002',
     },
-    expectedValue: 10,
+    expectedValue: 2,
   })
   // Test http requests total metrics (cache hit)
   axiosMock

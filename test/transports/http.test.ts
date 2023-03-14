@@ -203,61 +203,67 @@ test.serial(
   'per minute rate limit of 4 with one batch transport results in a call every 15s',
   async (t) => {
     const rateLimit1m = 4
-    const transport = new MockHttpTransport(true)
+    const WARMUP_SUBSCRIPTION_TTL = 100_000 // Over 1 minute, below 2 minutes
 
-    const config = new AdapterConfig(
-      {},
-      {
-        envDefaultOverrides: {
-          WARMUP_SUBSCRIPTION_TTL: 100_000, // Over 1 minute, below 2 minutes
-          CACHE_MAX_AGE: 0,
-        },
-      },
-    )
-
-    const adapter = new Adapter({
-      name: 'TEST',
-      defaultEndpoint: 'test',
-      config,
-      endpoints: [
-        new AdapterEndpoint({
-          name: 'test',
-          inputParameters,
-          transport: transport,
-        }),
-      ],
-      rateLimiting: {
-        tiers: {
-          default: {
-            rateLimit1m,
+    const subtest = async (strategy: RateLimitingStrategy, expectedValue: number) => {
+      const transport = new MockHttpTransport(true)
+      const config = new AdapterConfig(
+        {},
+        {
+          envDefaultOverrides: {
+            WARMUP_SUBSCRIPTION_TTL,
+            CACHE_MAX_AGE: 0,
+            RATE_LIMITING_STRATEGY: strategy,
           },
         },
-      },
-    })
+      )
 
-    // Start the adapter
-    const testAdapter = await TestAdapter.start(adapter, t.context)
+      const adapter = new Adapter({
+        name: 'TEST',
+        defaultEndpoint: 'test',
+        config,
+        endpoints: [
+          new AdapterEndpoint({
+            name: 'test',
+            inputParameters,
+            transport: transport,
+          }),
+        ],
+        rateLimiting: {
+          tiers: {
+            default: {
+              rateLimit1m,
+            },
+          },
+        },
+      })
 
-    // Expect the first response to time out
-    // The polling behavior is tested in the cache tests, so this is easier here.
-    const error = await testAdapter.request({ from, to })
-    t.is(error.statusCode, 504)
+      // Start the adapter
+      const testAdapter = await TestAdapter.start(adapter, t.context)
 
-    // Advance the clock a few minutes and check that the amount of calls is as expected
-    const timeToSleep = 3 * 60 * 1000 // 3m
-    await runAllUntilTime(t.context.clock, timeToSleep)
+      // Expect the first response to time out
+      // The polling behavior is tested in the cache tests, so this is easier here.
+      const error = await testAdapter.request({ from, to })
+      t.is(error.statusCode, 504)
+
+      // Advance the clock a few minutes and check that the amount of calls is as expected
+      const timeToSleep = 3 * 60 * 1000 // 3m
+      await runAllUntilTime(t.context.clock, timeToSleep)
+
+      t.is(transport.backgroundExecuteCalls, expectedValue)
+    }
 
     /**
      * The expected number of requests is at follows:
      * - At minute 0, a burst of `rateLimit1m` requests will be fired.
      * - The next request after those will be attempted immediately, only to hit the rate limiter blocking sleep.
      * - This will be repeated at the beginning of each minute interval (hence the rounding up when dividing the TTL).
-     * - Finally, the +1 will be the last request that was attempted to be fired then blocked,
+     * - Finally, the +1 for the counting strategy will be the last request that was attempted to be fired then blocked,
      *     and by the time it's fired the subscription is no longer active.
      */
-    const expected =
-      rateLimit1m * Math.ceil(adapter.config.settings.WARMUP_SUBSCRIPTION_TTL / 60_000) + 1
-    t.is(transport.backgroundExecuteCalls, expected)
+    const expected = rateLimit1m * Math.ceil(WARMUP_SUBSCRIPTION_TTL / 60_000)
+    await subtest(RateLimitingStrategy.FIXED, expected)
+    await subtest(RateLimitingStrategy.COUNTING, expected + 1)
   },
 )
 
@@ -265,49 +271,56 @@ test.serial(
   'per second limit of 1 with one batch transport results in a call every 1000ms',
   async (t) => {
     const rateLimit1s = 1
-    const transport = new MockHttpTransport(true)
 
-    const config = new AdapterConfig(
-      {},
-      {
-        envDefaultOverrides: {
-          WARMUP_SUBSCRIPTION_TTL: 100000,
-        },
-      },
-    )
-
-    const adapter = new Adapter({
-      name: 'TEST',
-      defaultEndpoint: 'test',
-      config,
-      endpoints: [
-        new AdapterEndpoint({
-          name: 'test',
-          inputParameters,
-          transport: transport,
-        }),
-      ],
-      rateLimiting: {
-        tiers: {
-          default: {
-            rateLimit1s,
+    const subtest = async (strategy: RateLimitingStrategy, expectedValue: number) => {
+      const transport = new MockHttpTransport(true)
+      const config = new AdapterConfig(
+        {},
+        {
+          envDefaultOverrides: {
+            WARMUP_SUBSCRIPTION_TTL: 100000,
+            RATE_LIMITING_STRATEGY: strategy,
           },
         },
-      },
-    })
+      )
 
-    // Start the adapter
-    const testAdapter = await TestAdapter.start(adapter, t.context)
+      const adapter = new Adapter({
+        name: 'TEST',
+        defaultEndpoint: 'test',
+        config,
+        endpoints: [
+          new AdapterEndpoint({
+            name: 'test',
+            inputParameters,
+            transport: transport,
+          }),
+        ],
+        rateLimiting: {
+          tiers: {
+            default: {
+              rateLimit1s,
+            },
+          },
+        },
+      })
 
-    // Expect the first response to time out
-    // The polling behavior is tested in the cache tests, so this is easier here.
-    const error = await testAdapter.request({ from, to })
-    t.is(error.statusCode, 504)
+      // Start the adapter
+      const testAdapter = await TestAdapter.start(adapter, t.context)
 
-    // Run for an entire minute and check that the values are as expected
-    await runAllUntilTime(t.context.clock, 60 * 1000 + 100)
-    // The + 1 is from the final request that was attempted to be fired, and sent in the next window
-    t.is(transport.backgroundExecuteCalls, 60 * rateLimit1s + 1)
+      // Expect the first response to time out
+      // The polling behavior is tested in the cache tests, so this is easier here.
+      const error = await testAdapter.request({ from, to })
+      t.is(error.statusCode, 504)
+
+      // Run for an entire minute and check that the values are as expected
+      await runAllUntilTime(t.context.clock, 60 * 1000 + 100)
+      // The + 1 is from the final request that was attempted to be fired, and sent in the next window
+      t.is(transport.backgroundExecuteCalls, expectedValue)
+    }
+
+    const expected = 60 * rateLimit1s + 1
+    await subtest(RateLimitingStrategy.FIXED, expected)
+    await subtest(RateLimitingStrategy.COUNTING, expected)
   },
 )
 
