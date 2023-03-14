@@ -29,12 +29,13 @@ export interface RateLimiter {
   ): this
 
   /**
-   * TODO: complete
+   * This method will block (if necessary) until the rate limiter can make sure the
+   * next outbound request will be within the specified limits.
    */
   waitForRateLimit(): Promise<void>
 
   /**
-   * TODO: complete
+   * Returns the time in milliseconds until the next request would be able to be fired
    */
   msUntilNextExecution(): number
 }
