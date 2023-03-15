@@ -1,11 +1,11 @@
-import * as client from 'prom-client'
-import { HttpRequestType, requestDurationBuckets } from './constants'
-import { AdapterRequest, makeLogger } from '../util'
-import { AdapterSettings } from '../config'
 import fastify, { FastifyReply, HookHandlerDoneFunction } from 'fastify'
 import { join } from 'path'
-import { AdapterError } from '../validation/error'
+import * as client from 'prom-client'
+import { AdapterSettings } from '../config'
 import { getMTLSOptions, httpsOptions } from '../index'
+import { AdapterRequest, makeLogger } from '../util'
+import { AdapterError } from '../validation/error'
+import { HttpRequestType, requestDurationBuckets } from './constants'
 
 const logger = makeLogger('Metrics')
 

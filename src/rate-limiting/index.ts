@@ -2,7 +2,7 @@ import { AdapterEndpoint, EndpointGenerics } from '../adapter'
 import { AdapterSettings } from '../config'
 import { makeLogger } from '../util'
 
-export * from './simple-counting'
+export * from './burst'
 
 const logger = makeLogger('RateLimitingUtils')
 
@@ -25,12 +25,17 @@ export interface RateLimiter {
    */
   initialize<T extends EndpointGenerics>(
     endpoints: AdapterEndpoint<T>[],
-    limits: AdapterRateLimitTier,
+    limits?: AdapterRateLimitTier,
   ): this
 
   /**
-   * This method will check using whatever strategy is implemented to determine if
-   * this request can be processed. If so, it returns true; if not, returns false.
+   * This method will block (if necessary) until the rate limiter can make sure the
+   * next outbound request will be within the specified limits.
+   */
+  waitForRateLimit(): Promise<void>
+
+  /**
+   * Returns the time in milliseconds until the next request would be able to be fired
    */
   msUntilNextExecution(): number
 }

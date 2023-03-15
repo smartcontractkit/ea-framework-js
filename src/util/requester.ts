@@ -192,14 +192,8 @@ export class Requester {
       `Popped next request (Key: ${next.key}, Retry #: ${next.retries}) from the queue (Size: ${this.queue.length})`,
     )
 
-    // Check if we can execute it now, or we have to wait
-    const timeToWait = this.rateLimiter.msUntilNextExecution()
-    if (timeToWait) {
-      logger.trace(
-        `Ran into request limits, sleeping ${timeToWait}ms before executing (Key: ${next.key}, Retry #: ${next.retries})`,
-      )
-      await sleep(timeToWait)
-    }
+    // Wait until the rate limiter allows the request to be executed
+    await this.rateLimiter.waitForRateLimit()
 
     // Fire off to complete in the background. We don't wait here to be able to fire off multiple requests concurrently
     this.executeRequest.bind(this)(next)

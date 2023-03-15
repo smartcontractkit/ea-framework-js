@@ -16,8 +16,6 @@ concurrency:
 jobs:
   validate-labels:
     name: Validate PR labels
-    if: always()
-    needs: add-labels
     runs-on: ubuntu-latest
     outputs:
       VERSION_INSTRUCTION: ${{ steps.validate.outputs.VERSION_INSTRUCTION }}

@@ -304,7 +304,7 @@ export class WebSocketTransport<
       timeSinceLastMessage: ${timeSinceLastMessage} |
       timeSinceConnectionOpened: ${timeSinceConnectionOpened} |
       timeSinceLastActivity: ${timeSinceLastActivity} |
-      subscriptionUnresponsiveTtl: ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}
+      subscriptionUnresponsiveTtl: ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL} |
       connectionUnresponsive: ${connectionUnresponsive} |
       `)
 

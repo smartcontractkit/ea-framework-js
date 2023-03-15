@@ -11,7 +11,7 @@ import {
 } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { mockWebSocketProvider, runAllUntil, runAllUntilTime, TestAdapter } from '../util'
+import { mockWebSocketProvider, runAllUntilTime, TestAdapter } from '../util'
 
 interface AdapterRequestParams {
   base: string
@@ -340,11 +340,20 @@ test.serial(
     process.env['METRICS_ENABLED'] = 'true'
 
     let execution = 0
-    let reexecuted = false
 
     // Mock WS
     mockWebSocketProvider(WebSocketClassProvider)
     const mockWsServer = new Server(URL, { mock: false })
+    mockWsServer.on('connection', (socket) => {
+      socket.on('message', () => {
+        socket.send(
+          JSON.stringify({
+            pair: `${base}/${quote}`,
+            value: price,
+          }),
+        )
+      })
+    })
 
     const transport = new WebSocketTransport<WebSocketTypes>({
       url: () => URL,
@@ -355,7 +364,6 @@ test.serial(
               execution++
               setTimeout(res, 15_000)
             } else {
-              reexecuted = true
               res()
             }
             rej(new Error('Error from open handler'))
@@ -414,12 +422,16 @@ test.serial(
 
     const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-    const response = await testAdapter.request({ base, quote })
-    t.is(response.statusCode, 504)
-
-    // Wait until the open handler fails once, the background execute should abort and then reexecute
-    const duration = adapter.config.settings.WS_CONNECTION_OPEN_TIMEOUT + 5000
-    await runAllUntilTime(t.context.clock, duration)
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base, quote },
+      expectedResponse: {
+        data: {
+          result: price,
+        },
+        result: price,
+        statusCode: 200,
+      },
+    })
 
     const metrics = await testAdapter.getMetrics()
     metrics.assert(t, {
@@ -430,9 +442,6 @@ test.serial(
       },
       expectedValue: 1,
     })
-
-    // Check that eventually we execute again
-    await runAllUntil(t.context.clock, () => reexecuted)
 
     process.env['METRICS_ENABLED'] = 'false'
     await testAdapter.api.close()
@@ -450,9 +459,18 @@ test.serial('does not hang the background execution if the open handler hangs', 
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
   const mockWsServer = new Server(URL, { mock: false })
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', () => {
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
+    })
+  })
 
   let execution = 0
-  let reexecuted = false
 
   const transport = new WebSocketTransport<WebSocketTypes>({
     url: () => URL,
@@ -463,7 +481,6 @@ test.serial('does not hang the background execution if the open handler hangs', 
             execution++
             setTimeout(res, 15_000)
           } else {
-            reexecuted = true
             res()
           }
         })
@@ -522,12 +539,16 @@ test.serial('does not hang the background execution if the open handler hangs', 
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-  const response = await testAdapter.request({ base, quote })
-  t.is(response.statusCode, 504)
-
-  // Wait until the open handler fails once, the background execute should abort and then reexecute
-  const duration = adapter.config.settings.WS_CONNECTION_OPEN_TIMEOUT + 5000
-  await runAllUntilTime(t.context.clock, duration)
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
+  })
 
   const metrics = await testAdapter.getMetrics()
   metrics.assert(t, {
@@ -538,9 +559,6 @@ test.serial('does not hang the background execution if the open handler hangs', 
     },
     expectedValue: 1,
   })
-
-  // Check that eventually we execute again
-  await runAllUntil(t.context.clock, () => reexecuted)
 
   process.env['METRICS_ENABLED'] = 'false'
   await testAdapter.api.close()

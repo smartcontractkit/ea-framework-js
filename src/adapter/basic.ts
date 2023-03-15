@@ -12,8 +12,8 @@ import {
   buildRateLimitTiersFromConfig,
   getRateLimitingTier,
   highestRateLimitTiers,
-  SimpleCountingRateLimiter,
 } from '../rate-limiting'
+import { RateLimiterFactory, RateLimitingStrategy } from '../rate-limiting/factory'
 import { AdapterRequest, AdapterResponse, makeLogger, SubscriptionSetFactory } from '../util'
 import { Requester } from '../util/requester'
 import { AdapterTimeoutError } from '../validation/error'
@@ -273,10 +273,9 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     }
 
     if (!dependencies.rateLimiter) {
-      dependencies.rateLimiter = new SimpleCountingRateLimiter().initialize(
-        this.endpoints,
-        rateLimitingTier,
-      )
+      dependencies.rateLimiter = RateLimiterFactory.buildRateLimiter(
+        this.config.settings.RATE_LIMITING_STRATEGY as RateLimitingStrategy,
+      ).initialize(this.endpoints, rateLimitingTier)
     }
     if (!dependencies.subscriptionSetFactory) {
       dependencies.subscriptionSetFactory = new SubscriptionSetFactory(

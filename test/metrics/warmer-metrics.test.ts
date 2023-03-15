@@ -1,9 +1,9 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
+import axios from 'axios'
+import MockAdapter from 'axios-mock-adapter'
 import { runAllUntilTime, TestAdapter } from '../util'
 import { buildHttpAdapter } from './helper'
-import MockAdapter from 'axios-mock-adapter'
-import axios from 'axios'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -41,25 +41,31 @@ const from = 'ETH'
 const to = 'USD'
 const price = 1234
 
-axiosMock
-  .onPost(URL + endpoint, {
-    pairs: [
-      {
-        base: from,
-        quote: to,
-      },
-    ],
-  })
-  .reply(200, {
-    prices: [
-      {
-        pair: `${from}/${to}`,
-        price,
-      },
-    ],
-  })
-
 test.serial('Test cache warmer active metric', async (t) => {
+  axiosMock
+    .onPost(URL + endpoint, {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(() => {
+      t.context.clock.tick(1)
+      return [
+        200,
+        {
+          prices: [
+            {
+              pair: `${from}/${to}`,
+              price,
+            },
+          ],
+        },
+      ]
+    })
+
   await t.context.testAdapter.startBackgroundExecuteThenGetResponse(t, {
     requestData: {
       from,
@@ -89,7 +95,7 @@ test.serial('Test cache warmer active metric', async (t) => {
   })
 
   // Wait until the cache expires, and the subscription is out
-  await runAllUntilTime(t.context.clock, 15000) // The provider response is slower
+  await runAllUntilTime(t.context.clock, 10000) // The provider response is slower
 
   // Now that the cache is out and the subscription no longer there, this should time out
   const error2 = await t.context.testAdapter.request({
@@ -107,7 +113,7 @@ test.serial('Test cache warmer active metric', async (t) => {
   metrics.assert(t, {
     name: 'bg_execute_total',
     labels: { adapter_endpoint: 'test', transport: 'default_single_transport' },
-    expectedValue: 17,
+    expectedValue: 12,
   })
   metrics.assert(t, {
     name: 'bg_execute_subscription_set_count',

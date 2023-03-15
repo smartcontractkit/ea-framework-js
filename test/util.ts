@@ -9,7 +9,7 @@ import { Cache, LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
 import { BaseAdapterSettings, SettingsDefinitionMap } from '../src/config'
 import { Transport, TransportDependencies, WebSocketClassProvider } from '../src/transports'
-import { AdapterRequest, AdapterResponse, PartialAdapterResponse } from '../src/util'
+import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from '../src/util'
 
 export type NopTransportTypes = {
   Request: {
@@ -96,6 +96,8 @@ export async function runAllUntil(clock: InstalledClock, isComplete: () => boole
 
 export async function runAllUntilTime(clock: InstalledClock, time: number): Promise<void> {
   const targetTime = clock.now + time
+  // Fire a promise that will resolve at the requested time, so we have a precise place where we'll stop
+  sleep(time)
   while (clock.now < targetTime) {
     await clock.nextAsync()
   }
@@ -154,6 +156,8 @@ export function assertEqualResponses(
     ),
     'number',
   )
+
+  delete actual?.meta
 
   delete (actual as unknown as Record<string, unknown>)['timestamps']
 
