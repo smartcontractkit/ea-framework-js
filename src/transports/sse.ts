@@ -7,6 +7,7 @@ import { Requester } from '../util/requester'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TransportDependencies, TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
+import { validator } from '../validation/utils'
 
 const logger = makeLogger('SSETransport')
 
@@ -110,6 +111,13 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
           const results = listener.parseResponse(e).map((r) => {
             const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
             const result = r as TimestampedProviderResult<T>
+            if (partialResponse.timestamps?.providerIndicatedTimeUnixMs !== undefined) {
+              const timestampValidator = validator.responseTimestamp()
+              const error = timestampValidator(partialResponse.timestamps?.providerIndicatedTimeUnixMs)
+              if (error) {
+                logger.warn(`Provider indicated time is invalid: ${error}`)
+              }
+            }
             result.response.timestamps = {
               providerDataStreamEstablishedUnixMs: this.providerDataStreamEstablished,
               providerDataReceivedUnixMs: providerDataReceived,

@@ -30,7 +30,7 @@ const _integer: () => Validator<number | string> = () => {
 
 const positive: () => Validator<number | string> = () => {
   return (value) => {
-    if (value && value < 0) {
+    if (value !== undefined && value < 0) {
       return `Value should be positive number, Received ${value}`
     }
     return
@@ -39,7 +39,7 @@ const positive: () => Validator<number | string> = () => {
 
 const minNumber: ValidatorWithParams<number, number | string> = (param) => {
   return (value) => {
-    if (value && value < param) {
+    if (value !== undefined && value < param) {
       return `Minimum allowed value is ${param}. Received ${value}`
     }
     return
@@ -48,7 +48,7 @@ const minNumber: ValidatorWithParams<number, number | string> = (param) => {
 
 const maxNumber: ValidatorWithParams<number, number | string> = (param) => {
   return (value) => {
-    if (value && value > param) {
+    if (value !== undefined && value > param) {
       return `Maximum allowed value is ${param}. Received ${value}`
     }
     return
@@ -90,16 +90,19 @@ const positiveInteger = () => compose([_integer(), positive()])
 
 const integer = (params?: { min?: number; max?: number }) => {
   const validators = [_integer()]
-  if (params?.min) {
+  if (params?.min !== undefined) {
     validators.push(minNumber(params.min))
   }
-  if (params?.max) {
+  if (params?.max !== undefined) {
     validators.push(maxNumber(params.max))
   }
   return compose(validators)
 }
 
 const port = () => integer({ min: 1, max: 65535 })
+
+// Validates that value is a valid timestamp from 2018-01-01 to now
+const responseTimestamp = () => integer({ min: 1514764861000, max: new Date().getTime() })
 
 export const validator = {
   integer,
@@ -108,5 +111,6 @@ export const validator = {
   url,
   host,
   object,
+  responseTimestamp,
   compose,
 }
