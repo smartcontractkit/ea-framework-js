@@ -217,7 +217,7 @@ export type EndpointTypes = {
 	Params: CryptoRequestParams // type of input parameters
   }  
  Response: SingleNumberResultResponse // type of External Adapte response. `SingleNumberResultResponse` is built in type that indicates that both `data` and `result` are numbers
- CustomSettings: typeof customSettings  // type of adapter config
+ Settings: BaseAdapterSettings  // type of adapter config
  Provider: {  
   WsMessage: WsMessage  // type of message that will come through the websocket connection
   }  
