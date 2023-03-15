@@ -45,7 +45,6 @@ export class FixedRateLimiter implements RateLimiter {
       timeSinceLastRequest: ${timeSinceLastRequest}
       period: ${this.period}
       remainingTime: ${remainingTime}
-      remainingTime: ${remainingTime}
     `)
     return remainingTime
   }
