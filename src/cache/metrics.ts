@@ -51,9 +51,3 @@ export enum CacheTypes {
   Redis = 'redis',
   Local = 'local',
 }
-
-export enum CMD_SENT_STATUS {
-  TIMEOUT = 'TIMEOUT',
-  FAIL = 'FAIL',
-  SUCCESS = 'SUCCESS',
-}
