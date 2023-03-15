@@ -1,8 +1,8 @@
 import { FastifyError, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { ReplyError as RedisError } from 'ioredis'
 import { Adapter } from '../adapter'
-import { calculateCacheKey, recordRedisCommandMetric } from '../cache'
-import { CMD_SENT_STATUS } from '../cache/metrics'
+import { calculateCacheKey } from '../cache'
+import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { getMetricsMeta } from '../metrics/util'
 import { makeLogger } from '../util'
 import {

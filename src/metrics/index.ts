@@ -9,6 +9,12 @@ import { HttpRequestType, requestDurationBuckets } from './constants'
 
 const logger = makeLogger('Metrics')
 
+export enum CMD_SENT_STATUS {
+  TIMEOUT = 'TIMEOUT',
+  FAIL = 'FAIL',
+  SUCCESS = 'SUCCESS',
+}
+
 export function setupMetricsServer(name: string, adapterSettings: AdapterSettings) {
   const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(adapterSettings)
   const metricsApp = fastify({
@@ -165,6 +171,12 @@ export const retrieveCost = <ProviderResponseBody>(data: ProviderResponseBody): 
     return 1
   }
 }
+
+export const recordRedisCommandMetric = (status: CMD_SENT_STATUS, functionName: string): void =>
+  metrics
+    .get('redisCommandsSentCount')
+    .labels({ status: CMD_SENT_STATUS[status], function_name: functionName })
+    .inc()
 
 export const metrics = new Metrics(() => ({
   httpRequestsTotal: new client.Counter({

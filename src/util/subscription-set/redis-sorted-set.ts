@@ -1,4 +1,5 @@
 import Redis from 'ioredis'
+import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../../metrics'
 import { SubscriptionSet } from './subscription-set'
 
 export class RedisSubscriptionSet<T> implements SubscriptionSet<T> {
@@ -14,14 +15,17 @@ export class RedisSubscriptionSet<T> implements SubscriptionSet<T> {
   async add(value: T, ttl: number): Promise<undefined> {
     const storedValue = JSON.stringify(value)
     await this.redisClient.zadd(this.subscriptionSetKey, Date.now() + ttl, storedValue)
+    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'zadd')
     return
   }
 
   async getAll(): Promise<T[]> {
     // Remove expired keys from sorted set
     await this.redisClient.zremrangebyscore(this.subscriptionSetKey, '-inf', Date.now())
+    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'zremrangebyscore')
     const parsedRequests: T[] = []
     const validEntries = await this.redisClient.zrange(this.subscriptionSetKey, 0, -1)
+    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'zrange')
     validEntries.forEach((entry) => {
       // Separate request and cache key prior to populating results array
       parsedRequests.push(JSON.parse(entry))

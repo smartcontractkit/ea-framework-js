@@ -5,7 +5,7 @@ import MockAdapter from 'axios-mock-adapter'
 import Redis, { ScanStream } from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
-import { HttpTransport } from '../../src/transports'
+import { HttpTransport, TransportRoutes } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { assertEqualResponses, runAllUntilTime, TestAdapter } from '../util'
 
@@ -15,34 +15,39 @@ export const test = untypedTest as TestFn<{
 }>
 
 class RedisMock {
-  store = new Map<string, string>()
+  store = new Map<string, Map<string, string>>()
 
-  async zadd(_: string, ttl: number, value: string): Promise<void> {
-    this.store.set(value, String(ttl))
+  async zadd(subscritpionSetKey: string, ttl: number, value: string): Promise<void> {
+    if (this.store.get(subscritpionSetKey)) {
+      this.store.get(subscritpionSetKey)?.set(value, String(ttl))
+    } else {
+      this.store.set(subscritpionSetKey, new Map<string, string>())
+      this.store.get(subscritpionSetKey)?.set(value, String(ttl))
+    }
   }
 
-  async zscanStream(_: string, { match }: { match: string }): Promise<ScanStream> {
-    const entries = Array.from(this.store.entries())
+  async zscanStream(subscritpionSetKey: string, { match }: { match: string }): Promise<ScanStream> {
+    const entries = Array.from((this.store.get(subscritpionSetKey) || new Map()).entries())
     const results = entries.filter((entry) => entry[0].startsWith(match))
     const stream = new ScanStream({ command: 'zscan', redis: {} })
     stream.push(results)
     return stream
   }
 
-  async zrem(_: string, key: string): Promise<void> {
-    this.store.delete(key)
+  async zrem(subscritpionSetKey: string, key: string): Promise<void> {
+    this.store.get(subscritpionSetKey)?.delete(key)
   }
-  async zremrangebyscore(): Promise<void> {
-    const expiredEntries = Array.from(this.store.entries()).filter(
-      ([_, ttl]) => Number(ttl) < Date.now(),
-    )
+  async zremrangebyscore(subscritpionSetKey: string): Promise<void> {
+    const expiredEntries = Array.from(
+      (this.store.get(subscritpionSetKey) || new Map()).entries(),
+    ).filter(([_, ttl]) => Number(ttl) < Date.now())
     expiredEntries.forEach(([key, _]) => {
-      this.store.delete(key)
+      this.store.get(subscritpionSetKey)?.delete(key)
     })
   }
 
-  async zrange(): Promise<string[]> {
-    return Array.from(this.store.keys())
+  async zrange(subscritpionSetKey: string): Promise<string[]> {
+    return Array.from((this.store.get(subscritpionSetKey) || new Map()).keys())
   }
 }
 
@@ -68,20 +73,23 @@ interface ProviderResponseBody {
 const URL = 'https://test.chainlink.com'
 const axiosMock = new MockAdapter(axios)
 
-type BatchEndpointTypes = {
+type BaseEndpointTypes = {
   Request: {
     Params: AdapterRequestParams
   }
   Response: SingleNumberResultResponse
   Settings: BaseAdapterSettings
+}
+
+type BatchEndpointTypes = BaseEndpointTypes & {
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
   }
 }
 
-const buildAdapter = () => {
-  const batchTransport = new HttpTransport<BatchEndpointTypes>({
+const batchTransport = () =>
+  new HttpTransport<BatchEndpointTypes>({
     prepareRequests: (params) => {
       return {
         params,
@@ -111,6 +119,7 @@ const buildAdapter = () => {
     },
   })
 
+const buildAdapter = () => {
   const config = new AdapterConfig(
     {},
     {
@@ -129,7 +138,37 @@ const buildAdapter = () => {
       new AdapterEndpoint({
         name: 'test',
         inputParameters,
-        transport: batchTransport,
+        transport: batchTransport(),
+      }),
+    ],
+  })
+}
+
+const buildDualTransportAdapter = () => {
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        CACHE_MAX_AGE: 1000,
+        CACHE_POLLING_MAX_RETRIES: 0,
+      },
+    },
+  )
+
+  const transports = new TransportRoutes<BaseEndpointTypes>()
+    .register('rest', batchTransport())
+    .register('restsecondary', batchTransport())
+
+  return new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters,
+        transportRoutes: transports,
+        defaultTransport: 'rest',
       }),
     ],
   })
@@ -148,6 +187,7 @@ const inputParameters = {
 
 const from = 'ETH'
 const to = 'USD'
+const from2 = 'BTC'
 const price = 1234
 
 axiosMock
@@ -163,6 +203,22 @@ axiosMock
     prices: [
       {
         pair: `${from}/${to}`,
+        price,
+      },
+    ],
+  })
+  .onPost(`${URL}/price`, {
+    pairs: [
+      {
+        base: from2,
+        quote: to,
+      },
+    ],
+  })
+  .reply(200, {
+    prices: [
+      {
+        pair: `${from2}/${to}`,
         price,
       },
     ],
@@ -215,4 +271,31 @@ test.serial('Test redis subscription set (add and getAll)', async (t) => {
   // Now that the cache is out and the subscription no longer there, this should time out
   const error = await t.context.testAdapter.request({ from, to })
   t.is(error.statusCode, 504)
+})
+
+test.serial('redis subscription set unshared between transports', async (t) => {
+  const adapter = buildDualTransportAdapter()
+  const dependencies: Partial<AdapterDependencies> = {
+    redisClient: new RedisMock() as unknown as Redis,
+  }
+  t.context.testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context, dependencies)
+
+  await t.context.testAdapter.request({
+    from,
+    to,
+    transport: 'rest',
+  })
+  await t.context.testAdapter.request({
+    from: from2,
+    to,
+    transport: 'restsecondary',
+  })
+  const internalHttpTransport = t.context.testAdapter.adapter.endpoints[0].transportRoutes.get(
+    'rest',
+  ) as unknown as HttpTransport<BatchEndpointTypes>
+  const internalWsTransport = t.context.testAdapter.adapter.endpoints[0].transportRoutes.get(
+    'restsecondary',
+  ) as unknown as HttpTransport<BatchEndpointTypes>
+  t.is((await internalHttpTransport.subscriptionSet.getAll()).length, 1)
+  t.is((await internalWsTransport.subscriptionSet.getAll()).length, 1)
 })
