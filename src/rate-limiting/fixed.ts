@@ -40,15 +40,14 @@ export class FixedRateLimiter implements RateLimiter {
 
     const timeSinceLastRequest = now - this.lastRequestAt // Positive int
     const remainingTime = Math.max(0, this.period - timeSinceLastRequest)
-    const timeToWait = Math.min(this.period, remainingTime)
     logger.trace(`Rate limiting details:
       now: ${now}
       timeSinceLastRequest: ${timeSinceLastRequest}
       period: ${this.period}
       remainingTime: ${remainingTime}
-      timeToWait: ${timeToWait}
+      remainingTime: ${remainingTime}
     `)
-    return timeToWait
+    return remainingTime
   }
 
   async waitForRateLimit(): Promise<void> {
