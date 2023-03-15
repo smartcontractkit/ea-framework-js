@@ -489,7 +489,7 @@ test.serial('Test host validator', async (t) => {
 })
 
 test.serial('Test response timestamp validator', async (t) => {
-  const timestampValidator= validator.responseTimestamp()
+  const timestampValidator = validator.responseTimestamp()
   let value = new Date().getTime()
   let error = timestampValidator(value)
   t.is(error, undefined)
