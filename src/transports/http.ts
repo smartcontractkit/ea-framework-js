@@ -234,7 +234,9 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
           const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
           if (partialResponse.timestamps?.providerIndicatedTimeUnixMs !== undefined) {
             const timestampValidator = validator.responseTimestamp()
-            const error = timestampValidator(partialResponse.timestamps?.providerIndicatedTimeUnixMs)
+            const error = timestampValidator(
+              partialResponse.timestamps?.providerIndicatedTimeUnixMs,
+            )
             if (error) {
               logger.warn(`Provider indicated time is invalid: ${error}`)
             }

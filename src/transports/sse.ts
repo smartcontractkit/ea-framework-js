@@ -113,7 +113,9 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
             const result = r as TimestampedProviderResult<T>
             if (partialResponse.timestamps?.providerIndicatedTimeUnixMs !== undefined) {
               const timestampValidator = validator.responseTimestamp()
-              const error = timestampValidator(partialResponse.timestamps?.providerIndicatedTimeUnixMs)
+              const error = timestampValidator(
+                partialResponse.timestamps?.providerIndicatedTimeUnixMs,
+              )
               if (error) {
                 logger.warn(`Provider indicated time is invalid: ${error}`)
               }
