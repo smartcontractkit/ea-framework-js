@@ -10,7 +10,7 @@ test('subscription set factory (local cache)', async (t) => {
   process.env['CACHE_TYPE'] = 'local'
   const config = buildAdapterSettings({})
   const factory = new SubscriptionSetFactory(config, 'test')
-  const subscriptionSet = factory.buildSet('test')
+  const subscriptionSet = factory.buildSet('test', 'test')
   t.is(subscriptionSet instanceof ExpiringSortedSet, true)
 })
 
@@ -18,7 +18,7 @@ test('subscription set factory (redis cache)', async (t) => {
   process.env['CACHE_TYPE'] = 'redis'
   const config = buildAdapterSettings({})
   const factory = new SubscriptionSetFactory(config, 'test', new RedisMock() as unknown as Redis)
-  const subscriptionSet = factory.buildSet('test')
+  const subscriptionSet = factory.buildSet('test', 'test')
   t.is(subscriptionSet instanceof RedisSubscriptionSet, true)
 })
 
@@ -27,7 +27,7 @@ test('subscription set factory (redis cache missing client)', async (t) => {
   const config = buildAdapterSettings({})
   const factory = new SubscriptionSetFactory(config, 'test')
   try {
-    factory.buildSet('test')
+    factory.buildSet('test', 'test')
     t.fail()
   } catch (e: unknown) {
     t.pass()
@@ -39,7 +39,7 @@ test('subscription set factory (local cache) max capacity', async (t) => {
   process.env['SUBSCRIPTION_SET_MAX_ITEMS'] = '3'
   const config = buildAdapterSettings({})
   const factory = new SubscriptionSetFactory(config, 'test')
-  const subscriptionSet = factory.buildSet('test')
+  const subscriptionSet = factory.buildSet('test', 'test')
 
   await subscriptionSet.add(1, 10000, '1')
   await subscriptionSet.add(2, 10000, '2')

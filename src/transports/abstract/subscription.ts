@@ -29,7 +29,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     name: string,
   ): Promise<void> {
     this.responseCache = dependencies.responseCache
-    this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName)
+    this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName, name)
     this.subscriptionTtl = this.getSubscriptionTtlFromConfig(adapterSettings) // Will be implemented by subclasses
     this.name = name
   }

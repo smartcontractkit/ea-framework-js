@@ -30,7 +30,7 @@ export class SubscriptionSetFactory {
     this.capacity = adapterSettings.SUBSCRIPTION_SET_MAX_ITEMS
   }
 
-  buildSet<T>(endpointName: string): SubscriptionSet<T> {
+  buildSet<T>(endpointName: string, transportName: string): SubscriptionSet<T> {
     switch (this.cacheType) {
       case 'local':
         return new ExpiringSortedSet<T>(this.capacity)
@@ -39,7 +39,7 @@ export class SubscriptionSetFactory {
           throw new Error('Redis client undefined. Cannot create Redis subscription set')
         }
         // Identifier key used for the subscription set in redis
-        const subscriptionSetKey = `${this.adapterName}-${endpointName}-subscriptionSet`
+        const subscriptionSetKey = `${this.adapterName}-${endpointName}-${transportName}-subscriptionSet`
         return new RedisSubscriptionSet<T>(this.redisClient, subscriptionSetKey)
       }
     }
