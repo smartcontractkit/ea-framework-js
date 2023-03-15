@@ -2,7 +2,7 @@ import { AdapterRateLimitTier, RateLimiter } from '.'
 import { AdapterEndpoint, EndpointGenerics } from '../adapter'
 import { makeLogger, sleep } from '../util'
 
-const logger = makeLogger('FixedRateLimiter')
+const logger = makeLogger('FixedIntervalRateLimiter')
 
 /**
  * The simplest version of a rate limit. This will not take any bursts into accoung,
@@ -10,7 +10,7 @@ const logger = makeLogger('FixedRateLimiter')
  * is checking when the last request was made to this rate limiter, to account for a period
  * of time with no requests and avoiding the wait of the initial request.
  */
-export class FixedRateLimiter implements RateLimiter {
+export class FixedIntervalRateLimiter implements RateLimiter {
   period!: number
   lastRequestAt: number | null = null
 
@@ -23,7 +23,7 @@ export class FixedRateLimiter implements RateLimiter {
     const perMinuteLimitInRPS = (limits?.rateLimit1m || Infinity) / 60
     const perSecondLimitInRPS = limits?.rateLimit1s || Infinity
     this.period = (1 / Math.min(perHourLimitInRPS, perMinuteLimitInRPS, perSecondLimitInRPS)) * 1000
-    logger.debug(`Using fixed rate limiting settings: period = ${this.period}`)
+    logger.debug(`Using fixed interval rate limiting settings: period = ${this.period}`)
 
     return this
   }

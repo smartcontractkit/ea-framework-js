@@ -2,7 +2,7 @@ import { AdapterEndpoint, EndpointGenerics } from '../adapter'
 import { AdapterSettings } from '../config'
 import { makeLogger } from '../util'
 
-export * from './simple-counting'
+export * from './burst'
 
 const logger = makeLogger('RateLimitingUtils')
 

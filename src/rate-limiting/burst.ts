@@ -1,8 +1,8 @@
 import { AdapterRateLimitTier, RateLimiter } from '.'
-import { AdapterEndpoint, EndpointGenerics } from './../adapter'
-import { makeLogger, sleep } from './../util'
+import { AdapterEndpoint, EndpointGenerics } from '../adapter'
+import { makeLogger, sleep } from '../util'
 
-const logger = makeLogger('SimpleCountingRateLimiter')
+const logger = makeLogger('BurstRateLimiter')
 
 /**
  * This rate limiter is the simplest stateful option.
@@ -12,7 +12,7 @@ const logger = makeLogger('SimpleCountingRateLimiter')
  * for things like daily quotas. The downside is that this does not work well for bursty
  * loads or spikes, in cases where e.g. the per second limit is high but daily quotas low.
  */
-export class SimpleCountingRateLimiter implements RateLimiter {
+export class BurstRateLimiter implements RateLimiter {
   latestSecondInterval = 0
   requestsThisSecond = 0
   latestMinuteInterval = 0

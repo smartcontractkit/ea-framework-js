@@ -4,8 +4,8 @@ import { Adapter, AdapterDependencies, AdapterEndpoint } from '../src/adapter'
 import { AdapterConfig } from '../src/config'
 import {
   buildRateLimitTiersFromConfig,
+  BurstRateLimiter,
   highestRateLimitTiers,
-  SimpleCountingRateLimiter,
 } from '../src/rate-limiting'
 import { NopTransport } from './util'
 
@@ -171,7 +171,7 @@ test('uses most restrictive tier if none is specified in settings', async (t) =>
         inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
-            t.true(dependencies.rateLimiter instanceof SimpleCountingRateLimiter)
+            t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
             t.is(
               (dependencies.rateLimiter as unknown as Record<string, number>)['perSecondLimit'],
               123,
@@ -184,7 +184,7 @@ test('uses most restrictive tier if none is specified in settings', async (t) =>
       {},
       {
         envDefaultOverrides: {
-          RATE_LIMITING_STRATEGY: 'counting',
+          RATE_LIMITING_STRATEGY: 'burst',
         },
       },
     ),
@@ -217,7 +217,7 @@ test('uses unlimited tier if none is specified in settings', async (t) => {
         inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
-            t.true(dependencies.rateLimiter instanceof SimpleCountingRateLimiter)
+            t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
             t.is(
               (dependencies.rateLimiter as unknown as Record<string, number>)['perSecondLimit'],
               Infinity,
@@ -230,7 +230,7 @@ test('uses unlimited tier if none is specified in settings', async (t) => {
       {},
       {
         envDefaultOverrides: {
-          RATE_LIMITING_STRATEGY: 'counting',
+          RATE_LIMITING_STRATEGY: 'burst',
         },
       },
     ),
@@ -245,7 +245,7 @@ test('uses specified tier if present in settings', async (t) => {
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
-        RATE_LIMITING_STRATEGY: 'counting',
+        RATE_LIMITING_STRATEGY: 'burst',
       },
     },
   )
@@ -258,7 +258,7 @@ test('uses specified tier if present in settings', async (t) => {
         inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
-            t.true(dependencies.rateLimiter instanceof SimpleCountingRateLimiter)
+            t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
             t.is(
               (dependencies.rateLimiter as unknown as Record<string, number>)['perSecondLimit'],
               1234,
@@ -295,7 +295,7 @@ test('test build rate limits from env vars (second, minute)', async (t) => {
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
-        RATE_LIMITING_STRATEGY: 'counting',
+        RATE_LIMITING_STRATEGY: 'burst',
       },
     },
   )
@@ -334,7 +334,7 @@ test('test build rate limits from env vars (second, capacity)', async (t) => {
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
-        RATE_LIMITING_STRATEGY: 'counting',
+        RATE_LIMITING_STRATEGY: 'burst',
       },
     },
   )
@@ -374,7 +374,7 @@ test('test build rate limits from env vars (second, minute, capacity)', async (t
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
-        RATE_LIMITING_STRATEGY: 'counting',
+        RATE_LIMITING_STRATEGY: 'burst',
       },
     },
   )
@@ -414,7 +414,7 @@ test('test build rate limits from env vars (capacity)', async (t) => {
     {
       envDefaultOverrides: {
         RATE_LIMIT_API_TIER: 'pro',
-        RATE_LIMITING_STRATEGY: 'counting',
+        RATE_LIMITING_STRATEGY: 'burst',
       },
     },
   )

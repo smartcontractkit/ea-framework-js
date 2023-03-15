@@ -258,12 +258,12 @@ test.serial(
      * - At minute 0, a burst of `rateLimit1m` requests will be fired.
      * - The next request after those will be attempted immediately, only to hit the rate limiter blocking sleep.
      * - This will be repeated at the beginning of each minute interval (hence the rounding up when dividing the TTL).
-     * - Finally, the +1 for the counting strategy will be the last request that was attempted to be fired then blocked,
+     * - Finally, the +1 for the burst strategy will be the last request that was attempted to be fired then blocked,
      *     and by the time it's fired the subscription is no longer active.
      */
     const expected = rateLimit1m * Math.ceil(WARMUP_SUBSCRIPTION_TTL / 60_000)
-    await subtest(RateLimitingStrategy.FIXED, expected)
-    await subtest(RateLimitingStrategy.COUNTING, expected + 1)
+    await subtest(RateLimitingStrategy.FIXED_INTERVAL, expected)
+    await subtest(RateLimitingStrategy.BURST, expected + 1)
   },
 )
 
@@ -319,8 +319,8 @@ test.serial(
     }
 
     const expected = 60 * rateLimit1s + 1
-    await subtest(RateLimitingStrategy.FIXED, expected)
-    await subtest(RateLimitingStrategy.COUNTING, expected)
+    await subtest(RateLimitingStrategy.FIXED_INTERVAL, expected)
+    await subtest(RateLimitingStrategy.BURST, expected)
   },
 )
 
@@ -870,12 +870,12 @@ test.serial(
       await testAdapter.api.close()
     }
 
-    // With the counting rate limiter, the result should be 2 requests, since we're advancing the clock
+    // With the burst rate limiter, the result should be 2 requests, since we're advancing the clock
     // less time than the per minute interval, but we're still in the same minute window and have capacity
-    await subtest(RateLimitingStrategy.COUNTING, 2)
-    // The fixed rate limiter on the other hand should not have executed the same request yet, since it
+    await subtest(RateLimitingStrategy.BURST, 2)
+    // The fixed interval rate limiter on the other hand should not have executed the same request yet, since it
     // will wait for 30s before actually getting the result
-    // await subtest(RateLimitingStrategy.FIXED, 1)
+    // await subtest(RateLimitingStrategy.FIXED_INTERVAL, 1)
     process.env['METRICS_ENABLED'] = 'false'
   },
 )

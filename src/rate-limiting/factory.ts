@@ -1,18 +1,18 @@
-import { RateLimiter, SimpleCountingRateLimiter } from '.'
-import { FixedRateLimiter } from './fixed'
+import { BurstRateLimiter, RateLimiter } from '.'
+import { FixedIntervalRateLimiter } from './fixed-interval'
 
 export enum RateLimitingStrategy {
-  COUNTING = 'counting',
-  FIXED = 'fixed',
+  BURST = 'burst',
+  FIXED_INTERVAL = 'fixed-interval',
 }
 
 export class RateLimiterFactory {
   static buildRateLimiter(strategy: RateLimitingStrategy): RateLimiter {
     switch (strategy) {
-      case RateLimitingStrategy.COUNTING:
-        return new SimpleCountingRateLimiter()
-      case RateLimitingStrategy.FIXED:
-        return new FixedRateLimiter()
+      case RateLimitingStrategy.BURST:
+        return new BurstRateLimiter()
+      case RateLimitingStrategy.FIXED_INTERVAL:
+        return new FixedIntervalRateLimiter()
     }
   }
 }
