@@ -16,8 +16,6 @@ To define a custom transport, you must implement the `Transport` interface.
 Example implementation of CustomTransport
 ```typescript  
  export class CustomTransport implements Transport<EndpointTypes> {
-       // variable to hold cache instances from framework
-      cache!: Cache<AdapterResponse<EndpointTypes['Response']>>
       // name of the transport, used for logging
       name!: string
       // cache instance for caching responses from provider
@@ -26,31 +24,43 @@ Example implementation of CustomTransport
         Response: EndpointTypes['Response']
       }>
     
-      async initialize(dependencies: TransportDependencies<EndpointTypes>): Promise<void> {
-        this.cache = dependencies.cache as Cache<AdapterResponse<EndpointTypes['Response']>>
+      async initialize(dependencies: TransportDependencies<EndpointTypes>, _adapterSettings: EndpointTypes['Settings'],  _endpointName: string,  transportName: string): Promise<void> {
         this.responseCache = dependencies.responseCache
+        this.requester = dependencies.requester
+        this.name = transportName
       }
     
       async foregroundExecute(
         req: AdapterRequest<EndpointTypes['Request']>,
-        config: AdapterConfig<typeof customSettings>,
+        settings: typeof config.settings,
       ): Promise<AdapterResponse<EndpointTypes['Response']>> {
         let sumValue = 0
     
         let lastPage = false
         const input = req.requestContext.data
        
-        const requestConfig = this.prepareRequest(input, config)
+        const requestConfig = this.prepareRequest(input, settings)
     
         const providerDataRequestedUnixMs = Date.now()
         while (!lastPage) {
-          const responseData = await this.makeRequest(requestConfig, config)
+            const result = await this.requester.request<ResponseSchema>(
+                calculateHttpRequestKey({
+                  context: {
+                    adapterSettings: settings,
+                    inputParameters: INPUT_PARAMETERS_FOR_ENDPOINT,
+                    endpointName: ENPDOINT_NAME,
+                  },
+                  data: requestConfig.params,
+                  transportName: this.name,
+                }),
+                requestConfig
+            )
     
-          const { data } = responseData.data
+          const { data } = result.response.data
     
           sumValue += data.value
     
-          const nextPageToken = responseData.data.next_page_token
+          const nextPageToken = result.response.data.next_page_token
           requestConfig.params.next_page_token = nextPageToken
     
           if (!nextPageToken) {
@@ -67,22 +77,27 @@ Example implementation of CustomTransport
             result: result,
           },
           statusCode: 200,
-          result: result
+          result: result,
           timestamps: {
             providerDataRequestedUnixMs,
             providerDataReceivedUnixMs,
           },
         }
-        await this.cache.set(req.requestContext.cacheKey, response, config.CACHE_MAX_AGE)
+        await this.responseCache.write(this.name, [
+          {
+            params: req.requestContext.data,
+            response,
+          },
+        ])
     
         return response
       }
     
       prepareRequest(
         params: RequestParams,
-        config: AdapterConfig<typeof customSettings>,
+        settings: typeof config.settings
       ): AxiosRequestConfig {
-        const { API_ENDPOINT, API_KEY } = config
+        const { API_ENDPOINT, API_KEY } = settings
         return {
           baseURL: API_ENDPOINT,
           url: '/data',
@@ -95,51 +110,14 @@ Example implementation of CustomTransport
         }
       }
     
-      async makeRequest(
-        axiosRequest: AxiosRequestConfig,
-        config: AdapterConfig<typeof customSettings>,
-      ): Promise<AxiosResponse<ResponseSchema>> {
-        let retryNumber = 0
-        let response = await this._makeRequest(axiosRequest, config.API_TIMEOUT)
-        while (response.status !== 200) {
-          retryNumber++
-          logger.warn(
-            'Encountered error when fetching data from provider:',
-            response.status,
-            response.statusText,
-          )
-    
-          if (retryNumber === config.RETRY) {
-            throw new AdapterError({
-              statusCode: 504,
-              message: `Custom transport hit the max number of retries (${config.RETRY} retries) and aborted`,
-            })
-          }
-    
-          logger.debug(`Sleeping for ${MS_BETWEEN_FAILED_REQS}ms before retrying`)
-          await sleep(MS_BETWEEN_FAILED_REQS)
-          response = await this._makeRequest(axiosRequest, config.API_TIMEOUT)
-        }
-        return response
-      }
-    
-      private async _makeRequest(
-        axiosRequest: AxiosRequestConfig,
-        timeout: number,
-      ): Promise<AxiosResponse> {
-        try {
-          return await axios.request({ ...axiosRequest, timeout })
-        } catch (e) {
-          return e as AxiosResponse
-        }
-      }
+   
     }
 ```
 Let's break down the CustomTransport class.
 It implements two methods from `Transport` interface, `initialize` and `foregroundExecute` and uses some internal helper methods.
 
 `initialize` is required method for a transport. When a transport get initialized by the framework,  `initialize`  method of the transport will be called with transport dependencies, adapter config, endpoint name, and transport name as arguments. The method is responsible for initializing transport state, for example setting cache variables, rate limit variables and transport name.
-In the example above `initialize` is used to assign `cache` and `responseCache` dependencies to a transport variable.
+In the example above `initialize` is used to assign `name`, `cache` and `responseCache` dependencies to a transport variable.
 
 The second method from `Transport` interface that is used is `foregroundExecute` which  performs a synchronous fetch/processing of information within the lifecycle of an incoming request.
 When request is made to adapter, `foregroundExecute` will be invoked with *AdapterRequest* and adapter config as arguments and should return *AdapterResponse*.
@@ -150,47 +128,63 @@ The first thing in the example that `foreGroundExecute` does is it registers loc
 let sumValue =  0
 let lastPage =  false  
 const input = req.requestContext.data 
-const requestConfig =  this.prepareRequest(input, config)
+const requestConfig =  this.prepareRequest(input, settings)
 ```
 The next step is to send the request to Data Provider. *While* loop is used to loop and repeat the request to a Provider until the last page is reached (no more `next_page_token` in the response)
 
 ```typescript
     while (!lastPage) {
-        const responseData = await this.makeRequest(requestConfig, config)
-        
-        const { data } = responseData.data
-        
-        sumValue += data.value
-        
-        const nextPageToken = responseData.data.next_page_token
-        requestConfig.params.next_page_token = nextPageToken
-        
-        if (!nextPageToken) {
-          lastPage = true
-        }
+      const result = await this.requester.request<ResponseSchema>(
+        calculateHttpRequestKey({
+          context: {
+            adapterSettings: settings,
+            inputParameters: INPUT_PARAMETERS_FOR_ENDPOINT,
+            endpointName: ENPDOINT_NAME,
+          },
+          data: requestConfig.params,
+          transportName: this.name,
+        }),
+        requestConfig
+      )
+    
+      const { data } = result.response.data
+    
+      sumValue += data.value
+    
+      const nextPageToken = result.response.data.next_page_token
+      requestConfig.params.next_page_token = nextPageToken
+    
+      if (!nextPageToken) {
+        lastPage = true
+      }
     }
 ```
-For each request iteration `next_page_token` from current response will be used for the next request.  Internal helper method `makeRequest` is used to handle errors and timeouts.
+For each request iteration `next_page_token` from current response will be used for the next request.  `Requester` class provided by the framework is used to make requests to Data Provider. It is also responsible for rate limiting requests, handling error and timeouts. 
 
 Once all the pages are fetched (no more `next_page_token` in the response, `lastPage = true`) the response object is constructed, saved in the cache and returned
 
 ```typescript
     const result = sumValue;
-        
+
     const response = {
-           data: {
-            result: result,
-           },
-           statusCode: 200,
-           result: result
-           timestamps: {
-              providerDataRequestedUnixMs,
-              providerDataReceivedUnixMs,
-           },
-         }
-       await this.cache.set(req.requestContext.cacheKey, response, config.CACHE_MAX_AGE)
-        
-     return response
+      data: {
+        result: result,
+      },
+      statusCode: 200,
+      result: result,
+      timestamps: {
+        providerDataRequestedUnixMs,
+        providerDataReceivedUnixMs,
+      },
+    }
+    await this.responseCache.write(this.name, [
+      {
+        params: req.requestContext.data,
+        response,
+      },
+    ])
+    
+    return response
 ```
 The example above showed custom transport implementation that makes a request to Data Provider multiple times, fetches multiple values, accumulates them and returns a single response. 
 
