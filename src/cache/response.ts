@@ -1,7 +1,8 @@
 import { AdapterDependencies } from '../adapter'
 import { AdapterSettings } from '../config'
 import {
-  AdapterResponse, makeLogger,
+  AdapterResponse,
+  makeLogger,
   RequestGenerics,
   ResponseGenerics,
   TimestampedProviderErrorResponse,
@@ -80,9 +81,7 @@ export class ResponseCache<
 
       if (response.timestamps?.providerIndicatedTimeUnixMs !== undefined) {
         const timestampValidator = validator.responseTimestamp()
-        const error = timestampValidator(
-          response.timestamps?.providerIndicatedTimeUnixMs,
-        )
+        const error = timestampValidator(response.timestamps?.providerIndicatedTimeUnixMs)
         if (error) {
           logger.warn(`Provider indicated time is invalid: ${error}`)
         }
