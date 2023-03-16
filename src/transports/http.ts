@@ -8,7 +8,6 @@ import { Requester } from '../util/requester'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
 import { SubscriptionTransport } from './abstract/subscription'
-import { validator } from '../validation/utils'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
 
@@ -232,15 +231,6 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
         .map((r) => {
           const result = r as TimestampedProviderResult<T>
           const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
-          if (partialResponse.timestamps?.providerIndicatedTimeUnixMs !== undefined) {
-            const timestampValidator = validator.responseTimestamp()
-            const error = timestampValidator(
-              partialResponse.timestamps?.providerIndicatedTimeUnixMs,
-            )
-            if (error) {
-              logger.warn(`Provider indicated time is invalid: ${error}`)
-            }
-          }
           result.response.timestamps = {
             ...requesterResult.timestamps,
             providerIndicatedTimeUnixMs: partialResponse.timestamps?.providerIndicatedTimeUnixMs,

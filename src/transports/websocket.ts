@@ -6,7 +6,6 @@ import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } 
 import { TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
 import { connectionErrorLabels, recordWsMessageMetrics } from './metrics'
-import { validator } from '../validation/utils'
 
 // Aliasing type for use at adapter level
 export { WebSocket, RawData as WebSocketRawData }
@@ -162,15 +161,6 @@ export class WebSocketTransport<
         const results = this.config.handlers.message(parsed, context)?.map((r) => {
           const result = r as TimestampedProviderResult<T>
           const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
-          if (partialResponse.timestamps?.providerIndicatedTimeUnixMs !== undefined) {
-            const timestampValidator = validator.responseTimestamp()
-            const error = timestampValidator(
-              partialResponse.timestamps?.providerIndicatedTimeUnixMs,
-            )
-            if (error) {
-              logger.warn(`Provider indicated time is invalid: ${error}`)
-            }
-          }
           result.response.timestamps = {
             providerDataStreamEstablishedUnixMs: this.providerDataStreamEstablished,
             providerDataReceivedUnixMs: providerDataReceived,
