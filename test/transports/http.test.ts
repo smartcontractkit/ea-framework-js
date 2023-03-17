@@ -880,6 +880,88 @@ test.serial(
   },
 )
 
+test.serial('requester retries request after initial failure', async (t) => {
+  process.env['METRICS_ENABLED'] = 'true'
+  process.env['RETRY'] = '1'
+  eaMetrics.clear()
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters,
+        transport: new MockHttpTransport(true),
+      }),
+    ],
+  })
+
+  let requestCount = 0
+  axiosMock
+    .onPost(endpoint, {
+      pairs: [
+        {
+          base: `${from}retry`,
+          quote: to,
+        },
+      ],
+    })
+    .reply(() => {
+      if (requestCount === 0) {
+        requestCount++
+        return [500]
+      } else {
+        return [
+          200,
+          {
+            prices: [
+              {
+                pair: `${from}retry/${to}`,
+                price,
+              },
+            ],
+          },
+        ]
+      }
+    })
+
+  // Start the adapter
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: {
+      from: `${from}retry`,
+      to,
+    },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  const metrics = await testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'data_provider_requests',
+    expectedValue: 1,
+    labels: {
+      method: 'POST',
+      provider_status_code: '500',
+    },
+  })
+
+  await testAdapter.api.close()
+
+  // The fixed interval rate limiter on the other hand should not have executed the same request yet, since it
+  // will wait for 30s before actually getting the result
+  // await subtest(RateLimitingStrategy.FIXED_INTERVAL, 1)
+  process.env['METRICS_ENABLED'] = 'false'
+  process.env['RETRY'] = '0'
+})
+
 test.serial('builds HTTP request queue key correctly from input params', async (t) => {
   const endpointName = 'test'
   const adapterSettings = buildAdapterSettings({})
