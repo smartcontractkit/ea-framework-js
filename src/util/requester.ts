@@ -104,6 +104,49 @@ export class Requester {
     this.queue = new UniqueLinkedList<QueuedRequest>(adapterSettings.MAX_HTTP_REQUEST_QUEUE_LENGTH)
   }
 
+  private queueRequest<T>(queuedRequest: QueuedRequest<T>): void {
+    // By the time we're here, we know that queuedRequest has both the unresolved promise, and the resolve and reject handlers within
+    // It's really, REALLY important for thread safety that from this point until this function returns, there are no async breaks.
+    // Node will stay within a "thread" until it gets a chance to switch context, like an "await" statement. This section of code depends
+    // on it executing from start to finish without any other actions to avoid race conditions, so if we had an "await" here we could run into problems.
+    // For example, two separate queue processing "threads" could be spawned by mistake, or the queue could overflow.
+    const overflowedRequest = this.queue.add(queuedRequest as QueuedRequest<unknown>)
+    if (overflowedRequest) {
+      // If we have overflow, it means the oldest request needs to be rejected because the queue is at its limits
+      logger.debug(
+        `Request (Key: ${overflowedRequest.key}, Retry #: ${overflowedRequest.retries}) was removed from the queue to make room for a newer one (Size: ${this.queue.length})`,
+      )
+      metrics.get('requesterQueueOverflow').inc()
+      overflowedRequest.reject(
+        new AdapterRateLimitError({
+          message:
+            'The EA was unable to execute the request to fetch the requested data from the DP because the request queue overflowed. This likely indicates that a higher API tier is needed.',
+          statusCode: 429,
+          msUntilNextExecution: this.rateLimiter.msUntilNextExecution(),
+        }),
+      )
+
+      // Remove the overflown request from our map
+      delete this.map[overflowedRequest.key]
+    }
+
+    // The item was successfully added to the queue, so we can also add it to our map
+    // If the request is being re-added because it will be retried, this will have no practical effect
+    logger.trace(
+      `Added request (Key: ${queuedRequest.key}, Retry #: ${queuedRequest.retries}) to the queue (Size: ${this.queue.length})`,
+    )
+    this.map[queuedRequest.key] = queuedRequest as QueuedRequest
+
+    // Finally, we start the queue processing
+    if (!this.processing) {
+      this.processing = true
+      logger.debug(`Starting requester queue processing`)
+      // We don't want to wait for the queue to finish processing here; this will just spawn a "thread"
+      // and the promise we'll return from this method is the one for the request when it resolves
+      this.processNext()
+    }
+  }
+
   /**
    * Queues the provided request, and returns a promise that will resolve whenever it's executed.
    *
@@ -135,42 +178,8 @@ export class Requester {
       })
     })
 
-    // By the time we're here, we know that queuedRequest has both the unresolved promise, and the resolve and reject handlers within
-    // It's really, REALLY important for thread safety that from this point until this function returns, there are no async breaks.
-    // Node will stay within a "thread" until it gets a chance to switch context, like an "await" statement. This section of code depends
-    // on it executing from start to finish without any other actions to avoid race conditions, so if we had an "await" here we could run into problems.
-    // For example, two separate queue processing "threads" could be spawned by mistake, or the queue could overflow.
-    const overflowedRequest = this.queue.add(queuedRequest as QueuedRequest)
-    if (overflowedRequest) {
-      // If we have overflow, it means the oldest request needs to be rejected because the queue is at its limits
-      logger.debug(
-        `Request (Key: ${overflowedRequest.key}, Retry #: ${overflowedRequest.retries}) was removed from the queue to make room for a newer one (Size: ${this.queue.length})`,
-      )
-      metrics.get('requesterQueueOverflow').inc()
-      overflowedRequest.reject(
-        new AdapterRateLimitError({
-          message:
-            'The EA was unable to execute the request to fetch the requested data from the DP because the request queue overflowed. This likely indicates that a higher API tier is needed.',
-          statusCode: 429,
-          msUntilNextExecution: this.rateLimiter.msUntilNextExecution(),
-        }),
-      )
-    }
-
-    // The item was successfully added to the queue, so we can also add it to our map
-    logger.trace(
-      `Added request (Key: ${key}, Retry #: ${0}) to the queue (Size: ${this.queue.length})`,
-    )
-    this.map[key] = queuedRequest as QueuedRequest
-
-    // Finally, we start the queue processing
-    if (!this.processing) {
-      this.processing = true
-      logger.debug(`Starting requester queue processing`)
-      // We don't want to wait for the queue to finish processing here; this will just spawn a "thread"
-      // and the promise we'll return from this method is the one for the request when it resolves
-      this.processNext()
-    }
+    // Add the request to our queue
+    this.queueRequest(queuedRequest)
 
     return queuedRequest.promise
   }
@@ -280,8 +289,9 @@ export class Requester {
         await sleep(timeToSleep)
 
         req.retries++
-        logger.trace(`Adding request to the queue (Key: ${key}, Retry #: ${req.retries})`)
-        this.queue.add(req)
+
+        // Re add the request to our queue
+        this.queueRequest(req)
       }
     } finally {
       // Record time taken for data provider request for success or failure

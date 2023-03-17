@@ -880,7 +880,7 @@ test.serial(
   },
 )
 
-test.only('requester retries request after initial failure', async (t) => {
+test.serial('requester retries request after initial failure', async (t) => {
   process.env['METRICS_ENABLED'] = 'true'
   process.env['RETRY'] = '1'
   eaMetrics.clear()
@@ -915,10 +915,10 @@ test.only('requester retries request after initial failure', async (t) => {
         return [
           200,
           {
-            volumes: [
+            prices: [
               {
                 pair: `${from}retry/${to}`,
-                volume,
+                price,
               },
             ],
           },
