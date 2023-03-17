@@ -255,7 +255,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     const highestTierValue = highestRateLimitTiers(this.rateLimiting?.tiers)
     const rateLimitTierFromConfig = buildRateLimitTiersFromConfig(this.config.settings)
     const perSecRateLimit = rateLimitTierFromConfig?.rateLimit1s || 0
-    const perMinuteRateLimit = (rateLimitTierFromConfig?.rateLimit1m || 0) * 60
+    const perMinuteRateLimit = (rateLimitTierFromConfig?.rateLimit1m || 0) / 60
 
     if (perSecRateLimit > highestTierValue) {
       logger.warn(
@@ -264,12 +264,15 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     }
 
     if (perMinuteRateLimit > highestTierValue) {
-      logger.warn(`The configured ${
-        this.config.settings.RATE_LIMIT_CAPACITY_MINUTE
-          ? 'RATE_LIMIT_CAPACITY_MINUTE'
-          : 'RATE_LIMIT_CAPACITY'
-      }
-      value is higher than the highest tier value the adapter rate limiting configurations ${highestTierValue}`)
+      logger.warn(
+        `The configured ${
+          this.config.settings.RATE_LIMIT_CAPACITY_MINUTE
+            ? 'RATE_LIMIT_CAPACITY_MINUTE'
+            : 'RATE_LIMIT_CAPACITY'
+        } value (${perMinuteRateLimit}) is higher than the highest tier value the adapter rate limiting configurations (${
+          highestTierValue * 60
+        })`,
+      )
     }
 
     if (!dependencies.rateLimiter) {
