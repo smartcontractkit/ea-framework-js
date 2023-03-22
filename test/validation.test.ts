@@ -488,6 +488,16 @@ test.serial('Test host validator', async (t) => {
   t.is(error, 'Value is not valid IP address. Received 23124.32.42.24')
 })
 
+test.serial('Test response timestamp validator', async (t) => {
+  const timestampValidator = validator.responseTimestamp()
+  let value = new Date().getTime()
+  let error = timestampValidator(value)
+  t.is(error, undefined)
+  value = 0
+  error = timestampValidator(value)
+  t.is(error, 'Minimum allowed value is 1514764861000. Received 0')
+})
+
 test.serial('Test integer validator', async (t) => {
   const integerValidator = validator.integer({ min: 10, max: 20 })
   let value: string | number = 11

@@ -2,6 +2,7 @@ import { AdapterDependencies } from '../adapter'
 import { AdapterSettings } from '../config'
 import {
   AdapterResponse,
+  makeLogger,
   RequestGenerics,
   ResponseGenerics,
   TimestampedProviderErrorResponse,
@@ -10,6 +11,9 @@ import {
 import { InputParameters } from '../validation/input-params'
 import { Cache, calculateCacheKey, calculateFeedId } from './'
 import * as cacheMetrics from './metrics'
+import { validator } from '../validation/utils'
+
+const logger = makeLogger('ResponseCache')
 
 /**
  * Special type of cache to store responses for this adapter.
@@ -72,6 +76,14 @@ export class ResponseCache<
               r.params,
             ),
           },
+        }
+      }
+
+      if (response.timestamps?.providerIndicatedTimeUnixMs !== undefined) {
+        const timestampValidator = validator.responseTimestamp()
+        const error = timestampValidator(response.timestamps?.providerIndicatedTimeUnixMs)
+        if (error) {
+          logger.warn(`Provider indicated time is invalid: ${error}`)
         }
       }
 

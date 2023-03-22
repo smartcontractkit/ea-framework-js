@@ -42,13 +42,13 @@ export abstract class StreamingTransport<
   ): Promise<void> {
     logger.debug('Generating delta (subscribes & unsubscribes)')
 
-    const desiredSubsSet = new Set(desiredSubs.map(s => JSON.stringify(s)))
-    const localSubscriptionsSet = new Set(this.localSubscriptions.map(s => JSON.stringify(s)))
+    const desiredSubsSet = new Set(desiredSubs.map((s) => JSON.stringify(s)))
+    const localSubscriptionsSet = new Set(this.localSubscriptions.map((s) => JSON.stringify(s)))
 
     const subscriptions = {
       desired: desiredSubs,
-      new: desiredSubs.filter(s => !localSubscriptionsSet.has(JSON.stringify(s))),
-      stale: this.localSubscriptions.filter(s => !desiredSubsSet.has(JSON.stringify(s))),
+      new: desiredSubs.filter((s) => !localSubscriptionsSet.has(JSON.stringify(s))),
+      stale: this.localSubscriptions.filter((s) => !desiredSubsSet.has(JSON.stringify(s))),
     }
 
     logger.debug(
