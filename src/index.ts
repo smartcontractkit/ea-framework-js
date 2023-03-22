@@ -113,9 +113,8 @@ export const start = async <T extends SettingsDefinitionMap>(
 
   // Listener for unhandled promise rejections that are bubbling up to the top
   process.on('unhandledRejection', (reason) => {
-    logger.error('Unhandled Promise rejection:', reason);
-  });
-
+    logger.error('Unhandled Promise rejection:', reason)
+  })
 
   return { api, metricsApi }
 }
