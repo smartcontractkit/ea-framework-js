@@ -962,6 +962,151 @@ test.serial('requester retries request after initial failure', async (t) => {
   process.env['RETRY'] = '0'
 })
 
+test.serial(
+  'requester coalesces requests across endpoints if the endpoint name override is provided',
+  async (t) => {
+    process.env['METRICS_ENABLED'] = 'true'
+    process.env['RETRY'] = '1'
+    eaMetrics.clear()
+
+    const buildTransport = (path: 'price' | 'volume') =>
+      new HttpTransport<{
+        Request: {
+          Params: AdapterRequestParams
+        }
+        Response: SingleNumberResultResponse
+        Settings: BaseAdapterSettings
+        Provider: {
+          RequestBody: ProviderRequestBody
+          ResponseBody: {
+            data: Array<{
+              pair: string
+              price: number
+              volume: number
+            }>
+          }
+        }
+      }>({
+        prepareRequests: (params) => ({
+          params,
+          endpointNameOverride: 'crypto_data',
+          request: {
+            baseURL: URL,
+            url: '/price',
+            method: 'POST',
+            data: {
+              pairs: params.map((p) => ({ base: p.from, quote: p.to })),
+            },
+          },
+        }),
+        parseResponse: (params, res) =>
+          res.data.data?.map((p) => {
+            const [_from, _to] = p.pair.split('/')
+            return {
+              params: { from: _from, to: _to },
+              response: {
+                data: {
+                  result: p[path],
+                },
+                result: p[path],
+              },
+            }
+          }) || [],
+      })
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      endpoints: [
+        new AdapterEndpoint({
+          name: 'price',
+          inputParameters,
+          transport: buildTransport('price'),
+        }),
+        new AdapterEndpoint({
+          name: 'volume',
+          inputParameters,
+          transport: buildTransport('volume'),
+        }),
+      ],
+    })
+
+    axiosMock
+      .onPost(endpoint, {
+        pairs: [
+          {
+            base: `${from}overrideEndpoint`,
+            quote: to,
+          },
+        ],
+      })
+      .reply(async () => {
+        await sleep(100)
+        return [
+          200,
+          {
+            data: [
+              {
+                pair: `${from}overrideEndpoint/${to}`,
+                price: 1234,
+                volume: 5678,
+              },
+            ],
+          },
+        ]
+      })
+
+    // Start the adapter
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+    await testAdapter.request({
+      endpoint: 'price',
+      from: `${from}overrideEndpoint`,
+      to,
+    })
+    await testAdapter.request({
+      endpoint: 'volume',
+      from: `${from}overrideEndpoint`,
+      to,
+    })
+
+    await testAdapter.waitForCache(2)
+
+    const priceResponse = await testAdapter.request({
+      endpoint: 'price',
+      from: `${from}overrideEndpoint`,
+      to,
+    })
+    t.is(priceResponse.statusCode, 200)
+    t.is(priceResponse.json().result, 1234)
+
+    const volumeResponse = await testAdapter.request({
+      endpoint: 'volume',
+      from: `${from}overrideEndpoint`,
+      to,
+    })
+    t.is(volumeResponse.statusCode, 200)
+    t.is(volumeResponse.json().result, 5678)
+
+    const metrics = await testAdapter.getMetrics()
+    metrics.assert(t, {
+      name: 'data_provider_requests',
+      expectedValue: 1,
+      labels: {
+        method: 'POST',
+        provider_status_code: '200',
+      },
+    })
+
+    await testAdapter.api.close()
+
+    // The fixed interval rate limiter on the other hand should not have executed the same request yet, since it
+    // will wait for 30s before actually getting the result
+    // await subtest(RateLimitingStrategy.FIXED_INTERVAL, 1)
+    process.env['METRICS_ENABLED'] = 'false'
+    process.env['RETRY'] = '0'
+  },
+)
+
 test.serial('builds HTTP request queue key correctly from input params', async (t) => {
   const endpointName = 'test'
   const adapterSettings = buildAdapterSettings({})
