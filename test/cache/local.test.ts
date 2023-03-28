@@ -123,5 +123,4 @@ test.serial('error responses are not overwriting successful cache entries', asyn
   await cache.set(cacheKey, errorResponse2, 10000)
   const value4 = await cache.get(cacheKey)
   t.is(value4, errorResponse2)
-
 })

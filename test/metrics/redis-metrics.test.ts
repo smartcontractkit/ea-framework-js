@@ -12,7 +12,6 @@ export const test = untypedTest as TestFn<{
   adapterEndpoint: AdapterEndpoint<EndpointGenerics>
 }>
 
-
 test.before(async (t) => {
   process.env['METRICS_ENABLED'] = 'true'
   // Set unique port between metrics tests to avoid conflicts in metrics servers

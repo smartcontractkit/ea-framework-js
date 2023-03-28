@@ -125,11 +125,11 @@ export class RedisMock {
     return new CommandChainMock(this)
   }
 
-  function(subcommand: 'LOAD' | 'LIST',  functionCode: string) {
+  function(subcommand: 'LOAD' | 'LIST', functionCode: string) {
     if (subcommand === 'LIST') {
       return Promise.resolve([])
-    }else if (subcommand === 'LOAD') {
-      const match  = functionCode.match(/name=(\w+)/)
+    } else if (subcommand === 'LOAD') {
+      const match = functionCode.match(/name=(\w+)/)
       const libName = match?.[1]
       return Promise.resolve(libName)
     }
