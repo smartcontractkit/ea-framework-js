@@ -124,6 +124,21 @@ export class RedisMock {
   multi() {
     return new CommandChainMock(this)
   }
+
+  function(subcommand: 'LOAD' | 'LIST',  functionCode: string) {
+    if (subcommand === 'LIST') {
+      return Promise.resolve([])
+    }else if (subcommand === 'LOAD') {
+      const match  = functionCode.match(/name=(\w+)/)
+      const libName = match?.[1]
+      return Promise.resolve(libName)
+    }
+  }
+
+  // eslint-disable-next-line max-params
+  fcall(fnName: string, numOfKeys: number, key: string, value: string, ttl: number) {
+    return this.set(key, value, 'PX', ttl)
+  }
 }
 
 class CommandChainMock {
@@ -133,6 +148,12 @@ class CommandChainMock {
 
   set(key: string, value: string, px: 'PX', ttl: number) {
     this.promises.push(this.redisMock.set(key, value, px, ttl))
+    return this
+  }
+
+  // eslint-disable-next-line max-params
+  fcall(fnName: string, numOfKeys: number, key: string, value: string, ttl: number) {
+    this.promises.push(this.redisMock.fcall(fnName, numOfKeys, key, value, ttl))
     return this
   }
 

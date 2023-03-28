@@ -1,4 +1,4 @@
-import { DoubleLinkedList, LinkedListNode, makeLogger } from '../util'
+import { AdapterResponse, DoubleLinkedList, LinkedListNode, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
 import { CacheTypes } from './metrics'
 
@@ -61,17 +61,27 @@ export class LocalCache<T = unknown> implements Cache<T> {
     }
   }
 
-  async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
+  async set(key: string, value: T, ttl: number): Promise<void> {
     logger.trace(`Setting key ${key} with ttl ${ttl}`)
     if (this.cache.has(key)) {
       logger.trace(`Found existing key ${key}. Updating value...`)
       const node = this.cache.get(key) as LinkedListNode<LocalCacheEntry<T>>
-      node.data = {
-        value,
-        expirationTimestamp: Date.now() + ttl,
+      const isCacheExpired = node.data.expirationTimestamp <= Date.now()
+      // If the new value is an error, we don't want to overwrite the current active(not expired) 'successful' cache. If both cached and new values are errors or successful entries, the cache will be updated.
+      if (
+        'errorMessage' in (value as AdapterResponse) &&
+        !isCacheExpired &&
+        !('errorMessage' in (node.data.value as AdapterResponse))
+      ) {
+        logger.trace(`New value for key ${key} is an error, not updating existing value`)
+      } else {
+        node.data = {
+          value,
+          expirationTimestamp: Date.now() + ttl,
+        }
+        // When existing key is updated we move it to the end of the list as we keep recently updated entries there
+        this.moveToTail(node)
       }
-      // When existing key is updated we move it to the end of the list as we keep recently updated entries there
-      this.moveToTail(node)
     } else {
       // For new cache entries check if we reached maximum size to delete least recently updated entry and free up space
       this.evictIfNeeded()

@@ -1,10 +1,10 @@
 import untypedTest, { TestFn } from 'ava'
 import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
-import { Cache, LocalCache, RedisCache } from '../../src/cache'
+import { Cache, RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
 import { BasicCacheSetterTransport } from '../cache/helper'
-import { NopTransport, TestAdapter } from '../util'
+import { NopTransport, RedisMock, TestAdapter } from '../util'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -12,39 +12,6 @@ export const test = untypedTest as TestFn<{
   adapterEndpoint: AdapterEndpoint<EndpointGenerics>
 }>
 
-class RedisMock {
-  store = new LocalCache<string>(10000)
-
-  get(key: string) {
-    return this.store.get(key)
-  }
-
-  del(key: string) {
-    return this.store.delete(key)
-  }
-
-  set(key: string, value: string, px: 'PX', ttl: number) {
-    return this.store.set(key, value, ttl)
-  }
-
-  multi() {
-    return new CommandChainMock(this)
-  }
-}
-
-class CommandChainMock {
-  promises: Promise<unknown>[] = []
-  constructor(private redisMock: RedisMock) {}
-
-  set(key: string, value: string, px: 'PX', ttl: number) {
-    this.promises.push(this.redisMock.set(key, value, px, ttl))
-    return this
-  }
-
-  exec() {
-    return Promise.all(this.promises)
-  }
-}
 
 test.before(async (t) => {
   process.env['METRICS_ENABLED'] = 'true'
