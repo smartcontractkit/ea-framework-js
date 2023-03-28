@@ -204,7 +204,7 @@ test.serial('test WS connection, subscription, and message metrics', async (t) =
   })
   metrics.assert(t, {
     name: 'bg_execute_subscription_set_count',
-    labels: { adapter_endpoint, transport_type },
+    labels: { adapter_endpoint, transport_type, transport },
     expectedValue: 1,
   })
   metrics.assertPositiveNumber(t, {
@@ -268,7 +268,7 @@ test.serial('test WS connection, subscription, and message metrics', async (t) =
   })
   metrics.assert(t, {
     name: 'bg_execute_subscription_set_count',
-    labels: { adapter_endpoint, transport_type },
+    labels: { adapter_endpoint, transport_type, transport },
     expectedValue: 0,
   })
 })

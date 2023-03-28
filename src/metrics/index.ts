@@ -210,7 +210,7 @@ export const metrics = new Metrics(() => ({
   bgExecuteSubscriptionSetCount: new client.Gauge({
     name: 'bg_execute_subscription_set_count',
     help: 'The number of active subscriptions in background execute',
-    labelNames: ['adapter_endpoint', 'transport_type'] as const,
+    labelNames: ['adapter_endpoint', 'transport_type', 'transport'] as const,
   }),
   bgExecuteTotal: new client.Counter({
     name: 'bg_execute_total',
