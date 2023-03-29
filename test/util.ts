@@ -125,14 +125,10 @@ export class RedisMock {
     return new CommandChainMock(this)
   }
 
-  function(subcommand: 'LOAD' | 'LIST', functionCode: string) {
-    if (subcommand === 'LIST') {
-      return Promise.resolve([])
-    } else if (subcommand === 'LOAD') {
-      const match = functionCode.match(/name=(\w+)/)
-      const libName = match?.[1]
-      return Promise.resolve(libName)
-    }
+  function(subcommand: 'LOAD', replace: 'REPLACE', functionCode: string) {
+    const match = functionCode.match(/name=(\w+)/)
+    const libName = match?.[1]
+    return Promise.resolve(libName)
   }
 
   // eslint-disable-next-line max-params
