@@ -44,7 +44,7 @@ export type ProviderRequestConfig<T extends HttpTransportGenerics> = {
   /** The request that will be sent to the data provider to fetch values for the params in this struct */
   request: AxiosRequestConfig<T['Provider']['RequestBody']>
 
-  /** Whether to override the endpoint name for the requester key, to allow the coalescing of requests across endpoints */
+  /** An endpoint name override for the requester key to allow the coalescing of requests across endpoints */
   endpointNameOverride?: string
 }
 
