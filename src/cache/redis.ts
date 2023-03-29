@@ -80,7 +80,13 @@ export class RedisCache<T = unknown> implements Cache<T> {
     let chain = this.client.multi()
 
     for (const entry of entries) {
-      chain = chain.fcall('setExternalAdapterResponse', 1, entry.key, JSON.stringify(entry.value), ttl)
+      chain = chain.fcall(
+        'setExternalAdapterResponse',
+        1,
+        entry.key,
+        JSON.stringify(entry.value),
+        ttl,
+      )
     }
 
     await chain.exec()
