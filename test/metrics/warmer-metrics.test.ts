@@ -86,7 +86,11 @@ test.serial('Test cache warmer active metric', async (t) => {
   })
   metrics.assert(t, {
     name: 'bg_execute_subscription_set_count',
-    labels: { adapter_endpoint: 'test', transport_type: 'MockHttpTransport' },
+    labels: {
+      adapter_endpoint: 'test',
+      transport_type: 'MockHttpTransport',
+      transport: 'default_single_transport',
+    },
     expectedValue: 1,
   })
   metrics.assertPositiveNumber(t, {
@@ -117,7 +121,11 @@ test.serial('Test cache warmer active metric', async (t) => {
   })
   metrics.assert(t, {
     name: 'bg_execute_subscription_set_count',
-    labels: { adapter_endpoint: 'test', transport_type: 'MockHttpTransport' },
+    labels: {
+      adapter_endpoint: 'test',
+      transport_type: 'MockHttpTransport',
+      transport: 'default_single_transport',
+    },
     expectedValue: 0,
   })
 })
