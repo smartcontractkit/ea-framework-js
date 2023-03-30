@@ -4,7 +4,6 @@ export interface CacheMetricsLabels {
   participant_id: string
   feed_id: string
   cache_type: string
-  // Is_from_ws?: string
 }
 
 export const cacheGet = (

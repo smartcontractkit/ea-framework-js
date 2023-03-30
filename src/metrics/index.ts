@@ -111,18 +111,11 @@ const httpRequestsTotalLabels = [
   'status_code',
   'retry',
   'type',
-  'is_cache_warming',
   'feed_id',
   'provider_status_code',
 ] as const
 
-const cacheMetricsLabels = [
-  'feed_id',
-  'participant_id',
-  'cache_type',
-  'is_from_ws',
-  'experimental',
-] as const
+const cacheMetricsLabels = ['feed_id', 'participant_id', 'cache_type'] as const
 
 export const buildHttpRequestMetricsLabel = (
   feedId: string,
@@ -283,12 +276,11 @@ export const metrics = new Metrics(() => ({
   wsConnectionActive: new client.Gauge({
     name: 'ws_connection_active',
     help: 'The number of active connections',
-    labelNames: ['url'] as const,
   }),
   wsConnectionErrors: new client.Counter({
     name: 'ws_connection_errors',
     help: 'The number of connection errors',
-    labelNames: ['url', 'message'] as const,
+    labelNames: ['message'] as const,
   }),
   wsConnectionClosures: new client.Counter({
     name: 'ws_connection_closures',
@@ -298,12 +290,12 @@ export const metrics = new Metrics(() => ({
   wsSubscriptionActive: new client.Gauge({
     name: 'ws_subscription_active',
     help: 'The number of currently active subscriptions',
-    labelNames: ['connection_url', 'feed_id', 'subscription_key'] as const,
+    labelNames: ['feed_id', 'subscription_key'] as const,
   }),
   wsSubscriptionTotal: new client.Counter({
     name: 'ws_subscription_total',
     help: 'The number of subscriptions opened in total',
-    labelNames: ['connection_url', 'feed_id', 'subscription_key'] as const,
+    labelNames: ['feed_id', 'subscription_key'] as const,
   }),
   wsMessageTotal: new client.Counter({
     name: 'ws_message_total',
