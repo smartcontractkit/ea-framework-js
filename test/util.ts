@@ -379,13 +379,7 @@ export class TestAdapter<T extends SettingsDefinitionMap = SettingsDefinitionMap
     const error = await this.request(params.requestData)
     t.is(error.statusCode, 504)
 
-    // Advance clock so that the batch warmer executes once again and wait for the cache to be set
-    // We disable the non-null assertion because we've already checked for existence in the line above
-    await runAllUntil(this.clock, () => {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const cacheSize = this.mockCache!.cache.size
-      return cacheSize >= (params.expectedCacheSize || 1)
-    })
+    await this.waitForCache(params.expectedCacheSize)
 
     // Second request should find the response in the cache
     const response = await this.request(params.requestData)
@@ -397,6 +391,22 @@ export class TestAdapter<T extends SettingsDefinitionMap = SettingsDefinitionMap
     }
 
     return response
+  }
+
+  async waitForCache(expectedSize?: number) {
+    if (!this.clock) {
+      throw new Error(
+        'The "startBackgroundExecuteThenGetResponse" method should only be called if a fake clock is installed',
+      )
+    }
+
+    // Advance clock so that the batch warmer executes once again and wait for the cache to be set
+    // We disable the non-null assertion because we've already checked for existence in the line above
+    await runAllUntil(this.clock, () => {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const cacheSize = this.mockCache!.cache.size
+      return cacheSize >= (expectedSize || 1)
+    })
   }
 
   async getMetrics(): Promise<TestMetrics> {

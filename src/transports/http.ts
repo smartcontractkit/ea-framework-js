@@ -43,6 +43,9 @@ export type ProviderRequestConfig<T extends HttpTransportGenerics> = {
 
   /** The request that will be sent to the data provider to fetch values for the params in this struct */
   request: AxiosRequestConfig<T['Provider']['RequestBody']>
+
+  /** An endpoint name override for the requester key to allow the coalescing of requests across endpoints */
+  endpointNameOverride?: string
 }
 
 /**
@@ -218,7 +221,10 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
       // Use cache key to avoid coalescing requests across different endpoints
       const requesterResult = await this.requester.request<T['Provider']['ResponseBody']>(
         calculateHttpRequestKey({
-          context,
+          context: {
+            ...context,
+            endpointName: requestConfig.endpointNameOverride ?? context.endpointName,
+          },
           data: requestConfig.params,
           transportName: this.name,
         }),
