@@ -344,6 +344,9 @@ export class WebSocketTransport<
       // Need to write this now, otherwise there could be messages sent with values before the open handler finishes
       this.providerDataStreamEstablished = Date.now()
 
+      // Local subscriptions array should be empty before the connection is opened
+      this.localSubscriptions = []
+
       // If the connection was closed, the new subscriptions should be the desired ones
       subscriptions.new = subscriptions.desired
 
