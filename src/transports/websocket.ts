@@ -327,12 +327,10 @@ export class WebSocketTransport<
       this.wsConnection?.close()
       connectionClosed = true
 
-      // If the connection was closed, the new subscriptions should be the desired ones
-      subscriptions.new = subscriptions.desired
-      if (subscriptions.new.length) {
+      if (subscriptions.desired.length) {
         logger.trace(
           `Connection will be reopened and will subscribe to new and resubscribe to existing: ${JSON.stringify(
-            subscriptions.new,
+            subscriptions.desired,
           )}`,
         )
       }
@@ -345,6 +343,9 @@ export class WebSocketTransport<
       this.currentUrl = urlFromConfig
       // Need to write this now, otherwise there could be messages sent with values before the open handler finishes
       this.providerDataStreamEstablished = Date.now()
+
+      // If the connection was closed, the new subscriptions should be the desired ones
+      subscriptions.new = subscriptions.desired
 
       // Connect to the provider
       this.wsConnection = await this.establishWsConnection(context, urlFromConfig, options)
