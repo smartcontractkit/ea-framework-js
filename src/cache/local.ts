@@ -61,7 +61,7 @@ export class LocalCache<T = unknown> implements Cache<T> {
     }
   }
 
-  async set(key: string, value: T, ttl: number): Promise<void> {
+  async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
     logger.trace(`Setting key ${key} with ttl ${ttl}`)
     if (this.cache.has(key)) {
       logger.trace(`Found existing key ${key}. Updating value...`)
@@ -69,7 +69,7 @@ export class LocalCache<T = unknown> implements Cache<T> {
       const isCacheExpired = node.data.expirationTimestamp <= Date.now()
       // If the new value is an error, we don't want to overwrite the current active(not expired) 'successful' cache. If both cached and new values are errors or successful entries, the cache will be updated.
       if (
-        'errorMessage' in (value as AdapterResponse) &&
+        'errorMessage' in (value as unknown as AdapterResponse) &&
         !isCacheExpired &&
         !('errorMessage' in (node.data.value as AdapterResponse))
       ) {
