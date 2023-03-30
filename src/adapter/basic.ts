@@ -80,6 +80,10 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
       throw new Error('This adapter has already been initialized!')
     }
 
+    if (this.name !== this.name.toUpperCase()) {
+      throw new Error('Adapter name must be uppercase')
+    }
+
     // Initialize metrics to register them with the prom-client
     metrics.initialize()
 
