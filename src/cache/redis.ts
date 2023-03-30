@@ -15,7 +15,33 @@ const logger = makeLogger('RedisCache')
 export class RedisCache<T = unknown> implements Cache<T> {
   type = CacheTypes.Redis
 
-  constructor(private client: Redis) {}
+  constructor(private client: Redis) {
+    this.loadFunctions()
+  }
+
+  async loadFunctions() {
+    // Load custom function 'setExternalAdapterResponse' with lua script to redis that will skip overwriting successful cache response if the new value is error response
+    const source = `#!lua name=ea
+          redis.register_function('setExternalAdapterResponse', function(keys, args)
+            local key = keys[1]
+            local value = args[1]
+            local ttl = tonumber(args[2])
+            local json_value = cjson.decode(value)
+            local key_exists = redis.call('EXISTS', key)
+            if json_value.errorMessage and key_exists == 1 then
+              local existing_json_value = cjson.decode(redis.call('GET', key))
+                if existing_json_value.errorMessage then
+                  return redis.call('SET', key, value, 'PX', ttl)
+                else
+                  return nil
+                end
+            else
+              return redis.call('SET', key, value, 'PX', ttl)
+            end
+          end)`
+
+    this.client.function('LOAD', 'REPLACE', source)
+  }
 
   async get(key: string): Promise<Readonly<T> | undefined> {
     logger.trace(`Getting key ${key}`)
@@ -42,7 +68,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
   async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
     logger.trace(`Setting key ${key}`)
-    await this.client.set(key, JSON.stringify(value), 'PX', ttl)
+    await this.client.fcall('setExternalAdapterResponse', 1, key, JSON.stringify(value), ttl)
 
     // Record set command sent to Redis
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'set')
@@ -54,7 +80,13 @@ export class RedisCache<T = unknown> implements Cache<T> {
     let chain = this.client.multi()
 
     for (const entry of entries) {
-      chain = chain.set(entry.key, JSON.stringify(entry.value), 'PX', ttl)
+      chain = chain.fcall(
+        'setExternalAdapterResponse',
+        1,
+        entry.key,
+        JSON.stringify(entry.value),
+        ttl,
+      )
     }
 
     await chain.exec()
