@@ -332,6 +332,52 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
   await t.context.clock.runToLastAsync()
 })
 
+test.serial('resubscribes after reconnection if server closes connection', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(URL, { mock: false })
+  let connectionCounter = 0
+  let messageCounter = 0
+
+  mockWsServer.on('connection', (socket) => {
+    connectionCounter++
+    socket.on('message', () => {
+      messageCounter++
+      if (messageCounter === 1) {
+        socket.close()
+      }
+    })
+  })
+
+  const adapter = createAdapter({
+    WS_SUBSCRIPTION_TTL: 30000,
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  const error = await testAdapter.request({
+    base,
+    quote,
+  })
+  t.is(error.statusCode, 504)
+
+  // The WS connection should not send any messages to the EA, so we advance the clock until
+  // we reach the point where the EA will consider it unhealthy and reconnect.
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+
+  // The connection was opened twice
+  t.is(connectionCounter, 2)
+  // The subscribe message was sent twice as well, since when we reopened we resubscribed to everything
+  t.is(messageCounter, 2)
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
 test.serial(
   'does not crash the server when open handler rejects with error or throws',
   async (t) => {
