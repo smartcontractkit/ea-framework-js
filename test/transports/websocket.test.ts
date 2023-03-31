@@ -66,6 +66,9 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
     url: () => URL,
     handlers: {
       message(message) {
+        if (!message.pair) {
+          return []
+        }
         const [base, quote] = message.pair.split('/')
         return [
           {
@@ -326,6 +329,55 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
   t.is(connectionCounter, 2)
   // The subscribe message was sent twice as well, since when we reopened we resubscribed to everything
   t.is(messageCounter, 2)
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
+test.serial('reconnects if provider stops sending expected messages', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 1000
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(URL, { mock: false })
+  let connectionCounter = 0
+
+
+  mockWsServer.on('connection', (socket) => {
+    let counter = 0
+    const parseMessage = () => {
+      if (counter++ === 0) {
+        socket.send(
+          JSON.stringify({error: ''}),
+        )
+      }
+    }
+    connectionCounter++
+    socket.on('message', parseMessage)
+  })
+
+  const adapter = createAdapter({
+    WS_SUBSCRIPTION_TTL: 30000,
+    WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  const error = await testAdapter.request({
+    base,
+    quote,
+  })
+  t.is(error.statusCode, 504)
+
+  // The WS connection sends messages that are not stored in the cache, so we advance the clock until
+  // we reach the point where the EA will consider it unhealthy and reconnect.
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+
+  // The connection was opened twice
+  t.is(connectionCounter, 2)
 
   testAdapter.api.close()
   mockWsServer.close()

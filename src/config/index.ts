@@ -213,7 +213,7 @@ export const BaseSettingsDefinition = {
   },
   WS_SUBSCRIPTION_UNRESPONSIVE_TTL: {
     description:
-      'The maximum acceptable time (in milliseconds) since the last message received on a WebSocket connection before it is considered unresponsive, causing the adapter to close and attempt to reopen it.',
+      'The maximum acceptable time (in milliseconds) since the last message was received and stored in the cache on a WebSocket connection before it is considered unresponsive, causing the adapter to close and attempt to reopen it.',
     type: 'number',
     default: 120000,
     validate: validator.integer({ min: 1000, max: 180000 }),
