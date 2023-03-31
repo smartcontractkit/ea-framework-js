@@ -171,8 +171,8 @@ export class WebSocketTransport<
         logger.trace(`Writing ${results?.length ?? 0} responses to cache`)
         if (Array.isArray(results) && results.length > 0) {
           // Updating the last message received time here, to only care about messages we use
-            this.lastMessageReceivedAt = Date.now()
-            await this.responseCache.write(this.name, results)
+          this.lastMessageReceivedAt = Date.now()
+          await this.responseCache.write(this.name, results)
         }
 
         // Do this after writing so we get the values to the cache ASAP
