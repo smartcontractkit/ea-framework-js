@@ -548,6 +548,108 @@ test.serial(
   },
 )
 
+test.serial(
+  'does not crash the server when new connection errors',
+  async (t) => {
+    const base = 'ETH'
+    const quote = 'DOGE'
+    process.env['METRICS_ENABLED'] = 'true'
+    eaMetrics.clear()
+
+    // Mock WS
+    mockWebSocketProvider(WebSocketClassProvider)
+    const mockWsServer = new Server(URL, { mock: false })
+    mockWsServer.on('connection', (socket) => {
+      socket.on('message', () => {
+        socket.send(
+          JSON.stringify({
+            pair: `${base}/${quote}`,
+            value: price,
+          }),
+        )
+      })
+    })
+
+    const transport = new WebSocketTransport<WebSocketTypes>({
+      // Changing the url so that the connection will error on initial request
+      url: () => `${URL}test`,
+      handlers: {
+        message(message) {
+          const [curBase, curQuote] = message.pair.split('/')
+          return [
+            {
+              params: { base: curBase, quote: curQuote },
+              response: {
+                data: {
+                  result: message.value,
+                },
+                result: message.value,
+              },
+            },
+          ]
+        },
+      },
+      builders: {
+        subscribeMessage: (params: AdapterRequestParams) => ({
+          request: 'subscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
+        unsubscribeMessage: (params: AdapterRequestParams) => ({
+          request: 'unsubscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
+      },
+    })
+
+    const webSocketEndpoint = new AdapterEndpoint({
+      name: 'TEST',
+      transport: transport,
+      inputParameters,
+    })
+
+    const config = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          BACKGROUND_EXECUTE_MS_WS,
+        },
+      },
+    )
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config,
+      endpoints: [webSocketEndpoint],
+    })
+
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+    const error = await testAdapter.request({
+      base,
+      quote,
+    })
+    t.is(error.statusCode, 504)
+
+    await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+
+    const metrics = await testAdapter.getMetrics()
+    metrics.assert(t, {
+      name: 'ws_connection_errors',
+      labels: {
+        message: "undefined"
+      },
+      expectedValue: 1,
+    })
+
+    process.env['METRICS_ENABLED'] = 'false'
+    t.pass()
+    await testAdapter.api.close()
+    mockWsServer.close()
+    await t.context.clock.runAllAsync()
+  },
+)
+
 test.serial('does not hang the background execution if the open handler hangs', async (t) => {
   const base = 'ETH'
   const quote = 'DOGE'

@@ -220,6 +220,7 @@ export class WebSocketTransport<
     const ctor = WebSocketClassProvider.get()
     const connection = new ctor(url, undefined, options)
     const handlers = this.buildConnectionHandlers(context, connection, resolve)
+    connection.addEventListener('error', handlers.error)
     connection.addEventListener(
       'open',
       this.rejectionHandler<WebSocket.Event>(reject, handlers.open),
