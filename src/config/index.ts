@@ -332,9 +332,9 @@ export const BaseSettingsDefinition = {
     options: ['burst', 'fixed-interval'],
     default: 'fixed-interval',
   },
-  TIME_TO_SLEEP_MS: {
+  REQUESTER_SLEEP_BEFORE_REQUEUEING_MS: {
     type: 'number',
-    description: 'Time to sleep between failed HTTP requests in ms',
+    description: 'Time to sleep after a failed HTTP request before re-queueing the request (in ms)',
     default: 0,
     validate: validator.integer({ min: 0, max: 120000 }),
   },

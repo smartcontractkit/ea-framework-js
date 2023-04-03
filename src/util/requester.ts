@@ -97,12 +97,12 @@ export class Requester {
   private map = {} as Record<string, QueuedRequest>
   private maxRetries: number
   private timeout: number
-  private timeToSleepMs: number
+  private sleepBeforeRequeueingMs: number
 
   constructor(private rateLimiter: RateLimiter, adapterSettings: AdapterSettings) {
     this.maxRetries = adapterSettings.RETRY
     this.timeout = adapterSettings.API_TIMEOUT
-    this.timeToSleepMs = adapterSettings.TIME_TO_SLEEP_MS
+    this.sleepBeforeRequeueingMs = adapterSettings.REQUESTER_SLEEP_BEFORE_REQUEUEING_MS
     this.queue = new UniqueLinkedList<QueuedRequest>(adapterSettings.MAX_HTTP_REQUEST_QUEUE_LENGTH)
   }
 
@@ -284,7 +284,7 @@ export class Requester {
         // Remove the request from our map
         delete this.map[key]
       } else {
-        const timeToSleep = this.timeToSleepMs || (2 ** retries + Math.random()) * 1000
+        const timeToSleep = this.sleepBeforeRequeueingMs || (2 ** retries + Math.random()) * 1000
         logger.info(
           `${this.maxRetries - retries} retries remaining, sleeping for ${timeToSleep}ms...`,
         )
