@@ -66,6 +66,9 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
     url: () => URL,
     handlers: {
       message(message) {
+        if (!message.pair) {
+          return []
+        }
         const [base, quote] = message.pair.split('/')
         return [
           {
@@ -332,6 +335,55 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
   await t.context.clock.runToLastAsync()
 })
 
+test.serial('reconnects if provider stops sending expected messages', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 1000
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(URL, { mock: false })
+  let connectionCounter = 0
+
+
+  mockWsServer.on('connection', (socket) => {
+    let counter = 0
+    const parseMessage = () => {
+      if (counter++ === 0) {
+        socket.send(
+          JSON.stringify({error: ''}),
+        )
+      }
+    }
+    connectionCounter++
+    socket.on('message', parseMessage)
+  })
+
+  const adapter = createAdapter({
+    WS_SUBSCRIPTION_TTL: 30000,
+    WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  const error = await testAdapter.request({
+    base,
+    quote,
+  })
+  t.is(error.statusCode, 504)
+
+  // The WS connection sends messages that are not stored in the cache, so we advance the clock until
+  // we reach the point where the EA will consider it unhealthy and reconnect.
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+
+  // The connection was opened twice
+  t.is(connectionCounter, 2)
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
 test.serial('resubscribes after reconnection if server closes connection', async (t) => {
   const base = 'ETH'
   const quote = 'DOGE'
@@ -490,6 +542,108 @@ test.serial(
     })
 
     process.env['METRICS_ENABLED'] = 'false'
+    await testAdapter.api.close()
+    mockWsServer.close()
+    await t.context.clock.runAllAsync()
+  },
+)
+
+test.serial(
+  'does not crash the server when new connection errors',
+  async (t) => {
+    const base = 'ETH'
+    const quote = 'DOGE'
+    process.env['METRICS_ENABLED'] = 'true'
+    eaMetrics.clear()
+
+    // Mock WS
+    mockWebSocketProvider(WebSocketClassProvider)
+    const mockWsServer = new Server(URL, { mock: false })
+    mockWsServer.on('connection', (socket) => {
+      socket.on('message', () => {
+        socket.send(
+          JSON.stringify({
+            pair: `${base}/${quote}`,
+            value: price,
+          }),
+        )
+      })
+    })
+
+    const transport = new WebSocketTransport<WebSocketTypes>({
+      // Changing the url so that the connection will error on initial request
+      url: () => `${URL}test`,
+      handlers: {
+        message(message) {
+          const [curBase, curQuote] = message.pair.split('/')
+          return [
+            {
+              params: { base: curBase, quote: curQuote },
+              response: {
+                data: {
+                  result: message.value,
+                },
+                result: message.value,
+              },
+            },
+          ]
+        },
+      },
+      builders: {
+        subscribeMessage: (params: AdapterRequestParams) => ({
+          request: 'subscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
+        unsubscribeMessage: (params: AdapterRequestParams) => ({
+          request: 'unsubscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
+      },
+    })
+
+    const webSocketEndpoint = new AdapterEndpoint({
+      name: 'TEST',
+      transport: transport,
+      inputParameters,
+    })
+
+    const config = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          BACKGROUND_EXECUTE_MS_WS,
+        },
+      },
+    )
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config,
+      endpoints: [webSocketEndpoint],
+    })
+
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+    const error = await testAdapter.request({
+      base,
+      quote,
+    })
+    t.is(error.statusCode, 504)
+
+    await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+
+    const metrics = await testAdapter.getMetrics()
+    metrics.assert(t, {
+      name: 'ws_connection_errors',
+      labels: {
+        message: "undefined"
+      },
+      expectedValue: 1,
+    })
+
+    process.env['METRICS_ENABLED'] = 'false'
+    t.pass()
     await testAdapter.api.close()
     mockWsServer.close()
     await t.context.clock.runAllAsync()

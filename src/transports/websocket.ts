@@ -168,13 +168,10 @@ export class WebSocketTransport<
           }
           return result
         })
-        if (Array.isArray(results)) {
+        logger.trace(`Writing ${results?.length ?? 0} responses to cache`)
+        if (Array.isArray(results) && results.length > 0) {
           // Updating the last message received time here, to only care about messages we use
-          if (results.length > 0) {
-            this.lastMessageReceivedAt = Date.now()
-          }
-
-          logger.trace(`Writing ${results.length} responses to cache`)
+          this.lastMessageReceivedAt = Date.now()
           await this.responseCache.write(this.name, results)
         }
 
@@ -223,6 +220,7 @@ export class WebSocketTransport<
     const ctor = WebSocketClassProvider.get()
     const connection = new ctor(url, undefined, options)
     const handlers = this.buildConnectionHandlers(context, connection, resolve)
+    connection.addEventListener('error', handlers.error)
     connection.addEventListener(
       'open',
       this.rejectionHandler<WebSocket.Event>(reject, handlers.open),
