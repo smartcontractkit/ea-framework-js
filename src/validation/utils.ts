@@ -104,6 +104,18 @@ const port = () => integer({ min: 1, max: 65535 })
 // Validates that value is a valid timestamp from 2018-01-01 to now
 const responseTimestamp = () => integer({ min: 1514764861000, max: new Date().getTime() })
 
+const base64 = () => {
+  return (value: string) => {
+    try {
+      const decoded = Buffer.from(value, 'base64').toString('utf-8');
+      const encodedAgain = Buffer.from(decoded, 'utf-8').toString('base64');
+      return value !== encodedAgain ?  `Value is not valid base64 string.` : undefined
+    } catch (err) {
+      return `Value is not valid base64 string.`
+    }
+  }
+}
+
 export const validator = {
   integer,
   positiveInteger,
@@ -112,5 +124,6 @@ export const validator = {
   host,
   object,
   responseTimestamp,
+  base64,
   compose,
 }

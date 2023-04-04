@@ -498,6 +498,16 @@ test.serial('Test response timestamp validator', async (t) => {
   t.is(error, 'Minimum allowed value is 1514764861000. Received 0')
 })
 
+test.serial('Test base64 validator', async (t) => {
+  const base64Validator = validator.base64()
+  let value = 'test'
+  let error = base64Validator(value)
+  t.is(error, 'Value is not valid base64 string.')
+  value = 'dGVzdA=='
+  error = base64Validator(value)
+  t.is(error, undefined)
+})
+
 test.serial('Test integer validator', async (t) => {
   const integerValidator = validator.integer({ min: 10, max: 20 })
   let value: string | number = 11

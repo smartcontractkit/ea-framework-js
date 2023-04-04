@@ -279,10 +279,12 @@ export const BaseSettingsDefinition = {
   TLS_PRIVATE_KEY: {
     description: 'Base64 Private Key of TSL/SSL certificate',
     type: 'string',
+    validate: validator.base64(),
   },
   TLS_PUBLIC_KEY: {
     description: 'Base64 Public Key of TSL/SSL certificate',
     type: 'string',
+    validate: validator.base64(),
   },
   TLS_PASSPHRASE: {
     description: 'Password to be used to generate an encryption key',
