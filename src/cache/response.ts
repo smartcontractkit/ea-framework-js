@@ -1,10 +1,10 @@
 import { AdapterDependencies } from '../adapter'
 import { AdapterSettings } from '../config'
 import {
-  AdapterResponse,
+  AdapterResponse, censor,
   makeLogger,
   RequestGenerics,
-  ResponseGenerics,
+  ResponseGenerics, TimestampedAdapterResponse,
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
 } from '../util'
@@ -12,6 +12,7 @@ import { InputParameters } from '../validation/input-params'
 import { Cache, calculateCacheKey, calculateFeedId } from './'
 import * as cacheMetrics from './metrics'
 import { validator } from '../validation/utils'
+import CensorList from '../util/censor/censor-list'
 
 const logger = makeLogger('ResponseCache')
 
@@ -56,9 +57,11 @@ export class ResponseCache<
    * @param results - the entries to write to the cache
    */
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+    const censorList = CensorList.getAll()
     const entries = results.map((r) => {
+      const censoredResponse = censor(r.response, censorList) as  TimestampedAdapterResponse<T["Response"]>
       const response: AdapterResponse<T['Response']> = {
-        ...r.response,
+        ...censoredResponse,
         statusCode: (r.response as TimestampedProviderErrorResponse).statusCode || 200,
       }
 
@@ -86,6 +89,8 @@ export class ResponseCache<
           logger.warn(`Provider indicated time is invalid: ${error}`)
         }
       }
+
+
 
       return {
         key: calculateCacheKey({
