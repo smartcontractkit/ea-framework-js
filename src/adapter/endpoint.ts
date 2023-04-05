@@ -24,6 +24,7 @@ export const DEFAULT_TRANSPORT_NAME = 'default_single_transport'
  */
 export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpointInterface<T> {
   name: string
+  adapterName!: string
   aliases?: string[] | undefined
   transportRoutes: TransportRoutes<T>
   inputParameters: SpecificInputParameters<T['Request']['Params']>
@@ -71,6 +72,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     dependencies: AdapterDependencies,
     adapterSettings: T['Settings'],
   ): Promise<void> {
+    this.adapterName = adapterName
     const responseCache = new ResponseCache({
       dependencies,
       adapterSettings: adapterSettings as AdapterSettings,
@@ -115,9 +117,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    */
   symbolOverrider(req: AdapterRequest) {
     const rawRequestBody = req.body as { data?: { overrides?: Overrides } }
-    const requestOverrides = rawRequestBody.data?.overrides?.[this.name.toLowerCase()]
+    const requestOverrides = rawRequestBody.data?.overrides?.[this.adapterName.toLowerCase()]
     const base = req.requestContext.data['base'] as string
-
     if (requestOverrides?.[base]) {
       // Perform overrides specified in the request payload
       req.requestContext.data['base'] = requestOverrides[base]

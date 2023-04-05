@@ -53,10 +53,10 @@ class OverrideTestTransport implements Transport<TestTransportGenerics> {
 test.beforeEach(async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
-    defaultEndpoint: 'test',
+    defaultEndpoint: 'test-endpoint',
     endpoints: [
       new AdapterEndpoint({
-        name: 'test',
+        name: 'test-endpoint',
         inputParameters: {
           base: {
             type: 'string',
