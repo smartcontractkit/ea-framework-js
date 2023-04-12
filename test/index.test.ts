@@ -127,3 +127,23 @@ test('Initialize adapter (error)', async (t) => {
     )
   }
 })
+
+test('Initialize adapter twice (error)', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters: {},
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+  try {
+    await start(adapter)
+    await start(adapter)
+    t.fail()
+  } catch (e: unknown) {
+    t.is((e as Error).message, 'This adapter has already been initialized!')
+  }
+})

@@ -120,14 +120,4 @@ export class ResponseCache<
 
     return
   }
-
-  /**
-   * Looks for an adapter response in the cache.
-   *
-   * @param cacheKey - the key made from the adapter params
-   * @returns the associated response if found
-   */
-  read(cacheKey: string) {
-    return this.cache.get(cacheKey)
-  }
 }

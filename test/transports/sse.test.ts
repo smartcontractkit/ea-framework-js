@@ -96,7 +96,9 @@ export const sseEndpoint = new AdapterEndpoint({
   inputParameters,
 })
 
+const SSE_KEEPALIVE_SLEEP = 5000
 const CACHE_MAX_AGE = 4000
+const SSE_SUBSCRIPTION_TTL = 10000
 const BACKGROUND_EXECUTE_MS_SSE = 5000
 
 // Disable retries to make the testing flow easier
@@ -106,6 +108,8 @@ const config = new AdapterConfig(
   {},
   {
     envDefaultOverrides: {
+      SSE_KEEPALIVE_SLEEP,
+      SSE_SUBSCRIPTION_TTL,
       CACHE_MAX_AGE,
       BACKGROUND_EXECUTE_MS_SSE,
     },

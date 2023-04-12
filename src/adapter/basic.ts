@@ -214,34 +214,32 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
   initializeDependencies(inputDependencies?: Partial<AdapterDependencies>): AdapterDependencies {
     const dependencies = inputDependencies || {}
 
-    if (!dependencies.redisClient) {
-      if (this.config.settings.CACHE_TYPE === 'redis') {
-        const maxCooldown = this.config.settings.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
-        const redisOptions = {
-          enableAutoPipelining: true, // This will make multiple commands be batch automatically
-          host: this.config.settings.CACHE_REDIS_HOST,
-          port: this.config.settings.CACHE_REDIS_PORT,
-          password: this.config.settings.CACHE_REDIS_PASSWORD,
-          path: this.config.settings.CACHE_REDIS_PATH, // If set, port and host are ignored
-          timeout: this.config.settings.CACHE_REDIS_TIMEOUT,
-          retryStrategy(times: number): number {
-            metrics.get('redisRetriesCount').inc()
-            logger.warn(`Redis reconnect attempt #${times}`)
-            return Math.min(times * 100, maxCooldown) // Next reconnect attempt time
-          },
-          connectTimeout: this.config.settings.CACHE_REDIS_CONNECTION_TIMEOUT,
-          maxRetriesPerRequest: 30, // Limits the number of retries before the adapter shuts down
-        }
-        if (this.config.settings.CACHE_REDIS_URL) {
-          dependencies.redisClient = new Redis(this.config.settings.CACHE_REDIS_URL, redisOptions)
-        } else {
-          dependencies.redisClient = new Redis(redisOptions)
-        }
-
-        dependencies.redisClient.on('connect', () => {
-          metrics.get('redisConnectionsOpen').inc()
-        })
+    if (this.config.settings.CACHE_TYPE === 'redis' && !dependencies.redisClient) {
+      const maxCooldown = this.config.settings.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
+      const redisOptions = {
+        enableAutoPipelining: true, // This will make multiple commands be batch automatically
+        host: this.config.settings.CACHE_REDIS_HOST,
+        port: this.config.settings.CACHE_REDIS_PORT,
+        password: this.config.settings.CACHE_REDIS_PASSWORD,
+        path: this.config.settings.CACHE_REDIS_PATH, // If set, port and host are ignored
+        timeout: this.config.settings.CACHE_REDIS_TIMEOUT,
+        retryStrategy(times: number): number {
+          metrics.get('redisRetriesCount').inc()
+          logger.warn(`Redis reconnect attempt #${times}`)
+          return Math.min(times * 100, maxCooldown) // Next reconnect attempt time
+        },
+        connectTimeout: this.config.settings.CACHE_REDIS_CONNECTION_TIMEOUT,
+        maxRetriesPerRequest: 30, // Limits the number of retries before the adapter shuts down
       }
+      if (this.config.settings.CACHE_REDIS_URL) {
+        dependencies.redisClient = new Redis(this.config.settings.CACHE_REDIS_URL, redisOptions)
+      } else {
+        dependencies.redisClient = new Redis(redisOptions)
+      }
+
+      dependencies.redisClient.on('connect', () => {
+        metrics.get('redisConnectionsOpen').inc()
+      })
     }
 
     if (!dependencies.cache) {

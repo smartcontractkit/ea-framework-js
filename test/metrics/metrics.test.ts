@@ -4,7 +4,7 @@ import axios from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
-import { retrieveCost } from '../../src/metrics'
+import { Metrics, retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { TestAdapter } from '../util'
 
@@ -287,4 +287,13 @@ test('Rate limit metrics retrieve cost (number)', async (t) => {
 test('Rate limit metrics retrieve cost (string)', async (t) => {
   const cost = retrieveCost({ data: {}, statusCode: 200, cost: '3' })
   t.is(cost, 3)
+})
+
+test('invalid metric name throws error', async (t) => {
+  const metrics = new Metrics(() => ({}))
+  const error = await t.throws(() =>
+    // @ts-expect-error - there is a type check for this, but we want to check it in runtime
+    metrics.get('invalid_name'),
+  )
+  t.is(error?.message, 'Metric "invalid_name" was not initialized before use')
 })

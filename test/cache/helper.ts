@@ -99,6 +99,30 @@ export const cacheTests = () => {
     t.is(response.json().result, 'injected')
   })
 
+  test('deletes the value in cache', async (t) => {
+    const data = {
+      base: 'qweqwe',
+      factor: 111,
+    }
+
+    const cacheKey = 'TEST-test-default_single_transport-{"base":"qweqwe","factor":111}'
+
+    // Inject values directly into the cache
+    const injectedEntry = {
+      data: null,
+      statusCode: 200,
+      result: 'injected',
+    }
+
+    t.context.cache.set(cacheKey, injectedEntry, 10000)
+
+    const response = await t.context.testAdapter.request(data)
+    t.is(response.json().result, 'injected')
+    await t.context.cache.delete(cacheKey)
+    const secondResponse = await t.context.testAdapter.request(data)
+    t.is(secondResponse.json().result, 111)
+  })
+
   test('skips expired cache entry and returns set up value', async (t) => {
     const data = {
       base: 'sdfghj',

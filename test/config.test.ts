@@ -1,5 +1,5 @@
 import test from 'ava'
-import { AdapterConfig, SettingsDefinitionMap } from '../src/config'
+import { AdapterConfig, getEnv, SettingDefinition, SettingsDefinitionMap } from '../src/config'
 import { validator } from '../src/validation/utils'
 
 test.afterEach(async () => {
@@ -32,6 +32,15 @@ test.serial('Test bad enum config', async (t) => {
     const config = new AdapterConfig({})
     config.initialize()
     config.validate()
+    t.fail()
+  } catch (e: unknown) {
+    t.pass()
+  }
+})
+
+test.serial('Test bad env name', async (t) => {
+  try {
+    getEnv('$#%', {} as SettingDefinition)
     t.fail()
   } catch (e: unknown) {
     t.pass()
