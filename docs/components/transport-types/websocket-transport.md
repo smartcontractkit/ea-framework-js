@@ -6,8 +6,10 @@ Example usage of WebSocketTransport
 
 ```typescript
  export const wsTransport = new WebSocketTransport<EndpointTypes>({
+  // url of the Data Provider WS connection
   url: (context, desiredSubs) => context.adapterConfig.WS_API_ENDPOINT,
   handlers: {
+    // Data Provider messages are handled in message method.
     message(message) {
       return [
         {
@@ -29,14 +31,12 @@ Example usage of WebSocketTransport
     },
   },
   builders: {
+    // It is possible to send custom JSON or string messages to Data Provider. For JSON messages, it will be automatically stringified.
     subscribeMessage: (params) => ({
       action: 'subscribe',
       symbols: [`${params.base}.${params.quote}`],
     }),
-    unsubscribeMessage: (params) => ({
-      action: 'unsubscribe',
-      symbols: [`${params.base}.${params.quote}`],
-    }),
+    unsubscribeMessage: (params) => `UNSUBSCRIBE:${params.base}.${params.quote}`
   },
 })
 ```
@@ -96,7 +96,7 @@ In the example above, after the connection is established a custom authenticatio
 
 ### Sending messages
 
-As shown in the first example, **builders** object contains two methods, **subscribeMessage** and **unsubscribeMessage**. Those methods can be used to send subscription/unsubscription messages to Data Provider. Both accept *params* which is the current input parameters of the request.
+As shown in the first example, **builders** object contains two methods, **subscribeMessage** and **unsubscribeMessage**. Those methods can be used to send subscription/unsubscription messages to Data Provider. Both accept *params* which is the current input parameters of the request and should return object or string as payload that will be sent to Data Provider. If the payload is object it will be automatically stringified.
 
 ### Retrieving and storing the response or errors
 
