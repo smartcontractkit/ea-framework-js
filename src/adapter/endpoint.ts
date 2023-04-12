@@ -32,7 +32,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   validator: InputValidator
   cacheKeyGenerator?: (data: Record<string, unknown>) => string
   customInputValidation?: CustomInputValidator<T>
-  requestTransforms?: RequestTransform<T>[]
+  requestTransforms: RequestTransform<T>[]
   overrides?: Record<string, string> | undefined
   customRouter?: (req: AdapterRequest<T['Request']>, settings: T['Settings']) => string
   defaultTransport?: string
@@ -99,10 +99,6 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @returns the request after passing through all request transforms
    */
   runRequestTransforms(req: AdapterRequest): void {
-    if (!this.requestTransforms) {
-      return
-    }
-
     for (const transform of this.requestTransforms) {
       transform(req)
     }

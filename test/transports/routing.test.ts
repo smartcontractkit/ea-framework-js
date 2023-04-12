@@ -651,3 +651,20 @@ test.serial('transport creation fails if transport names are not acceptable', as
     )
   }
 })
+
+test.serial('transports with same name throws error', async (t) => {
+   t.throws(
+      () =>
+        new AdapterEndpoint({
+          name: 'test',
+          inputParameters,
+          transportRoutes: new TransportRoutes<BaseEndpointTypes>().register(
+            'websocket', new MockWebSocketTransport(),
+          ).register(
+            'websocket', new MockWebSocketTransport(),
+          ),
+        }),
+     { message: 'Transport with name "websocket" is already registered in this map'}
+    )
+
+})

@@ -64,6 +64,13 @@ const BACKGROUND_EXECUTE_MS_WS = 5000
 const createAdapter = (envDefaultOverrides: Record<string, string | number | symbol>): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => URL,
+    options: () => {
+      return {
+        headers: {
+          'x-auth-token': 'token'
+        },
+      }
+    },
     handlers: {
       message(message) {
         if (!message.pair) {
@@ -78,16 +85,16 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
                 result: message.value,
               },
               result: message.value,
+              timestamps: {
+                providerIndicatedTimeUnixMs: Date.now(),
+              }
             },
           },
         ]
       },
     },
     builders: {
-      subscribeMessage: (params: AdapterRequestParams) => ({
-        request: 'subscribe',
-        pair: `${params.base}/${params.quote}`,
-      }),
+      subscribeMessage: (params: AdapterRequestParams) => `S:${params.base}/${params.quote}`,
       unsubscribeMessage: (params: AdapterRequestParams) => ({
         request: 'unsubscribe',
         pair: `${params.base}/${params.quote}`,
@@ -199,7 +206,7 @@ test.serial('reconnects when url changed', async (t) => {
       const parsed = JSON.parse(message)
       socket.send(
         JSON.stringify({
-          pair: parsed.pair,
+          pair: `${parsed.base}/${parsed.quote}`,
           value: price,
         }),
       )
@@ -229,16 +236,6 @@ test.serial('reconnects when url changed', async (t) => {
           },
         ]
       },
-    },
-    builders: {
-      subscribeMessage: (params: AdapterRequestParams) => ({
-        request: 'subscribe',
-        pair: `${params.base}/${params.quote}`,
-      }),
-      unsubscribeMessage: (params: AdapterRequestParams) => ({
-        request: 'unsubscribe',
-        pair: `${params.base}/${params.quote}`,
-      }),
     },
   })
 

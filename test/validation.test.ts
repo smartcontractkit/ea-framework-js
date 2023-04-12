@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../src/adapter'
 import { BaseAdapterSettings } from '../src/config'
-import { AdapterResponse } from '../src/util'
+import { AdapterResponse, isArray, isObject } from '../src/util'
 import { AdapterInputError } from '../src/validation/error'
 import { InputValidator } from '../src/validation/input-validator'
 import { validator } from '../src/validation/utils'
@@ -303,6 +303,33 @@ test.serial('invalid overrides object throws 400', async (t) => {
   t.is(error.statusCode, 400)
 })
 
+test.serial('invalid overrides property throws 400', async (t) => {
+  t.context.adapterEndpoint.inputParameters = {
+    base: {
+      type: 'string',
+      required: false,
+    },
+    quote: {
+      type: 'string',
+      required: false,
+    },
+  }
+  t.context.adapterEndpoint.validator = new InputValidator(
+    t.context.adapterEndpoint.inputParameters,
+  )
+
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 'OVER2',
+    quote: 'USD',
+    overrides: {
+      test: 'test',
+    },
+  })
+  t.is(error.statusCode, 400)
+})
+
+
 test.serial('invalid overrides key throws 400', async (t) => {
   t.context.adapterEndpoint.inputParameters = {
     base: {
@@ -517,6 +544,45 @@ test.serial('Test integer validator', async (t) => {
   value = 24
   error = integerValidator(value)
   t.is(error, 'Maximum allowed value is 20. Received 24')
+})
+
+test.serial('Test positive integer validator', async (t) => {
+  const positiveIntegerValidator = validator.positiveInteger()
+  let value = 11
+  let error = positiveIntegerValidator(value)
+  t.is(error, undefined)
+  value = -2
+  error = positiveIntegerValidator(value)
+  t.is(error, 'Value should be positive number, Received -2')
+})
+
+test.serial('Test isObject util function', async (t) => {
+  let value: string | number | [] | Record<string, string>  = 11
+  let result = isObject(value)
+  t.is(result, false)
+  value = 'test'
+  result = isObject(value)
+  value = []
+  result = isObject(value)
+  t.is(result, false)
+  value = {test: 'test'}
+  result = isObject(value)
+  t.is(result, true)
+})
+
+test.serial('Test isArray util function', async (t) => {
+  let value: string | number | [] | Record<string, string>  = 11
+  let result = isArray(value)
+  t.is(result, false)
+  value = 'test'
+  result = isArray(value)
+  t.is(result, false)
+  value = {test: 'test'}
+  result = isArray(value)
+  t.is(result, false)
+  value = []
+  result = isArray(value)
+  t.is(result, true)
 })
 
 test.serial('custom input validation', async (t) => {

@@ -26,13 +26,6 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       })
     }
 
-    if (!req.body) {
-      throw new AdapterInputError({
-        message: 'Body not present in adapter request, returning 400',
-        statusCode: 400,
-      })
-    }
-
     // We can restrict usage of the raw request body everywhere in the framework
     // by setting its type to EmptyBody, and we cast here (and only here)
     const requestBody = req.body as unknown as AdapterRequestBody

@@ -11,6 +11,7 @@ import {
   AdapterTimeoutError,
 } from '../src/validation/error'
 import { assertEqualResponses, NopTransport, NopTransportTypes, TestAdapter } from './util'
+import { ReplyError as RedisError } from 'ioredis'
 
 type TestContext = {
   testAdapter: TestAdapter
@@ -167,4 +168,21 @@ test('Adapter returns error when transport returns response with error message',
     statusCode: 502,
     errorMessage: 'test error message',
   })
+})
+
+test('RedisError returns 500', async (t) => {
+  const endpoint = new AdapterEndpoint<NopTransportTypes>({
+    name: 'TEST',
+    inputParameters: {},
+    transport: new (class extends NopTransport {
+      override async foregroundExecute() {
+        throw new RedisError('Error reply from redis')
+      }
+    })(),
+  })
+
+  const testAdapter = await makeAdapter(endpoint, t.context)
+  const error = await testAdapter.request({})
+  t.is(error.statusCode, 500)
+  t.is(error.body, 'Error reply from redis')
 })

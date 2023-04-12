@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
-import { Cache } from '../../src/cache'
-import { BaseSettingsDefinition, AdapterConfig } from '../../src/config'
+import { Cache, calculateCacheKey } from '../../src/cache'
+import { BaseSettingsDefinition, AdapterConfig, BaseAdapterSettings } from '../../src/config'
 import { AdapterRequest, AdapterResponse } from '../../src/util'
 import { InputValidator } from '../../src/validation/input-validator'
 import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
@@ -49,6 +49,22 @@ test.beforeEach(async (t) => {
         inputParameters: {},
         cacheKeyGenerator: (_) => {
           return `test:custom_cache_key`
+        },
+        transport: new (class extends NopTransport {
+          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Request']>) {
+            return {
+              data: null,
+              statusCode: 200,
+              result: req.requestContext.cacheKey as unknown,
+            } as AdapterResponse<NopTransportTypes['Response']>
+          }
+        })(),
+      }),
+      new AdapterEndpoint({
+        name: 'test-custom-cache-key-long',
+        inputParameters: {},
+        cacheKeyGenerator: (_) => {
+          return  `test:custom_cache_key_long_${'a'.repeat(200)}`
         },
         transport: new (class extends NopTransport {
           override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Request']>) {
@@ -145,4 +161,27 @@ test.serial('custom cache key', async (t) => {
     endpoint: 'test-custom-cache-key',
   })
   t.is(response.json().result, 'test:custom_cache_key')
+})
+
+test.serial('custom cache key is truncated if over max size', async (t) => {
+  const response = await t.context.testAdapter.request({
+    endpoint: 'test-custom-cache-key-long',
+  })
+  t.is(response.json().result, `test:custom_cache_key_long_${'a'.repeat(123)}`)
+})
+
+test.serial('throws error when cache data is not object', async (t) => {
+  try {
+    calculateCacheKey({
+      transportName: 'test',
+      data: 'test',
+      inputParameters: { base: { type: 'string', required: true } },
+      adapterName: 'test',
+      endpointName: 'test',
+      adapterSettings: {} as BaseAdapterSettings
+    })
+    t.fail()
+  } catch (e: unknown) {
+    t.pass()
+  }
 })

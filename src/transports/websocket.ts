@@ -359,14 +359,19 @@ export class WebSocketTransport<
     // Send messages only if the connection is open
     // Otherwise we could encounter the case where we just closed the connection because there's no desired ones,
     // but without this check we'd attempt to send out all the unsubscribe messages
-    if (!connectionClosed && this.config.builders) {
+    if (!connectionClosed) {
       logger.debug('Connection is open, sending subs/unsubs if there are any')
-      const { subscribeMessage, unsubscribeMessage } = this.config.builders
-      await this.sendMessages(
-        context,
-        subscribeMessage ? subscriptions.new.map(subscribeMessage) : subscriptions.new,
-        unsubscribeMessage ? subscriptions.stale.map(unsubscribeMessage) : subscriptions.stale,
-      )
+      const builders = this.config.builders
+      if (builders) {
+        const { subscribeMessage, unsubscribeMessage } = builders
+        await this.sendMessages(
+          context,
+          subscribeMessage ? subscriptions.new.map(subscribeMessage) : subscriptions.new,
+          unsubscribeMessage ? subscriptions.stale.map(unsubscribeMessage) : subscriptions.stale,
+        )
+      } else {
+        await this.sendMessages(context, subscriptions.new, subscriptions.stale)
+      }
     }
 
     // Record WS message and subscription metrics

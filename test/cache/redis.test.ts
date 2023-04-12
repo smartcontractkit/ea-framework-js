@@ -53,6 +53,65 @@ test.beforeEach(async (t) => {
 
 cacheTests()
 
+test.serial('redis client is initialized with options', async (t) => {
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        CACHE_TYPE: 'redis',
+        CACHE_REDIS_PORT: 6542
+      },
+    },
+  )
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'nowork',
+        inputParameters: {},
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+
+   const testAdapter  = await TestAdapter.start(adapter, t.context)
+   const client = testAdapter.adapter.dependencies.redisClient
+   t.is(client instanceof Redis, true)
+   t.is (client.options.port, 6542)
+})
+
+test.serial('redis client is initialized with url', async (t) => {
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        CACHE_TYPE: 'redis',
+        CACHE_REDIS_URL: 'redis://127.0.0.1:6543',
+      },
+    },
+  )
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'nowork',
+        inputParameters: {},
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+
+  const testAdapter  = await TestAdapter.start(adapter, t.context)
+  const client = testAdapter.adapter.dependencies.redisClient
+  t.is(client instanceof Redis, true)
+  t.is (client.options.port, 6543)
+})
+
+
 test.serial('running adapter throws on cache error', async (t) => {
   const data = {
     base: 'force-error', // Having this as a part of the cache key forces a cache error on RedisMock.set

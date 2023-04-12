@@ -8,6 +8,7 @@ import {
   highestRateLimitTiers,
 } from '../src/rate-limiting'
 import { NopTransport } from './util'
+import { RateLimiterFactory, RateLimitingStrategy } from '../src/rate-limiting/factory'
 
 test('empty tiers in rate limiting fails on startup', async (t) => {
   const adapter = new Adapter({
@@ -469,3 +470,22 @@ test('test build highest rate limits from config second, minute)', async (t) => 
   const highestRateLimitTier = highestRateLimitTiers(adapter.rateLimiting?.tiers)
   t.is(highestRateLimitTier, 4)
 })
+
+test('returns 0 when limit is set to infinity, no tier limit specified', async (t) => {
+ const burstRateLimiter =  RateLimiterFactory.buildRateLimiter(
+    RateLimitingStrategy.BURST,
+  ).initialize([], {})
+  const time = burstRateLimiter.msUntilNextExecution()
+  t.is(time, 0)
+})
+
+test('highestRateLimitTiers errors when no tiers are provided', async (t) => {
+  await t.throwsAsync(
+    async () =>
+      highestRateLimitTiers({}),
+    {
+      message: 'The tiers object is defined, but has no entries',
+    },
+  )
+})
+
