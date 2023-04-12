@@ -67,7 +67,7 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
     options: () => {
       return {
         headers: {
-          'x-auth-token': 'token'
+          'x-auth-token': 'token',
         },
       }
     },
@@ -87,7 +87,7 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
               result: message.value,
               timestamps: {
                 providerIndicatedTimeUnixMs: Date.now(),
-              }
+              },
             },
           },
         ]
@@ -342,14 +342,11 @@ test.serial('reconnects if provider stops sending expected messages', async (t) 
   const mockWsServer = new Server(URL, { mock: false })
   let connectionCounter = 0
 
-
   mockWsServer.on('connection', (socket) => {
     let counter = 0
     const parseMessage = () => {
       if (counter++ === 0) {
-        socket.send(
-          JSON.stringify({error: ''}),
-        )
+        socket.send(JSON.stringify({ error: '' }))
       }
     }
     connectionCounter++
@@ -545,107 +542,104 @@ test.serial(
   },
 )
 
-test.serial(
-  'does not crash the server when new connection errors',
-  async (t) => {
-    const base = 'ETH'
-    const quote = 'DOGE'
-    process.env['METRICS_ENABLED'] = 'true'
-    eaMetrics.clear()
+test.serial('does not crash the server when new connection errors', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  process.env['METRICS_ENABLED'] = 'true'
+  eaMetrics.clear()
 
-    // Mock WS
-    mockWebSocketProvider(WebSocketClassProvider)
-    const mockWsServer = new Server(URL, { mock: false })
-    mockWsServer.on('connection', (socket) => {
-      socket.on('message', () => {
-        socket.send(
-          JSON.stringify({
-            pair: `${base}/${quote}`,
-            value: price,
-          }),
-        )
-      })
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(URL, { mock: false })
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', () => {
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
     })
+  })
 
-    const transport = new WebSocketTransport<WebSocketTypes>({
-      // Changing the url so that the connection will error on initial request
-      url: () => `${URL}test`,
-      handlers: {
-        message(message) {
-          const [curBase, curQuote] = message.pair.split('/')
-          return [
-            {
-              params: { base: curBase, quote: curQuote },
-              response: {
-                data: {
-                  result: message.value,
-                },
+  const transport = new WebSocketTransport<WebSocketTypes>({
+    // Changing the url so that the connection will error on initial request
+    url: () => `${URL}test`,
+    handlers: {
+      message(message) {
+        const [curBase, curQuote] = message.pair.split('/')
+        return [
+          {
+            params: { base: curBase, quote: curQuote },
+            response: {
+              data: {
                 result: message.value,
               },
+              result: message.value,
             },
-          ]
-        },
+          },
+        ]
       },
-      builders: {
-        subscribeMessage: (params: AdapterRequestParams) => ({
-          request: 'subscribe',
-          pair: `${params.base}/${params.quote}`,
-        }),
-        unsubscribeMessage: (params: AdapterRequestParams) => ({
-          request: 'unsubscribe',
-          pair: `${params.base}/${params.quote}`,
-        }),
+    },
+    builders: {
+      subscribeMessage: (params: AdapterRequestParams) => ({
+        request: 'subscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+      unsubscribeMessage: (params: AdapterRequestParams) => ({
+        request: 'unsubscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+    },
+  })
+
+  const webSocketEndpoint = new AdapterEndpoint({
+    name: 'TEST',
+    transport: transport,
+    inputParameters,
+  })
+
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
       },
-    })
+    },
+  )
 
-    const webSocketEndpoint = new AdapterEndpoint({
-      name: 'TEST',
-      transport: transport,
-      inputParameters,
-    })
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [webSocketEndpoint],
+  })
 
-    const config = new AdapterConfig(
-      {},
-      {
-        envDefaultOverrides: {
-          BACKGROUND_EXECUTE_MS_WS,
-        },
-      },
-    )
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-    const adapter = new Adapter({
-      name: 'TEST',
-      defaultEndpoint: 'test',
-      config,
-      endpoints: [webSocketEndpoint],
-    })
+  const error = await testAdapter.request({
+    base,
+    quote,
+  })
+  t.is(error.statusCode, 504)
 
-    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
 
-    const error = await testAdapter.request({
-      base,
-      quote,
-    })
-    t.is(error.statusCode, 504)
+  const metrics = await testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'ws_connection_errors',
+    labels: {
+      message: 'undefined',
+    },
+    expectedValue: 1,
+  })
 
-    await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
-
-    const metrics = await testAdapter.getMetrics()
-    metrics.assert(t, {
-      name: 'ws_connection_errors',
-      labels: {
-        message: "undefined"
-      },
-      expectedValue: 1,
-    })
-
-    process.env['METRICS_ENABLED'] = 'false'
-    t.pass()
-    await testAdapter.api.close()
-    mockWsServer.close()
-    await t.context.clock.runAllAsync()
-  },
-)
+  process.env['METRICS_ENABLED'] = 'false'
+  t.pass()
+  await testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runAllAsync()
+})
 
 test.serial('does not hang the background execution if the open handler hangs', async (t) => {
   const base = 'ETH'

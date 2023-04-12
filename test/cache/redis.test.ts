@@ -59,7 +59,7 @@ test.serial('redis client is initialized with options', async (t) => {
     {
       envDefaultOverrides: {
         CACHE_TYPE: 'redis',
-        CACHE_REDIS_PORT: 6542
+        CACHE_REDIS_PORT: 6542,
       },
     },
   )
@@ -76,10 +76,10 @@ test.serial('redis client is initialized with options', async (t) => {
     ],
   })
 
-   const testAdapter  = await TestAdapter.start(adapter, t.context)
-   const client = testAdapter.adapter.dependencies.redisClient
-   t.is(client instanceof Redis, true)
-   t.is (client.options.port, 6542)
+  const testAdapter = await TestAdapter.start(adapter, t.context)
+  const client = testAdapter.adapter.dependencies.redisClient
+  t.is(client instanceof Redis, true)
+  t.is(client.options.port, 6542)
 })
 
 test.serial('redis client is initialized with url', async (t) => {
@@ -105,12 +105,11 @@ test.serial('redis client is initialized with url', async (t) => {
     ],
   })
 
-  const testAdapter  = await TestAdapter.start(adapter, t.context)
+  const testAdapter = await TestAdapter.start(adapter, t.context)
   const client = testAdapter.adapter.dependencies.redisClient
   t.is(client instanceof Redis, true)
-  t.is (client.options.port, 6543)
+  t.is(client.options.port, 6543)
 })
-
 
 test.serial('running adapter throws on cache error', async (t) => {
   const data = {

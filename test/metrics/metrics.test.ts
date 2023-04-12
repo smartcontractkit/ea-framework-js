@@ -293,7 +293,7 @@ test('invalid metric name throws error', async (t) => {
   const metrics = new Metrics(() => ({}))
   const error = await t.throws(() =>
     // @ts-expect-error - there is a type check for this, but we want to check it in runtime
-    metrics.get('invalid_name')
+    metrics.get('invalid_name'),
   )
   t.is(error?.message, 'Metric "invalid_name" was not initialized before use')
 })

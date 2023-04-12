@@ -42,10 +42,9 @@ test.serial('Test bad env name', async (t) => {
   try {
     getEnv('$#%', {} as SettingDefinition)
     t.fail()
-  }catch (e: unknown) {
+  } catch (e: unknown) {
     t.pass()
   }
-
 })
 
 test.serial('Test custom settings', async (t) => {

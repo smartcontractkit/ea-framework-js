@@ -64,7 +64,7 @@ test.beforeEach(async (t) => {
         name: 'test-custom-cache-key-long',
         inputParameters: {},
         cacheKeyGenerator: (_) => {
-          return  `test:custom_cache_key_long_${'a'.repeat(200)}`
+          return `test:custom_cache_key_long_${'a'.repeat(200)}`
         },
         transport: new (class extends NopTransport {
           override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Request']>) {
@@ -178,7 +178,7 @@ test.serial('throws error when cache data is not object', async (t) => {
       inputParameters: { base: { type: 'string', required: true } },
       adapterName: 'test',
       endpointName: 'test',
-      adapterSettings: {} as BaseAdapterSettings
+      adapterSettings: {} as BaseAdapterSettings,
     })
     t.fail()
   } catch (e: unknown) {

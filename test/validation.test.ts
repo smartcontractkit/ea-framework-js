@@ -329,7 +329,6 @@ test.serial('invalid overrides property throws 400', async (t) => {
   t.is(error.statusCode, 400)
 })
 
-
 test.serial('invalid overrides key throws 400', async (t) => {
   t.context.adapterEndpoint.inputParameters = {
     base: {
@@ -557,7 +556,7 @@ test.serial('Test positive integer validator', async (t) => {
 })
 
 test.serial('Test isObject util function', async (t) => {
-  let value: string | number | [] | Record<string, string>  = 11
+  let value: string | number | [] | Record<string, string> = 11
   let result = isObject(value)
   t.is(result, false)
   value = 'test'
@@ -565,19 +564,19 @@ test.serial('Test isObject util function', async (t) => {
   value = []
   result = isObject(value)
   t.is(result, false)
-  value = {test: 'test'}
+  value = { test: 'test' }
   result = isObject(value)
   t.is(result, true)
 })
 
 test.serial('Test isArray util function', async (t) => {
-  let value: string | number | [] | Record<string, string>  = 11
+  let value: string | number | [] | Record<string, string> = 11
   let result = isArray(value)
   t.is(result, false)
   value = 'test'
   result = isArray(value)
   t.is(result, false)
-  value = {test: 'test'}
+  value = { test: 'test' }
   result = isArray(value)
   t.is(result, false)
   value = []

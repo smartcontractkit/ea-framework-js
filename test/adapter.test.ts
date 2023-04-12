@@ -73,7 +73,7 @@ test('Bootstrap function runs if provided', async (t) => {
     ],
     bootstrap: async (ea) => {
       ea.name = 'BOOTSTRAPPED'
-    }
+    },
   })
   await start(adapter)
   t.is(adapter.name, 'BOOTSTRAPPED')
@@ -94,7 +94,7 @@ test.serial('Throws when transport.registerRequest errors', async (t) => {
     ],
   })
 
-  const testAdapter = await TestAdapter.start(adapter, {testAdapter: {} as TestAdapter})
+  const testAdapter = await TestAdapter.start(adapter, { testAdapter: {} as TestAdapter })
   const error = await testAdapter.request({
     endpoint: 'test',
   })

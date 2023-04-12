@@ -144,9 +144,6 @@ test('Initialize adapter twice (error)', async (t) => {
     await start(adapter)
     t.fail()
   } catch (e: unknown) {
-    t.is(
-      (e as Error).message,
-      'This adapter has already been initialized!',
-    )
+    t.is((e as Error).message, 'This adapter has already been initialized!')
   }
 })

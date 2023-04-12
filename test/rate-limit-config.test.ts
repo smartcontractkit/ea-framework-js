@@ -472,7 +472,7 @@ test('test build highest rate limits from config second, minute)', async (t) => 
 })
 
 test('returns 0 when limit is set to infinity, no tier limit specified', async (t) => {
- const burstRateLimiter =  RateLimiterFactory.buildRateLimiter(
+  const burstRateLimiter = RateLimiterFactory.buildRateLimiter(
     RateLimitingStrategy.BURST,
   ).initialize([], {})
   const time = burstRateLimiter.msUntilNextExecution()
@@ -480,12 +480,7 @@ test('returns 0 when limit is set to infinity, no tier limit specified', async (
 })
 
 test('highestRateLimitTiers errors when no tiers are provided', async (t) => {
-  await t.throwsAsync(
-    async () =>
-      highestRateLimitTiers({}),
-    {
-      message: 'The tiers object is defined, but has no entries',
-    },
-  )
+  await t.throwsAsync(async () => highestRateLimitTiers({}), {
+    message: 'The tiers object is defined, but has no entries',
+  })
 })
-

@@ -24,7 +24,7 @@ type PriceTestTypes = {
     Params: unknown
   }
   Response: {
-    Data: null | {result: number}
+    Data: null | { result: number }
     Result: number
   }
   Settings: BaseAdapterSettings
@@ -195,7 +195,7 @@ test('inverts result if matching includes are present in request', async (t) => 
   const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
     result: 1 / 1234,
     data: {
-      result: 1 / 1234
+      result: 1 / 1234,
     },
     statusCode: 200,
     timestamps: {
