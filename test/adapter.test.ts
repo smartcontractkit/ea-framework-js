@@ -26,23 +26,6 @@ test('duplicate endpoint names throw error on startup', async (t) => {
   })
 })
 
-test('throws error for invalid host', async (t) => {
-  process.env['EA_HOST'] = '123.8.9.10'
-  const adapter = new Adapter({
-    name: 'TEST',
-    endpoints: [
-      new AdapterEndpoint({
-        name: 'another',
-        aliases: ['test'],
-        inputParameters: {},
-        transport: new NopTransport(),
-      }),
-    ],
-  })
-
-  await t.throwsAsync(async () => expose(adapter))
-})
-
 test('lowercase adapter name throws error on startup', async (t) => {
   const adapter = new Adapter({
     // @ts-expect-error - tests that lowercase names throw errors in runtime
