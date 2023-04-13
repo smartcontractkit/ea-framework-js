@@ -184,7 +184,7 @@ export const BaseSettingsDefinition = {
     type: 'number',
     description: 'Retry count for failed HTTP requests',
     default: 1,
-    validate: validator.integer({ min: 1, max: 10 }),
+    validate: validator.integer({ min: 0, max: 10 }),
   },
   SSE_KEEPALIVE_SLEEP: {
     description: 'Maximum amount of time (in ms) between each SSE keepalive request',
