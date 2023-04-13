@@ -63,22 +63,6 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       adapter.config.settings,
     )
 
-    if (
-      adapter.config.settings.METRICS_ENABLED &&
-      adapter.config.settings.EXPERIMENTAL_METRICS_ENABLED
-    ) {
-      // Add metrics meta which includes feedId to the request
-      // Perform prior to overrides to maintain consistent Feed IDs across adapters
-      const metrics = getMetricsMeta(
-        {
-          inputParameters: endpoint.inputParameters,
-          adapterSettings: adapter.config.settings,
-        },
-        validatedData,
-      )
-      req.requestContext = { ...req.requestContext, meta: { metrics } }
-    }
-
     // Custom input validation defined in the EA
     const error =
       endpoint.customInputValidation && endpoint.customInputValidation(req, adapter.config.settings)
@@ -90,6 +74,22 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     // Run any request transforms that might have been defined in the adapter.
     // This is the last time modifications are supposed to happen to the request.
     endpoint.runRequestTransforms(req)
+
+    if (
+      adapter.config.settings.METRICS_ENABLED &&
+      adapter.config.settings.EXPERIMENTAL_METRICS_ENABLED
+    ) {
+      // Add metrics meta which includes feedId to the request
+      // Perform after overrides to maintain consistent Feed IDs across the same adapter
+      const metrics = getMetricsMeta(
+        {
+          inputParameters: endpoint.inputParameters,
+          adapterSettings: adapter.config.settings,
+        },
+        validatedData,
+      )
+      req.requestContext = { ...req.requestContext, meta: { metrics } }
+    }
 
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {
