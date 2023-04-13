@@ -14,7 +14,7 @@ import { InputParameters } from '../validation/input-params'
 import { Cache, calculateCacheKey, calculateFeedId } from './'
 import * as cacheMetrics from './metrics'
 import { validator } from '../validation/utils'
-import  CensorList from '../util/censor/censor-list'
+import CensorList from '../util/censor/censor-list'
 
 const logger = makeLogger('ResponseCache')
 
@@ -64,7 +64,7 @@ export class ResponseCache<
       let censoredResponse
       if (!censorList.length) {
         censoredResponse = r.response
-      }else {
+      } else {
         try {
           censoredResponse = censor(r.response, censorList, true) as TimestampedAdapterResponse<
             T['Response']
