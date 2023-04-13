@@ -14,7 +14,7 @@ import { InputParameters } from '../validation/input-params'
 import { Cache, calculateCacheKey, calculateFeedId } from './'
 import * as cacheMetrics from './metrics'
 import { validator } from '../validation/utils'
-import CensorList from '../util/censor/censor-list'
+import  CensorList from '../util/censor/censor-list'
 
 const logger = makeLogger('ResponseCache')
 
@@ -61,12 +61,27 @@ export class ResponseCache<
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
     const censorList = CensorList.getAll()
     const entries = results.map((r) => {
-      const censoredResponse = censor(r.response, censorList) as TimestampedAdapterResponse<
-        T['Response']
-      >
+      let censoredResponse
+      if (!censorList.length) {
+        censoredResponse = r.response
+      }else {
+        try {
+          censoredResponse = censor(r.response, censorList, true) as TimestampedAdapterResponse<
+            T['Response']
+          >
+        } catch (error) {
+          logger.error(`Error censoring response: ${error}`)
+          censoredResponse = {
+            statusCode: 502,
+            errorMessage: 'Response could not be censored due to an error',
+            timestamps: r.response.timestamps,
+          }
+        }
+      }
+
       const response: AdapterResponse<T['Response']> = {
         ...censoredResponse,
-        statusCode: (r.response as TimestampedProviderErrorResponse).statusCode || 200,
+        statusCode: (censoredResponse as TimestampedProviderErrorResponse).statusCode || 200,
       }
 
       if (
