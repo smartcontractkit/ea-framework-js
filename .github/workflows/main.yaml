@@ -33,6 +33,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup
       - run: |
+          # Check for test.only() in test files
           set +e
             files=$(find ${{ github.workspace }}/test -name "*.test.ts" | xargs grep -l 'test.only')
           set -e
