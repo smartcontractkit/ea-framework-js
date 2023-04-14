@@ -41,7 +41,7 @@ export class NopTransport implements Transport<NopTransportTypes> {
   }
 
   async foregroundExecute(
-    req: AdapterRequest<NopTransportTypes['Request']>,
+    _: AdapterRequest<NopTransportTypes['Request']>,
   ): Promise<void | AdapterResponse<NopTransportTypes['Response']>> {
     return
   }
@@ -201,7 +201,7 @@ class TestMetrics {
       }
 
       const [nameAndLabels, stringValue] = line.split(' ')
-      const [_, name, rawLabels] = nameAndLabels.match(/^([a-z_]+){(.*)}$/) as string[]
+      const [, name, rawLabels] = nameAndLabels.match(/^([a-z_]+){(.*)}$/) as string[]
       const sortedLabels = this.replaceQuotes(rawLabels)
         .split('",')
         .filter((label) => label !== '' && !label.startsWith('app_'))
@@ -289,7 +289,7 @@ export class TestAdapter<T extends SettingsDefinitionMap = SettingsDefinitionMap
     adapter: Adapter<T>,
     context: ExecutionContext<{
       clock?: InstalledClock
-      testAdapter: TestAdapter<any>
+      testAdapter: TestAdapter<T>
     }>['context'],
     dependencies?: Partial<AdapterDependencies>,
   ) {

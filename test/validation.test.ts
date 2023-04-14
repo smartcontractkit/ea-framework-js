@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../src/adapter'
 import { BaseAdapterSettings } from '../src/config'
-import { AdapterResponse, isArray, isObject } from '../src/util'
+import { AdapterRequest, AdapterResponse, isArray, isObject } from '../src/util'
 import { AdapterInputError } from '../src/validation/error'
 import { InputValidator } from '../src/validation/input-validator'
 import { validator } from '../src/validation/utils'
@@ -605,8 +605,8 @@ test.serial('custom input validation', async (t) => {
       required: true,
     },
   }
-  const customInputValidation = (input: any, _: BaseAdapterSettings) => {
-    if (input.requestContext.data.base === input.requestContext.data.quote) {
+  const customInputValidation = (input: AdapterRequest, _: BaseAdapterSettings) => {
+    if (input.requestContext.data['base'] === input.requestContext.data['quote']) {
       return new AdapterInputError({ statusCode: 400 })
     }
   }

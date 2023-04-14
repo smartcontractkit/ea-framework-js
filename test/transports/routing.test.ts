@@ -130,7 +130,7 @@ class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<any>): Promise<void> {
+  override async backgroundExecute(context: EndpointContext<WebSocketTypes>): Promise<void> {
     this.backgroundExecuteCalls++
     return super.backgroundExecute(context)
   }
@@ -181,8 +181,8 @@ class MockHttpTransport extends HttpTransport<HttpTypes> {
           },
         }
       },
-      parseResponse: (params: AdapterRequestParams[], res: AxiosResponse<any>) => {
-        return res.data.prices.map((p: any) => {
+      parseResponse: (params: AdapterRequestParams[], res: AxiosResponse) => {
+        return res.data.prices.map((p: { pair: string; price: number }) => {
           const [base, quote] = p.pair.split('/')
           return {
             params: { from: base, to: quote },
@@ -193,7 +193,7 @@ class MockHttpTransport extends HttpTransport<HttpTypes> {
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<any>): Promise<void> {
+  override async backgroundExecute(context: EndpointContext<HttpTypes>): Promise<void> {
     this.backgroundExecuteCalls++
     if (this.callSuper) {
       super.backgroundExecute(context)
@@ -258,7 +258,7 @@ class MockSseTransport extends SseTransport<SSETypes> {
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<any>): Promise<void> {
+  override async backgroundExecute(context: EndpointContext<SSETypes>): Promise<void> {
     this.backgroundExecuteCalls++
     return super.backgroundExecute(context)
   }
@@ -346,7 +346,7 @@ test.serial('endpoint routing can route to HttpTransport', async (t) => {
   })
 
   t.is(error.statusCode, 504)
-  const internalTransport = transports.get('batch') as MockHttpTransport
+  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -357,7 +357,7 @@ test.serial('endpoint routing can route to WebSocket transport', async (t) => {
     transport: 'WEBSOCKET',
   })
   t.is(error?.statusCode, 504)
-  const internalTransport = transports.get('websocket') as MockWebSocketTransport
+  const internalTransport = transports.get('websocket') as unknown as MockWebSocketTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -383,7 +383,7 @@ test.serial('endpoint routing can route to SSE transport', async (t) => {
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports.get('sse') as MockSseTransport
+  const internalTransport = transports.get('sse') as unknown as MockSseTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -445,7 +445,7 @@ test.serial('custom router is applied to get valid transport to route to', async
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports.get('batch') as MockHttpTransport
+  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -630,7 +630,7 @@ test.serial('missing transport in input params with default succeeds', async (t)
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports.get('batch') as MockHttpTransport
+  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
