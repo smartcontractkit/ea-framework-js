@@ -2,9 +2,11 @@ import { AdapterDependencies } from '../adapter'
 import { AdapterSettings } from '../config'
 import {
   AdapterResponse,
+  censor,
   makeLogger,
   RequestGenerics,
   ResponseGenerics,
+  TimestampedAdapterResponse,
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
 } from '../util'
@@ -12,6 +14,7 @@ import { InputParameters } from '../validation/input-params'
 import { Cache, calculateCacheKey, calculateFeedId } from './'
 import * as cacheMetrics from './metrics'
 import { validator } from '../validation/utils'
+import CensorList from '../util/censor/censor-list'
 
 const logger = makeLogger('ResponseCache')
 
@@ -56,10 +59,29 @@ export class ResponseCache<
    * @param results - the entries to write to the cache
    */
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+    const censorList = CensorList.getAll()
     const entries = results.map((r) => {
+      let censoredResponse
+      if (!censorList.length) {
+        censoredResponse = r.response
+      } else {
+        try {
+          censoredResponse = censor(r.response, censorList, true) as TimestampedAdapterResponse<
+            T['Response']
+          >
+        } catch (error) {
+          logger.error(`Error censoring response: ${error}`)
+          censoredResponse = {
+            statusCode: 502,
+            errorMessage: 'Response could not be censored due to an error',
+            timestamps: r.response.timestamps,
+          }
+        }
+      }
+
       const response: AdapterResponse<T['Response']> = {
-        ...r.response,
-        statusCode: (r.response as TimestampedProviderErrorResponse).statusCode || 200,
+        ...censoredResponse,
+        statusCode: (censoredResponse as TimestampedProviderErrorResponse).statusCode || 200,
       }
 
       if (

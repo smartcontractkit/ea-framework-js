@@ -67,9 +67,9 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
     {
       envDefaultOverrides: {
         MTLS_ENABLED: true,
-        TLS_PRIVATE_KEY: 'test',
-        TLS_PUBLIC_KEY: 'test',
-        TLS_CA: 'test',
+        TLS_PRIVATE_KEY: 'dGVzdA==',
+        TLS_PUBLIC_KEY: 'dGVzdA==',
+        TLS_CA: 'dGVzdA==',
       },
     },
   )
@@ -87,6 +87,7 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
   try {
     await start(adapter)
   } catch (e: unknown) {
+    console.log(e)
     t.pass()
   }
 })

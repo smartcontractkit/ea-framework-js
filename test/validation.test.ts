@@ -526,8 +526,16 @@ test.serial('Test response timestamp validator', async (t) => {
 
 test.serial('Test base64 validator', async (t) => {
   const base64Validator = validator.base64()
-  let value = 'test'
+  // @ts-expect-error - testing invalid input
+  let value: string = -1
   let error = base64Validator(value)
+  t.is(error, 'Value is not valid base64 string.')
+  // @ts-expect-error - testing invalid input
+  value = undefined
+  error = base64Validator(value)
+  t.is(error, 'Value is not valid base64 string.')
+  value = 'test'
+  error = base64Validator(value)
   t.is(error, 'Value is not valid base64 string.')
   value = 'dGVzdA=='
   error = base64Validator(value)
