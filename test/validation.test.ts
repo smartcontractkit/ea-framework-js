@@ -555,7 +555,7 @@ test.serial('Test integer validator', async (t) => {
   t.is(error, 'Maximum allowed value is 20. Received 24')
 })
 
-test.only('Test positive integer validator', async (t) => {
+test.serial('Test positive integer validator', async (t) => {
   const positiveIntegerValidator = validator.positiveInteger()
   let value = 11
   let error = positiveIntegerValidator(value)
