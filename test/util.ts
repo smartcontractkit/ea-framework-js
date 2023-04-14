@@ -125,14 +125,14 @@ export class RedisMock {
     return new CommandChainMock(this)
   }
 
-  function(subcommand: 'LOAD', replace: 'REPLACE', functionCode: string) {
-    const match = functionCode.match(/name=(\w+)/)
-    const libName = match?.[1]
-    return Promise.resolve(libName)
+  defineCommand(
+    _name: 'setExternalAdapterResponse',
+    _options: { lua: string; numberOfKeys: number },
+  ) {
+    return
   }
 
-  // eslint-disable-next-line max-params
-  fcall(fnName: string, numOfKeys: number, key: string, value: string, ttl: number) {
+  setExternalAdapterResponse(key: string, value: string, ttl: number) {
     return this.set(key, value, 'PX', ttl)
   }
 }
@@ -148,8 +148,8 @@ class CommandChainMock {
   }
 
   // eslint-disable-next-line max-params
-  fcall(fnName: string, numOfKeys: number, key: string, value: string, ttl: number) {
-    this.promises.push(this.redisMock.fcall(fnName, numOfKeys, key, value, ttl))
+  setExternalAdapterResponse(key: string, value: string, ttl: number) {
+    this.promises.push(this.redisMock.setExternalAdapterResponse(key, value, ttl))
     return this
   }
 

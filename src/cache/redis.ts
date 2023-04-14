@@ -1,8 +1,14 @@
-import Redis from 'ioredis'
+import Redis, { Result } from 'ioredis'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { AdapterResponse, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
 import { cacheMetricsLabel, cacheSet, CacheTypes } from './metrics'
+
+declare module 'ioredis' {
+  interface RedisCommander<Context> {
+    setExternalAdapterResponse(key: string, value: string, ttl: number): Result<string, Context>
+  }
+}
 
 const logger = makeLogger('RedisCache')
 
@@ -16,31 +22,27 @@ export class RedisCache<T = unknown> implements Cache<T> {
   type = CacheTypes.Redis
 
   constructor(private client: Redis) {
-    this.loadFunctions()
+    this.defineCommands()
   }
 
-  async loadFunctions() {
-    // Load custom function 'setExternalAdapterResponse' with lua script to redis that will skip overwriting successful cache response if the new value is error response
-    const source = `#!lua name=ea
-          redis.register_function('setExternalAdapterResponse', function(keys, args)
-            local key = keys[1]
-            local value = args[1]
-            local ttl = tonumber(args[2])
-            local json_value = cjson.decode(value)
-            local key_exists = redis.call('EXISTS', key)
-            if json_value.errorMessage and key_exists == 1 then
-              local existing_json_value = cjson.decode(redis.call('GET', key))
-                if existing_json_value.errorMessage then
-                  return redis.call('SET', key, value, 'PX', ttl)
-                else
-                  return nil
-                end
-            else
-              return redis.call('SET', key, value, 'PX', ttl)
-            end
-          end)`
-
-    this.client.function('LOAD', 'REPLACE', source)
+  defineCommands() {
+    // Load custom lua script 'setExternalAdapterResponse' to redis that will skip overwriting successful cache response if the new value is error response
+    const lua = `local key = KEYS[1]
+      local value = ARGV[1]
+      local ttl = tonumber(ARGV[2])
+      local json_value = cjson.decode(value)
+      local key_exists = redis.call('EXISTS', key)
+      if json_value.errorMessage and key_exists == 1 then
+        local existing_json_value = cjson.decode(redis.call('GET', key))
+          if existing_json_value.errorMessage then
+            return redis.call('SET', key, value, 'PX', ttl)
+          else
+            return nil
+          end
+      else
+        return redis.call('SET', key, value, 'PX', ttl)
+      end`
+    this.client.defineCommand('setExternalAdapterResponse', { lua, numberOfKeys: 1 })
   }
 
   async get(key: string): Promise<Readonly<T> | undefined> {
@@ -68,10 +70,10 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
   async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
     logger.trace(`Setting key ${key}`)
-    await this.client.fcall('setExternalAdapterResponse', 1, key, JSON.stringify(value), ttl)
+    await this.client.setExternalAdapterResponse(key, JSON.stringify(value), ttl)
 
     // Record set command sent to Redis
-    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'set')
+    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'setExternalAdapterResponse')
   }
 
   async setMany(entries: CacheEntry<Readonly<T>>[], ttl: number): Promise<void> {
@@ -80,13 +82,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
     let chain = this.client.multi()
 
     for (const entry of entries) {
-      chain = chain.fcall(
-        'setExternalAdapterResponse',
-        1,
-        entry.key,
-        JSON.stringify(entry.value),
-        ttl,
-      )
+      chain = chain.setExternalAdapterResponse(entry.key, JSON.stringify(entry.value), ttl)
     }
 
     await chain.exec()
