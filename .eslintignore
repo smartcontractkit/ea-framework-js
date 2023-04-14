@@ -4,6 +4,8 @@ node_modules
 dist
 # don't lint coverage output
 coverage
+# don't lint eslintrc
+.eslintrc.js
 
 .yarn
 .vscode

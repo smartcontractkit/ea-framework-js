@@ -202,8 +202,8 @@ test.serial('reconnects when url changed', async (t) => {
   mockWsServer.on('connection', (socket) => {
     connectionCounter++
 
-    const parseMessage = (message: any) => {
-      const parsed = JSON.parse(message)
+    const parseMessage = (message: string | ArrayBuffer | Blob | ArrayBufferView) => {
+      const parsed = JSON.parse(message as string)
       socket.send(
         JSON.stringify({
           pair: `${parsed.base}/${parsed.quote}`,
@@ -667,7 +667,7 @@ test.serial('does not hang the background execution if the open handler hangs', 
     url: () => URL,
     handlers: {
       async open() {
-        return new Promise((res, rej) => {
+        return new Promise((res) => {
           if (execution === 0) {
             execution++
             setTimeout(res, 15_000)
