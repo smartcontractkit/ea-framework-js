@@ -2,14 +2,14 @@ import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { AdapterConfig } from '../../src/config'
+import { AdapterConfig, SettingsDefinitionFromConfig } from '../../src/config'
 
 import { AdapterRequest } from '../../src/util'
 import { assertEqualResponses, NopTransport, TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
-  testAdapter: TestAdapter
+  testAdapter: TestAdapter<SettingsDefinitionFromConfig<typeof config>>
   api: FastifyInstance | undefined
 }>
 
@@ -56,7 +56,7 @@ test.serial('sensitive settings are censored in the response cache', async (t) =
                 response: {
                   data: {
                     result: price,
-                    api_key: `API KEY for request ${apiKey}`
+                    api_key: `API KEY for request ${apiKey}`,
                   } as unknown as null,
                   result: price as unknown as null,
                   timestamps: {
@@ -78,10 +78,10 @@ test.serial('sensitive settings are censored in the response cache', async (t) =
   assertEqualResponses(t, response.json(), {
     data: {
       result: price,
-      api_key: 'API KEY for request [API_KEY REDACTED]'
+      api_key: 'API KEY for request [API_KEY REDACTED]',
     },
     result: price,
-    statusCode: 200
+    statusCode: 200,
   })
 })
 
@@ -95,9 +95,9 @@ test.serial('writes error response when censoring fails', async (t) => {
       new AdapterEndpoint({
         name: 'test',
         inputParameters: {},
-        transport : new (class extends NopTransport {
+        transport: new (class extends NopTransport {
           override async foregroundExecute(req: AdapterRequest): Promise<void> {
-            const circular: any = {}
+            const circular: { circular?: unknown } = {}
             circular.circular = circular
             await this.responseCache.write(this.name, [
               {
@@ -114,7 +114,7 @@ test.serial('writes error response when censoring fails', async (t) => {
               },
             ])
           }
-        })()
+        })(),
       }),
     ],
   })
@@ -123,6 +123,6 @@ test.serial('writes error response when censoring fails', async (t) => {
   const response = await testAdapter.request({})
   assertEqualResponses(t, response.json(), {
     errorMessage: 'Response could not be censored due to an error',
-    statusCode: 502
+    statusCode: 502,
   })
 })
