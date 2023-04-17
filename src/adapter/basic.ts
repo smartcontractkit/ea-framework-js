@@ -254,6 +254,14 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
     const rateLimitingTier = getRateLimitingTier(this.config.settings, this.rateLimiting?.tiers)
 
+    if (rateLimitingTier) {
+      for (const limit of Object.values(rateLimitingTier)) {
+        if (limit && limit < 0) {
+          throw new Error('Rate limit must be a positive number')
+        }
+      }
+    }
+
     const highestTierValue = highestRateLimitTiers(this.rateLimiting?.tiers)
     const rateLimitTierFromConfig = buildRateLimitTiersFromConfig(this.config.settings)
     const perSecRateLimit = rateLimitTierFromConfig?.rateLimit1s || 0
@@ -267,12 +275,10 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
     if (perMinuteRateLimit > highestTierValue) {
       logger.warn(
-        `The configured ${
-          this.config.settings.RATE_LIMIT_CAPACITY_MINUTE
-            ? 'RATE_LIMIT_CAPACITY_MINUTE'
-            : 'RATE_LIMIT_CAPACITY'
-        } value (${perMinuteRateLimit}) is higher than the highest tier value the adapter rate limiting configurations (${
-          highestTierValue * 60
+        `The configured ${this.config.settings.RATE_LIMIT_CAPACITY_MINUTE
+          ? 'RATE_LIMIT_CAPACITY_MINUTE'
+          : 'RATE_LIMIT_CAPACITY'
+        } value (${perMinuteRateLimit}) is higher than the highest tier value the adapter rate limiting configurations (${highestTierValue * 60
         })`,
       )
     }
@@ -379,8 +385,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
       // Execute the registration handler without blocking
       logger.debug(
-        `Firing request registration handler${
-          cachedResponse ? ' (cached response already sent)' : ''
+        `Firing request registration handler${cachedResponse ? ' (cached response already sent)' : ''
         }`,
       )
 
