@@ -44,14 +44,14 @@ test('throws error if rate limit is a negative number', async (t) => {
     rateLimiting: {
       tiers: {
         free: {
-          rateLimit1s: 1,
-          rateLimit1m: -1,
+          rateLimit1s: undefined,
+          rateLimit1m: 1,
           rateLimit1h: -1
         },
         pro: {
           rateLimit1s: -1,
-          rateLimit1m: -1,
-          rateLimit1h: -1
+          rateLimit1m: 1,
+          rateLimit1h: 1
         }
       },
     },
