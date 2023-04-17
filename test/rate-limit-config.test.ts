@@ -46,7 +46,7 @@ test('throws error if rate limit is a negative number', async (t) => {
         free: {
           rateLimit1s: undefined,
           rateLimit1m: 1,
-          rateLimit1h: -1
+          rateLimit1h: -1.5
         },
         pro: {
           rateLimit1s: -1,
