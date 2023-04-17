@@ -46,7 +46,7 @@ The **prepareRequests**  method  takes the list of currently active input parame
 
 #### Send batch request to Data Provider
 
-The example above assumes that Data Provider doesn't support batching and each active input parameter will initiate request to Data Provider. Bellow is the example of batch version of prepareRequests
+The first example assumes that Data Provider doesn't support batching and each active input parameter will initiate request to Data Provider. Bellow is the example of batch version of prepareRequests
 
 ```typescript
 prepareRequests: (params, config) => {
@@ -142,12 +142,10 @@ export type EndpointTypes = {
 	Params: CryptoRequestParams // type for the EA endpoint input parameters
   }  
  Response: SingleNumberResultResponse // type of External Adapter response. `SingleNumberResultResponse` is a built in type that indicates that both `data` and `result` are numbers
- Settings: BaseAdapterSettings  // type of adapter config
+ Settings: BaseAdapterSettings // type of adapter config
  Provider: { 
-  RequestBody: never  // type of request body in the case of POST requests. This is usually `never` for GET requests, and is *not* the same as query params
-  ResponseBody: ProviderResponseBody  // interface of raw response body from Data Provider 
+  RequestBody: never // type of request body in the case of POST requests. This is usually `never` for GET requests, and is *not* the same as query params
+  ResponseBody: ProviderResponseBody // interface of raw response body from Data Provider
   }  
 }
 ```
-
- 
