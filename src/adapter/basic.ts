@@ -254,6 +254,14 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
     const rateLimitingTier = getRateLimitingTier(this.config.settings, this.rateLimiting?.tiers)
 
+    if (rateLimitingTier) {
+      for (const limit of Object.values(rateLimitingTier)) {
+        if (limit && limit < 0) {
+          throw new Error('Rate limit must be a positive number')
+        }
+      }
+    }
+
     const highestTierValue = highestRateLimitTiers(this.rateLimiting?.tiers)
     const rateLimitTierFromConfig = buildRateLimitTiersFromConfig(this.config.settings)
     const perSecRateLimit = rateLimitTierFromConfig?.rateLimit1s || 0
