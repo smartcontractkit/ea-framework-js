@@ -31,6 +31,37 @@ test('empty tiers in rate limiting fails on startup', async (t) => {
   })
 })
 
+test('throws error if rate limit is a negative number', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters: {},
+        transport: new NopTransport(),
+      }),
+    ],
+    rateLimiting: {
+      tiers: {
+        free: {
+          rateLimit1s: 1,
+          rateLimit1m: -1,
+          rateLimit1h: -1
+        },
+        pro: {
+          rateLimit1s: -1,
+          rateLimit1m: -1,
+          rateLimit1h: -1
+        }
+      },
+    },
+  })
+
+  await t.throwsAsync(async () => start(adapter), {
+    message: 'Rate limit must be a positive number',
+  })
+})
+
 test('selected tier is not a valid option', async (t) => {
   const config = new AdapterConfig(
     {},
