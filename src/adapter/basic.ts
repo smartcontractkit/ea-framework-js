@@ -275,10 +275,12 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
     if (perMinuteRateLimit > highestTierValue) {
       logger.warn(
-        `The configured ${this.config.settings.RATE_LIMIT_CAPACITY_MINUTE
-          ? 'RATE_LIMIT_CAPACITY_MINUTE'
-          : 'RATE_LIMIT_CAPACITY'
-        } value (${perMinuteRateLimit}) is higher than the highest tier value the adapter rate limiting configurations (${highestTierValue * 60
+        `The configured ${
+          this.config.settings.RATE_LIMIT_CAPACITY_MINUTE
+            ? 'RATE_LIMIT_CAPACITY_MINUTE'
+            : 'RATE_LIMIT_CAPACITY'
+        } value (${perMinuteRateLimit}) is higher than the highest tier value the adapter rate limiting configurations (${
+          highestTierValue * 60
         })`,
       )
     }
@@ -385,7 +387,8 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
       // Execute the registration handler without blocking
       logger.debug(
-        `Firing request registration handler${cachedResponse ? ' (cached response already sent)' : ''
+        `Firing request registration handler${
+          cachedResponse ? ' (cached response already sent)' : ''
         }`,
       )
 
