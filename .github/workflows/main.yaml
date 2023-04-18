@@ -24,7 +24,7 @@ jobs:
           main_version=$(node -pe "require('${{ github.workspace }}/package.json').version")
 
           if [ "$main_version" != "$current_version" ]; then
-           echo "Error: Package version on current branch ($current_package_version) does not match the one on ${{ github.base_ref }} branch ($main_package_version)"
+           echo "Error: Package version on current branch ($current_version) does not match the one on ${{ github.base_ref }} branch ($main_version)"
           exit 1
           fi
       - uses: actions/checkout@v3
