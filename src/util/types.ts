@@ -74,6 +74,8 @@ export type AdapterRequest<T extends RequestGenerics = RequestGenerics> =
  * Metadata for a particular request
  */
 export interface AdapterRequestMeta {
+  /** Name of the adapter */
+  adapterName?: string
   /** Relevant metrics gathered for this request */
   metrics?: AdapterMetricsMeta
 
