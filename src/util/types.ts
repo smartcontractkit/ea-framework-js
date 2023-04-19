@@ -74,13 +74,19 @@ export type AdapterRequest<T extends RequestGenerics = RequestGenerics> =
  * Metadata for a particular request
  */
 export interface AdapterRequestMeta {
-  /** Name of the adapter */
-  adapterName?: string
   /** Relevant metrics gathered for this request */
   metrics?: AdapterMetricsMeta
 
   /** An error that ocurred somewhere along this requests' lifecycle */
   error?: AdapterError | Error
+}
+
+/**
+ * Metadata for a particular response
+ */
+export interface AdapterResponseMeta extends AdapterRequestMeta {
+  /** Name of the adapter */
+  adapterName: string
 }
 
 /**
@@ -242,8 +248,8 @@ type TimestampedSuccessfulResponse<T extends ResponseGenerics> = PartialSuccessf
  * Full EA successful response, with metadata and defaults added
  */
 type SuccessfulResponse<T extends ResponseGenerics> = TimestampedSuccessfulResponse<T> & {
-  /** Metadata relevant to this request */
-  meta?: AdapterRequestMeta
+  /** Metadata relevant to this response */
+  meta?: AdapterResponseMeta
 
   /** HTTP status code, by default will be set to 200 */
   statusCode: number
