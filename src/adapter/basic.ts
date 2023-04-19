@@ -336,6 +336,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
         })
         req.requestContext.meta = {
           ...req.requestContext.meta,
+          adapterName: this.name,
           metrics: { ...req.requestContext.meta?.metrics, cacheHit: true },
         }
       }
