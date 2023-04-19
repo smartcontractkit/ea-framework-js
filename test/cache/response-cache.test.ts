@@ -3,7 +3,6 @@ import untypedTest, { TestFn } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { AdapterConfig, SettingsDefinitionFromConfig } from '../../src/config'
-
 import { AdapterRequest } from '../../src/util'
 import { assertEqualResponses, NopTransport, TestAdapter } from '../util'
 
