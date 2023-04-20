@@ -308,7 +308,7 @@ test.serial('validate response.meta has the correct properties', async (t) => {
       price,
     })
 
-  const response = await (await t.context.testAdapter.request({ from, to })).json()
+  const response = (await t.context.testAdapter.request({ from, to })).json()
 
   t.deepEqual(response.meta, {
     adapterName: 'TEST',
