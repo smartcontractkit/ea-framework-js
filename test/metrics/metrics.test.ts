@@ -297,3 +297,21 @@ test('invalid metric name throws error', async (t) => {
   )
   t.is(error?.message, 'Metric "invalid_name" was not initialized before use')
 })
+
+test.serial('validate response.meta has the correct properties', async (t) => {
+  axiosMock
+    .onGet(`${URL}${endpoint}`, {
+      base: from,
+      quote: to,
+    })
+    .reply(200, {
+      price,
+    })
+
+  const response = (await t.context.testAdapter.request({ from, to })).json()
+
+  t.deepEqual(response.meta, {
+    adapterName: 'TEST',
+    metrics: { feedId: '{"from":"eth","to":"usd"}' },
+  })
+})

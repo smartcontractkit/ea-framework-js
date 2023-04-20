@@ -89,6 +89,7 @@ export class ResponseCache<
         this.adapterSettings.EXPERIMENTAL_METRICS_ENABLED
       ) {
         response.meta = {
+          adapterName: this.adapterName,
           metrics: {
             feedId: calculateFeedId(
               {
