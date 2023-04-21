@@ -61,11 +61,17 @@ export class ResponseCache<
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
     const censorList = CensorList.getAll()
     const entries = results.map((r) => {
-      const {data, result, errorMessage} = r.response
+      const { data, result, errorMessage } = r.response
       if (!errorMessage && (data === undefined || data === null)) {
-        logger.warn(`The 'data' property of the response is ${data === undefined ? 'undefined' : 'null'}.`);
+        logger.warn(
+          `The 'data' property of the response is ${data === undefined ? 'undefined' : 'null'}.`,
+        )
       } else if (!errorMessage && (result === undefined || result === null)) {
-        logger.warn(`The 'result' property of the response is ${result === undefined ? 'undefined' : 'null'}.`);
+        logger.warn(
+          `The 'result' property of the response is ${
+            result === undefined ? 'undefined' : 'null'
+          }.`,
+        )
       }
       let censoredResponse
       if (!censorList.length) {
