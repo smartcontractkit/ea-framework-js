@@ -231,7 +231,7 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
       }
 
       // Validate each value from the array individually
-      return input.map(this.validateInputType)
+      return input.map((item) => this.validateInputType(item))
     } else {
       // We already know this won't be an array, but the generics are too complex for typescript
       // to infer by itself so we cast manually
@@ -240,9 +240,14 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
   }
 
   private validateInputType(input: NonArrayInputType<T>) {
+    // If we're here we've already checked this is not required
+    if (input == null) {
+      return
+    }
+
     // If the type is a nested input params object, use that to validate
-    if (this.definition.type instanceof InputParameters) {
-      return this.definition.type.validateInput(input)
+    if (this.type instanceof InputParameters) {
+      return this.type.validateInput(input)
     }
 
     // If the param has specified options, check that the input is one of them.
@@ -271,7 +276,7 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
   }
 
   private validateDefinition() {
-    const paramNames = new Set(...this.params.map((p) => p.name))
+    const paramNames = new Set(this.params.map((p) => p.name))
 
     // Check that aliases don't clash with other properties
     if (hasRepeatedValues(this.params.map((p) => p.aliases).flat())) {
@@ -309,7 +314,7 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
     for (const param of this.params) {
       for (const alias of param.aliases) {
         const value = data[alias]
-        if (!value) {
+        if (value == null) {
           continue
         }
         if (validated[param.name]) {
@@ -321,13 +326,18 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
         validated[param.name] = value
       }
 
-      // Perform all validations for the individual param value
-      param.validateInput(validated[param.name])
+      if (!validated[param.name] && param.definition.default) {
+        // If the parameter has a default value and we use it, we don't need to validate it as we've done it already
+        validated[param.name] = param.definition.default
+      } else {
+        // Perform all validations for the individual param value
+        param.validateInput(validated[param.name])
+      }
     }
 
     // We iterate again, now with the complete validated obj to check for dependencies and exclusions
     for (const param of this.params) {
-      if (!validated[param.name]) {
+      if (validated[param.name] == null) {
         continue
       }
 
@@ -354,12 +364,12 @@ export const validateOverrides = (input: { overrides?: Overrides }) => {
     return
   }
 
-  if (typeof input !== 'object') {
+  if (typeof input.overrides !== 'object') {
     throw new InputValidationError('Overrides should be an object')
   }
 
   for (const adapterName in input.overrides) {
-    const overrides = input.overrides
+    const overrides = input.overrides[adapterName]
     if (typeof overrides !== 'object') {
       throw new InputValidationError(`Overrides for adapter "${adapterName}" should be an object`)
     }

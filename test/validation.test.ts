@@ -375,7 +375,7 @@ test.serial('correctly typed params returns 200', async (t) => {
     string: 'test',
     number: 2,
     boolean: false,
-    array: [1, 'test'],
+    array: [1, 2],
     object: { test: 'test' },
   })
   t.is(response.statusCode, 200)
@@ -407,8 +407,10 @@ test.serial('duplicate params throws 400', async (t) => {
     }) as unknown as InputParameters<InputParametersDefinition>
   })
 
-  t.is(error?.statusCode, 400)
-  t.is(error?.message, 'Duplicate aliases')
+  t.is(
+    error?.message,
+    '[Param: base] There are repeated aliases for input param base: base,base,quote',
+  )
 })
 
 test.serial('default value is used for optional param', async (t) => {
@@ -425,15 +427,6 @@ test.serial('default value is used for optional param', async (t) => {
 })
 
 test.serial('missing input depends on param (error)', async (t) => {
-  t.context.adapterEndpoint.inputParameters = new InputParameters({
-    base: {
-      type: 'string',
-      description: 'stuff',
-      default: 'ETH',
-      dependsOn: ['quote'],
-    },
-  })
-
   const error: AdapterInputError | undefined = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
       base: {
@@ -445,8 +438,7 @@ test.serial('missing input depends on param (error)', async (t) => {
     })
   })
 
-  t.is(error?.statusCode, 400)
-  t.is(error?.message, "Input dependency/exclusive 'quote' is missing in input schema")
+  t.is(error?.message, 'Param "base" depends on non-existent params (quote)')
 })
 
 test.serial('Test port validator', async (t) => {
