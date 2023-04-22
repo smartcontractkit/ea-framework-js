@@ -1,9 +1,10 @@
 import untypedTest, { TestFn } from 'ava'
-import { Adapter, AdapterEndpoint, EndpointGenerics } from '../src/adapter'
+import { Adapter, AdapterEndpoint, CustomInputValidator, EndpointGenerics } from '../src/adapter'
 import { BaseAdapterSettings } from '../src/config'
 import { AdapterRequest, AdapterResponse, isArray, isObject } from '../src/util'
+import { InputParameters } from '../src/validation'
 import { AdapterInputError } from '../src/validation/error'
-import { InputValidator } from '../src/validation/input-validator'
+import { InputParametersDefinition } from '../src/validation/input-params'
 import { validator } from '../src/validation/utils'
 import { NopTransport, NopTransportTypes, TestAdapter } from './util'
 
@@ -18,7 +19,6 @@ test.beforeEach(async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           override async foregroundExecute(): Promise<void | AdapterResponse<
             NopTransportTypes['Response']
@@ -43,7 +43,7 @@ test.beforeEach(async (t) => {
  * for each one, we're just modifying the inputParameters and sending a new request every time
  */
 test.serial('any content-type other than application/json throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {}
+  t.context.adapterEndpoint.inputParameters = new InputParameters({})
 
   const error = await t.context.testAdapter.api.inject({
     url: '/',
@@ -57,7 +57,7 @@ test.serial('any content-type other than application/json throws 400', async (t)
 })
 
 test.serial('no body in request throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {}
+  t.context.adapterEndpoint.inputParameters = new InputParameters({})
 
   const error = await t.context.testAdapter.api.inject({
     url: '/',
@@ -71,36 +71,34 @@ test.serial('no body in request throws 400', async (t) => {
 })
 
 test.serial('invalid endpoint name throws 404', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {}
+  t.context.adapterEndpoint.inputParameters = new InputParameters({})
 
   const error = await t.context.testAdapter.request({ endpoint: 'random' })
   t.is(error.statusCode, 404)
 })
 
 test.serial('no endpoint without default throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {}
+  t.context.adapterEndpoint.inputParameters = new InputParameters({})
 
   const error = await t.context.testAdapter.request({})
   t.is(error.statusCode, 400)
 })
 
 test.serial('no params returns 200', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {}
+  t.context.adapterEndpoint.inputParameters = new InputParameters({})
 
   const response = await t.context.testAdapter.request({ endpoint: 'test' })
   t.is(response.statusCode, 200)
 })
 
 test.serial('missing required param throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
+      description: 'stuff',
       required: true,
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  })
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -109,15 +107,13 @@ test.serial('missing required param throws 400', async (t) => {
 })
 
 test.serial('wrongly typed string throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
+      description: 'stuff',
       required: true,
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  })
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -127,15 +123,13 @@ test.serial('wrongly typed string throws 400', async (t) => {
 })
 
 test.serial('wrongly typed number throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'number',
+      description: 'stuff',
       required: true,
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  })
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -145,15 +139,13 @@ test.serial('wrongly typed number throws 400', async (t) => {
 })
 
 test.serial('wrongly typed boolean throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'boolean',
+      description: 'stuff',
       required: true,
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  })
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -163,15 +155,13 @@ test.serial('wrongly typed boolean throws 400', async (t) => {
 })
 
 test.serial('wrongly typed array throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
-      type: 'array',
-      required: true,
+      type: 'string',
+      description: 'stuff',
+      array: true,
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -181,15 +171,19 @@ test.serial('wrongly typed array throws 400', async (t) => {
 })
 
 test.serial('wrongly typed object throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
-      type: 'object',
+      type: {
+        test: {
+          type: 'string',
+          description: 'stuff',
+          array: true,
+        },
+      },
+      description: 'stuff',
       required: true,
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -199,15 +193,12 @@ test.serial('wrongly typed object throws 400', async (t) => {
 })
 
 test.serial('wrongly typed optional param throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
-      required: false,
+      description: 'stuff',
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -217,16 +208,14 @@ test.serial('wrongly typed optional param throws 400', async (t) => {
 })
 
 test.serial('param not in options throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
+      description: 'stuff',
       required: true,
       options: ['ETH', 'BTC'],
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  })
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -236,19 +225,18 @@ test.serial('param not in options throws 400', async (t) => {
 })
 
 test.serial('missing dependent params throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
-      required: false,
+      description: 'stuff',
       dependsOn: ['quote'],
     },
     quote: {
-      required: false,
+      type: 'string',
+      description: 'stuff',
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
+
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
     base: 'ETH',
@@ -257,19 +245,17 @@ test.serial('missing dependent params throws 400', async (t) => {
 })
 
 test.serial('presented exclusive params throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
-      required: false,
+      description: 'stuff',
       exclusive: ['quote'],
     },
     quote: {
-      required: false,
+      type: 'string',
+      description: 'stuff',
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -280,19 +266,16 @@ test.serial('presented exclusive params throws 400', async (t) => {
 })
 
 test.serial('invalid overrides object throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
-      required: false,
+      description: 'stuff',
     },
     quote: {
       type: 'string',
-      required: false,
+      description: 'stuff',
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -304,19 +287,16 @@ test.serial('invalid overrides object throws 400', async (t) => {
 })
 
 test.serial('invalid overrides property throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
-      required: false,
+      description: 'stuff',
     },
     quote: {
       type: 'string',
-      required: false,
+      description: 'stuff',
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -330,19 +310,16 @@ test.serial('invalid overrides property throws 400', async (t) => {
 })
 
 test.serial('invalid overrides key throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
-      required: false,
+      description: 'stuff',
     },
     quote: {
       type: 'string',
-      required: false,
+      description: 'stuff',
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -360,31 +337,38 @@ test.serial('invalid overrides key throws 400', async (t) => {
 })
 
 test.serial('correctly typed params returns 200', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     string: {
       type: 'string',
+      description: 'stuff',
       required: true,
     },
     array: {
-      type: 'array',
-      required: true,
+      type: 'number',
+      array: true,
+      description: 'stuff',
     },
     object: {
-      type: 'object',
+      type: {
+        test: {
+          type: 'string',
+          description: 'stuff',
+        },
+      },
+      description: 'stuff',
       required: true,
     },
     boolean: {
       type: 'boolean',
+      description: 'stuff',
       required: true,
     },
     number: {
       type: 'number',
+      description: 'stuff',
       required: true,
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const response = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -398,15 +382,12 @@ test.serial('correctly typed params returns 200', async (t) => {
 })
 
 test.serial('omitted optional param returns 200', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
-      required: false,
+      description: 'stuff',
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const response = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -415,16 +396,15 @@ test.serial('omitted optional param returns 200', async (t) => {
 })
 
 test.serial('duplicate params throws 400', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
-    base: {
-      required: true,
-      aliases: ['base', 'quote'],
-    },
-  }
   const error: AdapterInputError | undefined = t.throws(() => {
-    t.context.adapterEndpoint.validator = new InputValidator(
-      t.context.adapterEndpoint.inputParameters,
-    )
+    new InputParameters({
+      base: {
+        type: 'string',
+        required: true,
+        description: 'stuff',
+        aliases: ['base', 'quote'],
+      },
+    }) as unknown as InputParameters<InputParametersDefinition>
   })
 
   t.is(error?.statusCode, 400)
@@ -432,52 +412,37 @@ test.serial('duplicate params throws 400', async (t) => {
 })
 
 test.serial('default value is used for optional param', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
-      required: false,
+      type: 'string',
+      description: 'stuff',
       default: 'ETH',
     },
-  }
+  })
 
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
-
-  const data = t.context.adapterEndpoint.validator.validateInput({})
+  const data = t.context.adapterEndpoint.inputParameters.validateInput({})
   t.is(data['base'], 'ETH')
 })
 
-test.serial('default value is used for required param (error)', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
-    base: {
-      required: true,
-      default: 'ETH',
-    },
-  }
-
-  const error: AdapterInputError | undefined = t.throws(() => {
-    t.context.adapterEndpoint.validator = new InputValidator(
-      t.context.adapterEndpoint.inputParameters,
-    )
-  })
-
-  t.is(error?.statusCode, 400)
-  t.is(error?.message, "base can't be required and have default value")
-})
-
 test.serial('missing input depends on param (error)', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
-      required: false,
+      type: 'string',
+      description: 'stuff',
       default: 'ETH',
       dependsOn: ['quote'],
     },
-  }
+  })
 
   const error: AdapterInputError | undefined = t.throws(() => {
-    t.context.adapterEndpoint.validator = new InputValidator(
-      t.context.adapterEndpoint.inputParameters,
-    )
+    t.context.adapterEndpoint.inputParameters = new InputParameters({
+      base: {
+        type: 'string',
+        description: 'stuff',
+        default: 'ETH',
+        dependsOn: ['quote'],
+      },
+    })
   })
 
   t.is(error?.statusCode, 400)
@@ -547,9 +512,6 @@ test.serial('Test integer validator', async (t) => {
   let value: string | number = 11
   let error = integerValidator(value)
   t.is(error, undefined)
-  value = '3'
-  error = integerValidator(value)
-  t.is(error, 'Value should be an integer (no floating point)., Received string 3')
   value = 3.141
   error = integerValidator(value)
   t.is(error, 'Value should be an integer (no floating point)., Received number 3.141')
@@ -603,27 +565,30 @@ test.serial('Test isArray util function', async (t) => {
 })
 
 test.serial('custom input validation', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  const inputParameters = new InputParameters({
     base: {
       type: 'string',
+      description: 'stuff',
       required: true,
     },
     quote: {
       type: 'string',
+      description: 'stuff',
       required: true,
     },
-  }
-  const customInputValidation = (input: AdapterRequest, _: BaseAdapterSettings) => {
+  })
+  t.context.adapterEndpoint.inputParameters = inputParameters
+  const customInputValidation = (
+    input: AdapterRequest<typeof inputParameters.definition>,
+    _: BaseAdapterSettings,
+  ) => {
     if (input.requestContext.data['base'] === input.requestContext.data['quote']) {
       return new AdapterInputError({ statusCode: 400 })
     }
   }
 
-  t.context.adapterEndpoint.customInputValidation = customInputValidation
-
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  t.context.adapterEndpoint.customInputValidation =
+    customInputValidation as CustomInputValidator<EndpointGenerics>
 
   const response = await t.context.testAdapter.request({
     base: 'BTC',
@@ -648,7 +613,6 @@ test.serial('limit size of input parameters', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           override async foregroundExecute(): Promise<void | AdapterResponse<
             NopTransportTypes['Response']
@@ -665,15 +629,13 @@ test.serial('limit size of input parameters', async (t) => {
   })
 
   t.context.adapterEndpoint = adapter.endpoints[0]
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     addresses: {
-      type: 'array',
-      required: true,
+      type: 'string',
+      array: true,
+      description: 'stuff',
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as unknown as InputParameters<InputParametersDefinition>
 
   const request = {
     addresses: [
