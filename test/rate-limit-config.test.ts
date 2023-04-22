@@ -3,12 +3,12 @@ import { start } from '../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../src/adapter'
 import { AdapterConfig } from '../src/config'
 import {
-  buildRateLimitTiersFromConfig,
   BurstRateLimiter,
+  buildRateLimitTiersFromConfig,
   highestRateLimitTiers,
 } from '../src/rate-limiting'
-import { NopTransport } from './util'
 import { RateLimiterFactory, RateLimitingStrategy } from '../src/rate-limiting/factory'
+import { NopTransport } from './util'
 
 test('empty tiers in rate limiting fails on startup', async (t) => {
   const adapter = new Adapter({
@@ -18,7 +18,6 @@ test('empty tiers in rate limiting fails on startup', async (t) => {
         name: 'test',
         aliases: ['qwe'],
         transport: new NopTransport(),
-        inputParameters: {},
       }),
     ],
     rateLimiting: {
@@ -37,7 +36,6 @@ test('throws error if rate limit is a negative number', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -77,7 +75,6 @@ test('selected tier is not a valid option', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -115,7 +112,6 @@ test('throws error if explicit allocation leaves no room for implicitly allocate
         endpoints: [
           new AdapterEndpoint({
             name: 'test',
-            inputParameters: {},
             transport: new NopTransport(),
             rateLimiting: {
               allocationPercentage: 100,
@@ -123,7 +119,6 @@ test('throws error if explicit allocation leaves no room for implicitly allocate
           }),
           new AdapterEndpoint({
             name: 'test2',
-            inputParameters: {},
             transport: new NopTransport(),
           }),
         ],
@@ -162,7 +157,6 @@ test('throws error if explicit allocation exceeds 100%', async (t) => {
         endpoints: [
           new AdapterEndpoint({
             name: 'test',
-            inputParameters: {},
             transport: new NopTransport(),
             rateLimiting: {
               allocationPercentage: 80,
@@ -170,7 +164,6 @@ test('throws error if explicit allocation exceeds 100%', async (t) => {
           }),
           new AdapterEndpoint({
             name: 'test2',
-            inputParameters: {},
             transport: new NopTransport(),
             rateLimiting: {
               allocationPercentage: 30,
@@ -200,7 +193,6 @@ test('uses most restrictive tier if none is specified in settings', async (t) =>
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
             t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
@@ -246,7 +238,6 @@ test('uses unlimited tier if none is specified in settings', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
             t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
@@ -287,7 +278,6 @@ test('uses specified tier if present in settings', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
             t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
@@ -337,7 +327,6 @@ test('test build rate limits from env vars (second, minute)', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -376,7 +365,6 @@ test('test build rate limits from env vars (second, capacity)', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -416,7 +404,6 @@ test('test build rate limits from env vars (second, minute, capacity)', async (t
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -456,7 +443,6 @@ test('test build rate limits from env vars (capacity)', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -483,7 +469,6 @@ test('test build highest rate limits from config second, minute)', async (t) => 
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],

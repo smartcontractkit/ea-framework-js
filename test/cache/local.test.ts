@@ -1,11 +1,11 @@
+import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { Cache, CacheFactory, LocalCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
-import { NopTransport, runAllUntilTime, TestAdapter } from '../util'
-import { BasicCacheSetterTransport } from './helper'
 import { PartialAdapterResponse } from '../../src/util'
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
-import untypedTest, { TestFn } from 'ava'
+import { NopTransport, TestAdapter, runAllUntilTime } from '../util'
+import { BasicCacheSetterTransport, cacheTestInputParameters } from './helper'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
@@ -31,21 +31,11 @@ test.beforeEach(async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {
-          base: {
-            type: 'string',
-            required: true,
-          },
-          factor: {
-            type: 'number',
-            required: true,
-          },
-        },
+        inputParameters: cacheTestInputParameters,
         transport: new BasicCacheSetterTransport(),
       }),
       new AdapterEndpoint({
         name: 'nowork',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],

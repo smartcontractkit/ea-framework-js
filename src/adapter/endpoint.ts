@@ -49,7 +49,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       )
     }
 
-    this.inputParameters = params.inputParameters
+    this.inputParameters = params.inputParameters || new InputParameters({})
     this.rateLimiting = params.rateLimiting
     this.cacheKeyGenerator = params.cacheKeyGenerator
     this.customInputValidation = params.customInputValidation

@@ -1,9 +1,10 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache, calculateCacheKey } from '../../src/cache'
-import { BaseSettingsDefinition, AdapterConfig, BaseAdapterSettings } from '../../src/config'
+import { AdapterConfig, BaseAdapterSettings, BaseSettingsDefinition } from '../../src/config'
 import { AdapterRequest, AdapterResponse } from '../../src/util'
-import { InputValidator } from '../../src/validation/input-validator'
+import { InputParameters } from '../../src/validation'
+import { InputParametersDefinition } from '../../src/validation/input-params'
 import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
@@ -28,9 +29,8 @@ test.beforeEach(async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
-          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Request']>) {
+          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Parameters']>) {
             return {
               data: null,
               statusCode: 200,
@@ -46,12 +46,11 @@ test.beforeEach(async (t) => {
       }),
       new AdapterEndpoint({
         name: 'test-custom-cache-key',
-        inputParameters: {},
         cacheKeyGenerator: (_) => {
           return `test:custom_cache_key`
         },
         transport: new (class extends NopTransport {
-          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Request']>) {
+          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Parameters']>) {
             return {
               data: null,
               statusCode: 200,
@@ -62,12 +61,11 @@ test.beforeEach(async (t) => {
       }),
       new AdapterEndpoint({
         name: 'test-custom-cache-key-long',
-        inputParameters: {},
         cacheKeyGenerator: (_) => {
           return `test:custom_cache_key_long_${'a'.repeat(200)}`
         },
         transport: new (class extends NopTransport {
-          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Request']>) {
+          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Parameters']>) {
             return {
               data: null,
               statusCode: 200,
@@ -92,35 +90,47 @@ test.serial('no parameters returns default cache key', async (t) => {
 })
 
 test.serial('builds cache key correctly from input params', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  const nestedParams = {
+    asd: {
+      type: 'string',
+      description: 'asd',
+    },
+    zxc: {
+      type: 'number',
+      description: 'zxc',
+    },
+  } as const
+
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
+      description: 'base',
       required: true,
     },
     quote: {
       type: 'string',
-      required: false,
+      description: 'quote',
     },
     factor: {
       type: 'number',
+      description: 'factor',
       required: true,
     },
     proper: {
       type: 'boolean',
-      required: false,
+      description: 'proper',
     },
     details: {
-      type: 'object',
+      type: nestedParams,
+      description: 'details',
       required: true,
     },
     nullable: {
-      type: 'object',
-      required: false,
+      type: nestedParams,
+      description: 'nullable',
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  }) as InputParameters<InputParametersDefinition>
+
   const response = await t.context.testAdapter.request({
     base: 'eth',
     factor: 123,
@@ -138,15 +148,14 @@ test.serial('builds cache key correctly from input params', async (t) => {
 })
 
 test.serial('cache key is truncated if over max size', async (t) => {
-  t.context.adapterEndpoint.inputParameters = {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
     base: {
       type: 'string',
+      description: 'base',
       required: true,
     },
-  }
-  t.context.adapterEndpoint.validator = new InputValidator(
-    t.context.adapterEndpoint.inputParameters,
-  )
+  })
+
   const response = await t.context.testAdapter.request({
     base: Array(100)
       .fill(null)
@@ -175,7 +184,9 @@ test.serial('throws error when cache data is not object', async (t) => {
     calculateCacheKey({
       transportName: 'test',
       data: 'test',
-      inputParameters: { base: { type: 'string', required: true } },
+      inputParameters: new InputParameters({
+        base: { type: 'string', description: 'base', required: true },
+      }),
       adapterName: 'test',
       endpointName: 'test',
       adapterSettings: {} as BaseAdapterSettings,

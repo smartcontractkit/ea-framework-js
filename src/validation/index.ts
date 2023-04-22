@@ -12,7 +12,7 @@ import {
   AdapterRequestContext,
 } from '../util/types'
 import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
-import { InputParametersDefinition } from './input-params'
+import { InputParametersDefinition, validateOverrides } from './input-params'
 export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
@@ -55,6 +55,8 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       })
     }
 
+    // Validate the incoming data and normalize
+    validateOverrides(requestBody.data)
     const validatedData = endpoint.inputParameters.validateInput(requestBody.data)
 
     req.requestContext = {

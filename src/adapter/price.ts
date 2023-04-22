@@ -1,6 +1,10 @@
 import { SettingsDefinitionMap } from '../config'
 import { AdapterRequest, AdapterRequestContext, AdapterResponse } from '../util'
-import { InputParameter, InputParametersDefinition } from '../validation/input-params'
+import {
+  InputParameter,
+  InputParameters,
+  InputParametersDefinition,
+} from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams, PriceEndpointGenerics } from './index'
 
@@ -23,7 +27,7 @@ export type PriceEndpointInputParameters = InputParametersDefinition & {
 /**
  * Base input parameter config that any [[PriceEndpoint]] must extend
  */
-export const priceEndpointInputParameters = {
+export const priceEndpointInputParametersDefinition = {
   base: {
     aliases: ['from', 'coin'],
     type: 'string',
@@ -62,7 +66,7 @@ type IncludesMap = Record<string, Record<string, IncludeDetails>>
 export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {
   constructor(
     params: AdapterEndpointParams<T> & {
-      inputParametersDefinition: PriceEndpointInputParameters
+      inputParameters: InputParameters<PriceEndpointInputParameters>
     },
   ) {
     super(params)
@@ -172,7 +176,7 @@ const DEFAULT_ALIASES = ['crypto', 'price']
 export class CryptoPriceEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {
   constructor(
     params: AdapterEndpointParams<T> & {
-      inputParametersDefinition: PriceEndpointInputParameters
+      inputParameters: InputParameters<PriceEndpointInputParameters>
     },
   ) {
     if (!params.aliases) {

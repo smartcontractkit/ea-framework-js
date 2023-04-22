@@ -3,7 +3,7 @@ import { start } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
 import { AdapterConfig, SettingsDefinitionMap } from '../src/config'
 import CensorList from '../src/util/censor/censor-list'
-import { censor, colorFactory, COLORS } from '../src/util/logger'
+import { COLORS, censor, colorFactory } from '../src/util/logger'
 import { NopTransport } from './util'
 
 test.before(async () => {
@@ -22,7 +22,6 @@ test.before(async () => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],

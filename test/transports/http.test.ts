@@ -11,7 +11,7 @@ import { RateLimitingStrategy } from '../../src/rate-limiting/factory'
 import { HttpTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse, sleep } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { assertEqualResponses, MockCache, runAllUntil, runAllUntilTime, TestAdapter } from '../util'
+import { MockCache, TestAdapter, assertEqualResponses, runAllUntil, runAllUntilTime } from '../util'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
@@ -58,10 +58,21 @@ test.afterEach(async (t) => {
   await t.context.testAdapter?.api.close()
 })
 
+const inputParameters = new InputParameters({
+  from: {
+    type: 'string',
+    description: 'from',
+    required: true,
+  },
+  to: {
+    type: 'string',
+    description: 'to',
+    required: true,
+  },
+})
+
 type HttpTransportTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
   Settings: BaseAdapterSettings
   Provider: {
@@ -160,17 +171,6 @@ axiosMock
     ],
   })
   .reply(500, 'There was an unexpected issue')
-
-const inputParameters = {
-  from: {
-    type: 'string',
-    required: true,
-  },
-  to: {
-    type: 'string',
-    required: true,
-  },
-} as const
 
 test.serial('sends request to DP and returns response', async (t) => {
   const adapter = new Adapter({
@@ -971,9 +971,7 @@ test.serial(
 
     const buildTransport = (path: 'price' | 'volume') =>
       new HttpTransport<{
-        Request: {
-          Params: AdapterRequestParams
-        }
+        Parameters: typeof inputParameters.definition
         Response: SingleNumberResultResponse
         Settings: BaseAdapterSettings
         Provider: {
@@ -1110,16 +1108,18 @@ test.serial(
 test.serial('builds HTTP request queue key correctly from input params', async (t) => {
   const endpointName = 'test'
   const adapterSettings = buildAdapterSettings({})
-  const params: InputParameters = {
+  const params = new InputParameters({
     base: {
       type: 'string',
+      description: 'base',
       required: true,
     },
     quote: {
       type: 'string',
+      description: 'quote',
       required: true,
     },
-  }
+  })
   const data = { base: 'ETH', quote: 'BTC' }
   t.is(
     calculateHttpRequestKey({

@@ -9,13 +9,11 @@ test('duplicate endpoint names throw error on startup', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
       new AdapterEndpoint({
         name: 'another',
         aliases: ['test'],
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -33,7 +31,6 @@ test('lowercase adapter name throws error on startup', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -50,7 +47,6 @@ test('Bootstrap function runs if provided', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -67,7 +63,6 @@ test.serial('Throws when transport.registerRequest errors', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           async registerRequest() {
             throw new Error('Error from registerRequest')

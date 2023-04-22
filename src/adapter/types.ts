@@ -138,7 +138,7 @@ export interface BaseAdapterEndpointParams<T extends EndpointGenerics> {
   aliases?: string[]
 
   /** Specification of what the body of a request hitting this endpoint should look like (used for validation) */
-  inputParameters: InputParameters<T['Parameters']>
+  inputParameters?: InputParameters<T['Parameters']>
 
   /** Specific details related to the rate limiting for this endpoint in particular */
   rateLimiting?: EndpointRateLimitingConfig

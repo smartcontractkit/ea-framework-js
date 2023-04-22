@@ -17,7 +17,7 @@ import {
   WebSocketTransport,
 } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { mockWebSocketProvider, TestAdapter } from '../util'
+import { TestAdapter, mockWebSocketProvider } from '../util'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter<SettingsDefinitionFromConfig<typeof adapterConfig>>
@@ -30,11 +30,6 @@ interface ProviderRequestBody {
 
 interface ProviderResponseBody {
   price: number
-}
-
-interface AdapterRequestParams {
-  from: string
-  to: string
 }
 
 interface ProviderMessage {
@@ -59,9 +54,7 @@ const websocketUrl = 'wss://test-ws.com/asd'
 const axiosMock = new MockAdapter(axios)
 
 type BaseEndpointTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: {
     Data: {
       price: number
@@ -81,7 +74,7 @@ const from = 'ETH'
 const to = 'USD'
 const price = 1500
 
-const inputParameters = {
+const inputParameters = new InputParameters({
   from: {
     description: 'from',
     required: true,
@@ -92,7 +85,7 @@ const inputParameters = {
     required: true,
     type: 'string',
   },
-} satisfies InputParameters
+})
 
 class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
   public backgroundExecuteCalls = 0
@@ -118,11 +111,11 @@ class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
         },
       },
       builders: {
-        subscribeMessage: (params: AdapterRequestParams) => ({
+        subscribeMessage: (params) => ({
           request: 'subscribe',
           pair: `${params.from}/${params.to}`,
         }),
-        unsubscribeMessage: (params: AdapterRequestParams) => ({
+        unsubscribeMessage: (params) => ({
           request: 'unsubscribe',
           pair: `${params.from}/${params.to}`,
         }),
@@ -168,7 +161,7 @@ class MockHttpTransport extends HttpTransport<HttpTypes> {
 
   constructor(private callSuper = false) {
     super({
-      prepareRequests: (params: AdapterRequestParams[]) => {
+      prepareRequests: (params) => {
         return {
           params,
           request: {
@@ -181,7 +174,7 @@ class MockHttpTransport extends HttpTransport<HttpTypes> {
           },
         }
       },
-      parseResponse: (params: AdapterRequestParams[], res: AxiosResponse) => {
+      parseResponse: (params, res: AxiosResponse) => {
         return res.data.prices.map((p: { pair: string; price: number }) => {
           const [base, quote] = p.pair.split('/')
           return {

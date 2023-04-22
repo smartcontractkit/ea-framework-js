@@ -3,7 +3,7 @@ import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosRequestConfig } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
+import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
 import { SSEConfig, SseTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
@@ -18,26 +18,21 @@ const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
 }>
 
-interface AdapterRequestParams {
-  base: string
-  quote: string
-}
-
-export const inputParameters = {
+export const inputParameters = new InputParameters({
   base: {
     type: 'string',
+    description: 'base',
     required: true,
   },
   quote: {
     type: 'string',
+    description: 'quote',
     required: true,
   },
-} satisfies InputParameters
+})
 
 type StreamEndpointTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
   Settings: BaseAdapterSettings
   Provider: {

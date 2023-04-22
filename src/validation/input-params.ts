@@ -89,10 +89,12 @@ export type InputParameter =
 
 export type InputParametersDefinition = Record<string, InputParameter>
 
+type ProperInputParametersDefinition = InputParametersDefinition & {
+  [K in ReservedInputParameterNames]?: never
+}
+
 export type TypeFromDefinition<T extends InputParametersDefinition> = {
   [K in keyof T]: TypeFromParameter<T[K]>
-} & {
-  [K in ReservedInputParameterNames]?: never
 }
 
 // Type TypeFromInputParameters<D extends InputParametersDefinition, T extends InputParameters<D>> = TypeFromDefinition<T['definition']>
@@ -255,7 +257,7 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
 
 const hasRepeatedValues = (array: string[]) => array.length !== new Set(array).size
 
-export class InputParameters<const T extends InputParametersDefinition> {
+export class InputParameters<const T extends ProperInputParametersDefinition> {
   params: ProcessedParam[]
 
   constructor(public definition: T) {
