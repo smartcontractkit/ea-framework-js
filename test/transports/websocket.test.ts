@@ -2,7 +2,7 @@ import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import {
   WebSocketClassProvider,
@@ -48,7 +48,7 @@ const price = 251324
 type WebSocketTypes = {
   Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     WsMessage: ProviderMessage
   }

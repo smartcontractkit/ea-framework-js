@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { Cache } from '../../src/cache'
-import { BaseAdapterSettings } from '../../src/config'
+import { EmptyCustomSettings } from '../../src/config'
 import { AdapterRequest } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
@@ -31,7 +31,7 @@ export type CacheTestTransportTypes = {
     Data: null
     Result: number
   }
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
 }
 
 export class BasicCacheSetterTransport extends NopTransport<CacheTestTransportTypes> {

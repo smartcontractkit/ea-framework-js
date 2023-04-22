@@ -10,7 +10,7 @@ import {
   priceEndpointInputParametersDefinition,
 } from '../src/adapter'
 import { ResponseCache } from '../src/cache/response'
-import { BaseAdapterSettings } from '../src/config'
+import { EmptyCustomSettings } from '../src/config'
 import { Transport } from '../src/transports'
 import { AdapterRequest, AdapterResponse } from '../src/util'
 import { InputParameters } from '../src/validation'
@@ -27,7 +27,7 @@ type PriceTestTypes = {
     Data: { result: number }
     Result: number
   }
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
 }
 
 class PriceTestTransport implements Transport<PriceTestTypes> {
@@ -62,11 +62,6 @@ const buildAdapter = async (
     name: 'TEST',
     endpoints: [
       new PriceEndpoint({
-        name: 'test',
-        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
-        transport: new PriceTestTransport(mockResponse),
-      }),
-      new CryptoPriceEndpoint({
         name: 'test',
         inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
         transport: new PriceTestTransport(mockResponse),

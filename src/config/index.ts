@@ -535,6 +535,7 @@ export type Settings<T extends SettingsDefinitionMap> = {
 }
 
 export type BaseAdapterSettings = Settings<BaseSettingsDefinitionType>
+export type EmptyCustomSettings = BaseAdapterSettings
 export type AdapterSettings<T extends CustomSettingsDefinition<T> = object> = Settings<T> &
   BaseAdapterSettings &
   SettingsObjectSpecifier

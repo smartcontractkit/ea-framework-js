@@ -7,7 +7,7 @@ import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
 import { Cache, LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
-import { BaseAdapterSettings, SettingsDefinitionMap } from '../src/config'
+import { EmptyCustomSettings, SettingsDefinitionMap } from '../src/config'
 import {
   Transport,
   TransportDependencies,
@@ -23,7 +23,7 @@ export type NopTransportTypes = {
     Data: null
     Result: null
   }
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
 }
 
 export class NopTransport<T extends TransportGenerics = NopTransportTypes> implements Transport<T> {

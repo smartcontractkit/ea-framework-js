@@ -151,6 +151,7 @@ test.serial('Test cache key collision across adapters', async (t) => {
 
   const data = {
     base: 'eth',
+    factor: 123,
   }
 
   // Populate cache
@@ -161,5 +162,7 @@ test.serial('Test cache key collision across adapters', async (t) => {
   const cacheResponseA = await testAdapterA.request(data)
   const cacheResponseB = await testAdapterB.request(data)
 
+  t.is(cacheResponseA.statusCode, 200)
+  t.is(cacheResponseB.statusCode, 200)
   t.not(cacheResponseA.json().result, cacheResponseB.json().result)
 })

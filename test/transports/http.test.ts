@@ -5,7 +5,7 @@ import MockAdapter from 'axios-mock-adapter'
 import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { calculateHttpRequestKey } from '../../src/cache'
-import { AdapterConfig, BaseAdapterSettings, buildAdapterSettings } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings, buildAdapterSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import { RateLimitingStrategy } from '../../src/rate-limiting/factory'
 import { HttpTransport } from '../../src/transports'
@@ -22,11 +22,6 @@ const test = untypedTest as TestFn<{
 const URL = 'http://test-url.com'
 const endpoint = '/price'
 const axiosMock = new MockAdapter(axios)
-
-interface AdapterRequestParams {
-  from: string
-  to: string
-}
 
 interface ProviderRequestBody {
   pairs: Array<{
@@ -74,7 +69,7 @@ const inputParameters = new InputParameters({
 type HttpTransportTypes = {
   Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
@@ -105,7 +100,7 @@ class MockHttpTransport extends HttpTransport<HttpTransportTypes> {
         },
       }),
       parseResponse: (
-        params: AdapterRequestParams[],
+        params,
         res: AxiosResponse<ProviderResponseBody>,
       ): ProviderResult<HttpTransportTypes>[] =>
         res.data.prices?.map((p) => {
@@ -542,7 +537,7 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
           },
         }),
         parseResponse: (
-          params: AdapterRequestParams[],
+          params,
           res: AxiosResponse<ProviderVolumeResponseBody>,
         ): ProviderResult<HttpVolumeTransportTypes>[] =>
           res.data.volumes?.map((p) => {
@@ -973,7 +968,7 @@ test.serial(
       new HttpTransport<{
         Parameters: typeof inputParameters.definition
         Response: SingleNumberResultResponse
-        Settings: BaseAdapterSettings
+        Settings: EmptyCustomSettings
         Provider: {
           RequestBody: ProviderRequestBody
           ResponseBody: {

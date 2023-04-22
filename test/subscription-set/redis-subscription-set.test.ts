@@ -4,7 +4,7 @@ import axios, { AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import Redis, { ScanStream } from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
-import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { HttpTransport, TransportRoutes } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
@@ -85,7 +85,7 @@ const axiosMock = new MockAdapter(axios)
 type BaseEndpointTypes = {
   Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
 }
 
 type BatchEndpointTypes = BaseEndpointTypes & {

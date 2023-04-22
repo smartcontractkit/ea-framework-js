@@ -1,6 +1,6 @@
 import { AxiosResponse } from 'axios'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings } from '../../src/config'
+import { EmptyCustomSettings } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
@@ -38,7 +38,7 @@ interface ProviderResponseBody {
 type HttpEndpointTypes = {
   Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
