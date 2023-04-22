@@ -1,33 +1,8 @@
-import { AdapterInputError } from "./error"
+import { Overrides, ReservedInputParameterNames } from '../util'
+import { AdapterInputError } from './error'
 
 /* INPUT TYPE VALIDATIONS */
 export type Override = Map<string, Map<string, string>>
-
-// Type ParameterType = 'bigint' | 'boolean' | 'array' | 'number' | 'object' | 'string'
-
-// export type InputParameter = {
-//   aliases?: readonly string[]
-//   description?: string
-//   type?: ParameterType
-//   required?: boolean
-//   options?: unknown[] // Enumerated options, ex. ['ADA', 'BTC', 'ETH']
-//   default?: unknown
-//   dependsOn?: readonly string[] // Other inputs this one depends on
-//   exclusive?: readonly string[] // Other inputs that cannot be present with this one
-// }
-
-// // Improve this, it's counting these with endopint and transport as undefined but existing
-// export type InputParameters = {
-//   [name: string]: InputParameter
-// } & {
-//   [K in ReservedInputParameterNames]?: never
-// }
-
-// export type SpecificInputParameters<T> = {
-//   [K in keyof T]: InputParameter
-// }
-
-// ---------------- Refactor ------------------
 
 type PrimitiveParameterTypeString = 'boolean' | 'number' | 'string'
 
@@ -106,72 +81,80 @@ type ArrayInputParameter = BaseInputParameter & {
   required?: never
 }
 
-type InputParameter = OptionalInputParameter | InputParameterWithDefault | RequiredInputParameter | ArrayInputParameter
+export type InputParameter =
+  | OptionalInputParameter
+  | InputParameterWithDefault
+  | RequiredInputParameter
+  | ArrayInputParameter
 
-type InputParametersDefinition = Record<string, InputParameter>
+export type InputParametersDefinition = Record<string, InputParameter>
 
-type TypeFromDefinition<T extends InputParametersDefinition> = {
+export type TypeFromDefinition<T extends InputParametersDefinition> = {
   [K in keyof T]: TypeFromParameter<T[K]>
+} & {
+  [K in ReservedInputParameterNames]?: never
 }
 
-const nestedParam = {
-  nestedStringParam: {
-    description: 'nested string',
-    type: 'string',
-  },
-  nestedRequiredNumberParam: {
-    description: 'nested number',
-    type: 'number',
-    required: true,
-  },
-  nestedDefaultBooleanParam: {
-    description: 'nested boolean',
-    type: 'boolean',
-    default: true,
-  },
-} as const satisfies InputParametersDefinition
+// Type TypeFromInputParameters<D extends InputParametersDefinition, T extends InputParameters<D>> = TypeFromDefinition<T['definition']>
 
-const paramsDefinition = {
-  stringParam: {
-    description: 'asd',
-    type: 'string',
-    options: ['asd', 'qwe']
-  },
-  numberParam: {
-    description: 'asd',
-    type: 'number',
-  },
-  requiredParam: {
-    description: 'asd',
-    type: 'boolean',
-    required: true,
-  },
-  defaultStringParam: {
-    description: 'string',
-    type: 'string',
-    default: 'qwe',
-  },
-  stringArrayParam: {
-    description: 'string',
-    type: 'string',
-    array: true,
-  },
-  numberArrayParam: {
-    description: 'numberArray',
-    type: 'number',
-    array: true,
-  },
-  objectParam: {
-    description: 'object',
-    type: nestedParam,
-  },
-} as const satisfies InputParametersDefinition
+// const nestedParam = {
+//   nestedStringParam: {
+//     description: 'nested string',
+//     type: 'string',
+//   },
+//   nestedRequiredNumberParam: {
+//     description: 'nested number',
+//     type: 'number',
+//     required: true,
+//   },
+//   nestedDefaultBooleanParam: {
+//     description: 'nested boolean',
+//     type: 'boolean',
+//     default: true,
+//   },
+// } as const satisfies InputParametersDefinition
+
+// const paramsDefinition = {
+//   stringParam: {
+//     description: 'asd',
+//     type: 'string',
+//     options: ['asd', 'qwe']
+//   },
+//   numberParam: {
+//     description: 'asd',
+//     type: 'number',
+//   },
+//   requiredParam: {
+//     description: 'asd',
+//     type: 'boolean',
+//     required: true,
+//   },
+//   defaultStringParam: {
+//     description: 'string',
+//     type: 'string',
+//     default: 'qwe',
+//   },
+//   stringArrayParam: {
+//     description: 'string',
+//     type: 'string',
+//     array: true,
+//   },
+//   numberArrayParam: {
+//     description: 'numberArray',
+//     type: 'number',
+//     array: true,
+//   },
+//   objectParam: {
+//     description: 'object',
+//     type: nestedParam,
+//   },
+// } as const satisfies InputParametersDefinition
 
 class InputValidationError extends AdapterInputError {
   constructor(message: string) {
     super({
       statusCode: 400,
-      message
+      message,
     })
   }
 }
@@ -183,11 +166,10 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
   options?: Set<string>
   type: PrimitiveParameterTypeString | InputParameters<InputParametersDefinition>
 
-
-
   constructor(public name: string, public definition: T) {
     this.aliases = [this.name, ...(this.definition.aliases || [])]
-    this.type = typeof definition.type === 'object' ? new InputParameters(definition.type) : definition.type
+    this.type =
+      typeof definition.type === 'object' ? new InputParameters(definition.type) : definition.type
 
     if (definition.options) {
       this.options = new Set(definition.options)
@@ -207,28 +189,28 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
     // Check that there are no repeated aliases
     if (hasRepeatedValues(this.aliases)) {
       throw this.definitionError(
-        `There are repeated aliases for input param ${this.name}: ${this.aliases}`
+        `There are repeated aliases for input param ${this.name}: ${this.aliases}`,
       )
     }
 
     // Check that the default specified complies with the param type
     if (this.definition.default && typeof this.definition.default !== this.definition.type) {
       throw this.definitionError(
-        `The specified default "${this.definition.default}" does not comply with the param type "${this.definition.type}"`
+        `The specified default "${this.definition.default}" does not comply with the param type "${this.definition.type}"`,
       )
     }
 
     // Check that every option complies with the param type
-    if (this.definition.options?.some(o => typeof o !== this.definition.type)) {
+    if (this.definition.options?.some((o) => typeof o !== this.definition.type)) {
       throw this.definitionError(
-        `The options specified (${this.definition.options}) do not all comply with the param type ${this.definition.type}`
+        `The options specified (${this.definition.options}) do not all comply with the param type ${this.definition.type}`,
       )
     }
 
     // Check that there are no repeated options
     if (this.options && this.definition.options?.length !== this.options.size) {
       throw this.definitionError(
-        `There are duplicates in the specified options: ${this.definition.options}`
+        `There are duplicates in the specified options: ${this.definition.options}`,
       )
     }
   }
@@ -260,7 +242,7 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
     if (this.definition.type instanceof InputParameters) {
       return this.definition.type.validateInput(input)
     }
-    
+
     // If the param has specified options, check that the input is one of them.
     // In this case we don't need to check the type, since the options will do that for us
     if (this.options && !this.options.has(input as string)) {
@@ -276,8 +258,10 @@ const hasRepeatedValues = (array: string[]) => array.length !== new Set(array).s
 export class InputParameters<const T extends InputParametersDefinition> {
   params: ProcessedParam[]
 
-  constructor(private definition: T) {
-    this.params = Object.entries(this.definition).map(([name, param]) => new ProcessedParam(name, param))
+  constructor(public definition: T) {
+    this.params = Object.entries(this.definition).map(
+      ([name, param]) => new ProcessedParam(name, param),
+    )
 
     // Check that all options match param type
     // Check that defaults matches param validation
@@ -285,22 +269,28 @@ export class InputParameters<const T extends InputParametersDefinition> {
   }
 
   private validateDefinition() {
-    const paramNames = new Set(...this.params.map(p => p.name))
+    const paramNames = new Set(...this.params.map((p) => p.name))
 
     // Check that aliases don't clash with other properties
-    if (hasRepeatedValues(this.params.map(p => p.aliases).flat())) {
-      throw new InputParametersDefinitionError("There are clashes in property names and aliases, check that they are all unique")
+    if (hasRepeatedValues(this.params.map((p) => p.aliases).flat())) {
+      throw new InputParametersDefinitionError(
+        'There are clashes in property names and aliases, check that they are all unique',
+      )
     }
-    
+
     for (const param of this.params) {
       // Check that all dependencies reference valid options
-      if (param.definition.dependsOn?.some(d => !paramNames.has(d))) {
-        throw new InputParametersDefinitionError(`Param "${param.name}" depends on non-existent params (${param.definition.dependsOn})`)
+      if (param.definition.dependsOn?.some((d) => !paramNames.has(d))) {
+        throw new InputParametersDefinitionError(
+          `Param "${param.name}" depends on non-existent params (${param.definition.dependsOn})`,
+        )
       }
 
       // Check that all exclusions reference valid options
-      if (param.definition.exclusive?.some(d => !paramNames.has(d))) {
-        throw new InputParametersDefinitionError(`Param "${param.name}" excludes non-existent params (${param.definition.exclusive})`)
+      if (param.definition.exclusive?.some((d) => !paramNames.has(d))) {
+        throw new InputParametersDefinitionError(
+          `Param "${param.name}" excludes non-existent params (${param.definition.exclusive})`,
+        )
       }
     }
   }
@@ -321,11 +311,13 @@ export class InputParameters<const T extends InputParametersDefinition> {
           continue
         }
         if (validated[param.name]) {
-          throw new InputValidationError(`Parameter "${param.name}" is specified more than once (aliases: ${param.aliases})`)
+          throw new InputValidationError(
+            `Parameter "${param.name}" is specified more than once (aliases: ${param.aliases})`,
+          )
         }
 
         validated[param.name] = value
-      }      
+      }
 
       // Perform all validations for the individual param value
       param.validateInput(validated[param.name])
@@ -337,22 +329,46 @@ export class InputParameters<const T extends InputParametersDefinition> {
         continue
       }
 
-      if (param.definition.dependsOn?.some(d => !validated[d])) {
-        throw new InputValidationError(`Parameter "${param.name}" is missing dependencies (${param.definition.dependsOn})`)
+      if (param.definition.dependsOn?.some((d) => !validated[d])) {
+        throw new InputValidationError(
+          `Parameter "${param.name}" is missing dependencies (${param.definition.dependsOn})`,
+        )
       }
 
-      if (param.definition.exclusive?.some(d => validated[d])) {
-        throw new InputValidationError(`Parameter "${param.name}" cannot be present at the same time as exclusions (${param.definition.exclusive})`)
+      if (param.definition.exclusive?.some((d) => validated[d])) {
+        throw new InputValidationError(
+          `Parameter "${param.name}" cannot be present at the same time as exclusions (${param.definition.exclusive})`,
+        )
       }
     }
-    
 
     return validated as TypeFromDefinition<T>
   }
 }
 
-// Type calculatedType = TypeFromDefinition<typeof params>
+export const validateOverrides = (input: { overrides?: Overrides }) => {
+  if (!input.overrides) {
+    // Nothing to validate!
+    return
+  }
 
-const params = new InputParameters(paramsDefinition)
+  if (typeof input !== 'object') {
+    throw new InputValidationError('Overrides should be an object')
+  }
 
-params.validateInput({}).objectParam?.nestedDefaultBooleanParam
+  for (const adapterName in input.overrides) {
+    const overrides = input.overrides
+    if (typeof overrides !== 'object') {
+      throw new InputValidationError(`Overrides for adapter "${adapterName}" should be an object`)
+    }
+
+    for (const symbol in overrides) {
+      const override = overrides[symbol]
+      if (typeof symbol !== 'string' || typeof override !== 'string') {
+        throw new InputValidationError(
+          `Overrides should map strings to strings, got ${symbol} to ${override}`,
+        )
+      }
+    }
+  }
+}

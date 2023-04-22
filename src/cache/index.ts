@@ -72,7 +72,7 @@ export const calculateCacheKey = <T extends EndpointGenerics>({
   transportName,
 }: {
   data: unknown
-  inputParameters: InputParameters
+  inputParameters: InputParameters<T['Parameters']>
   adapterName: string
   endpointName: string
   adapterSettings: T['Settings']
@@ -122,7 +122,7 @@ const calculateKey = <T extends EndpointGenerics>({
   endpointName: string
   transportName: string
   adapterSettings: T['Settings']
-  inputParameters: InputParameters
+  inputParameters: InputParameters<T['Parameters']>
 }) => {
   const paramsKey = Object.keys(inputParameters).length
     ? calculateParamsKey(data, adapterSettings.MAX_COMMON_KEY_SIZE)
@@ -135,7 +135,7 @@ export const calculateFeedId = <T extends EndpointGenerics>(
     inputParameters,
     adapterSettings,
   }: {
-    inputParameters: InputParameters
+    inputParameters: InputParameters<T['Parameters']>
     adapterSettings: T['Settings']
   },
   data: unknown,

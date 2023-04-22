@@ -5,7 +5,7 @@ import { InputParameters } from '../validation'
 
 export const getMetricsMeta = <T extends EndpointGenerics>(
   args: {
-    inputParameters: InputParameters
+    inputParameters: InputParameters<T['Parameters']>
     adapterSettings: T['Settings']
   },
   data: AdapterRequestData,

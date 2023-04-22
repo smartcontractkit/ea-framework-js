@@ -5,6 +5,7 @@ import { calculateHttpRequestKey } from '../cache'
 import { makeLogger, sleep } from '../util'
 import { Requester } from '../util/requester'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
+import { TypeFromDefinition } from '../validation/input-params'
 import { TransportDependencies, TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
 
@@ -49,18 +50,18 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
   constructor(
     private config: {
       prepareSSEConnectionConfig: (
-        params: T['Request']['Params'][],
+        params: TypeFromDefinition<T['Parameters']>[],
         context: EndpointContext<T>,
       ) => SSEConfig
       prepareKeepAliveRequest?: (
         context: EndpointContext<T>,
       ) => AxiosRequestConfig<T['Provider']['RequestBody']>
       prepareSubscriptionRequest: (
-        params: T['Request']['Params'][],
+        params: TypeFromDefinition<T['Parameters']>[],
         context: EndpointContext<T>,
       ) => AxiosRequestConfig<T['Provider']['RequestBody']>
       prepareUnsubscriptionRequest: (
-        params: T['Request']['Params'][],
+        params: TypeFromDefinition<T['Parameters']>[],
         context: EndpointContext<T>,
       ) => AxiosRequestConfig<T['Provider']['RequestBody']>
       eventListeners: {
@@ -93,7 +94,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
 
   async streamHandler(
     context: EndpointContext<T>,
-    subscriptions: SubscriptionDeltas<T['Request']['Params']>,
+    subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
   ): Promise<void> {
     if (
       (subscriptions.new.length || subscriptions.stale.length) &&
@@ -104,7 +105,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
       this.providerDataStreamEstablished = Date.now()
       this.sseConnection = new this.EventSource(sseConfig.url, sseConfig.eventSourceInitDict)
 
-      const eventHandlerGenerator = (listener: typeof this.config.eventListeners[0]) => {
+      const eventHandlerGenerator = (listener: (typeof this.config.eventListeners)[0]) => {
         return (e: MessageEvent) => {
           const providerDataReceived = Date.now()
           const results = listener.parseResponse(e).map((r) => {

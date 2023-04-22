@@ -1,7 +1,8 @@
 import { AdapterDependencies, DEFAULT_TRANSPORT_NAME, EndpointContext } from '../adapter'
 import { ResponseCache } from '../cache/response'
 import { BaseAdapterSettings } from '../config'
-import { AdapterRequest, AdapterResponse, RequestGenerics, ResponseGenerics } from '../util/types'
+import { AdapterRequest, AdapterResponse, ResponseGenerics } from '../util/types'
+import { InputParametersDefinition } from '../validation/input-params'
 
 export * from './http'
 export * from './sse'
@@ -19,7 +20,7 @@ export type TransportGenerics = {
   /**
    * Type details about incoming Adapter requests to this Transport
    */
-  Request: RequestGenerics
+  Parameters: InputParametersDefinition
 
   /**
    * Type details about outbound responses from this Transport
@@ -39,10 +40,7 @@ export type TransportDependencies<T extends TransportGenerics> = AdapterDependen
   /**
    * Cache that will be used to write responses that the Transport will return
    */
-  responseCache: ResponseCache<{
-    Request: T['Request']
-    Response: T['Response']
-  }>
+  responseCache: ResponseCache<T>
 }
 
 /**
@@ -57,10 +55,7 @@ export type TransportDependencies<T extends TransportGenerics> = AdapterDependen
  */
 export interface Transport<T extends TransportGenerics> {
   name: string
-  responseCache: ResponseCache<{
-    Request: T['Request']
-    Response: T['Response']
-  }>
+  responseCache: ResponseCache<T>
 
   /**
    * Initializes the transport in the Adapter context.
@@ -85,7 +80,7 @@ export interface Transport<T extends TransportGenerics> {
    * @returns an empty Promise
    */
   registerRequest?: (
-    req: AdapterRequest<T['Request']>,
+    req: AdapterRequest<T['Parameters']>,
     adapterSettings: T['Settings'],
   ) => Promise<void>
 
@@ -102,7 +97,7 @@ export interface Transport<T extends TransportGenerics> {
    *   immediately fetching data and returning it without the background process.
    */
   foregroundExecute?: (
-    req: AdapterRequest<T['Request']>,
+    req: AdapterRequest<T['Parameters']>,
     adapterSettings: T['Settings'],
   ) => Promise<AdapterResponse<{
     Data: T['Response']['Data']

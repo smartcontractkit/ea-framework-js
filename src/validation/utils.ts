@@ -1,14 +1,12 @@
-import { ValidationErrorMessage } from '../config'
 import { isIP } from 'net'
+import { ValidationErrorMessage } from '../config'
 
 export type Validator<V> = (value?: V) => ValidationErrorMessage
 export type ValidatorWithParams<P, V> = (param: P, customError?: string) => Validator<V>
 
 // Composes complex validator function that runs each validator in order and returns first occurred error description and skips the rest of validation
-const compose: (f: Validator<string | number>[]) => Validator<number | string> = (
-  validatorFunctions: Validator<number | string>[],
-) => {
-  return (value) => {
+const compose: <T>(f: Validator<T>[]) => Validator<T> = <T>(validatorFunctions: Validator<T>[]) => {
+  return (value: T | undefined) => {
     for (const validator of validatorFunctions) {
       const errorText = validator(value)
       if (errorText?.length) {
@@ -19,7 +17,7 @@ const compose: (f: Validator<string | number>[]) => Validator<number | string> =
   }
 }
 
-const _integer: () => Validator<number | string> = () => {
+const _integer: () => Validator<number> = () => {
   return (value) => {
     if (!Number.isInteger(value)) {
       return `Value should be an integer (no floating point)., Received ${typeof value} ${value}`
@@ -28,7 +26,7 @@ const _integer: () => Validator<number | string> = () => {
   }
 }
 
-const positive: () => Validator<number | string> = () => {
+const positive: () => Validator<number> = () => {
   return (value) => {
     if (value !== undefined && value < 0) {
       return `Value should be positive number, Received ${value}`
@@ -37,7 +35,7 @@ const positive: () => Validator<number | string> = () => {
   }
 }
 
-const minNumber: ValidatorWithParams<number, number | string> = (param) => {
+const minNumber: ValidatorWithParams<number, number> = (param) => {
   return (value) => {
     if (value !== undefined && value < param) {
       return `Minimum allowed value is ${param}. Received ${value}`
@@ -46,7 +44,7 @@ const minNumber: ValidatorWithParams<number, number | string> = (param) => {
   }
 }
 
-const maxNumber: ValidatorWithParams<number, number | string> = (param) => {
+const maxNumber: ValidatorWithParams<number, number> = (param) => {
   return (value) => {
     if (value !== undefined && value > param) {
       return `Maximum allowed value is ${param}. Received ${value}`

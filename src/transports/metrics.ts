@@ -3,6 +3,7 @@ import { EndpointContext } from '../adapter'
 import { calculateFeedId } from '../cache'
 import { metrics } from '../metrics'
 import { InputParameters } from '../validation'
+import { TypeFromDefinition } from '../validation/input-params'
 
 // Websocket Metrics
 export const connectionErrorLabels = (message: string) => ({
@@ -14,11 +15,11 @@ export type MessageDirection = 'sent' | 'received'
 
 export const messageSubsLabels = <T extends TransportGenerics>(
   context: {
-    inputParameters: InputParameters
+    inputParameters: InputParameters<T['Parameters']>
     endpointName: string
     adapterSettings: T['Settings']
   },
-  params: T['Request']['Params'],
+  params: TypeFromDefinition<T['Parameters']>,
 ) => {
   const feedId = calculateFeedId(context, params)
 
@@ -33,10 +34,10 @@ export const messageSubsLabels = <T extends TransportGenerics>(
 // since avoiding storing extra info in expiring sorted set
 export const recordWsMessageMetrics = <T extends TransportGenerics>(
   context: EndpointContext<T>,
-  subscribes: T['Request']['Params'][],
-  unsubscribes: T['Request']['Params'][],
+  subscribes: TypeFromDefinition<T['Parameters']>[],
+  unsubscribes: TypeFromDefinition<T['Parameters']>[],
 ): void => {
-  const recordMetrics = (params: T['Request']['Params'], type: 'sub' | 'unsub') => {
+  const recordMetrics = (params: TypeFromDefinition<T['Parameters']>, type: 'sub' | 'unsub') => {
     const baseLabels = messageSubsLabels(context, params)
 
     // Record total number of ws messages sent

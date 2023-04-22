@@ -1,6 +1,7 @@
 import { TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
 import { makeLogger } from '../../util'
+import { TypeFromDefinition } from '../../validation/input-params'
 import { SubscriptionTransport } from './subscription'
 
 const logger = makeLogger('StreamingTransport')
@@ -27,18 +28,18 @@ export type SubscriptionDeltas<T> = {
  * @typeParam T - all types related to the [[Transport]]
  */
 export abstract class StreamingTransport<
-  T extends TransportGenerics,
+  const T extends TransportGenerics,
 > extends SubscriptionTransport<T> {
   // The double sets serve to create a simple polling mechanism instead of needing a subscription
   // This one would not; this is always local state
-  localSubscriptions: T['Request']['Params'][] = []
+  localSubscriptions: TypeFromDefinition<T['Parameters']>[] = []
 
   // This only tracks when the connection was established, not when the subscription was requested
   providerDataStreamEstablished = 0
 
   override async backgroundHandler(
     context: EndpointContext<T>,
-    desiredSubs: T['Request']['Params'][],
+    desiredSubs: TypeFromDefinition<T['Parameters']>[],
   ): Promise<void> {
     logger.debug('Generating delta (subscribes & unsubscribes)')
 
@@ -78,6 +79,6 @@ export abstract class StreamingTransport<
    */
   abstract streamHandler(
     context: EndpointContext<T>,
-    subscriptions: SubscriptionDeltas<T['Request']['Params']>,
+    subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
   ): Promise<void>
 }

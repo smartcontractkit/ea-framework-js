@@ -12,13 +12,18 @@ import {
   AdapterRequestContext,
 } from '../util/types'
 import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
-export { InputParameters, SpecificInputParameters } from './input-params'
+import { InputParametersDefinition } from './input-params'
+export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
 
 export const validatorMiddleware: AdapterMiddlewareBuilder =
   (adapter: Adapter) =>
-  (req: AdapterRequest, reply: FastifyReply, done: HookHandlerDoneFunction) => {
+  (
+    req: AdapterRequest<InputParametersDefinition>,
+    reply: FastifyReply,
+    done: HookHandlerDoneFunction,
+  ) => {
     if (req.headers['content-type'] !== 'application/json') {
       throw new AdapterInputError({
         message: 'Content type not "application/json", returning 400',
@@ -50,13 +55,14 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       })
     }
 
-    const validatedData = endpoint.validator.validateInput(requestBody.data)
+    const validatedData = endpoint.inputParameters.validateInput(requestBody.data)
 
     req.requestContext = {
       cacheKey: '',
       data: validatedData,
       endpointName: endpoint.name,
-    } as AdapterRequestContext
+    } as AdapterRequestContext<InputParametersDefinition>
+
     // We do it afterwards so the custom routers can have a request with a requestContext fulfilled (sans transportName, ofc)
     req.requestContext.transportName = endpoint.getTransportNameForRequest(
       req,

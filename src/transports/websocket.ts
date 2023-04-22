@@ -3,6 +3,7 @@ import { EndpointContext } from '../adapter'
 import { metrics } from '../metrics'
 import { deferredPromise, makeLogger, sleep, timeoutPromise } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
+import { TypeFromDefinition } from '../validation/input-params'
 import { TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
 import { connectionErrorLabels, recordWsMessageMetrics } from './metrics'
@@ -37,7 +38,7 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
   /** Endpoint to which to open the WS connection*/
   url: (
     context: EndpointContext<T>,
-    desiredSubs: T['Request']['Params'][],
+    desiredSubs: TypeFromDefinition<T['Parameters']>[],
   ) => Promise<string> | string
 
   /** Optional parameters used when establishing the WebSocket connection */
@@ -76,7 +77,7 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
      * @param params - the body of the adapter request
      * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
      */
-    subscribeMessage?: (params: T['Request']['Params']) => unknown
+    subscribeMessage?: (params: TypeFromDefinition<T['Parameters']>) => unknown
 
     /**
      * Builds a WS message that will be sent to unsubscribe to a specific feed
@@ -84,7 +85,7 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
      * @param params - the body of the adapter request
      * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
      */
-    unsubscribeMessage?: (params: T['Request']['Params']) => unknown
+    unsubscribeMessage?: (params: TypeFromDefinition<T['Parameters']>) => unknown
   }
 }
 
@@ -270,7 +271,7 @@ export class WebSocketTransport<
 
   async streamHandler(
     context: EndpointContext<T>,
-    subscriptions: SubscriptionDeltas<T['Request']['Params']>,
+    subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
   ): Promise<void> {
     // New subs && no connection -> connect -> add subs
     // No new subs && no connection -> skip
@@ -416,7 +417,7 @@ export class WebsocketReverseMappingTransport<
   T extends WebsocketTransportGenerics,
   K,
 > extends WebSocketTransport<T> {
-  private requestMapping: Map<K, T['Request']['Params']> = new Map()
+  private requestMapping: Map<K, TypeFromDefinition<T['Parameters']>> = new Map()
 
   /**
    * Sets the request params mapping for the given value
@@ -425,7 +426,7 @@ export class WebsocketReverseMappingTransport<
    * @param params - the body of the adapter request
    * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
    */
-  setReverseMapping(value: K, params: T['Request']['Params']) {
+  setReverseMapping(value: K, params: TypeFromDefinition<T['Parameters']>) {
     this.requestMapping.set(value, params)
   }
 
@@ -435,7 +436,7 @@ export class WebsocketReverseMappingTransport<
    * @param value - the Data Provider lookup value
    * @returns the request parameters for the Data Provider lookup value, if one has been set
    */
-  getReverseMapping(value: K): T['Request']['Params'] | undefined {
+  getReverseMapping(value: K): TypeFromDefinition<T['Parameters']> | undefined {
     return this.requestMapping.get(value)
   }
 }
