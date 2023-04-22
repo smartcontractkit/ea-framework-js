@@ -15,10 +15,10 @@ import {
   WebSocketClassProvider,
 } from '../src/transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from '../src/util'
-import { InputParametersDefinition } from '../src/validation/input-params'
+import { EmptyInputParameters } from '../src/validation/input-params'
 
 export type NopTransportTypes = {
-  Parameters: InputParametersDefinition
+  Parameters: EmptyInputParameters
   Response: {
     Data: null
     Result: null

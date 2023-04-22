@@ -94,63 +94,10 @@ type ProperInputParametersDefinition = InputParametersDefinition & {
 }
 
 export type TypeFromDefinition<T extends InputParametersDefinition> = {
-  [K in keyof T]: TypeFromParameter<T[K]>
+  -readonly [K in keyof T]: TypeFromParameter<T[K]>
 }
 
-// Type TypeFromInputParameters<D extends InputParametersDefinition, T extends InputParameters<D>> = TypeFromDefinition<T['definition']>
-
-// const nestedParam = {
-//   nestedStringParam: {
-//     description: 'nested string',
-//     type: 'string',
-//   },
-//   nestedRequiredNumberParam: {
-//     description: 'nested number',
-//     type: 'number',
-//     required: true,
-//   },
-//   nestedDefaultBooleanParam: {
-//     description: 'nested boolean',
-//     type: 'boolean',
-//     default: true,
-//   },
-// } as const satisfies InputParametersDefinition
-
-// const paramsDefinition = {
-//   stringParam: {
-//     description: 'asd',
-//     type: 'string',
-//     options: ['asd', 'qwe']
-//   },
-//   numberParam: {
-//     description: 'asd',
-//     type: 'number',
-//   },
-//   requiredParam: {
-//     description: 'asd',
-//     type: 'boolean',
-//     required: true,
-//   },
-//   defaultStringParam: {
-//     description: 'string',
-//     type: 'string',
-//     default: 'qwe',
-//   },
-//   stringArrayParam: {
-//     description: 'string',
-//     type: 'string',
-//     array: true,
-//   },
-//   numberArrayParam: {
-//     description: 'numberArray',
-//     type: 'number',
-//     array: true,
-//   },
-//   objectParam: {
-//     description: 'object',
-//     type: nestedParam,
-//   },
-// } as const satisfies InputParametersDefinition
+export type EmptyInputParameters = InputParametersDefinition
 
 class InputValidationError extends AdapterInputError {
   constructor(message: string) {

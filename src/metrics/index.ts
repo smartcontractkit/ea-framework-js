@@ -123,7 +123,7 @@ export const buildHttpRequestMetricsLabel = (
   error?: AdapterError | Error,
   cacheHit?: boolean,
 ): Record<string, string | number | undefined> => {
-  const labels = {} as Record<typeof httpRequestsTotalLabels[number], string | number | undefined>
+  const labels = {} as Record<(typeof httpRequestsTotalLabels)[number], string | number | undefined>
   labels.method = 'POST'
   labels.feed_id = feedId
   if (error instanceof AdapterError) {
