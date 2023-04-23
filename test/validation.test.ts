@@ -4,7 +4,7 @@ import { BaseAdapterSettings } from '../src/config'
 import { AdapterRequest, AdapterResponse, isArray, isObject } from '../src/util'
 import { InputParameters } from '../src/validation'
 import { AdapterInputError } from '../src/validation/error'
-import { InputParametersDefinition } from '../src/validation/input-params'
+import { EmptyInputParameters } from '../src/validation/input-params'
 import { validator } from '../src/validation/utils'
 import { NopTransport, NopTransportTypes, TestAdapter } from './util'
 
@@ -161,7 +161,7 @@ test.serial('wrongly typed array throws 400', async (t) => {
       description: 'stuff',
       array: true,
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -183,7 +183,7 @@ test.serial('wrongly typed object throws 400', async (t) => {
       description: 'stuff',
       required: true,
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -198,7 +198,7 @@ test.serial('wrongly typed optional param throws 400', async (t) => {
       type: 'string',
       description: 'stuff',
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -235,7 +235,7 @@ test.serial('missing dependent params throws 400', async (t) => {
       type: 'string',
       description: 'stuff',
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -255,7 +255,7 @@ test.serial('presented exclusive params throws 400', async (t) => {
       type: 'string',
       description: 'stuff',
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -275,7 +275,7 @@ test.serial('invalid overrides object throws 400', async (t) => {
       type: 'string',
       description: 'stuff',
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -296,7 +296,7 @@ test.serial('invalid overrides property throws 400', async (t) => {
       type: 'string',
       description: 'stuff',
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -305,6 +305,48 @@ test.serial('invalid overrides property throws 400', async (t) => {
     overrides: {
       test: 'test',
     },
+  })
+  t.is(error.statusCode, 400)
+})
+
+test.serial('valid overrides property succeeds', async (t) => {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
+    base: {
+      type: 'string',
+      description: 'stuff',
+    },
+    quote: {
+      type: 'string',
+      description: 'stuff',
+    },
+  }) as unknown as InputParameters<EmptyInputParameters>
+
+  const response = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 'OVER2',
+    quote: 'USD',
+    overrides: {
+      test: {
+        asd: 'qwe',
+      },
+    },
+  })
+  t.is(response.statusCode, 200)
+})
+
+test.serial('duplicate param (name + alias) throws 400', async (t) => {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
+    base: {
+      type: 'string',
+      description: 'stuff',
+      aliases: ['from'],
+    },
+  }) as unknown as InputParameters<EmptyInputParameters>
+
+  const error = await t.context.testAdapter.request({
+    endpoint: 'test',
+    base: 'asd',
+    from: 'qwe',
   })
   t.is(error.statusCode, 400)
 })
@@ -319,7 +361,7 @@ test.serial('invalid overrides key throws 400', async (t) => {
       type: 'string',
       description: 'stuff',
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const error = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -368,7 +410,7 @@ test.serial('correctly typed params returns 200', async (t) => {
       description: 'stuff',
       required: true,
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const response = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -387,7 +429,7 @@ test.serial('omitted optional param returns 200', async (t) => {
       type: 'string',
       description: 'stuff',
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const response = await t.context.testAdapter.request({
     endpoint: 'test',
@@ -395,7 +437,7 @@ test.serial('omitted optional param returns 200', async (t) => {
   t.is(response.statusCode, 200)
 })
 
-test.serial('duplicate params throws 400', async (t) => {
+test.serial('duplicate params in definition fails', async (t) => {
   const error: AdapterInputError | undefined = t.throws(() => {
     new InputParameters({
       base: {
@@ -404,7 +446,7 @@ test.serial('duplicate params throws 400', async (t) => {
         description: 'stuff',
         aliases: ['base', 'quote'],
       },
-    }) as unknown as InputParameters<InputParametersDefinition>
+    }) as unknown as InputParameters<EmptyInputParameters>
   })
 
   t.is(
@@ -412,6 +454,8 @@ test.serial('duplicate params throws 400', async (t) => {
     '[Param: base] There are repeated aliases for input param base: base,base,quote',
   )
 })
+
+// TODO: rename tests (throws 400)
 
 test.serial('default value is used for optional param', async (t) => {
   t.context.adapterEndpoint.inputParameters = new InputParameters({
@@ -426,7 +470,20 @@ test.serial('default value is used for optional param', async (t) => {
   t.is(data['base'], 'ETH')
 })
 
-test.serial('missing input depends on param (error)', async (t) => {
+test.serial('non-required array param coerces null value to empty array', async (t) => {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
+    list: {
+      type: 'string',
+      description: 'stuff',
+      array: true,
+    },
+  }) as unknown as InputParameters<EmptyInputParameters>
+
+  const data = t.context.adapterEndpoint.inputParameters.validateInput({})
+  t.deepEqual(data['list'] as unknown, [])
+})
+
+test.serial('missing dependency fails validation', async (t) => {
   const error: AdapterInputError | undefined = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
       base: {
@@ -438,7 +495,132 @@ test.serial('missing input depends on param (error)', async (t) => {
     })
   })
 
-  t.is(error?.message, 'Param "base" depends on non-existent params (quote)')
+  t.is(error?.message, 'Param "base" depends on non-existent param "quote"')
+})
+
+test.serial('missing exclusion fails validation', async (t) => {
+  const error: AdapterInputError | undefined = t.throws(() => {
+    t.context.adapterEndpoint.inputParameters = new InputParameters({
+      base: {
+        type: 'string',
+        description: 'stuff',
+        default: 'ETH',
+        exclusive: ['quote'],
+      },
+    })
+  })
+
+  t.is(error?.message, 'Param "base" excludes non-existent param "quote"')
+})
+
+test.serial('dependency on required param fails validation', async (t) => {
+  const error: AdapterInputError | undefined = t.throws(() => {
+    t.context.adapterEndpoint.inputParameters = new InputParameters({
+      base: {
+        type: 'string',
+        description: 'stuff',
+        default: 'ETH',
+        dependsOn: ['quote'],
+      },
+      quote: {
+        type: 'string',
+        description: 'stuff',
+        required: true,
+      },
+    })
+  })
+
+  t.is(
+    error?.message,
+    'Param "base" has an unnecessary dependency on "quote" (dependency is always required)',
+  )
+})
+
+test.serial('exclusion of required param fails validation', async (t) => {
+  const error: AdapterInputError | undefined = t.throws(() => {
+    t.context.adapterEndpoint.inputParameters = new InputParameters({
+      base: {
+        type: 'string',
+        description: 'stuff',
+        default: 'ETH',
+        exclusive: ['quote'],
+      },
+      quote: {
+        type: 'string',
+        description: 'stuff',
+        required: true,
+      },
+    })
+  })
+
+  t.is(error?.message, 'Param "base" excludes required (i.e. always present) param "quote"')
+})
+
+test.serial('aliases of different properties with common values fail validation', async (t) => {
+  const error: AdapterInputError | undefined = t.throws(() => {
+    t.context.adapterEndpoint.inputParameters = new InputParameters({
+      base: {
+        type: 'string',
+        description: 'stuff',
+        aliases: ['asd', 'shared'],
+      },
+      quote: {
+        type: 'string',
+        description: 'stuff',
+        aliases: ['shared', 'qwe'],
+      },
+    }) as InputParameters<EmptyInputParameters>
+  })
+
+  t.is(
+    error?.message,
+    'There are clashes in property names and aliases, check that they are all unique',
+  )
+})
+
+test.serial('throws on wrong default type', async (t) => {
+  const error: AdapterInputError | undefined = t.throws(() => {
+    t.context.adapterEndpoint.inputParameters = new InputParameters({
+      base: {
+        type: 'string',
+        description: 'stuff',
+        default: 123,
+      },
+    })
+  })
+
+  t.is(
+    error?.message,
+    '[Param: base] The specified default "123" does not comply with the param type "string"',
+  )
+})
+
+test.serial('throws on empty options array', async (t) => {
+  const error: AdapterInputError | undefined = t.throws(() => {
+    t.context.adapterEndpoint.inputParameters = new InputParameters({
+      base: {
+        type: 'string',
+        description: 'stuff',
+        options: [],
+      },
+    }) as InputParameters<EmptyInputParameters>
+  })
+
+  t.is(error?.message, '[Param: base] The options array must contain at least one option')
+})
+
+test.serial('throws on repeated options', async (t) => {
+  const error: AdapterInputError | undefined = t.throws(() => {
+    t.context.adapterEndpoint.inputParameters = new InputParameters({
+      base: {
+        type: 'string',
+        description: 'stuff',
+        options: ['test', 'asd', 'test'],
+      },
+    }) as InputParameters<EmptyInputParameters>
+  })
+
+  t.is(error?.message, '[Param: base] There are duplicates in the specified options: test,asd,test')
 })
 
 test.serial('Test port validator', async (t) => {
@@ -627,7 +809,7 @@ test.serial('limit size of input parameters', async (t) => {
       array: true,
       description: 'stuff',
     },
-  }) as unknown as InputParameters<InputParametersDefinition>
+  }) as unknown as InputParameters<EmptyInputParameters>
 
   const request = {
     addresses: [

@@ -74,16 +74,6 @@ const host: () => Validator<string> = () => {
   }
 }
 
-const object = () => {
-  return (value: Record<string, unknown>) => {
-    const isObject = typeof value === 'object' && value !== null
-    if (!isObject) {
-      return `Value is not valid object.`
-    }
-    return
-  }
-}
-
 const positiveInteger = () => compose([_integer(), positive()])
 
 const integer = (params?: { min?: number; max?: number }) => {
@@ -124,7 +114,6 @@ export const validator = {
   port,
   url,
   host,
-  object,
   responseTimestamp,
   base64,
   compose,

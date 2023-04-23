@@ -48,6 +48,8 @@ type BaseInputParameter = {
 }
 
 type OptionalInputParameter = BaseInputParameter & {
+  type: 'string'
+
   // Excluded props
   required?: never
   array?: never
@@ -75,10 +77,10 @@ type RequiredInputParameter = BaseInputParameter & {
 // Currently array params are always expected to be present and have at least one item
 type ArrayInputParameter = BaseInputParameter & {
   array: true
+  required?: boolean
 
   // Excluded props
   default?: never
-  required?: never
 }
 
 export type InputParameter =
@@ -149,11 +151,9 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
       )
     }
 
-    // Check that every option complies with the param type
-    if (this.definition.options?.some((o) => typeof o !== this.definition.type)) {
-      throw this.definitionError(
-        `The options specified (${this.definition.options}) do not all comply with the param type ${this.definition.type}`,
-      )
+    // Check that if options are specified it has at least one entry
+    if (this.definition.options?.length === 0) {
+      throw this.definitionError(`The options array must contain at least one option`)
     }
 
     // Check that there are no repeated options
@@ -164,26 +164,31 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
     }
   }
 
-  validateInput(input: unknown) {
+  validateInput(input: unknown): unknown {
     if (this.definition.required && input == null) {
       throw this.validationError('param is required but no value was provided')
     }
 
+    if (this.definition.default && input == null) {
+      return this.definition.default
+    }
+
     if (this.definition.array) {
-      if (!Array.isArray(input)) {
-        throw this.validationError('input value is not an array')
-      }
-      if (input.length === 0) {
-        throw this.validationError('input array must be non-empty')
+      if (!(Array.isArray(input) && input.length >= 0)) {
+        if (this.definition.required || input != null) {
+          throw this.validationError('input value must be a non-empty array')
+        } else {
+          return []
+        }
       }
 
       // Validate each value from the array individually
       return input.map((item) => this.validateInputType(item))
-    } else {
-      // We already know this won't be an array, but the generics are too complex for typescript
-      // to infer by itself so we cast manually
-      this.validateInputType(input as ShouldBeUndefinable<T>)
     }
+
+    // We already know this won't be an array, but the generics are too complex for typescript
+    // to infer by itself so we cast manually
+    return this.validateInputType(input as ShouldBeUndefinable<T>)
   }
 
   private validateInputType(input: NonArrayInputType<T>) {
@@ -204,6 +209,9 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
     } else if (typeof input !== this.definition.type) {
       throw this.validationError(`input type is not the expected one (${this.type})`)
     }
+
+    // If no validations failed and no defaults / modifications were applied, use the original input
+    return input
   }
 }
 
@@ -234,21 +242,35 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
 
     for (const param of this.params) {
       // Check that all dependencies reference valid options
-      if (param.definition.dependsOn?.some((d) => !paramNames.has(d))) {
-        throw new InputParametersDefinitionError(
-          `Param "${param.name}" depends on non-existent params (${param.definition.dependsOn})`,
-        )
+      for (const dependency of param.definition.dependsOn || []) {
+        if (!paramNames.has(dependency)) {
+          throw new InputParametersDefinitionError(
+            `Param "${param.name}" depends on non-existent param "${dependency}"`,
+          )
+        }
+        if (this.definition[dependency].required) {
+          throw new InputParametersDefinitionError(
+            `Param "${param.name}" has an unnecessary dependency on "${dependency}" (dependency is always required)`,
+          )
+        }
       }
 
-      // Check that all exclusions reference valid options
-      if (param.definition.exclusive?.some((d) => !paramNames.has(d))) {
-        throw new InputParametersDefinitionError(
-          `Param "${param.name}" excludes non-existent params (${param.definition.exclusive})`,
-        )
+      for (const exclusion of param.definition.exclusive || []) {
+        if (!paramNames.has(exclusion)) {
+          throw new InputParametersDefinitionError(
+            `Param "${param.name}" excludes non-existent param "${exclusion}"`,
+          )
+        }
+        if (this.definition[exclusion].required) {
+          throw new InputParametersDefinitionError(
+            `Param "${param.name}" excludes required (i.e. always present) param "${exclusion}"`,
+          )
+        }
       }
     }
   }
 
+  // TODO: Add docs to all fns
   validateInput(rawData: unknown): TypeFromDefinition<T> {
     if (typeof rawData !== 'object' || rawData == null) {
       throw new InputValidationError('Input for input parameters should be an object')
@@ -259,27 +281,21 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
 
     // Validate each param individually
     for (const param of this.params) {
+      let value: unknown
       for (const alias of param.aliases) {
-        const value = data[alias]
-        if (value == null) {
+        if (data[alias] == null) {
           continue
         }
-        if (validated[param.name]) {
+        if (value) {
           throw new InputValidationError(
             `Parameter "${param.name}" is specified more than once (aliases: ${param.aliases})`,
           )
         }
-
-        validated[param.name] = value
+        value = data[alias]
       }
 
-      if (!validated[param.name] && param.definition.default) {
-        // If the parameter has a default value and we use it, we don't need to validate it as we've done it already
-        validated[param.name] = param.definition.default
-      } else {
-        // Perform all validations for the individual param value
-        param.validateInput(validated[param.name])
-      }
+      // Perform all validations for the individual param value
+      validated[param.name] = param.validateInput(value)
     }
 
     // We iterate again, now with the complete validated obj to check for dependencies and exclusions
@@ -288,13 +304,13 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
         continue
       }
 
-      if (param.definition.dependsOn?.some((d) => !validated[d])) {
+      if (param.definition.dependsOn?.some((d) => validated[d] == null)) {
         throw new InputValidationError(
           `Parameter "${param.name}" is missing dependencies (${param.definition.dependsOn})`,
         )
       }
 
-      if (param.definition.exclusive?.some((d) => validated[d])) {
+      if (param.definition.exclusive?.some((d) => validated[d] != null)) {
         throw new InputValidationError(
           `Parameter "${param.name}" cannot be present at the same time as exclusions (${param.definition.exclusive})`,
         )
