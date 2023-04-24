@@ -11,7 +11,7 @@ import { Adapter, AdapterEndpointParams, AdapterParams, PriceEndpointGenerics } 
 /**
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
  */
-export type PriceEndpointInputParameters = InputParametersDefinition & {
+export type PriceEndpointInputParameters = {
   base: InputParameter & {
     aliases: readonly ['from', 'coin', ...string[]]
     type: 'string'
