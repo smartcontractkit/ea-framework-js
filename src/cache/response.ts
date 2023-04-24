@@ -10,11 +10,11 @@ import {
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
 } from '../util'
+import CensorList from '../util/censor/censor-list'
 import { InputParameters } from '../validation/input-params'
+import { validator } from '../validation/utils'
 import { Cache, calculateCacheKey, calculateFeedId } from './'
 import * as cacheMetrics from './metrics'
-import { validator } from '../validation/utils'
-import CensorList from '../util/censor/censor-list'
 
 const logger = makeLogger('ResponseCache')
 
@@ -62,16 +62,10 @@ export class ResponseCache<
     const censorList = CensorList.getAll()
     const entries = results.map((r) => {
       const { data, result, errorMessage } = r.response
-      if (!errorMessage && (data === undefined || data === null)) {
-        logger.warn(
-          `The 'data' property of the response is ${data === undefined ? 'undefined' : 'null'}.`,
-        )
-      } else if (!errorMessage && (result === undefined || result === null)) {
-        logger.warn(
-          `The 'result' property of the response is ${
-            result === undefined ? 'undefined' : 'null'
-          }.`,
-        )
+      if (!errorMessage && data === undefined) {
+        logger.warn('The "data" property of the response is undefined.')
+      } else if (!errorMessage && result === undefined) {
+        logger.warn('The "result" property of the response is undefined.')
       }
       let censoredResponse
       if (!censorList.length) {
