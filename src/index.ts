@@ -98,6 +98,15 @@ export const start = async <T extends SettingsDefinitionMap>(
     logger.info('REST API is disabled; this instance will not process incoming requests.')
   }
 
+  // Listener for unhandled promise rejections that are bubbling up to the top
+  process.on('unhandledRejection', (err: Error) => {
+    logger.error({
+      name: err.name,
+      stack: err.stack,
+      message: err.message,
+    })
+  })
+
   if (
     adapter.config.settings.EA_MODE === 'writer' ||
     adapter.config.settings.EA_MODE === 'reader-writer'
@@ -110,11 +119,6 @@ export const start = async <T extends SettingsDefinitionMap>(
       'Background executor is disabled; this instance will not perform async background executes.',
     )
   }
-
-  // Listener for unhandled promise rejections that are bubbling up to the top
-  process.on('unhandledRejection', (reason) => {
-    logger.error('Unhandled Promise rejection:', reason)
-  })
 
   return { api, metricsApi }
 }

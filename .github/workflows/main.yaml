@@ -32,6 +32,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup
+      - run: |
+          # Check for test.only() in test files
+          set +e
+            files=$(find ${{ github.workspace }}/test -name "*.test.ts" | xargs grep -l 'test.only')
+          set -e
+          
+          if [[ -n $files ]]; then
+            echo "Error: Found /test.only/ in following test files:"
+            echo "$files"
+            exit 1
+          fi
       - run: yarn test
       - uses: actions/upload-artifact@v3
         with:

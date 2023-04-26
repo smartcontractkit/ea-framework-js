@@ -184,7 +184,7 @@ export const BaseSettingsDefinition = {
     type: 'number',
     description: 'Retry count for failed HTTP requests',
     default: 1,
-    validate: validator.integer({ min: 1, max: 10 }),
+    validate: validator.integer({ min: 0, max: 10 }),
   },
   SSE_KEEPALIVE_SLEEP: {
     description: 'Maximum amount of time (in ms) between each SSE keepalive request',
@@ -279,10 +279,12 @@ export const BaseSettingsDefinition = {
   TLS_PRIVATE_KEY: {
     description: 'Base64 Private Key of TSL/SSL certificate',
     type: 'string',
+    validate: validator.base64(),
   },
   TLS_PUBLIC_KEY: {
     description: 'Base64 Public Key of TSL/SSL certificate',
     type: 'string',
+    validate: validator.base64(),
   },
   TLS_PASSPHRASE: {
     description: 'Password to be used to generate an encryption key',
@@ -533,6 +535,7 @@ export type Settings<T extends SettingsDefinitionMap> = {
 }
 
 export type BaseAdapterSettings = Settings<BaseSettingsDefinitionType>
+export type EmptyCustomSettings = BaseAdapterSettings
 export type AdapterSettings<T extends CustomSettingsDefinition<T> = object> = Settings<T> &
   BaseAdapterSettings &
   SettingsObjectSpecifier

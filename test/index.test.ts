@@ -14,7 +14,6 @@ test.beforeEach(async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -46,7 +45,6 @@ test('MTLS_ENABLED with no TLS params should error', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -67,9 +65,9 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
     {
       envDefaultOverrides: {
         MTLS_ENABLED: true,
-        TLS_PRIVATE_KEY: 'test',
-        TLS_PUBLIC_KEY: 'test',
-        TLS_CA: 'test',
+        TLS_PRIVATE_KEY: 'dGVzdA==',
+        TLS_PUBLIC_KEY: 'dGVzdA==',
+        TLS_CA: 'dGVzdA==',
       },
     },
   )
@@ -79,7 +77,6 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -107,7 +104,6 @@ test('Adapter writer mode api disabled', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -125,5 +121,24 @@ test('Initialize adapter (error)', async (t) => {
       (e as Error).message,
       'The adapter has not been initialized as an instance of the Adapter class, exiting.',
     )
+  }
+})
+
+test('Initialize adapter twice (error)', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+  try {
+    await start(adapter)
+    await start(adapter)
+    t.fail()
+  } catch (e: unknown) {
+    t.is((e as Error).message, 'This adapter has already been initialized!')
   }
 })

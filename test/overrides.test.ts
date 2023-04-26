@@ -3,6 +3,7 @@ import { Adapter, AdapterEndpoint, EndpointGenerics } from '../src/adapter'
 import { ResponseCache } from '../src/cache/response'
 import { Transport, TransportGenerics } from '../src/transports'
 import { AdapterRequest } from '../src/util'
+import { InputParameters } from '../src/validation'
 import { TestAdapter } from './util'
 
 const test = untypedTest as TestFn<{
@@ -15,10 +16,21 @@ type Pair = {
   quote: string
 }
 
+const inputParameters = new InputParameters({
+  base: {
+    type: 'string',
+    description: 'base',
+    required: true,
+  },
+  quote: {
+    type: 'string',
+    description: 'quote',
+    required: true,
+  },
+})
+
 type TestTransportGenerics = TransportGenerics & {
-  Request: {
-    Params: Pair
-  }
+  Parameters: typeof inputParameters.definition
   Response: {
     Data: Pair
   }
@@ -26,14 +38,11 @@ type TestTransportGenerics = TransportGenerics & {
 
 class OverrideTestTransport implements Transport<TestTransportGenerics> {
   name!: string
-  responseCache!: ResponseCache<{
-    Request: TestTransportGenerics['Request']
-    Response: TestTransportGenerics['Response']
-  }>
+  responseCache!: ResponseCache<TestTransportGenerics>
   async initialize() {
     return
   }
-  async foregroundExecute(req: AdapterRequest<TestTransportGenerics['Request']>) {
+  async foregroundExecute(req: AdapterRequest<TestTransportGenerics['Parameters']>) {
     return {
       data: {
         base: req.requestContext.data.base,
@@ -53,20 +62,11 @@ class OverrideTestTransport implements Transport<TestTransportGenerics> {
 test.beforeEach(async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
-    defaultEndpoint: 'test',
+    defaultEndpoint: 'test-endpoint',
     endpoints: [
       new AdapterEndpoint({
-        name: 'test',
-        inputParameters: {
-          base: {
-            type: 'string',
-            required: true,
-          },
-          quote: {
-            type: 'string',
-            required: true,
-          },
-        },
+        name: 'test-endpoint',
+        inputParameters,
         transport: new OverrideTestTransport(),
         overrides: {
           OVER1: 'overriden_1',

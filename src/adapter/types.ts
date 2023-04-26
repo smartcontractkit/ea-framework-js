@@ -6,7 +6,7 @@ import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics, TransportRoutes } from '../transports'
 import { AdapterRequest, SingleNumberResultResponse, SubscriptionSetFactory } from '../util'
 import { Requester } from '../util/requester'
-import { InputParameters, SpecificInputParameters } from '../validation'
+import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { Adapter } from './basic'
 import { AdapterEndpoint } from './endpoint'
@@ -48,7 +48,7 @@ export interface EndpointContext<T extends EndpointGenerics> {
   endpointName: string
 
   /** Input parameters for this endpoint */
-  inputParameters: InputParameters
+  inputParameters: InputParameters<T['Parameters']>
 
   /** Initialized config for the adapter that the Transport can access */
   adapterSettings: T['Settings']
@@ -66,17 +66,8 @@ export interface AdapterRateLimitingConfig {
  * Type to perform arbitrary modifications on an adapter request
  */
 export type RequestTransform<T extends EndpointGenerics> = (
-  req: AdapterRequest<T['Request']>,
+  req: AdapterRequest<T['Parameters']>,
 ) => void
-
-/**
- * Map of overrides objects (symbol -\> symbol) per adapter name
- */
-export type Overrides = {
-  [adapterName: string]: {
-    [symbol: string]: string
-  }
-}
 
 /**
  * Main structure of an External Adapter
@@ -132,7 +123,7 @@ export type EndpointGenerics = TransportGenerics
 export type PriceEndpointGenerics = TransportGenerics & { Response: SingleNumberResultResponse }
 
 export type CustomInputValidator<T extends EndpointGenerics> = (
-  input: AdapterRequest<T['Request']>,
+  input: AdapterRequest<T['Parameters']>,
   adapterSettings: T['Settings'],
 ) => AdapterError | undefined
 
@@ -147,7 +138,7 @@ export interface BaseAdapterEndpointParams<T extends EndpointGenerics> {
   aliases?: string[]
 
   /** Specification of what the body of a request hitting this endpoint should look like (used for validation) */
-  inputParameters: SpecificInputParameters<T['Request']['Params']>
+  inputParameters?: InputParameters<T['Parameters']>
 
   /** Specific details related to the rate limiting for this endpoint in particular */
   rateLimiting?: EndpointRateLimitingConfig
@@ -176,7 +167,7 @@ type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
   transportRoutes: TransportRoutes<T>
 
   /** Custom function to direct an incoming request to the appropriate transport from the transports map */
-  customRouter?: (req: AdapterRequest<T['Request']>, settings: T['Settings']) => string
+  customRouter?: (req: AdapterRequest<T['Parameters']>, settings: T['Settings']) => string
 
   /** If no value is returned from the custom router or the default (transport param), which transport to use */
   defaultTransport?: string

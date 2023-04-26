@@ -2,16 +2,18 @@ import { AdapterDependencies } from '../adapter'
 import { AdapterSettings } from '../config'
 import {
   AdapterResponse,
+  censor,
   makeLogger,
-  RequestGenerics,
   ResponseGenerics,
+  TimestampedAdapterResponse,
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
 } from '../util'
-import { InputParameters } from '../validation/input-params'
+import CensorList from '../util/censor/censor-list'
+import { InputParameters, InputParametersDefinition } from '../validation/input-params'
+import { validator } from '../validation/utils'
 import { Cache, calculateCacheKey, calculateFeedId } from './'
 import * as cacheMetrics from './metrics'
-import { validator } from '../validation/utils'
 
 const logger = makeLogger('ResponseCache')
 
@@ -20,12 +22,12 @@ const logger = makeLogger('ResponseCache')
  */
 export class ResponseCache<
   T extends {
-    Request: RequestGenerics
+    Parameters: InputParametersDefinition
     Response: ResponseGenerics
   },
 > {
   cache: Cache<AdapterResponse<T['Response']>>
-  inputParameters: InputParameters
+  inputParameters: InputParameters<T['Parameters']>
   adapterName: string
   endpointName: string
   adapterSettings: AdapterSettings
@@ -41,7 +43,7 @@ export class ResponseCache<
     adapterSettings: AdapterSettings
     adapterName: string
     endpointName: string
-    inputParameters: InputParameters
+    inputParameters: InputParameters<T['Parameters']>
   }) {
     this.cache = dependencies.cache as Cache<AdapterResponse<T['Response']>>
     this.inputParameters = inputParameters
@@ -56,10 +58,35 @@ export class ResponseCache<
    * @param results - the entries to write to the cache
    */
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+    const censorList = CensorList.getAll()
     const entries = results.map((r) => {
+      const { data, result, errorMessage } = r.response
+      if (!errorMessage && data === undefined) {
+        logger.warn('The "data" property of the response is undefined.')
+      } else if (!errorMessage && result === undefined) {
+        logger.warn('The "result" property of the response is undefined.')
+      }
+      let censoredResponse
+      if (!censorList.length) {
+        censoredResponse = r.response
+      } else {
+        try {
+          censoredResponse = censor(r.response, censorList, true) as TimestampedAdapterResponse<
+            T['Response']
+          >
+        } catch (error) {
+          logger.error(`Error censoring response: ${error}`)
+          censoredResponse = {
+            statusCode: 502,
+            errorMessage: 'Response could not be censored due to an error',
+            timestamps: r.response.timestamps,
+          }
+        }
+      }
+
       const response: AdapterResponse<T['Response']> = {
-        ...r.response,
-        statusCode: (r.response as TimestampedProviderErrorResponse).statusCode || 200,
+        ...censoredResponse,
+        statusCode: (censoredResponse as TimestampedProviderErrorResponse).statusCode || 200,
       }
 
       if (
@@ -67,6 +94,7 @@ export class ResponseCache<
         this.adapterSettings.EXPERIMENTAL_METRICS_ENABLED
       ) {
         response.meta = {
+          adapterName: this.adapterName,
           metrics: {
             feedId: calculateFeedId(
               {
@@ -119,15 +147,5 @@ export class ResponseCache<
     }
 
     return
-  }
-
-  /**
-   * Looks for an adapter response in the cache.
-   *
-   * @param cacheKey - the key made from the adapter params
-   * @returns the associated response if found
-   */
-  read(cacheKey: string) {
-    return this.cache.get(cacheKey)
   }
 }

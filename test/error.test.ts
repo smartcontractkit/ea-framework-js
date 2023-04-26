@@ -1,4 +1,5 @@
 import untypedTest, { ExecutionContext, TestFn } from 'ava'
+import { ReplyError as RedisError } from 'ioredis'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
 import { AdapterResponse, ResponseTimestamps } from '../src/util'
 import {
@@ -10,7 +11,7 @@ import {
   AdapterRateLimitError,
   AdapterTimeoutError,
 } from '../src/validation/error'
-import { assertEqualResponses, NopTransport, NopTransportTypes, TestAdapter } from './util'
+import { NopTransport, NopTransportTypes, TestAdapter, assertEqualResponses } from './util'
 
 type TestContext = {
   testAdapter: TestAdapter
@@ -35,7 +36,6 @@ const makeAdapter = async (
 test('Non AdapterError exception returns 500', async (t) => {
   const endpoint = new AdapterEndpoint<NopTransportTypes>({
     name: 'TEST',
-    inputParameters: {},
     transport: new (class extends NopTransport {
       override async foregroundExecute() {
         throw new Error('Test error')
@@ -52,7 +52,6 @@ test('Non AdapterError exception returns 500', async (t) => {
 test('Non AdapterError exception returns 500 with default message', async (t) => {
   const endpoint = new AdapterEndpoint<NopTransportTypes>({
     name: 'TEST',
-    inputParameters: {},
     transport: new (class extends NopTransport {
       override async foregroundExecute() {
         throw new Error()
@@ -69,7 +68,6 @@ test('Non AdapterError exception returns 500 with default message', async (t) =>
 test('Adapter error returns default status of 500', async (t) => {
   const endpoint = new AdapterEndpoint<NopTransportTypes>({
     name: 'TEST',
-    inputParameters: {},
     transport: new (class extends NopTransport {
       override async foregroundExecute() {
         throw new AdapterError({ message: 'Expected error, returning 500' })
@@ -93,7 +91,6 @@ test('Adapter error returns default status of 500', async (t) => {
 test('Adapter error returns specified 200, with accompanying provider status code', async (t) => {
   const endpoint = new AdapterEndpoint<NopTransportTypes>({
     name: 'TEST',
-    inputParameters: {},
     transport: new (class extends NopTransport {
       override async foregroundExecute() {
         throw new AdapterError({
@@ -142,7 +139,6 @@ test('Special adapter errors have status 500', async (t) => {
 test('Adapter returns error when transport returns response with error message', async (t) => {
   const endpoint = new AdapterEndpoint<NopTransportTypes>({
     name: 'TEST',
-    inputParameters: {},
     transport: new (class extends NopTransport {
       override async foregroundExecute() {
         const response: AdapterResponse<NopTransportTypes['Response']> = {
@@ -167,4 +163,20 @@ test('Adapter returns error when transport returns response with error message',
     statusCode: 502,
     errorMessage: 'test error message',
   })
+})
+
+test('RedisError returns 500', async (t) => {
+  const endpoint = new AdapterEndpoint<NopTransportTypes>({
+    name: 'TEST',
+    transport: new (class extends NopTransport {
+      override async foregroundExecute() {
+        throw new RedisError('Error reply from redis')
+      }
+    })(),
+  })
+
+  const testAdapter = await makeAdapter(endpoint, t.context)
+  const error = await testAdapter.request({})
+  t.is(error.statusCode, 500)
+  t.is(error.body, 'Error reply from redis')
 })

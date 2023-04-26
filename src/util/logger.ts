@@ -1,10 +1,11 @@
+import { randomUUID } from 'crypto'
+import { FastifyReply, HookHandlerDoneFunction } from 'fastify'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import pino from 'pino'
 import { BaseSettingsDefinition } from '../config'
-import { AdapterRequest } from './types'
-import { FastifyReply, HookHandlerDoneFunction } from 'fastify'
-import { randomUUID } from 'crypto'
-import { AsyncLocalStorage } from 'node:async_hooks'
+import { InputParametersDefinition } from '../validation/input-params'
 import CensorList, { CensorKeyValue } from './censor/censor-list'
+import { AdapterRequest } from './types'
 
 export const asyncLocalStorage = new AsyncLocalStorage()
 
@@ -117,7 +118,7 @@ export const makeLogger = (layer: string) =>
   })
 
 export const loggingContextMiddleware = (
-  req: AdapterRequest,
+  req: AdapterRequest<InputParametersDefinition>,
   res: FastifyReply,
   done: HookHandlerDoneFunction,
 ) => {
@@ -129,13 +130,16 @@ export const loggingContextMiddleware = (
 
 // Obj is typed as "any" because it could be a variety of structures in the logger
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function censor(obj: any, censorList: CensorKeyValue[]) {
+export function censor(obj: any, censorList: CensorKeyValue[], throwOnError = false) {
   let stringified = ''
   try {
     // JSON.stringify(obj) will fail if obj contains a circular reference.
     // If it fails, we fall back to replacing it with "[Unknown]".
     stringified = JSON.stringify(obj)
   } catch (e) {
+    if (throwOnError) {
+      throw e
+    }
     return '[Unknown]'
   }
   censorList.forEach((entry) => {

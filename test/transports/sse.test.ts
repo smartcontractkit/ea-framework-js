@@ -3,7 +3,7 @@ import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosRequestConfig } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { SSEConfig, SseTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
@@ -18,28 +18,23 @@ const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
 }>
 
-interface AdapterRequestParams {
-  base: string
-  quote: string
-}
-
-export const inputParameters = {
+export const inputParameters = new InputParameters({
   base: {
     type: 'string',
+    description: 'base',
     required: true,
   },
   quote: {
     type: 'string',
+    description: 'quote',
     required: true,
   },
-} satisfies InputParameters
+})
 
 type StreamEndpointTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     RequestBody: never
   }
@@ -96,7 +91,9 @@ export const sseEndpoint = new AdapterEndpoint({
   inputParameters,
 })
 
+const SSE_KEEPALIVE_SLEEP = 5000
 const CACHE_MAX_AGE = 4000
+const SSE_SUBSCRIPTION_TTL = 10000
 const BACKGROUND_EXECUTE_MS_SSE = 5000
 
 // Disable retries to make the testing flow easier
@@ -106,6 +103,8 @@ const config = new AdapterConfig(
   {},
   {
     envDefaultOverrides: {
+      SSE_KEEPALIVE_SLEEP,
+      SSE_SUBSCRIPTION_TTL,
       CACHE_MAX_AGE,
       BACKGROUND_EXECUTE_MS_SSE,
     },

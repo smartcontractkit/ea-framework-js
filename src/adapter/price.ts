@@ -1,5 +1,10 @@
 import { SettingsDefinitionMap } from '../config'
-import { AdapterRequest, AdapterRequestContext, AdapterResponse, RequestGenerics } from '../util'
+import { AdapterRequest, AdapterRequestContext, AdapterResponse } from '../util'
+import {
+  InputParameter,
+  InputParameters,
+  InputParametersDefinition,
+} from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams, PriceEndpointGenerics } from './index'
 
@@ -7,24 +12,22 @@ import { Adapter, AdapterEndpointParams, AdapterParams, PriceEndpointGenerics } 
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
  */
 export type PriceEndpointInputParameters = {
-  base: {
+  base: InputParameter & {
     aliases: readonly ['from', 'coin', ...string[]]
     type: 'string'
     description: 'The symbol of symbols of the currency to query'
-    required: boolean
   }
-  quote: {
+  quote: InputParameter & {
     aliases: readonly ['to', 'market', ...string[]]
     type: 'string'
     description: 'The symbol of the currency to convert to'
-    required: boolean
   }
 }
 
 /**
  * Base input parameter config that any [[PriceEndpoint]] must extend
  */
-export const priceEndpointInputParameters: PriceEndpointInputParameters = {
+export const priceEndpointInputParametersDefinition = {
   base: {
     aliases: ['from', 'coin'],
     type: 'string',
@@ -37,15 +40,7 @@ export const priceEndpointInputParameters: PriceEndpointInputParameters = {
     description: 'The symbol of the currency to convert to',
     required: true,
   },
-}
-
-/**
- * Type for base input params for a PriceEndpoint
- */
-export type PriceEndpointParams = {
-  base: string
-  quote: string
-}
+} as const satisfies PriceEndpointInputParameters
 
 /**
  * Structure of an "includes" file.
@@ -71,7 +66,7 @@ type IncludesMap = Record<string, Record<string, IncludeDetails>>
 export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {
   constructor(
     params: AdapterEndpointParams<T> & {
-      inputParameters: PriceEndpointInputParameters
+      inputParameters: InputParameters<PriceEndpointInputParameters>
     },
   ) {
     super(params)
@@ -91,7 +86,7 @@ const buildIncludesMap = (includesFile: IncludesFile) => {
   return includesMap
 }
 
-type PriceAdapterRequest<T extends RequestGenerics> = AdapterRequest<T> & {
+type PriceAdapterRequest<T extends InputParametersDefinition> = AdapterRequest<T> & {
   requestContext: AdapterRequestContext<T> & {
     priceMeta: {
       inverse: boolean
@@ -112,7 +107,9 @@ export class PriceAdapter<
       includes?: IncludesFile
     },
   ) {
-    const priceEndpoints = params.endpoints.filter((e) => e instanceof PriceEndpoint)
+    const priceEndpoints = params.endpoints.filter(
+      (e) => e instanceof PriceEndpoint,
+    ) as PriceEndpoint<PriceEndpointGenerics>[]
     if (!priceEndpoints.length) {
       throw new Error(
         `This PriceAdapter's list of endpoints does not contain a valid PriceEndpoint`,
@@ -125,10 +122,8 @@ export class PriceAdapter<
       // Build includes map for constant lookups
       this.includesMap = buildIncludesMap(params.includes)
 
-      const requestTransform = (req: AdapterRequest) => {
-        const priceRequest = req as PriceAdapterRequest<{
-          Params: PriceEndpointParams
-        }>
+      const requestTransform = (req: AdapterRequest<InputParametersDefinition>) => {
+        const priceRequest = req as PriceAdapterRequest<PriceEndpointInputParameters>
         const requestData = priceRequest.requestContext.data
         const includesDetails = this.includesMap?.[requestData.base]?.[requestData.quote]
 
@@ -150,9 +145,7 @@ export class PriceAdapter<
   }
 
   override async handleRequest(
-    req: PriceAdapterRequest<{
-      Params: PriceEndpointParams
-    }>,
+    req: PriceAdapterRequest<PriceEndpointInputParameters>,
     replySent: Promise<unknown>,
   ): Promise<AdapterResponse> {
     const response = await super.handleRequest(req, replySent)
@@ -183,7 +176,7 @@ const DEFAULT_ALIASES = ['crypto', 'price']
 export class CryptoPriceEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {
   constructor(
     params: AdapterEndpointParams<T> & {
-      inputParameters: PriceEndpointInputParameters
+      inputParameters: InputParameters<PriceEndpointInputParameters>
     },
   ) {
     if (!params.aliases) {

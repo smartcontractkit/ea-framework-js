@@ -76,21 +76,82 @@ jobs:
             | awk -F: '{ print $2 }' \
             | sed 's/[", ]//g')  
           echo "VERSION_TAG=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
-      - id: create-pr
-        name: Create PR
+      - name: Create commit
+        id: create-commit
         if: inputs.dry-run != 'true'
-        uses: peter-evans/create-pull-request@v3 # Creates a new branch, adds a commit, and opens a PR
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'Bump version to ${{ steps.tick-version.outputs.VERSION_TAG }}, original branch: ${{ github.head_ref || github.ref_name}}'
-          title: 'Bump version to ${{ steps.tick-version.outputs.VERSION_TAG }}'
-          body: |
-            This PR was created by the [createVersionBumpPR](./.github/actions/tick-version) GitHub action. It will be merged automatically once checks are successful.
-          branch: 'version-bump/${{ steps.tick-version.outputs.VERSION_TAG }}'
-          delete-branch: true
-          reviewers: ${{github.event.issue.user.login }} #This will be empty if run this job is run manually
-          labels: version-bump
-          base: ${{ github.base_ref || 'main' }} #always use target branch from PR or main when running manually because we always need some base branch to compare to
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FILE_TO_COMMIT: package.json
+          VERSION_BRANCH: "version-bump/${{ steps.tick-version.outputs.VERSION_TAG }}"
+        run: |
+          # start with creating new branch 'version-bump/VERSION_TAG', also update the reference to the origin if it doesn't exist
+          git checkout -b $VERSION_BRANCH
+          if ! gh api -X GET /repos/:owner/:repo/git/ref/heads/$VERSION_BRANCH >/dev/null 2>&1; then
+            echo "creating new branch"
+            gh api -X POST /repos/:owner/:repo/git/refs -f ref="refs/heads/main" -f sha="$GITHUB_SHA" -f "ref=refs/heads/$VERSION_BRANCH"
+          
+            # move the branch pointer one commit backwards so that we can manually commit changes done by 'npm version ...' command
+            git reset HEAD~
+          
+            # create a commit with content of package.json. This will give us 'verified' commit label from github actions bot
+            MESSAGE="${{ steps.tick-version.outputs.VERSION_TAG }}"
+            SHA=$( git rev-parse $VERSION_BRANCH:$FILE_TO_COMMIT )
+            CONTENT=$( base64 -i $FILE_TO_COMMIT )
+            NEW_COMMIT_SHA=$(gh api --method PUT /repos/:owner/:repo/contents/$FILE_TO_COMMIT \
+             --field message="$MESSAGE" \
+             --field content="$CONTENT" \
+            --field encoding="base64" \
+            --field branch="$VERSION_BRANCH" \
+            --field sha="$SHA" | jq -r '.commit.sha')
+          
+            # create a tag from VERSION_TAG
+            TAG_RESPONSE=$(gh api --method POST /repos/:owner/:repo/git/tags \
+            --field tag="v${{ steps.tick-version.outputs.VERSION_TAG }}" \
+            --field message="${{ steps.tick-version.outputs.VERSION_TAG }}" \
+            --field object="$NEW_COMMIT_SHA" \
+            --field type="commit")
+          
+            NEW_TAG_SHA=$(echo "$TAG_RESPONSE" | jq -r '.sha')
+          
+            # update the reference so that the tag is visible in github
+            gh api --method POST /repos/:owner/:repo/git/refs \
+            --field ref="refs/tags/v${{ steps.tick-version.outputs.VERSION_TAG }}" \
+            --field sha="$NEW_TAG_SHA"
+          fi
+          echo "VERSION_BRANCH=$VERSION_BRANCH" >> $GITHUB_OUTPUT
+      - name: Create PR
+        id: create-pr
+        if: inputs.dry-run != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # at this point either new branch with one new commit is created so we open PR, or we get the open PR and set the outputs
+          pullRequest=$(gh api --method GET "/repos/:owner/:repo/pulls" --jq ".[] | select(.head.ref == \"${{ steps.create-commit.outputs.VERSION_BRANCH }}\" and .state == \"open\") | {url: .html_url, number: .number}")
+          
+          if [[ -z "$pullRequest" ]]; then
+            echo "No pull requests found for branch ${{ steps.create-commit.outputs.VERSION_BRANCH }}, creating new PR"
+            response=$(gh api --method POST /repos/:owner/:repo/pulls \
+            --field title="Bump version to ${{ steps.tick-version.outputs.VERSION_TAG }}" \
+            --field body="This PR bumps the version to ${{ steps.tick-version.outputs.VERSION_TAG }}" \
+            --field head="${{ steps.create-commit.outputs.VERSION_BRANCH }}" \
+            --field base="${{ github.base_ref || 'main' }}")
+          
+            pr_url=$(echo $response | jq -r '.html_url')
+            pr_number=$(echo $response | jq -r '.number')
+          
+            echo "pull-request-number=$pr_number" >> $GITHUB_OUTPUT
+            echo "pull-request-url=$pr_url" >> $GITHUB_OUTPUT
+          
+            # as a last step we create a label for PR
+            gh api --method POST "/repos/:owner/:repo/issues/$pr_number/labels" -F "labels[]=version-bump"
+          else
+            echo "Pull requests found for branch ${{ steps.create-commit.outputs.VERSION_BRANCH }}, setting outputs"
+            pr_url=$(echo "$pullRequest" | jq -r '.url')
+            pr_number=$(echo "$pullRequest" | jq -r '.number')
+          
+            echo "pull-request-number=$pr_number" >> $GITHUB_OUTPUT
+            echo "pull-request-url=$pr_url" >> $GITHUB_OUTPUT
+          fi
 
   post-result-to-pr:
     runs-on: ubuntu-latest

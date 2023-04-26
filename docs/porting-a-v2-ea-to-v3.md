@@ -62,11 +62,9 @@ Each transport will need a type that defines a set of types. This will look some
 
 ```typescript
 export type EndpointTypes = {
-  Request: {
-    Params: EndpointParams // Types for the request to the EA
-  }
+  Parameters: typeof inputParameters.definition // Types of the custom input params. For no parameters, use EmptyInputParameters
+  CustomSettings: typeof customSettings // Types of custom settings. For generic settings, use EmptyCustomSettings
   Response: SingleNumberResultResponse // Type of the response from the EA
-  CustomSettings: typeof customSettings // Types of custom settings. For generic settings, use SettingsMap
   Provider: {
     ... // Provider specific details, these differ and are defined by each Transport implementation
   }

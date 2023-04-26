@@ -1,10 +1,11 @@
 import test from 'ava'
-import { priceEndpointInputParameters } from '../../src/adapter'
+import { priceEndpointInputParametersDefinition } from '../../src/adapter'
 import { cacheMetricsLabel } from '../../src/cache/metrics'
 import { AdapterSettings } from '../../src/config'
 import { buildHttpRequestMetricsLabel } from '../../src/metrics'
 import { HttpRequestType } from '../../src/metrics/constants'
 import { connectionErrorLabels, messageSubsLabels } from '../../src/transports/metrics'
+import { InputParameters } from '../../src/validation'
 import { AdapterError } from '../../src/validation/error'
 
 test('Generate cache label test', (t) => {
@@ -77,7 +78,7 @@ test('Generate WS message and subscription label test', (t) => {
     messageSubsLabels(
       {
         adapterSettings: {} as AdapterSettings,
-        inputParameters: priceEndpointInputParameters,
+        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
         endpointName: 'test',
       },
       {

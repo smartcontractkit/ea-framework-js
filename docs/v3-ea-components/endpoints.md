@@ -6,63 +6,12 @@ If the endpoint field is omitted, the adapter will use the default endpoint in t
 
 Define each endpoint in its own file in the `/endpoints` folder. Name the file the endpoint's name such as `crypto.ts`. Use the parameters described in the sections below to create endpoints that fit the need of your particular adapter.
 
-## Endpoint Types
-
-Endpoints contain a type parameter that allows specifying all relevant types in a single structure. The developer can specify types for the adapter request, adapter response, provider request, provider response, and settings. An example is shown below.
-
-```typescript
-import { customSettings } from './config'
-
-interface RequestParams {
-  base: string
-  quote: string
-}
-
-interface ResponseSchema {
-  base: string
-  quote: string
-  price: number
-}
-
-interface RequestBody {
-  symbol: string
-  convert: string
-}
-
-interface ProviderMessage {
-  from: string
-  to: string
-  result: number
-}
-
-type EndpointTypes = {
-  // Expected adapter request structure received by this endpoint
-  Request: {
-    Params: RequestParams
-  }
-  // Expected adapter response structure returned by the endpoint
-  Response: {
-    Data: ResponseSchema
-    Result: number
-  }
-  // The adapter configs including the custom settings
-  // Set to 'SettingsMap' (provided by the framework) if the adapter does not have custom settings
-  CustomSettings: typeof customSettings
-  // Expected data provider request and response structures. Options for REST and Websocket
-  Provider: {
-    RequestBody: RequestBody // Used for HTTP transports. Set to "never" if API solely uses query parameters.
-    ResponseBody: ResponseSchema // Used for HTTP transports
-    WsMessage: ProviderMessage // Used for Websocket transports
-  }
-}
-```
-
 ## Input Parameters
 
 Input parameters define the structure of the request expected by the endpoint. The framework provides helpful fields to customize input parameters along with validations to ensure each request conforms to the structure.
 
 ```typescript
-const inputParameters = {
+const inputParameters = new InputParameters({
   param1: {
     aliases: ['param-one'],
     required: true,
@@ -83,7 +32,51 @@ const inputParameters = {
     type: 'string',
     description: 'Exclusive from param1',
   },
-} as const
+})
+```
+
+## Endpoint Types
+
+Endpoints contain a type parameter that allows specifying all relevant types in a single structure. The developer can specify types for the adapter request, adapter response, provider request, provider response, and settings. An example is shown below.
+
+```typescript
+import { customSettings } from './config'
+
+interface ResponseSchema {
+  base: string
+  quote: string
+  price: number
+}
+
+interface RequestBody {
+  symbol: string
+  convert: string
+}
+
+interface ProviderMessage {
+  from: string
+  to: string
+  result: number
+}
+
+type EndpointTypes = {
+  // Expected adapter request structure received by this endpoint
+  Parameters: typeof inputParameters.definition
+  // Expected adapter response structure returned by the endpoint
+  Response: {
+    Data: ResponseSchema
+    Result: number
+  }
+  // The adapter configs including the custom settings
+  // Set to 'SettingsMap' (provided by the framework) if the adapter does not have custom settings
+  CustomSettings: typeof customSettings
+  // Expected data provider request and response structures. Options for REST and Websocket
+  Provider: {
+    RequestBody: RequestBody // Used for HTTP transports. Set to "never" if API solely uses query parameters.
+    ResponseBody: ResponseSchema // Used for HTTP transports
+    WsMessage: ProviderMessage // Used for Websocket transports
+  }
+}
 ```
 
 ## Cache Key Generator
@@ -111,7 +104,7 @@ The custom input validation method allows the developer to specify custom logic 
 
 ```typescript
 function customInputValidation(
-  req: RequestParams,
+  req: TypeFromDefinition<typeof inputParameters.definition>,
   config: AdapterConfig<typeof customSettings>,
 ): AdapterError | undefined {
   if (req.value && (req.value < 0 || req.value > 100)) {
@@ -140,9 +133,7 @@ import { SingleNumberResultResponse } from '@chainlink/external-adapter-framewor
 
 type EndpointTypes = {
   // The PriceEndpointInputParameters type is the most common request params for a price endpoint. {base: string, quote: string}
-  Request: {
-    Params: PriceEndpointParams,
-  },
+  Parameters: PriceEndpointInputParameters
   ...
   // The SingleNumberResultResponse type is the most common response format for price endpoints. {result: number, data: { result: number }}
   Response: SingleNumberResultResponse,

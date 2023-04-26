@@ -17,7 +17,7 @@ import {
   WebSocketTransport,
 } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { mockWebSocketProvider, TestAdapter } from '../util'
+import { TestAdapter, mockWebSocketProvider } from '../util'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter<SettingsDefinitionFromConfig<typeof adapterConfig>>
@@ -30,11 +30,6 @@ interface ProviderRequestBody {
 
 interface ProviderResponseBody {
   price: number
-}
-
-interface AdapterRequestParams {
-  from: string
-  to: string
 }
 
 interface ProviderMessage {
@@ -59,9 +54,7 @@ const websocketUrl = 'wss://test-ws.com/asd'
 const axiosMock = new MockAdapter(axios)
 
 type BaseEndpointTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: {
     Data: {
       price: number
@@ -81,7 +74,7 @@ const from = 'ETH'
 const to = 'USD'
 const price = 1500
 
-const inputParameters = {
+const inputParameters = new InputParameters({
   from: {
     description: 'from',
     required: true,
@@ -92,7 +85,7 @@ const inputParameters = {
     required: true,
     type: 'string',
   },
-} satisfies InputParameters
+})
 
 class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
   public backgroundExecuteCalls = 0
@@ -118,11 +111,11 @@ class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
         },
       },
       builders: {
-        subscribeMessage: (params: AdapterRequestParams) => ({
+        subscribeMessage: (params) => ({
           request: 'subscribe',
           pair: `${params.from}/${params.to}`,
         }),
-        unsubscribeMessage: (params: AdapterRequestParams) => ({
+        unsubscribeMessage: (params) => ({
           request: 'unsubscribe',
           pair: `${params.from}/${params.to}`,
         }),
@@ -130,7 +123,7 @@ class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<any>): Promise<void> {
+  override async backgroundExecute(context: EndpointContext<WebSocketTypes>): Promise<void> {
     this.backgroundExecuteCalls++
     return super.backgroundExecute(context)
   }
@@ -168,7 +161,7 @@ class MockHttpTransport extends HttpTransport<HttpTypes> {
 
   constructor(private callSuper = false) {
     super({
-      prepareRequests: (params: AdapterRequestParams[]) => {
+      prepareRequests: (params) => {
         return {
           params,
           request: {
@@ -181,8 +174,8 @@ class MockHttpTransport extends HttpTransport<HttpTypes> {
           },
         }
       },
-      parseResponse: (params: AdapterRequestParams[], res: AxiosResponse<any>) => {
-        return res.data.prices.map((p: any) => {
+      parseResponse: (params, res: AxiosResponse) => {
+        return res.data.prices.map((p: { pair: string; price: number }) => {
           const [base, quote] = p.pair.split('/')
           return {
             params: { from: base, to: quote },
@@ -193,7 +186,7 @@ class MockHttpTransport extends HttpTransport<HttpTypes> {
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<any>): Promise<void> {
+  override async backgroundExecute(context: EndpointContext<HttpTypes>): Promise<void> {
     this.backgroundExecuteCalls++
     if (this.callSuper) {
       super.backgroundExecute(context)
@@ -258,7 +251,7 @@ class MockSseTransport extends SseTransport<SSETypes> {
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<any>): Promise<void> {
+  override async backgroundExecute(context: EndpointContext<SSETypes>): Promise<void> {
     this.backgroundExecuteCalls++
     return super.backgroundExecute(context)
   }
@@ -346,7 +339,7 @@ test.serial('endpoint routing can route to HttpTransport', async (t) => {
   })
 
   t.is(error.statusCode, 504)
-  const internalTransport = transports.get('batch') as MockHttpTransport
+  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -357,7 +350,7 @@ test.serial('endpoint routing can route to WebSocket transport', async (t) => {
     transport: 'WEBSOCKET',
   })
   t.is(error?.statusCode, 504)
-  const internalTransport = transports.get('websocket') as MockWebSocketTransport
+  const internalTransport = transports.get('websocket') as unknown as MockWebSocketTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -383,7 +376,7 @@ test.serial('endpoint routing can route to SSE transport', async (t) => {
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports.get('sse') as MockSseTransport
+  const internalTransport = transports.get('sse') as unknown as MockSseTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -445,7 +438,7 @@ test.serial('custom router is applied to get valid transport to route to', async
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports.get('batch') as MockHttpTransport
+  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -630,7 +623,7 @@ test.serial('missing transport in input params with default succeeds', async (t)
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports.get('batch') as MockHttpTransport
+  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
   t.assert(internalTransport.backgroundExecuteCalls > 0)
 })
 
@@ -650,4 +643,18 @@ test.serial('transport creation fails if transport names are not acceptable', as
         }),
     )
   }
+})
+
+test.serial('transports with same name throws error', async (t) => {
+  t.throws(
+    () =>
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters,
+        transportRoutes: new TransportRoutes<BaseEndpointTypes>()
+          .register('websocket', new MockWebSocketTransport())
+          .register('websocket', new MockWebSocketTransport()),
+      }),
+    { message: 'Transport with name "websocket" is already registered in this map' },
+  )
 })

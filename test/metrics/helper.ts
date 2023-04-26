@@ -1,8 +1,9 @@
 import { AxiosResponse } from 'axios'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings } from '../../src/config'
+import { EmptyCustomSettings } from '../../src/config'
 import { HttpTransport } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
+import { InputParameters } from '../../src/validation'
 
 export const buildHttpAdapter = (): Adapter => {
   return new Adapter({
@@ -20,11 +21,6 @@ export const buildHttpAdapter = (): Adapter => {
 
 const URL = 'http://test-url.com'
 
-interface AdapterRequestParams {
-  from: string
-  to: string
-}
-
 interface ProviderRequestBody {
   pairs: Array<{
     base: string
@@ -40,11 +36,9 @@ interface ProviderResponseBody {
 }
 
 type HttpEndpointTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
@@ -54,7 +48,7 @@ type HttpEndpointTypes = {
 class MockHttpTransport extends HttpTransport<HttpEndpointTypes> {
   constructor() {
     super({
-      prepareRequests: (params: AdapterRequestParams[]) => {
+      prepareRequests: (params) => {
         return {
           params,
           request: {
@@ -67,7 +61,7 @@ class MockHttpTransport extends HttpTransport<HttpEndpointTypes> {
           },
         }
       },
-      parseResponse: (params: AdapterRequestParams[], res: AxiosResponse<ProviderResponseBody>) => {
+      parseResponse: (params, res: AxiosResponse<ProviderResponseBody>) => {
         return res.data.prices.map((p) => {
           const [from, to] = p.pair.split('/')
           return {
@@ -85,13 +79,15 @@ class MockHttpTransport extends HttpTransport<HttpEndpointTypes> {
   }
 }
 
-const inputParameters = {
+const inputParameters = new InputParameters({
   from: {
     type: 'string',
+    description: 'from',
     required: true,
   },
   to: {
     type: 'string',
+    description: 'to',
     required: true,
   },
-} as const
+})

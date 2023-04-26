@@ -5,13 +5,13 @@ import MockAdapter from 'axios-mock-adapter'
 import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { calculateHttpRequestKey } from '../../src/cache'
-import { AdapterConfig, BaseAdapterSettings, buildAdapterSettings } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings, buildAdapterSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import { RateLimitingStrategy } from '../../src/rate-limiting/factory'
 import { HttpTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse, sleep } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { assertEqualResponses, MockCache, runAllUntil, runAllUntilTime, TestAdapter } from '../util'
+import { MockCache, TestAdapter, assertEqualResponses, runAllUntil, runAllUntilTime } from '../util'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
@@ -22,11 +22,6 @@ const test = untypedTest as TestFn<{
 const URL = 'http://test-url.com'
 const endpoint = '/price'
 const axiosMock = new MockAdapter(axios)
-
-interface AdapterRequestParams {
-  from: string
-  to: string
-}
 
 interface ProviderRequestBody {
   pairs: Array<{
@@ -58,12 +53,23 @@ test.afterEach(async (t) => {
   await t.context.testAdapter?.api.close()
 })
 
+const inputParameters = new InputParameters({
+  from: {
+    type: 'string',
+    description: 'from',
+    required: true,
+  },
+  to: {
+    type: 'string',
+    description: 'to',
+    required: true,
+  },
+})
+
 type HttpTransportTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
@@ -94,7 +100,7 @@ class MockHttpTransport extends HttpTransport<HttpTransportTypes> {
         },
       }),
       parseResponse: (
-        params: AdapterRequestParams[],
+        params,
         res: AxiosResponse<ProviderResponseBody>,
       ): ProviderResult<HttpTransportTypes>[] =>
         res.data.prices?.map((p) => {
@@ -160,17 +166,6 @@ axiosMock
     ],
   })
   .reply(500, 'There was an unexpected issue')
-
-const inputParameters = {
-  from: {
-    type: 'string',
-    required: true,
-  },
-  to: {
-    type: 'string',
-    required: true,
-  },
-} as const
 
 test.serial('sends request to DP and returns response', async (t) => {
   const adapter = new Adapter({
@@ -542,7 +537,7 @@ test.serial('requests from different transports are NOT coalesced', async (t) =>
           },
         }),
         parseResponse: (
-          params: AdapterRequestParams[],
+          params,
           res: AxiosResponse<ProviderVolumeResponseBody>,
         ): ProviderResult<HttpVolumeTransportTypes>[] =>
           res.data.volumes?.map((p) => {
@@ -971,11 +966,9 @@ test.serial(
 
     const buildTransport = (path: 'price' | 'volume') =>
       new HttpTransport<{
-        Request: {
-          Params: AdapterRequestParams
-        }
+        Parameters: typeof inputParameters.definition
         Response: SingleNumberResultResponse
-        Settings: BaseAdapterSettings
+        Settings: EmptyCustomSettings
         Provider: {
           RequestBody: ProviderRequestBody
           ResponseBody: {
@@ -1110,16 +1103,18 @@ test.serial(
 test.serial('builds HTTP request queue key correctly from input params', async (t) => {
   const endpointName = 'test'
   const adapterSettings = buildAdapterSettings({})
-  const params: InputParameters = {
+  const params = new InputParameters({
     base: {
       type: 'string',
+      description: 'base',
       required: true,
     },
     quote: {
       type: 'string',
+      description: 'quote',
       required: true,
     },
-  }
+  })
   const data = { base: 'ETH', quote: 'BTC' }
   t.is(
     calculateHttpRequestKey({

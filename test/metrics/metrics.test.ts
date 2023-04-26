@@ -3,9 +3,10 @@ import untypedTest, { TestFn } from 'ava'
 import axios from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
-import { retrieveCost } from '../../src/metrics'
+import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
+import { Metrics, retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
+import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
@@ -14,11 +15,6 @@ const test = untypedTest as TestFn<{
 }>
 
 const URL = 'http://test-url.com'
-
-interface AdapterRequestParams {
-  from: string
-  to: string
-}
 
 interface ProviderRequestBody {
   base: string
@@ -29,17 +25,28 @@ interface ProviderResponseBody {
   price: number
 }
 
+const inputParameters = new InputParameters({
+  from: {
+    type: 'string',
+    description: 'from',
+    required: true,
+  },
+  to: {
+    type: 'string',
+    description: 'to',
+    required: true,
+  },
+})
+
 type RestEndpointTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: {
     Data: {
       price: number
     }
     Result: number
   }
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
@@ -83,16 +90,7 @@ const createAdapterEndpoint = (): AdapterEndpoint<RestEndpointTypes> => {
 
   return new AdapterEndpoint({
     name: 'TEST',
-    inputParameters: {
-      from: {
-        type: 'string',
-        required: true,
-      },
-      to: {
-        type: 'string',
-        required: true,
-      },
-    },
+    inputParameters,
     transport: restEndpointTransport,
   })
 }
@@ -287,4 +285,31 @@ test('Rate limit metrics retrieve cost (number)', async (t) => {
 test('Rate limit metrics retrieve cost (string)', async (t) => {
   const cost = retrieveCost({ data: {}, statusCode: 200, cost: '3' })
   t.is(cost, 3)
+})
+
+test('invalid metric name throws error', async (t) => {
+  const metrics = new Metrics(() => ({}))
+  const error = await t.throws(() =>
+    // @ts-expect-error - there is a type check for this, but we want to check it in runtime
+    metrics.get('invalid_name'),
+  )
+  t.is(error?.message, 'Metric "invalid_name" was not initialized before use')
+})
+
+test.serial('validate response.meta has the correct properties', async (t) => {
+  axiosMock
+    .onGet(`${URL}${endpoint}`, {
+      base: from,
+      quote: to,
+    })
+    .reply(200, {
+      price,
+    })
+
+  const response = (await t.context.testAdapter.request({ from, to })).json()
+
+  t.deepEqual(response.meta, {
+    adapterName: 'TEST',
+    metrics: { feedId: '{"from":"eth","to":"usd"}' },
+  })
 })

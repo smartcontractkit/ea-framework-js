@@ -2,10 +2,10 @@ import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { mockWebSocketProvider, TestAdapter } from '../util'
+import { TestAdapter, mockWebSocketProvider } from '../util'
 
 export const test = untypedTest as TestFn<{
   adapterEndpoint: AdapterEndpoint<WebSocketEndpointTypes>
@@ -14,21 +14,18 @@ export const test = untypedTest as TestFn<{
   clock: InstalledClock
 }>
 
-interface AdapterRequestParams {
-  base: string
-  quote: string
-}
-
-export const inputParameters = {
+export const inputParameters = new InputParameters({
   base: {
     type: 'string',
+    description: 'base',
     required: true,
   },
   quote: {
     type: 'string',
+    description: 'quote',
     required: true,
   },
-} satisfies InputParameters
+})
 
 interface ProviderMessage {
   pair: string
@@ -36,16 +33,14 @@ interface ProviderMessage {
 }
 
 type WebSocketEndpointTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: {
     Data: {
       price: number
     }
     Result: number
   }
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     WsMessage: ProviderMessage
   }
@@ -73,11 +68,11 @@ export const websocketTransport = new WebSocketTransport<WebSocketEndpointTypes>
     },
   },
   builders: {
-    subscribeMessage: (params: AdapterRequestParams) => ({
+    subscribeMessage: (params) => ({
       request: 'subscribe',
       pair: `${params.base}/${params.quote}`,
     }),
-    unsubscribeMessage: (params: AdapterRequestParams) => ({
+    unsubscribeMessage: (params) => ({
       request: 'unsubscribe',
       pair: `${params.base}/${params.quote}`,
     }),

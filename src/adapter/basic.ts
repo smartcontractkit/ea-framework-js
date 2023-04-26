@@ -14,9 +14,10 @@ import {
   highestRateLimitTiers,
 } from '../rate-limiting'
 import { RateLimiterFactory, RateLimitingStrategy } from '../rate-limiting/factory'
-import { AdapterRequest, AdapterResponse, makeLogger, SubscriptionSetFactory } from '../util'
+import { AdapterRequest, AdapterResponse, SubscriptionSetFactory, makeLogger } from '../util'
 import { Requester } from '../util/requester'
 import { AdapterTimeoutError } from '../validation/error'
+import { InputParametersDefinition } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import {
   AdapterDependencies,
@@ -214,34 +215,32 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
   initializeDependencies(inputDependencies?: Partial<AdapterDependencies>): AdapterDependencies {
     const dependencies = inputDependencies || {}
 
-    if (!dependencies.redisClient) {
-      if (this.config.settings.CACHE_TYPE === 'redis') {
-        const maxCooldown = this.config.settings.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
-        const redisOptions = {
-          enableAutoPipelining: true, // This will make multiple commands be batch automatically
-          host: this.config.settings.CACHE_REDIS_HOST,
-          port: this.config.settings.CACHE_REDIS_PORT,
-          password: this.config.settings.CACHE_REDIS_PASSWORD,
-          path: this.config.settings.CACHE_REDIS_PATH, // If set, port and host are ignored
-          timeout: this.config.settings.CACHE_REDIS_TIMEOUT,
-          retryStrategy(times: number): number {
-            metrics.get('redisRetriesCount').inc()
-            logger.warn(`Redis reconnect attempt #${times}`)
-            return Math.min(times * 100, maxCooldown) // Next reconnect attempt time
-          },
-          connectTimeout: this.config.settings.CACHE_REDIS_CONNECTION_TIMEOUT,
-          maxRetriesPerRequest: 30, // Limits the number of retries before the adapter shuts down
-        }
-        if (this.config.settings.CACHE_REDIS_URL) {
-          dependencies.redisClient = new Redis(this.config.settings.CACHE_REDIS_URL, redisOptions)
-        } else {
-          dependencies.redisClient = new Redis(redisOptions)
-        }
-
-        dependencies.redisClient.on('connect', () => {
-          metrics.get('redisConnectionsOpen').inc()
-        })
+    if (this.config.settings.CACHE_TYPE === 'redis' && !dependencies.redisClient) {
+      const maxCooldown = this.config.settings.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
+      const redisOptions = {
+        enableAutoPipelining: true, // This will make multiple commands be batch automatically
+        host: this.config.settings.CACHE_REDIS_HOST,
+        port: this.config.settings.CACHE_REDIS_PORT,
+        password: this.config.settings.CACHE_REDIS_PASSWORD,
+        path: this.config.settings.CACHE_REDIS_PATH, // If set, port and host are ignored
+        timeout: this.config.settings.CACHE_REDIS_TIMEOUT,
+        retryStrategy(times: number): number {
+          metrics.get('redisRetriesCount').inc()
+          logger.warn(`Redis reconnect attempt #${times}`)
+          return Math.min(times * 100, maxCooldown) // Next reconnect attempt time
+        },
+        connectTimeout: this.config.settings.CACHE_REDIS_CONNECTION_TIMEOUT,
+        maxRetriesPerRequest: 30, // Limits the number of retries before the adapter shuts down
       }
+      if (this.config.settings.CACHE_REDIS_URL) {
+        dependencies.redisClient = new Redis(this.config.settings.CACHE_REDIS_URL, redisOptions)
+      } else {
+        dependencies.redisClient = new Redis(redisOptions)
+      }
+
+      dependencies.redisClient.on('connect', () => {
+        metrics.get('redisConnectionsOpen').inc()
+      })
     }
 
     if (!dependencies.cache) {
@@ -255,6 +254,14 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     }
 
     const rateLimitingTier = getRateLimitingTier(this.config.settings, this.rateLimiting?.tiers)
+
+    if (rateLimitingTier) {
+      for (const limit of Object.values(rateLimitingTier)) {
+        if (limit && limit < 0) {
+          throw new Error('Rate limit must be a positive number')
+        }
+      }
+    }
 
     const highestTierValue = highestRateLimitTiers(this.rateLimiting?.tiers)
     const rateLimitTierFromConfig = buildRateLimitTiersFromConfig(this.config.settings)
@@ -304,7 +311,9 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
    * @param req - the incoming request to this adapter
    * @returns the cached value if exists
    */
-  async findResponseInCache(req: AdapterRequest): Promise<Readonly<AdapterResponse> | undefined> {
+  async findResponseInCache(
+    req: AdapterRequest<InputParametersDefinition>,
+  ): Promise<Readonly<AdapterResponse> | undefined> {
     const response = await (this.dependencies.cache as Cache<AdapterResponse>).get(
       req.requestContext.cacheKey,
     )
@@ -346,7 +355,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
    * @returns a simple Promise when it's done
    */
   async handleRequest(
-    req: AdapterRequest,
+    req: AdapterRequest<InputParametersDefinition>,
     replySent: Promise<unknown>,
   ): Promise<Readonly<AdapterResponse>> {
     // Get transport, must be here because it's already checked in the validator

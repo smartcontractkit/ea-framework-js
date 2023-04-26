@@ -72,7 +72,7 @@ export const calculateCacheKey = <T extends EndpointGenerics>({
   transportName,
 }: {
   data: unknown
-  inputParameters: InputParameters
+  inputParameters: InputParameters<T['Parameters']>
   adapterName: string
   endpointName: string
   adapterSettings: T['Settings']
@@ -122,9 +122,9 @@ const calculateKey = <T extends EndpointGenerics>({
   endpointName: string
   transportName: string
   adapterSettings: T['Settings']
-  inputParameters: InputParameters
+  inputParameters: InputParameters<T['Parameters']>
 }) => {
-  const paramsKey = Object.keys(inputParameters).length
+  const paramsKey = inputParameters.params.length
     ? calculateParamsKey(data, adapterSettings.MAX_COMMON_KEY_SIZE)
     : adapterSettings.DEFAULT_CACHE_KEY
   return `${endpointName}-${transportName}-${paramsKey}`
@@ -135,12 +135,12 @@ export const calculateFeedId = <T extends EndpointGenerics>(
     inputParameters,
     adapterSettings,
   }: {
-    inputParameters: InputParameters
+    inputParameters: InputParameters<T['Parameters']>
     adapterSettings: T['Settings']
   },
   data: unknown,
 ): string => {
-  if (Object.keys(inputParameters).length === 0) {
+  if (inputParameters.params.length === 0) {
     logger.trace(`Cannot generate Feed ID without input parameters`)
     return 'N/A'
   }

@@ -20,6 +20,8 @@ test('subscription set factory (redis cache)', async (t) => {
   const factory = new SubscriptionSetFactory(config, 'test', new RedisMock() as unknown as Redis)
   const subscriptionSet = factory.buildSet('test', 'test')
   t.is(subscriptionSet instanceof RedisSubscriptionSet, true)
+  const value = subscriptionSet.get('testKey')
+  t.is(value, undefined)
 })
 
 test('subscription set factory (redis cache missing client)', async (t) => {

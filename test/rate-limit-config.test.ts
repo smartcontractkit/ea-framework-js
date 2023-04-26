@@ -3,10 +3,11 @@ import { start } from '../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../src/adapter'
 import { AdapterConfig } from '../src/config'
 import {
-  buildRateLimitTiersFromConfig,
   BurstRateLimiter,
+  buildRateLimitTiersFromConfig,
   highestRateLimitTiers,
 } from '../src/rate-limiting'
+import { RateLimiterFactory, RateLimitingStrategy } from '../src/rate-limiting/factory'
 import { NopTransport } from './util'
 
 test('empty tiers in rate limiting fails on startup', async (t) => {
@@ -17,7 +18,6 @@ test('empty tiers in rate limiting fails on startup', async (t) => {
         name: 'test',
         aliases: ['qwe'],
         transport: new NopTransport(),
-        inputParameters: {},
       }),
     ],
     rateLimiting: {
@@ -27,6 +27,36 @@ test('empty tiers in rate limiting fails on startup', async (t) => {
 
   await t.throwsAsync(async () => start(adapter), {
     message: 'The tiers object is defined, but has no entries',
+  })
+})
+
+test('throws error if rate limit is a negative number', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        transport: new NopTransport(),
+      }),
+    ],
+    rateLimiting: {
+      tiers: {
+        free: {
+          rateLimit1s: undefined,
+          rateLimit1m: 1,
+          rateLimit1h: -1.5,
+        },
+        pro: {
+          rateLimit1s: -1,
+          rateLimit1m: 1,
+          rateLimit1h: 1,
+        },
+      },
+    },
+  })
+
+  await t.throwsAsync(async () => start(adapter), {
+    message: 'Rate limit must be a positive number',
   })
 })
 
@@ -45,7 +75,6 @@ test('selected tier is not a valid option', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -83,7 +112,6 @@ test('throws error if explicit allocation leaves no room for implicitly allocate
         endpoints: [
           new AdapterEndpoint({
             name: 'test',
-            inputParameters: {},
             transport: new NopTransport(),
             rateLimiting: {
               allocationPercentage: 100,
@@ -91,7 +119,6 @@ test('throws error if explicit allocation leaves no room for implicitly allocate
           }),
           new AdapterEndpoint({
             name: 'test2',
-            inputParameters: {},
             transport: new NopTransport(),
           }),
         ],
@@ -130,7 +157,6 @@ test('throws error if explicit allocation exceeds 100%', async (t) => {
         endpoints: [
           new AdapterEndpoint({
             name: 'test',
-            inputParameters: {},
             transport: new NopTransport(),
             rateLimiting: {
               allocationPercentage: 80,
@@ -138,7 +164,6 @@ test('throws error if explicit allocation exceeds 100%', async (t) => {
           }),
           new AdapterEndpoint({
             name: 'test2',
-            inputParameters: {},
             transport: new NopTransport(),
             rateLimiting: {
               allocationPercentage: 30,
@@ -168,7 +193,6 @@ test('uses most restrictive tier if none is specified in settings', async (t) =>
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
             t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
@@ -214,7 +238,6 @@ test('uses unlimited tier if none is specified in settings', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
             t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
@@ -255,7 +278,6 @@ test('uses specified tier if present in settings', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           override async initialize(dependencies: AdapterDependencies): Promise<void> {
             t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
@@ -305,7 +327,6 @@ test('test build rate limits from env vars (second, minute)', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -344,7 +365,6 @@ test('test build rate limits from env vars (second, capacity)', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -384,7 +404,6 @@ test('test build rate limits from env vars (second, minute, capacity)', async (t
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -424,7 +443,6 @@ test('test build rate limits from env vars (capacity)', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -451,7 +469,6 @@ test('test build highest rate limits from config second, minute)', async (t) => 
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -468,4 +485,18 @@ test('test build highest rate limits from config second, minute)', async (t) => 
   })
   const highestRateLimitTier = highestRateLimitTiers(adapter.rateLimiting?.tiers)
   t.is(highestRateLimitTier, 4)
+})
+
+test('returns 0 when limit is set to infinity, no tier limit specified', async (t) => {
+  const burstRateLimiter = RateLimiterFactory.buildRateLimiter(
+    RateLimitingStrategy.BURST,
+  ).initialize([], {})
+  const time = burstRateLimiter.msUntilNextExecution()
+  t.is(time, 0)
+})
+
+test('highestRateLimitTiers errors when no tiers are provided', async (t) => {
+  await t.throwsAsync(async () => highestRateLimitTiers({}), {
+    message: 'The tiers object is defined, but has no entries',
+  })
 })

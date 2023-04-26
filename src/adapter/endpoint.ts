@@ -1,10 +1,9 @@
 import { ResponseCache } from '../cache/response'
 import { AdapterSettings } from '../config'
 import { TransportRoutes } from '../transports'
-import { AdapterRequest, AdapterRequestData, makeLogger } from '../util'
-import { SpecificInputParameters } from '../validation'
+import { AdapterRequest, AdapterRequestData, Overrides, makeLogger } from '../util'
+import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
-import { InputValidator } from '../validation/input-validator'
 import {
   AdapterDependencies,
   AdapterEndpointInterface,
@@ -12,7 +11,6 @@ import {
   CustomInputValidator,
   EndpointGenerics,
   EndpointRateLimitingConfig,
-  Overrides,
   RequestTransform,
 } from './types'
 
@@ -24,16 +22,16 @@ export const DEFAULT_TRANSPORT_NAME = 'default_single_transport'
  */
 export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpointInterface<T> {
   name: string
+  adapterName!: string
   aliases?: string[] | undefined
   transportRoutes: TransportRoutes<T>
-  inputParameters: SpecificInputParameters<T['Request']['Params']>
+  inputParameters: InputParameters<T['Parameters']>
   rateLimiting?: EndpointRateLimitingConfig | undefined
-  validator: InputValidator
   cacheKeyGenerator?: (data: Record<string, unknown>) => string
   customInputValidation?: CustomInputValidator<T>
-  requestTransforms?: RequestTransform<T>[]
+  requestTransforms: RequestTransform<T>[]
   overrides?: Record<string, string> | undefined
-  customRouter?: (req: AdapterRequest<T['Request']>, settings: T['Settings']) => string
+  customRouter?: (req: AdapterRequest<T['Parameters']>, settings: T['Settings']) => string
   defaultTransport?: string
 
   constructor(params: AdapterEndpointParams<T>) {
@@ -51,9 +49,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       )
     }
 
-    this.inputParameters = params.inputParameters
+    this.inputParameters = params.inputParameters || new InputParameters({})
     this.rateLimiting = params.rateLimiting
-    this.validator = new InputValidator(this.inputParameters)
     this.cacheKeyGenerator = params.cacheKeyGenerator
     this.customInputValidation = params.customInputValidation
     this.overrides = params.overrides
@@ -71,6 +68,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     dependencies: AdapterDependencies,
     adapterSettings: T['Settings'],
   ): Promise<void> {
+    this.adapterName = adapterName
     const responseCache = new ResponseCache({
       dependencies,
       adapterSettings: adapterSettings as AdapterSettings,
@@ -96,11 +94,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @param req - the current adapter request
    * @returns the request after passing through all request transforms
    */
-  runRequestTransforms(req: AdapterRequest): void {
-    if (!this.requestTransforms) {
-      return
-    }
-
+  runRequestTransforms(req: AdapterRequest<T['Parameters']>): void {
     for (const transform of this.requestTransforms) {
       transform(req)
     }
@@ -113,23 +107,26 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @param req - the current adapter request
    * @returns the modified (or new) request
    */
-  symbolOverrider(req: AdapterRequest) {
+  symbolOverrider(req: AdapterRequest<T['Parameters']>) {
     const rawRequestBody = req.body as { data?: { overrides?: Overrides } }
-    const requestOverrides = rawRequestBody.data?.overrides?.[this.name.toLowerCase()]
-    const base = req.requestContext.data['base'] as string
-
+    const requestOverrides = rawRequestBody.data?.overrides?.[this.adapterName.toLowerCase()]
+    const data = req.requestContext.data as Record<string, string>
+    const base = data['base']
     if (requestOverrides?.[base]) {
       // Perform overrides specified in the request payload
-      req.requestContext.data['base'] = requestOverrides[base]
+      data['base'] = requestOverrides[base]
     } else if (this.overrides?.[base]) {
       // Perform hardcoded adapter overrides
-      req.requestContext.data['base'] = this.overrides[base]
+      data['base'] = this.overrides[base]
     }
 
     return req
   }
 
-  getTransportNameForRequest(req: AdapterRequest<T['Request']>, settings: T['Settings']): string {
+  getTransportNameForRequest(
+    req: AdapterRequest<T['Parameters']>,
+    settings: T['Settings'],
+  ): string {
     // If there's only one transport, return it
     if (this.transportRoutes.get(DEFAULT_TRANSPORT_NAME)) {
       return DEFAULT_TRANSPORT_NAME
@@ -171,7 +168,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @param req - The current adapter request
    * @returns the transport param if present
    */
-  private defaultRouter(req: AdapterRequest<T['Request']>) {
+  private defaultRouter(req: AdapterRequest<T['Parameters']>) {
     const rawRequestBody = req.body as unknown as { data: AdapterRequestData }
     return rawRequestBody.data?.transport
   }

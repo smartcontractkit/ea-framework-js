@@ -3,7 +3,7 @@ import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache, RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
-import { BasicCacheSetterTransport } from '../cache/helper'
+import { BasicCacheSetterTransport, cacheTestInputParameters } from '../cache/helper'
 import { NopTransport, RedisMock, TestAdapter } from '../util'
 
 export const test = untypedTest as TestFn<{
@@ -32,21 +32,11 @@ test.before(async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {
-          base: {
-            type: 'string',
-            required: true,
-          },
-          factor: {
-            type: 'number',
-            required: true,
-          },
-        },
+        inputParameters: cacheTestInputParameters,
         transport: new BasicCacheSetterTransport(),
       }),
       new AdapterEndpoint({
         name: 'nowork',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],

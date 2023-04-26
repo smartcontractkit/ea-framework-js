@@ -2,37 +2,34 @@ import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import {
   WebSocketClassProvider,
-  WebsocketReverseMappingTransport,
   WebSocketTransport,
+  WebsocketReverseMappingTransport,
 } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { mockWebSocketProvider, runAllUntilTime, TestAdapter } from '../util'
-
-interface AdapterRequestParams {
-  base: string
-  quote: string
-}
+import { TestAdapter, mockWebSocketProvider, runAllUntilTime } from '../util'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
   clock: InstalledClock
 }>
 
-export const inputParameters = {
+export const inputParameters = new InputParameters({
   base: {
     type: 'string',
+    description: 'base',
     required: true,
   },
   quote: {
     type: 'string',
+    description: 'quote',
     required: true,
   },
-} satisfies InputParameters
+})
 
 interface ProviderMessage {
   pair: string
@@ -49,11 +46,9 @@ process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 const price = 251324
 
 type WebSocketTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     WsMessage: ProviderMessage
   }
@@ -64,6 +59,13 @@ const BACKGROUND_EXECUTE_MS_WS = 5000
 const createAdapter = (envDefaultOverrides: Record<string, string | number | symbol>): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => URL,
+    options: () => {
+      return {
+        headers: {
+          'x-auth-token': 'token',
+        },
+      }
+    },
     handlers: {
       message(message) {
         if (!message.pair) {
@@ -78,17 +80,17 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
                 result: message.value,
               },
               result: message.value,
+              timestamps: {
+                providerIndicatedTimeUnixMs: Date.now(),
+              },
             },
           },
         ]
       },
     },
     builders: {
-      subscribeMessage: (params: AdapterRequestParams) => ({
-        request: 'subscribe',
-        pair: `${params.base}/${params.quote}`,
-      }),
-      unsubscribeMessage: (params: AdapterRequestParams) => ({
+      subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
+      unsubscribeMessage: (params) => ({
         request: 'unsubscribe',
         pair: `${params.base}/${params.quote}`,
       }),
@@ -195,11 +197,11 @@ test.serial('reconnects when url changed', async (t) => {
   mockWsServer.on('connection', (socket) => {
     connectionCounter++
 
-    const parseMessage = (message: any) => {
-      const parsed = JSON.parse(message)
+    const parseMessage = (message: string | ArrayBuffer | Blob | ArrayBufferView) => {
+      const parsed = JSON.parse(message as string)
       socket.send(
         JSON.stringify({
-          pair: parsed.pair,
+          pair: `${parsed.base}/${parsed.quote}`,
           value: price,
         }),
       )
@@ -229,16 +231,6 @@ test.serial('reconnects when url changed', async (t) => {
           },
         ]
       },
-    },
-    builders: {
-      subscribeMessage: (params: AdapterRequestParams) => ({
-        request: 'subscribe',
-        pair: `${params.base}/${params.quote}`,
-      }),
-      unsubscribeMessage: (params: AdapterRequestParams) => ({
-        request: 'unsubscribe',
-        pair: `${params.base}/${params.quote}`,
-      }),
     },
   })
 
@@ -345,14 +337,11 @@ test.serial('reconnects if provider stops sending expected messages', async (t) 
   const mockWsServer = new Server(URL, { mock: false })
   let connectionCounter = 0
 
-
   mockWsServer.on('connection', (socket) => {
     let counter = 0
     const parseMessage = () => {
       if (counter++ === 0) {
-        socket.send(
-          JSON.stringify({error: ''}),
-        )
+        socket.send(JSON.stringify({ error: '' }))
       }
     }
     connectionCounter++
@@ -484,11 +473,11 @@ test.serial(
         },
       },
       builders: {
-        subscribeMessage: (params: AdapterRequestParams) => ({
+        subscribeMessage: (params) => ({
           request: 'subscribe',
           pair: `${params.base}/${params.quote}`,
         }),
-        unsubscribeMessage: (params: AdapterRequestParams) => ({
+        unsubscribeMessage: (params) => ({
           request: 'unsubscribe',
           pair: `${params.base}/${params.quote}`,
         }),
@@ -548,107 +537,104 @@ test.serial(
   },
 )
 
-test.serial(
-  'does not crash the server when new connection errors',
-  async (t) => {
-    const base = 'ETH'
-    const quote = 'DOGE'
-    process.env['METRICS_ENABLED'] = 'true'
-    eaMetrics.clear()
+test.serial('does not crash the server when new connection errors', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  process.env['METRICS_ENABLED'] = 'true'
+  eaMetrics.clear()
 
-    // Mock WS
-    mockWebSocketProvider(WebSocketClassProvider)
-    const mockWsServer = new Server(URL, { mock: false })
-    mockWsServer.on('connection', (socket) => {
-      socket.on('message', () => {
-        socket.send(
-          JSON.stringify({
-            pair: `${base}/${quote}`,
-            value: price,
-          }),
-        )
-      })
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(URL, { mock: false })
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', () => {
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
     })
+  })
 
-    const transport = new WebSocketTransport<WebSocketTypes>({
-      // Changing the url so that the connection will error on initial request
-      url: () => `${URL}test`,
-      handlers: {
-        message(message) {
-          const [curBase, curQuote] = message.pair.split('/')
-          return [
-            {
-              params: { base: curBase, quote: curQuote },
-              response: {
-                data: {
-                  result: message.value,
-                },
+  const transport = new WebSocketTransport<WebSocketTypes>({
+    // Changing the url so that the connection will error on initial request
+    url: () => `${URL}test`,
+    handlers: {
+      message(message) {
+        const [curBase, curQuote] = message.pair.split('/')
+        return [
+          {
+            params: { base: curBase, quote: curQuote },
+            response: {
+              data: {
                 result: message.value,
               },
+              result: message.value,
             },
-          ]
-        },
+          },
+        ]
       },
-      builders: {
-        subscribeMessage: (params: AdapterRequestParams) => ({
-          request: 'subscribe',
-          pair: `${params.base}/${params.quote}`,
-        }),
-        unsubscribeMessage: (params: AdapterRequestParams) => ({
-          request: 'unsubscribe',
-          pair: `${params.base}/${params.quote}`,
-        }),
+    },
+    builders: {
+      subscribeMessage: (params) => ({
+        request: 'subscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+      unsubscribeMessage: (params) => ({
+        request: 'unsubscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+    },
+  })
+
+  const webSocketEndpoint = new AdapterEndpoint({
+    name: 'TEST',
+    transport: transport,
+    inputParameters,
+  })
+
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
       },
-    })
+    },
+  )
 
-    const webSocketEndpoint = new AdapterEndpoint({
-      name: 'TEST',
-      transport: transport,
-      inputParameters,
-    })
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [webSocketEndpoint],
+  })
 
-    const config = new AdapterConfig(
-      {},
-      {
-        envDefaultOverrides: {
-          BACKGROUND_EXECUTE_MS_WS,
-        },
-      },
-    )
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-    const adapter = new Adapter({
-      name: 'TEST',
-      defaultEndpoint: 'test',
-      config,
-      endpoints: [webSocketEndpoint],
-    })
+  const error = await testAdapter.request({
+    base,
+    quote,
+  })
+  t.is(error.statusCode, 504)
 
-    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
 
-    const error = await testAdapter.request({
-      base,
-      quote,
-    })
-    t.is(error.statusCode, 504)
+  const metrics = await testAdapter.getMetrics()
+  metrics.assert(t, {
+    name: 'ws_connection_errors',
+    labels: {
+      message: 'undefined',
+    },
+    expectedValue: 1,
+  })
 
-    await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
-
-    const metrics = await testAdapter.getMetrics()
-    metrics.assert(t, {
-      name: 'ws_connection_errors',
-      labels: {
-        message: "undefined"
-      },
-      expectedValue: 1,
-    })
-
-    process.env['METRICS_ENABLED'] = 'false'
-    t.pass()
-    await testAdapter.api.close()
-    mockWsServer.close()
-    await t.context.clock.runAllAsync()
-  },
-)
+  process.env['METRICS_ENABLED'] = 'false'
+  t.pass()
+  await testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runAllAsync()
+})
 
 test.serial('does not hang the background execution if the open handler hangs', async (t) => {
   const base = 'ETH'
@@ -676,7 +662,7 @@ test.serial('does not hang the background execution if the open handler hangs', 
     url: () => URL,
     handlers: {
       async open() {
-        return new Promise((res, rej) => {
+        return new Promise((res) => {
           if (execution === 0) {
             execution++
             setTimeout(res, 15_000)
@@ -702,11 +688,11 @@ test.serial('does not hang the background execution if the open handler hangs', 
       },
     },
     builders: {
-      subscribeMessage: (params: AdapterRequestParams) => ({
+      subscribeMessage: (params) => ({
         request: 'subscribe',
         pair: `${params.base}/${params.quote}`,
       }),
-      unsubscribeMessage: (params: AdapterRequestParams) => ({
+      unsubscribeMessage: (params) => ({
         request: 'unsubscribe',
         pair: `${params.base}/${params.quote}`,
       }),
@@ -793,7 +779,7 @@ const createReverseMappingAdapter = (
         },
       },
       builders: {
-        subscribeMessage: (params: AdapterRequestParams) => {
+        subscribeMessage: (params) => {
           const pair = `${params.base}/${params.quote}`
           websocketTransport.setReverseMapping(pair, params)
           return {
@@ -801,7 +787,7 @@ const createReverseMappingAdapter = (
             pair,
           }
         },
-        unsubscribeMessage: (params: AdapterRequestParams) => ({
+        unsubscribeMessage: (params) => ({
           request: 'unsubscribe',
           pair: `${params.base}/${params.quote}`,
         }),

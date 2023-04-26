@@ -12,23 +12,21 @@ import {
   AdapterRequestContext,
 } from '../util/types'
 import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
-export { InputParameters, SpecificInputParameters } from './input-params'
+import { InputParametersDefinition, validateOverrides } from './input-params'
+export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
 
 export const validatorMiddleware: AdapterMiddlewareBuilder =
   (adapter: Adapter) =>
-  (req: AdapterRequest, reply: FastifyReply, done: HookHandlerDoneFunction) => {
+  (
+    req: AdapterRequest<InputParametersDefinition>,
+    reply: FastifyReply,
+    done: HookHandlerDoneFunction,
+  ) => {
     if (req.headers['content-type'] !== 'application/json') {
       throw new AdapterInputError({
         message: 'Content type not "application/json", returning 400',
-        statusCode: 400,
-      })
-    }
-
-    if (!req.body) {
-      throw new AdapterInputError({
-        message: 'Body not present in adapter request, returning 400',
         statusCode: 400,
       })
     }
@@ -57,34 +55,21 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       })
     }
 
-    const validatedData = endpoint.validator.validateInput(requestBody.data)
+    // Validate the incoming data and normalize
+    validateOverrides(requestBody.data)
+    const validatedData = endpoint.inputParameters.validateInput(requestBody.data)
 
     req.requestContext = {
       cacheKey: '',
       data: validatedData,
       endpointName: endpoint.name,
-    } as AdapterRequestContext
+    } as AdapterRequestContext<InputParametersDefinition>
+
     // We do it afterwards so the custom routers can have a request with a requestContext fulfilled (sans transportName, ofc)
     req.requestContext.transportName = endpoint.getTransportNameForRequest(
       req,
       adapter.config.settings,
     )
-
-    if (
-      adapter.config.settings.METRICS_ENABLED &&
-      adapter.config.settings.EXPERIMENTAL_METRICS_ENABLED
-    ) {
-      // Add metrics meta which includes feedId to the request
-      // Perform prior to overrides to maintain consistent Feed IDs across adapters
-      const metrics = getMetricsMeta(
-        {
-          inputParameters: endpoint.inputParameters,
-          adapterSettings: adapter.config.settings,
-        },
-        validatedData,
-      )
-      req.requestContext = { ...req.requestContext, meta: { metrics } }
-    }
 
     // Custom input validation defined in the EA
     const error =
@@ -97,6 +82,22 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     // Run any request transforms that might have been defined in the adapter.
     // This is the last time modifications are supposed to happen to the request.
     endpoint.runRequestTransforms(req)
+
+    if (
+      adapter.config.settings.METRICS_ENABLED &&
+      adapter.config.settings.EXPERIMENTAL_METRICS_ENABLED
+    ) {
+      // Add metrics meta which includes feedId to the request
+      // Perform after overrides to maintain consistent Feed IDs across the same adapter
+      const metrics = getMetricsMeta(
+        {
+          inputParameters: endpoint.inputParameters,
+          adapterSettings: adapter.config.settings,
+        },
+        validatedData,
+      )
+      req.requestContext = { ...req.requestContext, meta: { metrics } }
+    }
 
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {
