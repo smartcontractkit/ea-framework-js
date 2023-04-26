@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint, CustomInputValidator, EndpointGenerics } from '../src/adapter'
 import { BaseAdapterSettings } from '../src/config'
-import { AdapterRequest, AdapterResponse, isArray, isObject } from '../src/util'
+import { AdapterRequest, AdapterResponse } from '../src/util'
 import { InputParameters } from '../src/validation'
 import { AdapterInputError } from '../src/validation/error'
 import { EmptyInputParameters } from '../src/validation/input-params'
@@ -578,23 +578,6 @@ test.serial('aliases of different properties with common values fail validation'
   )
 })
 
-test.serial('throws on wrong default type', async (t) => {
-  const error: AdapterInputError | undefined = t.throws(() => {
-    t.context.adapterEndpoint.inputParameters = new InputParameters({
-      base: {
-        type: 'string',
-        description: 'stuff',
-        default: 123,
-      },
-    })
-  })
-
-  t.is(
-    error?.message,
-    '[Param: base] The specified default "123" does not comply with the param type "string"',
-  )
-})
-
 test.serial('throws on empty options array', async (t) => {
   const error: AdapterInputError | undefined = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
@@ -714,35 +697,6 @@ test.serial('Test positive integer validator', async (t) => {
   value = -2
   error = positiveIntegerValidator(value)
   t.is(error, 'Value should be positive number, Received -2')
-})
-
-test.serial('Test isObject util function', async (t) => {
-  let value: string | number | [] | Record<string, string> = 11
-  let result = isObject(value)
-  t.is(result, false)
-  value = 'test'
-  result = isObject(value)
-  value = []
-  result = isObject(value)
-  t.is(result, false)
-  value = { test: 'test' }
-  result = isObject(value)
-  t.is(result, true)
-})
-
-test.serial('Test isArray util function', async (t) => {
-  let value: string | number | [] | Record<string, string> = 11
-  let result = isArray(value)
-  t.is(result, false)
-  value = 'test'
-  result = isArray(value)
-  t.is(result, false)
-  value = { test: 'test' }
-  result = isArray(value)
-  t.is(result, false)
-  value = []
-  result = isArray(value)
-  t.is(result, true)
 })
 
 test.serial('custom input validation', async (t) => {

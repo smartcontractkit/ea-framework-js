@@ -1,15 +1,32 @@
-import { Overrides, ReservedInputParameterNames } from '../util'
-import { AdapterInputError } from './error'
+import { Overrides, ReservedInputParameterNames, hasRepeatedValues } from '../util'
+import { AdapterError } from './error'
 
-/* INPUT TYPE VALIDATIONS */
+/**
+ * Type for the overrides object that is either hardcoded in the adapter,
+ * or present in the incoming request body
+ */
 export type Override = Map<string, Map<string, string>>
 
+/**
+ * Possible strings that correspond to types of primitive values
+ * that can be specified for an input parameter
+ */
 type PrimitiveParameterTypeString = 'boolean' | 'number' | 'string'
 
+/**
+ * Possible types for each of the possible type strings
+ */
 type PrimitiveParameterType = TypeFromTypeString<PrimitiveParameterTypeString>
 
+/**
+ * All possible types for an input parameter (either a string, or a nested param definition)
+ */
 type ParameterType = PrimitiveParameterTypeString | InputParametersDefinition
 
+/**
+ * Given a type parameter T that is a parameter type (string or nested definition),
+ * equals to the corresponding type for that type string or definition
+ */
 type TypeFromTypeString<T extends ParameterType> = T extends 'string'
   ? string
   : T extends 'number'
@@ -20,88 +37,160 @@ type TypeFromTypeString<T extends ParameterType> = T extends 'string'
   ? TypeFromDefinition<T>
   : never
 
+/**
+ * Util type to be able to discern exactly if a generic is exactly unknown
+ * (because everything extends unknown, but unknown only extends itself)
+ */
 type IsUnknown<T> = unknown extends T ? true : false
 
+/**
+ * Given a concrete InputParameter P, results in the type for that definition taking into account
+ * the required property of the definition (i.e. makes it optional or not)
+ */
 type ShouldBeUndefinable<
   P extends InputParameter,
   T = TypeFromTypeString<P['type']>,
 > = P['required'] extends true ? T : IsUnknown<P['default']> extends true ? T | undefined : T
 
+/**
+ * Just an alias to make types below more readable
+ */
 type NonArrayInputType<P extends InputParameter> = ShouldBeUndefinable<P>
 
+/**
+ * Given an InputParameter P, results in the corresponding type for that definition,
+ * accounting for configurations like required, array, defaults, etc.
+ */
 type TypeFromParameter<
   P extends InputParameter,
   T = TypeFromTypeString<P['type']>,
 > = P['array'] extends true ? T[] : NonArrayInputType<P>
 
+/**
+ * Constraint for an InputParameter to make sure options are only specified for parameters of type string.
+ * All these constraints, for them to work properly, should represent the entire closed realm of possibilities.
+ * That is, there should be no possible input parameter that the constraint doesn't accept one way or the other.
+ */
+type InputParameterOptionConstraints =
+  | {
+      // Only allow options for string params
+      type: 'string'
+      options?: string[] | readonly string[] // Enumerated options, ex. ['ADA', 'BTC', 'ETH']
+    }
+  | {
+      type: Exclude<ParameterType, 'string'>
+      options?: never
+    }
+
+/**
+ * Constraint to make sure input parameter defaults match their type, and that
+ * defaults are only allowed for primitive types
+ */
+type InputParameterDefaultTypeConstraints =
+  | {
+      type: 'string'
+      default?: string
+    }
+  | {
+      type: 'number'
+      default?: number
+    }
+  | {
+      type: 'boolean'
+      default?: boolean
+    }
+  | {
+      type: Exclude<ParameterType, 'string' | 'number' | 'boolean'>
+      default?: never
+    }
+
+/**
+ * Constraint to avoid unnecessary or impossible required and default combinations
+ */
+type InputParameterDefaultRequiredConstraints =
+  | {
+      required: true
+      default?: never
+    }
+  | {
+      required?: false
+      default?: PrimitiveParameterType
+    }
+
+/**
+ * Constraint to make sure array input parameters don't specify a default
+ */
+type InputParameterArrayDefaultConstraints =
+  | {
+      array: true
+      default?: never
+    }
+  | {
+      array?: false
+      default?: PrimitiveParameterType
+    }
+
+/**
+ * Basic structure for an InputParameter.
+ * The concrete possible types that will be used in a definition can be found below this one.
+ * (they are split into several types due to existential types not being supported)
+ */
 type BaseInputParameter = {
   description: string
   type: ParameterType
+
+  // Constrained properties (check *Constraints types above)
+  default?: PrimitiveParameterType
+  required?: boolean
+  array?: boolean
+  options?: string[] | readonly string[] // Enumerated options, ex. ['ADA', 'BTC', 'ETH']
 
   // Purposefully ignored in the types, as aliases will be converted to the main keys
   aliases?: readonly string[]
 
   // Not accounted for in the types
-  options?: string[] | readonly string[] // Enumerated options, ex. ['ADA', 'BTC', 'ETH']
   dependsOn?: readonly string[] // Other inputs this one depends on
   exclusive?: readonly string[] // Other inputs that cannot be present with this one
 }
 
-type OptionalInputParameter = BaseInputParameter & {
-  type: 'string'
+/**
+ * Type for the definition of one InputParameter.
+ * This is built from the base type, intersected with a bunch of constraints.
+ */
+export type InputParameter = BaseInputParameter &
+  InputParameterOptionConstraints &
+  InputParameterDefaultTypeConstraints &
+  InputParameterDefaultRequiredConstraints &
+  InputParameterArrayDefaultConstraints
 
-  // Excluded props
-  required?: never
-  array?: never
-  default?: never
-}
-
-// Trying to define the default type based on the self object would be an "existential type" and is not supported by typescript.
-// Attempting to do it with workarounds is a deep rabbit hole and should be avoided.
-type InputParameterWithDefault = BaseInputParameter & {
-  default?: PrimitiveParameterType
-
-  // Excluded props
-  required?: never
-  array?: never
-}
-
-type RequiredInputParameter = BaseInputParameter & {
-  required: true
-
-  // Excluded props
-  default?: never
-  array?: never
-}
-
-// Currently array params are always expected to be present and have at least one item
-type ArrayInputParameter = BaseInputParameter & {
-  array: true
-  required?: boolean
-
-  // Excluded props
-  default?: never
-}
-
-export type InputParameter =
-  | OptionalInputParameter
-  | InputParameterWithDefault
-  | RequiredInputParameter
-  | ArrayInputParameter
-
+/**
+ * Map of input names to their corresponding definition.
+ */
 export type InputParametersDefinition = Record<string, InputParameter>
 
+/**
+ * Constrains the InputParametersDefinition to exclude reserved param names.
+ */
 type ProperInputParametersDefinition = InputParametersDefinition & {
   [K in ReservedInputParameterNames]?: never
 }
 
+/**
+ * Given an input parameter definition, results in the type for the actual params object.
+ */
 export type TypeFromDefinition<T extends InputParametersDefinition> = {
   -readonly [K in keyof T]: TypeFromParameter<T[K]>
 }
 
+/**
+ * Util type to represent the absence of input parameters for an adapter endpoint.
+ */
 export type EmptyInputParameters = InputParametersDefinition
 
-class InputValidationError extends AdapterInputError {
+/**
+ * Error thrown when the validation of a request's params fails.
+ */
+class InputValidationError extends AdapterError {
   constructor(message: string) {
     super({
       statusCode: 400,
@@ -110,11 +199,23 @@ class InputValidationError extends AdapterInputError {
   }
 }
 
+/**
+ * Error thrown when the validation of the input parameters definition fails.
+ */
 class InputParametersDefinitionError extends Error {}
 
+/**
+ * This class encapsulates logic for a single input parameter, taking its definition
+ * and performing validations (both on the definition on construction, and params when prompted).
+ */
 class ProcessedParam<const T extends InputParameter = InputParameter> {
+  /** List of aliases for this processed parameter, including the original parameter name */
   aliases: string[]
+
+  /** Set of all possible options for this parameter (used when validating inputs) */
   options?: Set<string>
+
+  /** Definition for the type of this parameter */
   type: PrimitiveParameterTypeString | InputParameters<InputParametersDefinition>
 
   constructor(public name: string, public definition: T) {
@@ -129,25 +230,24 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
     this.validateDefinition()
   }
 
+  /** Util method to throw a definition error prefixed with this param name */
   private definitionError(message: string): InputParametersDefinitionError {
     return new InputParametersDefinitionError(`[Param: ${this.name}] ${message}`)
   }
+
+  /** Util method to throw a validation error prefixed with this param name */
   private validationError(message: string): InputParametersDefinitionError {
     return new InputValidationError(`[Param: ${this.name}] ${message}`)
   }
 
+  /**
+   * Validates the definition that this parameter has been constructed with.
+   */
   private validateDefinition() {
     // Check that there are no repeated aliases
     if (hasRepeatedValues(this.aliases)) {
       throw this.definitionError(
         `There are repeated aliases for input param ${this.name}: ${this.aliases}`,
-      )
-    }
-
-    // Check that the default specified complies with the param type
-    if (this.definition.default && typeof this.definition.default !== this.definition.type) {
-      throw this.definitionError(
-        `The specified default "${this.definition.default}" does not comply with the param type "${this.definition.type}"`,
       )
     }
 
@@ -164,6 +264,13 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
     }
   }
 
+  /**
+   * Validates an incoming adapter request's input params and
+   * performs all necessary checks and modifications.
+   *
+   * @param input - the input data from an incoming adapter request
+   * @returns - the validated data
+   */
   validateInput(input: unknown): unknown {
     if (this.definition.required && input == null) {
       throw this.validationError('param is required but no value was provided')
@@ -191,6 +298,12 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
     return this.validateInputType(input as ShouldBeUndefinable<T>)
   }
 
+  /**
+   * Validates a single value from the incoming params.
+   *
+   * @param input - a single value from the request params object
+   * @returns - the validated input data
+   */
   private validateInputType(input: NonArrayInputType<T>) {
     // If we're here we've already checked this is not required
     if (input == null) {
@@ -215,8 +328,6 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
   }
 }
 
-const hasRepeatedValues = (array: string[]) => array.length !== new Set(array).size
-
 export class InputParameters<const T extends ProperInputParametersDefinition> {
   params: ProcessedParam[]
 
@@ -230,6 +341,9 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
     this.validateDefinition()
   }
 
+  /**
+   * Validates the entire definitions object provided to the constructor.
+   */
   private validateDefinition() {
     const paramNames = new Set(this.params.map((p) => p.name))
 
@@ -270,7 +384,13 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
     }
   }
 
-  // TODO: Add docs to all fns
+  /**
+   * Validates an incoming adapter request's input params and
+   * performs all necessary checks and modifications.
+   *
+   * @param input - the input data from an incoming adapter request
+   * @returns - the validated data
+   */
   validateInput(rawData: unknown): TypeFromDefinition<T> {
     if (typeof rawData !== 'object' || rawData == null) {
       throw new InputValidationError('Input for input parameters should be an object')
@@ -321,6 +441,12 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
   }
 }
 
+/**
+ * Validates that the overrides object in a request (if present) is correct.
+ *
+ * @param input - a request's input data, which may contain overrides
+ * @returns nothing, only throws if an error is found
+ */
 export const validateOverrides = (input: { overrides?: Overrides }) => {
   if (!input.overrides) {
     // Nothing to validate!

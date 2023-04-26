@@ -13,14 +13,6 @@ export const sleep = (ms: number): Promise<void> => {
   })
 }
 
-export const isObject = (o: unknown): boolean =>
-  o !== null && typeof o === 'object' && Array.isArray(o) === false
-
-export const isArray = (o: unknown): boolean =>
-  o !== null && typeof o === 'object' && Array.isArray(o)
-
-export const isEmpty = (o: unknown): boolean => o === undefined || o === null || o === ''
-
 export type PromiseOrValue<T> = Promise<T> | T
 
 export class LinkedListNode<T = unknown> {
@@ -125,6 +117,7 @@ export const timeoutPromise = <T>(
 
 type DeferredResolve<T> = (value: T) => void
 type DeferredReject = (reason?: unknown) => void
+
 /**
  * This function will create a promise, and synchronously return both the promise itself and
  * the resolve and reject callbacks so that they can be used and passed around individually.
@@ -140,3 +133,11 @@ export const deferredPromise = <T>(): [Promise<T>, DeferredResolve<T>, DeferredR
   })
   return [promise, resolve, reject]
 }
+
+/**
+ * Checks if the provided array includes any duplicates
+ *
+ * @param array - any array to check
+ * @returns whether the array has duplicate items
+ */
+export const hasRepeatedValues = (array: string[]) => array.length !== new Set(array).size
