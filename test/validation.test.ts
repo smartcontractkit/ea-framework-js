@@ -410,6 +410,16 @@ test.serial('correctly typed params returns 200', async (t) => {
       description: 'stuff',
       required: true,
     },
+    stringOptions: {
+      type: 'string',
+      description: 'stuff[]',
+      options: ['123', 'sdfoij'],
+    },
+    numberOptions: {
+      type: 'number',
+      description: 'stuff[]',
+      options: [123, 234],
+    },
   }) as unknown as InputParameters<EmptyInputParameters>
 
   const response = await t.context.testAdapter.request({

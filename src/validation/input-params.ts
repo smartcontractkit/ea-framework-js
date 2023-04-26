@@ -73,9 +73,12 @@ type TypeFromParameter<
  */
 type InputParameterOptionConstraints =
   | {
-      // Only allow options for string params
       type: 'string'
-      options?: string[] | readonly string[] // Enumerated options, ex. ['ADA', 'BTC', 'ETH']
+      options?: string[] | readonly string[]
+    }
+  | {
+      type: 'number'
+      options?: number[] | readonly number[]
     }
   | {
       type: Exclude<ParameterType, 'string'>
@@ -143,7 +146,7 @@ type BaseInputParameter = {
   default?: PrimitiveParameterType
   required?: boolean
   array?: boolean
-  options?: string[] | readonly string[] // Enumerated options, ex. ['ADA', 'BTC', 'ETH']
+  options?: string[] | readonly string[] | number | readonly number[] // Enumerated options, ex. ['ADA', 'BTC', 'ETH']
 
   // Purposefully ignored in the types, as aliases will be converted to the main keys
   aliases?: readonly string[]
@@ -213,7 +216,7 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
   aliases: string[]
 
   /** Set of all possible options for this parameter (used when validating inputs) */
-  options?: Set<string>
+  options?: Set<TypeFromParameter<T>>
 
   /** Definition for the type of this parameter */
   type: PrimitiveParameterTypeString | InputParameters<InputParametersDefinition>
@@ -224,7 +227,7 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
       typeof definition.type === 'object' ? new InputParameters(definition.type) : definition.type
 
     if (definition.options) {
-      this.options = new Set(definition.options)
+      this.options = new Set(definition.options as TypeFromParameter<T>[])
     }
 
     this.validateDefinition()
@@ -317,7 +320,7 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
 
     // If the param has specified options, check that the input is one of them.
     // In this case we don't need to check the type, since the options will do that for us
-    if (this.options && !this.options.has(input as string)) {
+    if (this.options && !this.options.has(input as TypeFromParameter<T>)) {
       throw this.validationError(`input is not one of valid options (${this.definition.options})`)
     } else if (typeof input !== this.definition.type) {
       throw this.validationError(`input type is not the expected one (${this.type})`)
