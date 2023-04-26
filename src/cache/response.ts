@@ -60,6 +60,12 @@ export class ResponseCache<
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
     const censorList = CensorList.getAll()
     const entries = results.map((r) => {
+      const { data, result, errorMessage } = r.response
+      if (!errorMessage && data === undefined) {
+        logger.warn('The "data" property of the response is undefined.')
+      } else if (!errorMessage && result === undefined) {
+        logger.warn('The "result" property of the response is undefined.')
+      }
       let censoredResponse
       if (!censorList.length) {
         censoredResponse = r.response
@@ -88,6 +94,7 @@ export class ResponseCache<
         this.adapterSettings.EXPERIMENTAL_METRICS_ENABLED
       ) {
         response.meta = {
+          adapterName: this.adapterName,
           metrics: {
             feedId: calculateFeedId(
               {

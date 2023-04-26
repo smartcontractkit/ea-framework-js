@@ -658,6 +658,13 @@ test.serial('Test response timestamp validator', async (t) => {
   let value = new Date().getTime()
   let error = timestampValidator(value)
   t.is(error, undefined)
+  // Test reasonable limit over current timestamp
+  error = timestampValidator(value + 30)
+  t.is(error, undefined)
+  // Test over maximum timestamp
+  error = timestampValidator(value + 1000)
+  t.is(error, `Maximum allowed value is ${value + 50}. Received ${value + 1000}`)
+  // Test under minimum timestamp
   value = 0
   error = timestampValidator(value)
   t.is(error, 'Minimum allowed value is 1514764861000. Received 0')
