@@ -420,6 +420,17 @@ test.serial('correctly typed params returns 200', async (t) => {
       description: 'stuff[]',
       options: [123, 234],
     },
+    arrayOfObjects: {
+      type: {
+        address: {
+          type: 'string',
+          required: true,
+          description: 'inner stuff',
+        },
+      },
+      array: true,
+      description: 'an array of address objects',
+    },
   }) as unknown as InputParameters<EmptyInputParameters>
 
   const response = await t.context.testAdapter.request({
