@@ -5,6 +5,7 @@ import { AdapterSettings } from '../config'
 import { getMTLSOptions, httpsOptions } from '../index'
 import { AdapterRequest, makeLogger } from '../util'
 import { AdapterError } from '../validation/error'
+import { InputParametersDefinition } from '../validation/input-params'
 import { HttpRequestType, requestDurationBuckets } from './constants'
 
 const logger = makeLogger('Metrics')
@@ -54,7 +55,7 @@ export const setupMetrics = (name: string): void => {
  * @returns the cache middleware function
  */
 export const buildMetricsMiddleware = (
-  req: AdapterRequest,
+  req: AdapterRequest<InputParametersDefinition>,
   res: FastifyReply,
   done: HookHandlerDoneFunction,
 ) => {
@@ -122,7 +123,7 @@ export const buildHttpRequestMetricsLabel = (
   error?: AdapterError | Error,
   cacheHit?: boolean,
 ): Record<string, string | number | undefined> => {
-  const labels = {} as Record<typeof httpRequestsTotalLabels[number], string | number | undefined>
+  const labels = {} as Record<(typeof httpRequestsTotalLabels)[number], string | number | undefined>
   labels.method = 'POST'
   labels.feed_id = feedId
   if (error instanceof AdapterError) {

@@ -7,6 +7,7 @@ import { makeLogger, sleep } from '../util'
 import { Requester } from '../util/requester'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
+import { TypeFromDefinition } from '../validation/input-params'
 import { SubscriptionTransport } from './abstract/subscription'
 
 const WARMUP_BATCH_REQUEST_ID = '9002'
@@ -39,7 +40,7 @@ type HttpTransportGenerics = TransportGenerics & {
  */
 export type ProviderRequestConfig<T extends HttpTransportGenerics> = {
   /** The input parameters for requests that will get responses from the request in this struct */
-  params: T['Request']['Params'][]
+  params: TypeFromDefinition<T['Parameters']>[]
 
   /** The request that will be sent to the data provider to fetch values for the params in this struct */
   request: AxiosRequestConfig<T['Provider']['RequestBody']>
@@ -65,7 +66,7 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
    * @returns one or multiple request configs
    */
   prepareRequests: (
-    params: T['Request']['Params'][],
+    params: TypeFromDefinition<T['Parameters']>[],
     adapterSettings: T['Settings'],
   ) => ProviderRequestConfig<T> | ProviderRequestConfig<T>[]
 
@@ -84,7 +85,7 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
    * @returns a list of ProviderResults
    */
   parseResponse: (
-    params: T['Request']['Params'][],
+    params: TypeFromDefinition<T['Parameters']>[],
     res: AxiosResponse<T['Provider']['ResponseBody']>,
     adapterSettings: T['Settings'],
   ) => ProviderResult<T>[]
@@ -126,7 +127,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
 
   async backgroundHandler(
     context: EndpointContext<T>,
-    entries: T['Request']['Params'][],
+    entries: TypeFromDefinition<T['Parameters']>[],
   ): Promise<void> {
     if (!entries.length) {
       logger.debug(

@@ -6,12 +6,14 @@ import {
   IncludesFile,
   PriceAdapter,
   PriceEndpoint,
-  priceEndpointInputParameters,
+  PriceEndpointInputParameters,
+  priceEndpointInputParametersDefinition,
 } from '../src/adapter'
 import { ResponseCache } from '../src/cache/response'
-import { BaseAdapterSettings } from '../src/config'
+import { EmptyCustomSettings } from '../src/config'
 import { Transport } from '../src/transports'
 import { AdapterRequest, AdapterResponse } from '../src/util'
+import { InputParameters } from '../src/validation'
 import { NopTransport, TestAdapter } from './util'
 
 type TestContext = {
@@ -20,25 +22,22 @@ type TestContext = {
 const test = untypedTest as TestFn<TestContext>
 
 type PriceTestTypes = {
-  Request: {
-    Params: unknown
-  }
+  Parameters: PriceEndpointInputParameters
   Response: {
-    Data: null | { result: number }
+    Data: { result: number }
     Result: number
   }
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
 }
 
 class PriceTestTransport implements Transport<PriceTestTypes> {
   name!: string
-  responseCache!: ResponseCache<{
-    Request: PriceTestTypes['Request']
-    Response: PriceTestTypes['Response']
-  }>
+  responseCache!: ResponseCache<PriceTestTypes>
 
   constructor(
-    private mockResponse: (req: AdapterRequest) => AdapterResponse<PriceTestTypes['Response']>,
+    private mockResponse: (
+      req: AdapterRequest<PriceEndpointInputParameters>,
+    ) => AdapterResponse<PriceTestTypes['Response']>,
   ) {}
 
   async initialize(): Promise<void> {
@@ -46,7 +45,7 @@ class PriceTestTransport implements Transport<PriceTestTypes> {
   }
 
   async foregroundExecute(
-    req: AdapterRequest<PriceTestTypes['Request']>,
+    req: AdapterRequest<PriceEndpointInputParameters>,
   ): Promise<void | AdapterResponse<PriceTestTypes['Response']>> {
     return this.mockResponse(req)
   }
@@ -54,7 +53,9 @@ class PriceTestTransport implements Transport<PriceTestTypes> {
 
 const buildAdapter = async (
   context: ExecutionContext<TestContext>['context'],
-  mockResponse: (req: AdapterRequest) => AdapterResponse<PriceTestTypes['Response']>,
+  mockResponse: (
+    req: AdapterRequest<PriceEndpointInputParameters>,
+  ) => AdapterResponse<PriceTestTypes['Response']>,
   includes?: IncludesFile,
 ) => {
   const adapter = new PriceAdapter({
@@ -62,12 +63,12 @@ const buildAdapter = async (
     endpoints: [
       new PriceEndpoint({
         name: 'test',
-        inputParameters: priceEndpointInputParameters,
+        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
         transport: new PriceTestTransport(mockResponse),
       }),
       new AdapterEndpoint({
         name: 'basicEndpoint',
-        inputParameters: priceEndpointInputParameters,
+        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
         transport: new PriceTestTransport(mockResponse),
       }),
     ],
@@ -86,7 +87,6 @@ test('price adapter fails to start if no price endpoint is defined', async (t) =
         endpoints: [
           new AdapterEndpoint({
             name: 'test',
-            inputParameters: {},
             transport: new NopTransport(),
           }),
         ],
@@ -100,7 +100,9 @@ test('price adapter fails to start if no price endpoint is defined', async (t) =
 test('does not invert result if no includes are present', async (t) => {
   const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
     result: 1234,
-    data: null,
+    data: {
+      result: 1234,
+    },
     statusCode: 200,
     timestamps: {
       providerDataRequestedUnixMs: 0,
@@ -145,7 +147,9 @@ test('does not invert result if no includes match', async (t) => {
 
   const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
     result: 1234,
-    data: null,
+    data: {
+      result: 1234,
+    },
     statusCode: 200,
     timestamps: {
       providerDataRequestedUnixMs: 0,
@@ -248,7 +252,9 @@ test('does not invert result if inverse pair sent directly', async (t) => {
 
   const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
     result: 1 / 1234,
-    data: null,
+    data: {
+      result: 1234,
+    },
     statusCode: 200,
     timestamps: {
       providerDataRequestedUnixMs: 0,
@@ -300,7 +306,9 @@ test('basic adapter endpoints bypass includes logic successfully', async (t) => 
 
   const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
     result: 1234,
-    data: null,
+    data: {
+      result: 1234,
+    },
     statusCode: 200,
     timestamps: {
       providerDataRequestedUnixMs: 0,
@@ -333,16 +341,21 @@ test('basic adapter endpoints bypass includes logic successfully', async (t) => 
 })
 
 test('crypto price endpoint has common aliases', async (t) => {
-  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
-    result: 1234,
-    data: null,
-    statusCode: 200,
-    timestamps: {
-      providerDataRequestedUnixMs: 0,
-      providerDataReceivedUnixMs: 0,
-      providerIndicatedTimeUnixMs: undefined,
-    },
-  }
+  const mockResponse: (
+    req: AdapterRequest<PriceEndpointInputParameters>,
+  ) => AdapterResponse<PriceTestTypes['Response']> = () =>
+    ({
+      result: 1234,
+      data: {
+        result: 1234,
+      },
+      statusCode: 200,
+      timestamps: {
+        providerDataRequestedUnixMs: 0,
+        providerDataReceivedUnixMs: 0,
+        providerIndicatedTimeUnixMs: undefined,
+      },
+    } as AdapterResponse<PriceTestTypes['Response']>)
 
   const data = {
     base: 'BTC',
@@ -354,9 +367,9 @@ test('crypto price endpoint has common aliases', async (t) => {
     endpoints: [
       new CryptoPriceEndpoint({
         name: 'test',
-        inputParameters: priceEndpointInputParameters,
-        transport: new PriceTestTransport(() => mockResponse),
-      }),
+        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
+        transport: new PriceTestTransport(mockResponse),
+      }) as AdapterEndpoint<PriceTestTypes>,
     ],
   })
 
@@ -370,29 +383,34 @@ test('crypto price endpoint has common aliases', async (t) => {
 })
 
 test('price adapter throws if non-crypto endpoint reuses aliases', async (t) => {
-  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
-    result: 1234,
-    data: null,
-    statusCode: 200,
-    timestamps: {
-      providerDataRequestedUnixMs: 0,
-      providerDataReceivedUnixMs: 0,
-      providerIndicatedTimeUnixMs: undefined,
-    },
-  }
+  const mockResponse: (
+    req: AdapterRequest<PriceEndpointInputParameters>,
+  ) => AdapterResponse<PriceTestTypes['Response']> = () =>
+    ({
+      result: 1234,
+      data: {
+        result: 1234,
+      },
+      statusCode: 200,
+      timestamps: {
+        providerDataRequestedUnixMs: 0,
+        providerDataReceivedUnixMs: 0,
+        providerIndicatedTimeUnixMs: undefined,
+      },
+    } as AdapterResponse<PriceTestTypes['Response']>)
 
   const adapter = new PriceAdapter({
     name: 'TEST',
     endpoints: [
       new CryptoPriceEndpoint({
         name: 'test',
-        inputParameters: priceEndpointInputParameters,
-        transport: new PriceTestTransport(() => mockResponse),
+        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
+        transport: new PriceTestTransport(mockResponse),
       }),
       new AdapterEndpoint({
         name: 'price',
-        inputParameters: priceEndpointInputParameters,
-        transport: new NopTransport(),
+        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
+        transport: new NopTransport<PriceTestTypes>(),
       }),
     ],
   })

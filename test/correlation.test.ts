@@ -1,7 +1,7 @@
 import untypedTest, { ExecutionContext, TestFn } from 'ava'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
 import { AdapterResponse, sleep } from '../src/util'
-import { asyncLocalStorage, Store } from '../src/util/logger'
+import { Store, asyncLocalStorage } from '../src/util/logger'
 import { NopTransport, NopTransportTypes, TestAdapter } from './util'
 
 type TestContext = {
@@ -22,7 +22,6 @@ const startAdapter = async (
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new (class extends NopTransport {
           override async foregroundExecute() {
             const store = asyncLocalStorage.getStore() as Store

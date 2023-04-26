@@ -4,10 +4,11 @@ import axios, { AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import Redis, { ScanStream } from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
-import { BaseAdapterSettings, AdapterConfig } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { HttpTransport, TransportRoutes } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
-import { assertEqualResponses, runAllUntilTime, TestAdapter } from '../util'
+import { InputParameters } from '../../src/validation'
+import { TestAdapter, assertEqualResponses, runAllUntilTime } from '../util'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -51,10 +52,18 @@ class RedisMock {
   }
 }
 
-interface AdapterRequestParams {
-  from: string
-  to: string
-}
+export const inputParameters = new InputParameters({
+  from: {
+    type: 'string',
+    description: 'from',
+    required: true,
+  },
+  to: {
+    type: 'string',
+    description: 'to',
+    required: true,
+  },
+})
 
 interface ProviderRequestBody {
   pairs: Array<{
@@ -74,11 +83,9 @@ const URL = 'https://test.chainlink.com'
 const axiosMock = new MockAdapter(axios)
 
 type BaseEndpointTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
 }
 
 type BatchEndpointTypes = BaseEndpointTypes & {
@@ -103,7 +110,7 @@ const batchTransport = () =>
         },
       }
     },
-    parseResponse: (_: AdapterRequestParams[], res: AxiosResponse<ProviderResponseBody>) => {
+    parseResponse: (_, res: AxiosResponse<ProviderResponseBody>) => {
       return res.data.prices.map((p) => {
         const [from, to] = p.pair.split('/')
         return {
@@ -173,17 +180,6 @@ const buildDualTransportAdapter = () => {
     ],
   })
 }
-
-const inputParameters = {
-  from: {
-    type: 'string',
-    required: true,
-  },
-  to: {
-    type: 'string',
-    required: true,
-  },
-} as const
 
 const from = 'ETH'
 const to = 'USD'

@@ -1,7 +1,9 @@
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { Cache } from '../../src/cache'
+import { EmptyCustomSettings } from '../../src/config'
 import { AdapterRequest } from '../../src/util'
+import { InputParameters } from '../../src/validation'
 import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
 
 export const test = untypedTest as TestFn<{
@@ -10,14 +12,38 @@ export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
 }>
 
-export class BasicCacheSetterTransport extends NopTransport {
-  override async foregroundExecute(req: AdapterRequest): Promise<void> {
+export const cacheTestInputParameters = new InputParameters({
+  base: {
+    type: 'string',
+    description: 'base',
+    required: true,
+  },
+  factor: {
+    type: 'number',
+    description: 'factor',
+    required: true,
+  },
+})
+
+export type CacheTestTransportTypes = {
+  Parameters: typeof cacheTestInputParameters.definition
+  Response: {
+    Data: null
+    Result: number
+  }
+  Settings: EmptyCustomSettings
+}
+
+export class BasicCacheSetterTransport extends NopTransport<CacheTestTransportTypes> {
+  override async foregroundExecute(
+    req: AdapterRequest<typeof cacheTestInputParameters.definition>,
+  ): Promise<void> {
     await this.responseCache.write(this.name, [
       {
         params: req.requestContext.data,
         response: {
           data: null,
-          result: req.requestContext.data['factor'] as null,
+          result: req.requestContext.data.factor,
           timestamps: {
             providerDataRequestedUnixMs: 0,
             providerDataReceivedUnixMs: 0,
@@ -29,14 +55,16 @@ export class BasicCacheSetterTransport extends NopTransport {
   }
 }
 
-export class DifferentResultTransport extends NopTransport {
-  override async foregroundExecute(req: AdapterRequest): Promise<void> {
+export class DifferentResultTransport extends NopTransport<CacheTestTransportTypes> {
+  override async foregroundExecute(
+    req: AdapterRequest<typeof cacheTestInputParameters.definition>,
+  ): Promise<void> {
     await this.responseCache.write(this.name, [
       {
         params: req.requestContext.data,
         response: {
           data: null,
-          result: Date.now() as unknown as null,
+          result: Date.now(),
           timestamps: {
             providerDataRequestedUnixMs: 0,
             providerDataReceivedUnixMs: 0,
@@ -55,12 +83,7 @@ export function buildDiffResultAdapter(name: Uppercase<string>) {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {
-          base: {
-            type: 'string',
-            required: true,
-          },
-        },
+        inputParameters: cacheTestInputParameters,
         transport: new DifferentResultTransport(),
       }),
     ],

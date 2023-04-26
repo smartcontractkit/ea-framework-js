@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { Adapter } from '../adapter'
 import { AdapterError } from '../validation/error'
+import { InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
 declare module 'fastify' {
   // eslint-disable-next-line no-shadow
   export interface FastifyRequest {
@@ -28,22 +29,23 @@ export interface AdapterRequestBody<T = AdapterRequestData> {
  * Object that will be added to the request on a successful validation.
  * Contains all the necessary information the adapter will need across the request execution.
  */
-export type AdapterRequestContext<T = AdapterRequestData> = {
-  /** Name of the endpoint this payload should be directed to */
-  endpointName: string
+export type AdapterRequestContext<T extends InputParametersDefinition = InputParametersDefinition> =
+  {
+    /** Name of the endpoint this payload should be directed to */
+    endpointName: string
 
-  /** Name of the endpoint this payload should be directed to */
-  transportName: string
+    /** Name of the endpoint this payload should be directed to */
+    transportName: string
 
-  /** Precalculated cache key used to get and set corresponding values from the cache and subscription sets */
-  cacheKey: string
+    /** Precalculated cache key used to get and set corresponding values from the cache and subscription sets */
+    cacheKey: string
 
-  /** Normalized and validated data coming from the request body */
-  data: T
+    /** Normalized and validated data coming from the request body */
+    data: TypeFromDefinition<T>
 
-  /** Metadata relevant to this particular request */
-  meta?: AdapterRequestMeta
-}
+    /** Metadata relevant to this particular request */
+    meta?: AdapterRequestMeta
+  }
 
 /**
  * Helper type to denote an empty body
@@ -61,13 +63,13 @@ export type AdapterRouteGeneric = {
 /**
  * Structure for all requests incoming to this adapter
  */
-export type AdapterRequest<T extends RequestGenerics = RequestGenerics> =
+export type AdapterRequest<T extends InputParametersDefinition> =
   FastifyRequest<AdapterRouteGeneric> & {
     /** Set to an empty record so the user does not access the raw request data and uses the Validated data from the context instead */
     body: EmptyBody
 
     /** Container for all validated information that will be used by the framework across this request's lifecycle */
-    requestContext: AdapterRequestContext<T['Params']>
+    requestContext: AdapterRequestContext<T>
   }
 
 /**
@@ -101,11 +103,21 @@ export interface AdapterMetricsMeta {
 }
 
 /**
+ * Map of overrides objects (symbol -\> symbol) per adapter name
+ */
+export type Overrides = {
+  [adapterName: string]: {
+    [symbol: string]: string
+  }
+}
+
+/**
  * Input params that can always be present in an incoming request
  */
 type CommonAdapterRequestParams = {
   endpoint?: string
   transport?: string
+  overrides?: Overrides
 }
 export type ReservedInputParameterNames = keyof CommonAdapterRequestParams
 
@@ -115,7 +127,7 @@ export type ReservedInputParameterNames = keyof CommonAdapterRequestParams
 export type AdapterRequestData = Record<string, unknown> & CommonAdapterRequestParams
 
 export type ProviderResultGenerics = {
-  Request: RequestGenerics
+  Parameters: InputParametersDefinition
   Response: ResponseGenerics
 }
 
@@ -124,7 +136,7 @@ export type ProviderResultGenerics = {
  */
 export type ProviderResult<T extends ProviderResultGenerics> = {
   /** The set of parameters that uniquely relate to the response */
-  params: T['Request']['Params']
+  params: TypeFromDefinition<T['Parameters']>
 
   /** Value that will be included in the result property of the response */
   response: PartialAdapterResponse<T['Response']>
@@ -136,16 +148,6 @@ export type TimestampedProviderResult<T extends ProviderResultGenerics> = Pick<
 > & {
   /** Value that will be included in the result property of the response, with timestamps applied */
   response: TimestampedAdapterResponse<T['Response']>
-}
-
-/**
- * Helper struct type that provides detail about the incoming Adapter Request
- */
-export type RequestGenerics = {
-  /**
-   * Type for the parameters sent to the EA in the data property of the body.
-   */
-  Params: unknown
 }
 
 /**
@@ -285,10 +287,17 @@ export type SingleNumberResultResponse = {
 
 export type Middleware =
   | ((
-      req: AdapterRequest,
+      req: AdapterRequest<InputParametersDefinition>,
       reply: FastifyReply,
       done: HookHandlerDoneFunction,
     ) => FastifyReply | void)
-  | ((req: AdapterRequest, reply: FastifyReply) => Promise<FastifyReply | void>)
+  | ((
+      req: AdapterRequest<InputParametersDefinition>,
+      reply: FastifyReply,
+    ) => Promise<FastifyReply | void>)
 
 export type AdapterMiddlewareBuilder = (adapter: Adapter) => Middleware
+
+export type Writeable<T> = {
+  -readonly [K in keyof T]: T[K]
+}

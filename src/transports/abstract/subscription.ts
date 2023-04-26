@@ -2,8 +2,9 @@ import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
 import { ResponseCache } from '../../cache/response'
 import { metrics } from '../../metrics'
-import { makeLogger, SubscriptionSet } from '../../util'
+import { SubscriptionSet, makeLogger } from '../../util'
 import { AdapterRequest } from '../../util/types'
+import { TypeFromDefinition } from '../../validation/input-params'
 
 const logger = makeLogger('SubscriptionTransport')
 
@@ -13,12 +14,11 @@ const logger = makeLogger('SubscriptionTransport')
  *
  * @typeParam T - all types related to the [[Transport]]
  */
-export abstract class SubscriptionTransport<T extends TransportGenerics> implements Transport<T> {
-  responseCache!: ResponseCache<{
-    Request: T['Request']
-    Response: T['Response']
-  }>
-  subscriptionSet!: SubscriptionSet<T['Request']['Params']>
+export abstract class SubscriptionTransport<const T extends TransportGenerics>
+  implements Transport<T>
+{
+  responseCache!: ResponseCache<T>
+  subscriptionSet!: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
   subscriptionTtl!: number
   name!: string
 
@@ -34,7 +34,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     this.name = name
   }
 
-  async registerRequest(req: AdapterRequest<T['Request']>, _: T['Settings']): Promise<void> {
+  async registerRequest(req: AdapterRequest<T['Parameters']>, _: T['Settings']): Promise<void> {
     logger.debug(
       `Adding entry to subscription set (ttl ${this.subscriptionTtl}): [${req.requestContext.cacheKey}] = ${req.requestContext.data}`,
     )
@@ -74,7 +74,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
    */
   abstract backgroundHandler(
     context: EndpointContext<T>,
-    entries: T['Request']['Params'][],
+    entries: TypeFromDefinition<T['Parameters']>[],
   ): Promise<void>
 
   /**

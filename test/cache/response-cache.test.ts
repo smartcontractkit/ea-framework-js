@@ -5,6 +5,7 @@ import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { AdapterConfig, SettingsDefinitionFromConfig } from '../../src/config'
 import { AdapterRequest } from '../../src/util'
 import { assertEqualResponses, NopTransport, TestAdapter } from '../util'
+import { CacheTestTransportTypes } from './helper'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
@@ -46,9 +47,10 @@ test.serial('sensitive settings are censored in the response cache', async (t) =
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
-        transport: new (class extends NopTransport {
-          override async foregroundExecute(req: AdapterRequest): Promise<void> {
+        transport: new (class extends NopTransport<CacheTestTransportTypes> {
+          override async foregroundExecute(
+            req: AdapterRequest<CacheTestTransportTypes['Parameters']>,
+          ): Promise<void> {
             await this.responseCache.write(this.name, [
               {
                 params: req.requestContext.data,
@@ -57,7 +59,7 @@ test.serial('sensitive settings are censored in the response cache', async (t) =
                     result: price,
                     api_key: `API KEY for request ${apiKey}`,
                   } as unknown as null,
-                  result: price as unknown as null,
+                  result: price,
                   timestamps: {
                     providerDataRequestedUnixMs: 0,
                     providerDataReceivedUnixMs: 0,
@@ -93,9 +95,10 @@ test.serial('writes error response when censoring fails', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
-        transport: new (class extends NopTransport {
-          override async foregroundExecute(req: AdapterRequest): Promise<void> {
+        transport: new (class extends NopTransport<CacheTestTransportTypes> {
+          override async foregroundExecute(
+            req: AdapterRequest<CacheTestTransportTypes['Parameters']>,
+          ): Promise<void> {
             const circular: { circular?: unknown } = {}
             circular.circular = circular
             await this.responseCache.write(this.name, [
@@ -103,7 +106,7 @@ test.serial('writes error response when censoring fails', async (t) => {
                 params: req.requestContext.data,
                 response: {
                   data: circular as unknown as null,
-                  result: price as unknown as null,
+                  result: price,
                   timestamps: {
                     providerDataRequestedUnixMs: 0,
                     providerDataReceivedUnixMs: 0,

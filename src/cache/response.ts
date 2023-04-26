@@ -4,14 +4,13 @@ import {
   AdapterResponse,
   censor,
   makeLogger,
-  RequestGenerics,
   ResponseGenerics,
   TimestampedAdapterResponse,
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
 } from '../util'
 import CensorList from '../util/censor/censor-list'
-import { InputParameters } from '../validation/input-params'
+import { InputParameters, InputParametersDefinition } from '../validation/input-params'
 import { validator } from '../validation/utils'
 import { Cache, calculateCacheKey, calculateFeedId } from './'
 import * as cacheMetrics from './metrics'
@@ -23,12 +22,12 @@ const logger = makeLogger('ResponseCache')
  */
 export class ResponseCache<
   T extends {
-    Request: RequestGenerics
+    Parameters: InputParametersDefinition
     Response: ResponseGenerics
   },
 > {
   cache: Cache<AdapterResponse<T['Response']>>
-  inputParameters: InputParameters
+  inputParameters: InputParameters<T['Parameters']>
   adapterName: string
   endpointName: string
   adapterSettings: AdapterSettings
@@ -44,7 +43,7 @@ export class ResponseCache<
     adapterSettings: AdapterSettings
     adapterName: string
     endpointName: string
-    inputParameters: InputParameters
+    inputParameters: InputParameters<T['Parameters']>
   }) {
     this.cache = dependencies.cache as Cache<AdapterResponse<T['Response']>>
     this.inputParameters = inputParameters

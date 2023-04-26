@@ -25,12 +25,10 @@ test.serial('background executor calls transport function with background contex
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport,
       }),
       new AdapterEndpoint({
         name: 'skipped',
-        inputParameters: {},
         transport: new NopTransport(), // Also add coverage for skipped executors
       }),
     ],
@@ -57,7 +55,6 @@ test.serial('background executor ends recursive chain on server close', async (t
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport,
       }),
     ],
@@ -91,12 +88,10 @@ test.serial('background executor error does not stop the loop', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport,
       }),
       new AdapterEndpoint({
         name: 'skipped',
-        inputParameters: {},
         transport: new NopTransport(), // Also add coverage for skipped executors
       }),
     ],
@@ -151,12 +146,10 @@ test.serial('background executor timeout does not stop the loop', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport,
       }),
       new AdapterEndpoint({
         name: 'skipped',
-        inputParameters: {},
         transport: new NopTransport(), // Also add coverage for skipped executors
       }),
     ],

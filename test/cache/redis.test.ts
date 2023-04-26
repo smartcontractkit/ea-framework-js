@@ -3,7 +3,13 @@ import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter
 import { CacheFactory, RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
 import { NopTransport, RedisMock, TestAdapter } from '../util'
-import { BasicCacheSetterTransport, buildDiffResultAdapter, cacheTests, test } from './helper'
+import {
+  BasicCacheSetterTransport,
+  buildDiffResultAdapter,
+  cacheTestInputParameters,
+  cacheTests,
+  test,
+} from './helper'
 
 test.beforeEach(async (t) => {
   const config = new AdapterConfig(
@@ -22,21 +28,11 @@ test.beforeEach(async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {
-          base: {
-            type: 'string',
-            required: true,
-          },
-          factor: {
-            type: 'number',
-            required: true,
-          },
-        },
+        inputParameters: cacheTestInputParameters,
         transport: new BasicCacheSetterTransport(),
       }),
       new AdapterEndpoint({
         name: 'nowork',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -70,7 +66,6 @@ test.serial('redis client is initialized with options', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'nowork',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -99,7 +94,6 @@ test.serial('redis client is initialized with url', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'nowork',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -157,6 +151,7 @@ test.serial('Test cache key collision across adapters', async (t) => {
 
   const data = {
     base: 'eth',
+    factor: 123,
   }
 
   // Populate cache
@@ -167,5 +162,7 @@ test.serial('Test cache key collision across adapters', async (t) => {
   const cacheResponseA = await testAdapterA.request(data)
   const cacheResponseB = await testAdapterB.request(data)
 
+  t.is(cacheResponseA.statusCode, 200)
+  t.is(cacheResponseB.statusCode, 200)
   t.not(cacheResponseA.json().result, cacheResponseB.json().result)
 })

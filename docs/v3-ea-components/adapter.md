@@ -88,7 +88,9 @@ Below is an example of a request transform function that uses the incoming reque
 Note: This component should not be used for overrides and inverses.
 
 ```typescript
-export const requestTransform = (req: AdapterRequest<RequestParams>): void => {
+export const requestTransform = (
+  req: AdapterRequest<TypeFromDefinition<typeof inputParameters.definition>>,
+): void => {
   const base = req.requestContext.data.base
   const quote = req.requestContext.data.quote
   if (base && quote) {

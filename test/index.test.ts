@@ -14,7 +14,6 @@ test.beforeEach(async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -46,7 +45,6 @@ test('MTLS_ENABLED with no TLS params should error', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -79,7 +77,6 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -107,7 +104,6 @@ test('Adapter writer mode api disabled', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],
@@ -134,7 +130,6 @@ test('Initialize adapter twice (error)', async (t) => {
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        inputParameters: {},
         transport: new NopTransport(),
       }),
     ],

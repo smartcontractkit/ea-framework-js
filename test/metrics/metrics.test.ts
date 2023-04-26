@@ -3,9 +3,10 @@ import untypedTest, { TestFn } from 'ava'
 import axios from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { Metrics, retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
+import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../util'
 
 const test = untypedTest as TestFn<{
@@ -14,11 +15,6 @@ const test = untypedTest as TestFn<{
 }>
 
 const URL = 'http://test-url.com'
-
-interface AdapterRequestParams {
-  from: string
-  to: string
-}
 
 interface ProviderRequestBody {
   base: string
@@ -29,17 +25,28 @@ interface ProviderResponseBody {
   price: number
 }
 
+const inputParameters = new InputParameters({
+  from: {
+    type: 'string',
+    description: 'from',
+    required: true,
+  },
+  to: {
+    type: 'string',
+    description: 'to',
+    required: true,
+  },
+})
+
 type RestEndpointTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: {
     Data: {
       price: number
     }
     Result: number
   }
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     RequestBody: ProviderRequestBody
     ResponseBody: ProviderResponseBody
@@ -83,16 +90,7 @@ const createAdapterEndpoint = (): AdapterEndpoint<RestEndpointTypes> => {
 
   return new AdapterEndpoint({
     name: 'TEST',
-    inputParameters: {
-      from: {
-        type: 'string',
-        required: true,
-      },
-      to: {
-        type: 'string',
-        required: true,
-      },
-    },
+    inputParameters,
     transport: restEndpointTransport,
   })
 }

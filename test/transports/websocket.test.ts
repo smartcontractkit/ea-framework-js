@@ -2,37 +2,34 @@ import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { AdapterConfig, BaseAdapterSettings } from '../../src/config'
+import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import {
   WebSocketClassProvider,
-  WebsocketReverseMappingTransport,
   WebSocketTransport,
+  WebsocketReverseMappingTransport,
 } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { mockWebSocketProvider, runAllUntilTime, TestAdapter } from '../util'
-
-interface AdapterRequestParams {
-  base: string
-  quote: string
-}
+import { TestAdapter, mockWebSocketProvider, runAllUntilTime } from '../util'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
   clock: InstalledClock
 }>
 
-export const inputParameters = {
+export const inputParameters = new InputParameters({
   base: {
     type: 'string',
+    description: 'base',
     required: true,
   },
   quote: {
     type: 'string',
+    description: 'quote',
     required: true,
   },
-} satisfies InputParameters
+})
 
 interface ProviderMessage {
   pair: string
@@ -49,11 +46,9 @@ process.env['CACHE_POLLING_MAX_RETRIES'] = '0'
 const price = 251324
 
 type WebSocketTypes = {
-  Request: {
-    Params: AdapterRequestParams
-  }
+  Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
   Provider: {
     WsMessage: ProviderMessage
   }
@@ -94,8 +89,8 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
       },
     },
     builders: {
-      subscribeMessage: (params: AdapterRequestParams) => `S:${params.base}/${params.quote}`,
-      unsubscribeMessage: (params: AdapterRequestParams) => ({
+      subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
+      unsubscribeMessage: (params) => ({
         request: 'unsubscribe',
         pair: `${params.base}/${params.quote}`,
       }),
@@ -478,11 +473,11 @@ test.serial(
         },
       },
       builders: {
-        subscribeMessage: (params: AdapterRequestParams) => ({
+        subscribeMessage: (params) => ({
           request: 'subscribe',
           pair: `${params.base}/${params.quote}`,
         }),
-        unsubscribeMessage: (params: AdapterRequestParams) => ({
+        unsubscribeMessage: (params) => ({
           request: 'unsubscribe',
           pair: `${params.base}/${params.quote}`,
         }),
@@ -582,11 +577,11 @@ test.serial('does not crash the server when new connection errors', async (t) =>
       },
     },
     builders: {
-      subscribeMessage: (params: AdapterRequestParams) => ({
+      subscribeMessage: (params) => ({
         request: 'subscribe',
         pair: `${params.base}/${params.quote}`,
       }),
-      unsubscribeMessage: (params: AdapterRequestParams) => ({
+      unsubscribeMessage: (params) => ({
         request: 'unsubscribe',
         pair: `${params.base}/${params.quote}`,
       }),
@@ -693,11 +688,11 @@ test.serial('does not hang the background execution if the open handler hangs', 
       },
     },
     builders: {
-      subscribeMessage: (params: AdapterRequestParams) => ({
+      subscribeMessage: (params) => ({
         request: 'subscribe',
         pair: `${params.base}/${params.quote}`,
       }),
-      unsubscribeMessage: (params: AdapterRequestParams) => ({
+      unsubscribeMessage: (params) => ({
         request: 'unsubscribe',
         pair: `${params.base}/${params.quote}`,
       }),
@@ -784,7 +779,7 @@ const createReverseMappingAdapter = (
         },
       },
       builders: {
-        subscribeMessage: (params: AdapterRequestParams) => {
+        subscribeMessage: (params) => {
           const pair = `${params.base}/${params.quote}`
           websocketTransport.setReverseMapping(pair, params)
           return {
@@ -792,7 +787,7 @@ const createReverseMappingAdapter = (
             pair,
           }
         },
-        unsubscribeMessage: (params: AdapterRequestParams) => ({
+        unsubscribeMessage: (params) => ({
           request: 'unsubscribe',
           pair: `${params.base}/${params.quote}`,
         }),

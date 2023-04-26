@@ -7,31 +7,32 @@ import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
 import { Cache, LocalCache } from '../src/cache'
 import { ResponseCache } from '../src/cache/response'
-import { BaseAdapterSettings, SettingsDefinitionMap } from '../src/config'
-import { Transport, TransportDependencies, WebSocketClassProvider } from '../src/transports'
+import { EmptyCustomSettings, SettingsDefinitionMap } from '../src/config'
+import {
+  Transport,
+  TransportDependencies,
+  TransportGenerics,
+  WebSocketClassProvider,
+} from '../src/transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from '../src/util'
+import { EmptyInputParameters } from '../src/validation/input-params'
 
 export type NopTransportTypes = {
-  Request: {
-    Params: unknown
-  }
+  Parameters: EmptyInputParameters
   Response: {
     Data: null
     Result: null
   }
-  Settings: BaseAdapterSettings
+  Settings: EmptyCustomSettings
 }
 
-export class NopTransport implements Transport<NopTransportTypes> {
+export class NopTransport<T extends TransportGenerics = NopTransportTypes> implements Transport<T> {
   name!: string
-  responseCache!: ResponseCache<{
-    Request: NopTransportTypes['Request']
-    Response: NopTransportTypes['Response']
-  }>
+  responseCache!: ResponseCache<T>
 
   async initialize(
-    dependencies: TransportDependencies<NopTransportTypes>,
-    adapterSettings: NopTransportTypes['Settings'],
+    dependencies: TransportDependencies<T>,
+    adapterSettings: T['Settings'],
     endpointName: string,
     transportName: string,
   ): Promise<void> {
@@ -41,8 +42,8 @@ export class NopTransport implements Transport<NopTransportTypes> {
   }
 
   async foregroundExecute(
-    _: AdapterRequest<NopTransportTypes['Request']>,
-  ): Promise<void | AdapterResponse<NopTransportTypes['Response']>> {
+    _: AdapterRequest<T['Parameters']>,
+  ): Promise<void | AdapterResponse<T['Response']>> {
     return
   }
 }
