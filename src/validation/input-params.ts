@@ -81,7 +81,7 @@ type InputParameterOptionConstraints =
       options?: number[] | readonly number[]
     }
   | {
-      type: Exclude<ParameterType, 'string'>
+      type: Exclude<ParameterType, 'string' | 'number'>
       options?: never
     }
 
