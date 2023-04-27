@@ -60,3 +60,13 @@ jobs:
         with:
           name: coverage-reports
       - run: yarn code-coverage
+      - uses: ./.github/actions/set-git-credentials
+      - run: |
+          # save coverage summary in a branch 'coverage-pr-PR_NUMBER' so we can have access to it in a different workflow
+          BRANCH="coverage-pr-${{ github.event.pull_request.number }}"
+          git checkout -b $BRANCH          
+          git add -f coverage/coverage-summary.json
+          git commit -m "coverage summary report"
+          git push --set-upstream origin $BRANCH --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
