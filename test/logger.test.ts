@@ -55,6 +55,16 @@ test('properly redacts API_KEY (object with added text)', async (t) => {
   t.deepEqual(redacted, { apiKey: 'Bearer [API_KEY REDACTED]' })
 })
 
+test('properly handles undefined property', async (t) => {
+  const redacted = censor({ apiKey: undefined }, CensorList.getAll())
+  t.deepEqual(redacted, {})
+})
+
+test('properly handles undefined', async (t) => {
+  const redacted = censor(undefined, CensorList.getAll())
+  t.deepEqual(redacted, undefined)
+})
+
 test('properly redacts API_KEY (multiple nested values)', async (t) => {
   const redacted = censor(
     { apiKey: 'mock-api-key', config: { headers: { auth: 'mock-api-key' } } },

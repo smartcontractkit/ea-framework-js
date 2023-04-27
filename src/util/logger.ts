@@ -145,7 +145,7 @@ export function censor(obj: any, censorList: CensorKeyValue[], throwOnError = fa
   }
 
   if (typeof stringified !== 'string') {
-    return '[Undefined]'
+    return undefined
   }
 
   let result: string = stringified
