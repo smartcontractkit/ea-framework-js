@@ -1,4 +1,4 @@
-import fastify, { FastifyReply, HookHandlerDoneFunction } from 'fastify'
+import fastify, { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { join } from 'path'
 import * as client from 'prom-client'
 import { AdapterSettings } from '../config'
@@ -55,10 +55,12 @@ export const setupMetrics = (name: string): void => {
  * @returns the cache middleware function
  */
 export const buildMetricsMiddleware = (
-  req: AdapterRequest<InputParametersDefinition>,
+  rawReq: FastifyRequest,
   res: FastifyReply,
   done: HookHandlerDoneFunction,
 ) => {
+  const req = rawReq as AdapterRequest<InputParametersDefinition>
+
   // The request context can technically be empty if the input validation failed
   const feedId = req.requestContext?.meta?.metrics?.feedId || 'N/A'
   const labels = buildHttpRequestMetricsLabel(

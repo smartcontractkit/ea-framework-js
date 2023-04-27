@@ -4,6 +4,7 @@ import {
   InputParameter,
   InputParameters,
   InputParametersDefinition,
+  TypeFromDefinition,
 } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams, PriceEndpointGenerics } from './index'
@@ -87,7 +88,7 @@ const buildIncludesMap = (includesFile: IncludesFile) => {
 }
 
 type PriceAdapterRequest<T extends InputParametersDefinition> = AdapterRequest<T> & {
-  requestContext: AdapterRequestContext<T> & {
+  requestContext: AdapterRequestContext<TypeFromDefinition<T>> & {
     priceMeta: {
       inverse: boolean
     }

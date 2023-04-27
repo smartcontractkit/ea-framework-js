@@ -61,7 +61,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     // Copy over params
     this.name = params.name
     this.defaultEndpoint = params.defaultEndpoint?.toLowerCase()
-    this.endpoints = params.endpoints
+    this.endpoints = params.endpoints as AdapterEndpoint<EndpointGenerics>[]
     this.rateLimiting = params.rateLimiting
     this.bootstrap = params.bootstrap
     this.config =

@@ -5,7 +5,7 @@ import { InputParametersDefinition, TypeFromDefinition } from '../validation/inp
 declare module 'fastify' {
   // eslint-disable-next-line no-shadow
   export interface FastifyRequest {
-    requestContext: AdapterRequestContext
+    requestContext: AdapterRequestContext<unknown>
   }
 }
 
@@ -29,23 +29,22 @@ export interface AdapterRequestBody<T = AdapterRequestData> {
  * Object that will be added to the request on a successful validation.
  * Contains all the necessary information the adapter will need across the request execution.
  */
-export type AdapterRequestContext<T extends InputParametersDefinition = InputParametersDefinition> =
-  {
-    /** Name of the endpoint this payload should be directed to */
-    endpointName: string
+export type AdapterRequestContext<T> = {
+  /** Name of the endpoint this payload should be directed to */
+  endpointName: string
 
-    /** Name of the endpoint this payload should be directed to */
-    transportName: string
+  /** Name of the endpoint this payload should be directed to */
+  transportName: string
 
-    /** Precalculated cache key used to get and set corresponding values from the cache and subscription sets */
-    cacheKey: string
+  /** Precalculated cache key used to get and set corresponding values from the cache and subscription sets */
+  cacheKey: string
 
-    /** Normalized and validated data coming from the request body */
-    data: TypeFromDefinition<T>
+  /** Normalized and validated data coming from the request body */
+  data: T
 
-    /** Metadata relevant to this particular request */
-    meta?: AdapterRequestMeta
-  }
+  /** Metadata relevant to this particular request */
+  meta?: AdapterRequestMeta
+}
 
 /**
  * Helper type to denote an empty body
@@ -69,7 +68,7 @@ export type AdapterRequest<T extends InputParametersDefinition> =
     body: EmptyBody
 
     /** Container for all validated information that will be used by the framework across this request's lifecycle */
-    requestContext: AdapterRequestContext<T>
+    requestContext: AdapterRequestContext<TypeFromDefinition<T>>
   }
 
 /**
@@ -287,14 +286,11 @@ export type SingleNumberResultResponse = {
 
 export type Middleware =
   | ((
-      req: AdapterRequest<InputParametersDefinition>,
+      req: FastifyRequest,
       reply: FastifyReply,
       done: HookHandlerDoneFunction,
     ) => FastifyReply | void)
-  | ((
-      req: AdapterRequest<InputParametersDefinition>,
-      reply: FastifyReply,
-    ) => Promise<FastifyReply | void>)
+  | ((req: FastifyRequest, reply: FastifyReply) => Promise<FastifyReply | void>)
 
 export type AdapterMiddlewareBuilder = (adapter: Adapter) => Middleware
 
