@@ -1,27 +1,34 @@
 import { SettingsDefinitionMap } from '../config'
-import { AdapterRequest, AdapterRequestContext, AdapterResponse } from '../util'
+import { TransportGenerics } from '../transports'
 import {
-  InputParameter,
+  AdapterRequest,
+  AdapterRequestContext,
+  AdapterResponse,
+  SingleNumberResultResponse,
+} from '../util'
+import {
   InputParameters,
   InputParametersDefinition,
   TypeFromDefinition,
 } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
-import { Adapter, AdapterEndpointParams, AdapterParams, PriceEndpointGenerics } from './index'
+import { Adapter, AdapterEndpointParams, AdapterParams } from './index'
 
 /**
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
  */
-export type PriceEndpointInputParameters = {
-  base: InputParameter & {
+export type PriceEndpointInputParameters = InputParametersDefinition & {
+  base: {
     aliases: readonly ['from', 'coin', ...string[]]
     type: 'string'
     description: 'The symbol of symbols of the currency to query'
+    required?: boolean
   }
-  quote: InputParameter & {
+  quote: {
     aliases: readonly ['to', 'market', ...string[]]
     type: 'string'
     description: 'The symbol of the currency to convert to'
+    required?: boolean
   }
 }
 
@@ -61,18 +68,18 @@ type IncludePair = {
 type IncludesMap = Record<string, Record<string, IncludeDetails>>
 
 /**
+ * Helper type structure that contains the different types passed to the generic parameters of a PriceEndpoint
+ */
+export type PriceEndpointGenerics = TransportGenerics & {
+  Parameters: PriceEndpointInputParameters
+  Response: SingleNumberResultResponse
+}
+
+/**
  * A PriceEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its InputParameters must extend the basic ones (base/quote).
  */
-export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {
-  constructor(
-    params: AdapterEndpointParams<T> & {
-      inputParameters: InputParameters<PriceEndpointInputParameters>
-    },
-  ) {
-    super(params)
-  }
-}
+export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {}
 
 const buildIncludesMap = (includesFile: IncludesFile) => {
   const includesMap: IncludesMap = {}
@@ -126,6 +133,9 @@ export class PriceAdapter<
       const requestTransform = (req: AdapterRequest<InputParametersDefinition>) => {
         const priceRequest = req as PriceAdapterRequest<PriceEndpointInputParameters>
         const requestData = priceRequest.requestContext.data
+        if (!requestData.base || !requestData.quote) {
+          return
+        }
         const includesDetails = this.includesMap?.[requestData.base]?.[requestData.quote]
 
         if (includesDetails) {
