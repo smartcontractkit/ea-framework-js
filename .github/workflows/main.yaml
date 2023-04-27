@@ -47,7 +47,9 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: coverage-reports
-          path: ./**/coverage/tmp/*.json
+          path: |
+            ./**/coverage/tmp/*.json
+            ./**/coverage/coverage-summary.json
   # Only run if tests have run and completed successfully
   code-coverage:
     needs: test
