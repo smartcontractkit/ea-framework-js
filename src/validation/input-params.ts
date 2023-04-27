@@ -189,6 +189,8 @@ type ProperInputParametersDefinition = InputParametersDefinition & {
   [K in ReservedInputParameterNames]?: never
 }
 
+type EmptyDefinition = {} // eslint-disable-line
+
 /**
  * Given an input parameter definition, results in the type for the actual params object.
  */
@@ -199,7 +201,7 @@ export type TypeFromDefinition<T extends InputParametersDefinition> = {
 /**
  * Util type to represent the absence of input parameters for an adapter endpoint.
  */
-export type EmptyInputParameters = InputParametersDefinition
+export type EmptyInputParameters = EmptyDefinition
 
 /**
  * Error thrown when the validation of a request's params fails.

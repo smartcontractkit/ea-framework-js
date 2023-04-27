@@ -11,8 +11,8 @@ import {
 } from '../src/adapter'
 import { ResponseCache } from '../src/cache/response'
 import { EmptyCustomSettings } from '../src/config'
-import { Transport } from '../src/transports'
-import { AdapterRequest, AdapterResponse } from '../src/util'
+import { HttpTransport, Transport } from '../src/transports'
+import { AdapterRequest, AdapterResponse, SingleNumberResultResponse } from '../src/util'
 import { InputParameters } from '../src/validation'
 import { NopTransport, TestAdapter } from './util'
 
@@ -417,4 +417,111 @@ test('price adapter throws if non-crypto endpoint reuses aliases', async (t) => 
 
   const error: Error | undefined = await t.throwsAsync(() => start(adapter))
   t.is(error?.message, 'Duplicate endpoint / alias: "price"')
+})
+
+// This test is here only to check for type safety
+test('can create a price adapter with only a single ', async (t) => {
+  const mockResponse: (
+    req: AdapterRequest<PriceEndpointInputParameters>,
+  ) => AdapterResponse<PriceTestTypes['Response']> = () =>
+    ({
+      result: 1234,
+      data: {
+        result: 1234,
+      },
+      statusCode: 200,
+      timestamps: {
+        providerDataRequestedUnixMs: 0,
+        providerDataReceivedUnixMs: 0,
+        providerIndicatedTimeUnixMs: undefined,
+      },
+    } as AdapterResponse<PriceTestTypes['Response']>)
+
+  const adapter = new PriceAdapter({
+    name: 'TEST',
+    endpoints: [
+      new CryptoPriceEndpoint({
+        name: 'test',
+        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
+        transport: new PriceTestTransport(mockResponse),
+      }),
+    ],
+  })
+
+  t.truthy(adapter)
+})
+
+test('can create a price endpoint with non-required base and quote', async (t) => {
+  const parametersDefinition = {
+    base: {
+      aliases: ['from', 'coin'],
+      type: 'string',
+      description: 'The symbol of symbols of the currency to query',
+      required: false,
+    },
+    quote: {
+      aliases: ['to', 'market'],
+      type: 'string',
+      description: 'The symbol of the currency to convert to',
+      required: true,
+    },
+  } as const
+
+  const testInputParameters = new InputParameters(parametersDefinition)
+
+  type TestTypes = {
+    Parameters: typeof testInputParameters.definition
+    Settings: EmptyCustomSettings
+    Response: SingleNumberResultResponse
+    Provider: {
+      RequestBody: unknown
+      ResponseBody: unknown
+    }
+  }
+
+  const transport = new HttpTransport<TestTypes>({
+    prepareRequests: (params) => {
+      return {
+        params,
+        request: {
+          url: '/price',
+          method: 'POST',
+          data: {
+            pairs: params.map((p) => ({ base: p.base, quote: p.quote })),
+          },
+        },
+      }
+    },
+    parseResponse: (params) => {
+      return [
+        {
+          params: params[0],
+          response: {
+            statusCode: 400,
+            errorMessage: 'asd',
+          },
+        },
+      ]
+    },
+  })
+
+  const endpoint = new PriceEndpoint<TestTypes>({
+    name: 'test',
+    inputParameters: testInputParameters,
+    transport,
+  })
+
+  const adapter = new PriceAdapter({
+    name: 'TEST',
+    endpoints: [
+      endpoint,
+      new AdapterEndpoint({
+        name: 'price',
+        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
+        transport: new NopTransport<PriceTestTypes>(),
+      }),
+    ],
+  })
+
+  t.truthy(adapter)
 })
