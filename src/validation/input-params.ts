@@ -38,6 +38,18 @@ type TypeFromTypeString<T extends ParameterType> = T extends 'string'
   : never
 
 /**
+ * All posible types for specifying options for an InputParameter
+ */
+type ParameterOptions = string[] | readonly string[] | number | readonly number[]
+
+/**
+ * Given a parameter P, if the parameter has options it will constrain the type to a union of those options.
+ */
+type TypeFromOptionsOrTypeString<P extends InputParameter> = P['options'] extends ParameterOptions
+  ? P['options'][number]
+  : TypeFromTypeString<P['type']>
+
+/**
  * Util type to be able to discern exactly if a generic is exactly unknown
  * (because everything extends unknown, but unknown only extends itself)
  */
@@ -49,7 +61,7 @@ type IsUnknown<T> = unknown extends T ? true : false
  */
 type ShouldBeUndefinable<
   P extends InputParameter,
-  T = TypeFromTypeString<P['type']>,
+  T = TypeFromOptionsOrTypeString<P>,
 > = P['required'] extends true ? T : IsUnknown<P['default']> extends true ? T | undefined : T
 
 /**
@@ -61,10 +73,9 @@ type NonArrayInputType<P extends InputParameter> = ShouldBeUndefinable<P>
  * Given an InputParameter P, results in the corresponding type for that definition,
  * accounting for configurations like required, array, defaults, etc.
  */
-type TypeFromParameter<
-  P extends InputParameter,
-  T = TypeFromTypeString<P['type']>,
-> = P['array'] extends true ? T[] : NonArrayInputType<P>
+type TypeFromParameter<P extends InputParameter, T = NonArrayInputType<P>> = P['array'] extends true
+  ? T[]
+  : T
 
 /**
  * Constraint for an InputParameter to make sure options are only specified for parameters of type string.
@@ -146,7 +157,7 @@ type BaseInputParameter = {
   default?: PrimitiveParameterType
   required?: boolean
   array?: boolean
-  options?: string[] | readonly string[] | number | readonly number[] // Enumerated options, ex. ['ADA', 'BTC', 'ETH']
+  options?: ParameterOptions // Enumerated options, ex. ['ADA', 'BTC', 'ETH']
 
   // Purposefully ignored in the types, as aliases will be converted to the main keys
   aliases?: readonly string[]
