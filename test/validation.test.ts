@@ -4,7 +4,7 @@ import { BaseAdapterSettings } from '../src/config'
 import { AdapterRequest, AdapterResponse } from '../src/util'
 import { InputParameters } from '../src/validation'
 import { AdapterInputError } from '../src/validation/error'
-import { EmptyInputParameters } from '../src/validation/input-params'
+import { EmptyInputParameters, TypeFromDefinition } from '../src/validation/input-params'
 import { validator } from '../src/validation/utils'
 import { NopTransport, NopTransportTypes, TestAdapter } from './util'
 
@@ -379,7 +379,7 @@ test.serial('invalid overrides key throws 400', async (t) => {
 })
 
 test.serial('correctly typed params returns 200', async (t) => {
-  t.context.adapterEndpoint.inputParameters = new InputParameters({
+  const inputParameters = new InputParameters({
     string: {
       type: 'string',
       description: 'stuff',
@@ -431,15 +431,32 @@ test.serial('correctly typed params returns 200', async (t) => {
       array: true,
       description: 'an array of address objects',
     },
-  }) as unknown as InputParameters<EmptyInputParameters>
+  })
+
+  // We declare it here to also test the types
+  const testObject: TypeFromDefinition<typeof inputParameters.definition> = {
+    string: 'asd',
+    array: [1, 2, 3],
+    object: {
+      test: 'asd',
+    },
+    boolean: false,
+    number: 123,
+    stringOptions: '123',
+    numberOptions: 123,
+    arrayOfObjects: [
+      {
+        address: 'qwe',
+      },
+    ],
+  }
+
+  t.context.adapterEndpoint.inputParameters =
+    inputParameters as unknown as InputParameters<EmptyInputParameters>
 
   const response = await t.context.testAdapter.request({
     endpoint: 'test',
-    string: 'test',
-    number: 2,
-    boolean: false,
-    array: [1, 2],
-    object: { test: 'test' },
+    ...testObject,
   })
   t.is(response.statusCode, 200)
 })
@@ -607,7 +624,7 @@ test.serial('throws on empty options array', async (t) => {
         description: 'stuff',
         options: [],
       },
-    }) as InputParameters<EmptyInputParameters>
+    }) as unknown as InputParameters<EmptyInputParameters>
   })
 
   t.is(error?.message, '[Param: base] The options array must contain at least one option')
