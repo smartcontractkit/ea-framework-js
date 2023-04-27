@@ -6,11 +6,7 @@ import {
   AdapterResponse,
   SingleNumberResultResponse,
 } from '../util'
-import {
-  InputParameters,
-  InputParametersDefinition,
-  TypeFromDefinition,
-} from '../validation/input-params'
+import { InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams } from './index'
 
@@ -185,11 +181,7 @@ const DEFAULT_ALIASES = ['crypto', 'price']
  * a set of common aliases that are used across EAs to specify endpoints that provide crypto prices.
  */
 export class CryptoPriceEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {
-  constructor(
-    params: AdapterEndpointParams<T> & {
-      inputParameters: InputParameters<PriceEndpointInputParameters>
-    },
-  ) {
+  constructor(params: AdapterEndpointParams<T>) {
     if (!params.aliases) {
       params.aliases = []
     }
