@@ -525,3 +525,83 @@ test('can create a price endpoint with non-required base and quote', async (t) =
 
   t.truthy(adapter)
 })
+
+test('can create a crypto price endpoint with non-required base and quote and extra properties', async (t) => {
+  const parametersDefinition = {
+    index: {
+      description: 'The ID of the index. Takes priority over base/quote when provided.',
+      type: 'string',
+      required: false,
+    },
+    base: {
+      aliases: ['from', 'coin'],
+      type: 'string',
+      description: 'The symbol of symbols of the currency to query',
+      required: false,
+    },
+    quote: {
+      aliases: ['to', 'market'],
+      type: 'string',
+      description: 'The symbol of the currency to convert to',
+      required: true,
+    },
+  } as const
+
+  const testInputParameters = new InputParameters(parametersDefinition)
+
+  type TestTypes = {
+    Parameters: typeof testInputParameters.definition
+    Settings: EmptyCustomSettings
+    Response: SingleNumberResultResponse
+    Provider: {
+      RequestBody: unknown
+      ResponseBody: unknown
+    }
+  }
+
+  const transport = new HttpTransport<TestTypes>({
+    prepareRequests: (params) => {
+      return {
+        params,
+        request: {
+          url: '/price',
+          method: 'POST',
+          data: {
+            pairs: params.map((p) => ({ base: p.base, quote: p.quote, index: p.index })),
+          },
+        },
+      }
+    },
+    parseResponse: (params) => {
+      return [
+        {
+          params: params[0],
+          response: {
+            statusCode: 400,
+            errorMessage: 'asd',
+          },
+        },
+      ]
+    },
+  })
+
+  const endpoint = new CryptoPriceEndpoint<TestTypes>({
+    name: 'test',
+    inputParameters: testInputParameters,
+    transport,
+  })
+
+  const adapter = new PriceAdapter({
+    name: 'TEST',
+    endpoints: [
+      endpoint,
+      new AdapterEndpoint({
+        name: 'price',
+        inputParameters: new InputParameters(priceEndpointInputParametersDefinition),
+        transport: new NopTransport<PriceTestTypes>(),
+      }),
+    ],
+  })
+
+  t.truthy(adapter)
+})
