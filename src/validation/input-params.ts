@@ -40,7 +40,7 @@ type TypeFromTypeString<T extends ParameterType> = T extends 'string'
 /**
  * All posible types for specifying options for an InputParameter
  */
-type ParameterOptions = string[] | readonly string[] | number | readonly number[]
+type ParameterOptions = string[] | readonly string[] | number[] | readonly number[]
 
 /**
  * Given a parameter P, if the parameter has options it will constrain the type to a union of those options.
