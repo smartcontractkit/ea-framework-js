@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { FastifyReply, HookHandlerDoneFunction } from 'fastify'
+import { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import pino from 'pino'
 import { BaseSettingsDefinition } from '../config'
@@ -118,10 +118,11 @@ export const makeLogger = (layer: string) =>
   })
 
 export const loggingContextMiddleware = (
-  req: AdapterRequest<InputParametersDefinition>,
+  rawReq: FastifyRequest,
   res: FastifyReply,
   done: HookHandlerDoneFunction,
 ) => {
+  const req = rawReq as AdapterRequest<InputParametersDefinition>
   const correlationId = req.headers['x-correlation-id'] || randomUUID()
   asyncLocalStorage.run({ correlationId: correlationId }, () => {
     done()
