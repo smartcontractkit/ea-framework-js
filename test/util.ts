@@ -15,7 +15,7 @@ import {
   WebSocketClassProvider,
 } from '../src/transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from '../src/util'
-import { EmptyInputParameters } from '../src/validation/input-params'
+import { EmptyInputParameters, TypeFromDefinition } from '../src/validation/input-params'
 
 export type NopTransportTypes = {
   Parameters: EmptyInputParameters
@@ -42,7 +42,7 @@ export class NopTransport<T extends TransportGenerics = NopTransportTypes> imple
   }
 
   async foregroundExecute(
-    _: AdapterRequest<T['Parameters']>,
+    _: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
   ): Promise<void | AdapterResponse<T['Response']>> {
     return
   }

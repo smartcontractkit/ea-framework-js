@@ -6,14 +6,18 @@ import {
   AdapterResponse,
   SingleNumberResultResponse,
 } from '../util'
-import { InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
+import {
+  EmptyInputParameters,
+  InputParametersDefinition,
+  TypeFromDefinition,
+} from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams } from './index'
 
 /**
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
  */
-export type PriceEndpointInputParameters = InputParametersDefinition & {
+export type PriceEndpointInputParametersDefinition = InputParametersDefinition & {
   base: {
     aliases: readonly ['from', 'coin', ...string[]]
     type: 'string'
@@ -44,7 +48,7 @@ export const priceEndpointInputParametersDefinition = {
     description: 'The symbol of the currency to convert to',
     required: true,
   },
-} as const satisfies PriceEndpointInputParameters
+} as const satisfies PriceEndpointInputParametersDefinition
 
 /**
  * Structure of an "includes" file.
@@ -67,7 +71,7 @@ type IncludesMap = Record<string, Record<string, IncludeDetails>>
  * Helper type structure that contains the different types passed to the generic parameters of a PriceEndpoint
  */
 export type PriceEndpointGenerics = TransportGenerics & {
-  Parameters: PriceEndpointInputParameters
+  Parameters: PriceEndpointInputParametersDefinition
   Response: SingleNumberResultResponse
 }
 
@@ -90,8 +94,8 @@ const buildIncludesMap = (includesFile: IncludesFile) => {
   return includesMap
 }
 
-type PriceAdapterRequest<T extends InputParametersDefinition> = AdapterRequest<T> & {
-  requestContext: AdapterRequestContext<TypeFromDefinition<T>> & {
+type PriceAdapterRequest<T> = AdapterRequest<T> & {
+  requestContext: AdapterRequestContext<T> & {
     priceMeta: {
       inverse: boolean
     }
@@ -126,8 +130,10 @@ export class PriceAdapter<
       // Build includes map for constant lookups
       this.includesMap = buildIncludesMap(params.includes)
 
-      const requestTransform = (req: AdapterRequest<InputParametersDefinition>) => {
-        const priceRequest = req as PriceAdapterRequest<PriceEndpointInputParameters>
+      const requestTransform = (req: AdapterRequest<EmptyInputParameters>) => {
+        const priceRequest = req as PriceAdapterRequest<
+          TypeFromDefinition<PriceEndpointInputParametersDefinition>
+        >
         const requestData = priceRequest.requestContext.data
         if (!requestData.base || !requestData.quote) {
           return
@@ -152,7 +158,7 @@ export class PriceAdapter<
   }
 
   override async handleRequest(
-    req: PriceAdapterRequest<PriceEndpointInputParameters>,
+    req: PriceAdapterRequest<PriceEndpointInputParametersDefinition>,
     replySent: Promise<unknown>,
   ): Promise<AdapterResponse> {
     const response = await super.handleRequest(req, replySent)

@@ -2,7 +2,7 @@ import { AdapterDependencies, DEFAULT_TRANSPORT_NAME, EndpointContext } from '..
 import { ResponseCache } from '../cache/response'
 import { BaseAdapterSettings } from '../config'
 import { AdapterRequest, AdapterResponse, ResponseGenerics } from '../util/types'
-import { InputParametersDefinition } from '../validation/input-params'
+import { InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
 
 export * from './http'
 export * from './sse'
@@ -80,7 +80,7 @@ export interface Transport<T extends TransportGenerics> {
    * @returns an empty Promise
    */
   registerRequest?: (
-    req: AdapterRequest<T['Parameters']>,
+    req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
     adapterSettings: T['Settings'],
   ) => Promise<void>
 
@@ -97,7 +97,7 @@ export interface Transport<T extends TransportGenerics> {
    *   immediately fetching data and returning it without the background process.
    */
   foregroundExecute?: (
-    req: AdapterRequest<T['Parameters']>,
+    req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
     adapterSettings: T['Settings'],
   ) => Promise<AdapterResponse<{
     Data: T['Response']['Data']

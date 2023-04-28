@@ -193,17 +193,30 @@ type EmptyDefinition = {} // eslint-disable-line
 
 /**
  * Given an input parameter definition, results in the type for the actual params object.
+ *
+ * The use of any is to avoid problems stemming from the heterogeneous array of [[AdapterEndpoint]]
+ * in the [[AdapterParams]]. What we're doing is basically saying that if the definition provided to this
+ * type is `any`, then the resulting type for that definition should be `any` as well.
+ * For more details, please look at said `endpoints` param and the explanations there.
  */
-export type TypeFromDefinition<T extends InputParametersDefinition> = {
-  -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
-    ? K
-    : never]: TypeFromParameter<T[K]>
-} & {
-  -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
-    ? never
-    : K]?: TypeFromParameter<T[K]>
-}
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export type TypeFromDefinition<T extends InputParametersDefinition> = T extends any
+  ? any
+  : {
+      -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
+        ? K
+        : never]: TypeFromParameter<T[K]>
+    } & {
+      -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
+        ? never
+        : K]?: TypeFromParameter<T[K]>
+    }
+/* eslint-enable */
 
+/**
+ * Checks whether the definition for a single input parameter should include undefined in its options or not.
+ * This is to discern while computing the type from input param definitions to make them optional keys as well.
+ */
 type TypeFromDefinitionIsDefined<T extends InputParameter> = T['required'] extends true
   ? true
   : T['array'] extends true
@@ -211,6 +224,62 @@ type TypeFromDefinitionIsDefined<T extends InputParameter> = T['required'] exten
   : IsUnknown<T['default']> extends false
   ? true
   : false
+
+const asd = {} as TypeFromDefinition<{
+  string: {
+    type: 'string'
+    description: 'stuff'
+    required: true
+  }
+  array: {
+    type: 'number'
+    array: true
+    description: 'stuff'
+  }
+  object: {
+    type: {
+      test: {
+        type: 'string'
+        description: 'stuff'
+      }
+    }
+    description: 'stuff'
+    required: true
+  }
+  boolean: {
+    type: 'boolean'
+    description: 'stuff'
+    required: true
+  }
+  number: {
+    type: 'number'
+    description: 'stuff'
+    required: true
+  }
+  stringOptions: {
+    type: 'string'
+    description: 'stuff[]'
+    options: ['123', 'sdfoij']
+  }
+  numberOptions: {
+    type: 'number'
+    description: 'stuff[]'
+    options: [123, 234]
+  }
+  arrayOfObjects: {
+    type: {
+      address: {
+        type: 'string'
+        required: true
+        description: 'inner stuff'
+      }
+    }
+    array: true
+    description: 'an array of address objects'
+  }
+}>
+
+asd
 
 /**
  * Util type to represent the absence of input parameters for an adapter endpoint.
@@ -359,6 +428,10 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
 }
 
 export class InputParameters<const T extends ProperInputParametersDefinition> {
+  // Helper type to avoid doing TypeFromDefinition<typeof inputParameters.definition>
+  // Should not be used in practice
+  readonly validated!: TypeFromDefinition<T>
+
   params: ProcessedParam[]
 
   constructor(public definition: T) {

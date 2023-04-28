@@ -34,7 +34,10 @@ export abstract class SubscriptionTransport<const T extends TransportGenerics>
     this.name = name
   }
 
-  async registerRequest(req: AdapterRequest<T['Parameters']>, _: T['Settings']): Promise<void> {
+  async registerRequest(
+    req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
+    _: T['Settings'],
+  ): Promise<void> {
     logger.debug(
       `Adding entry to subscription set (ttl ${this.subscriptionTtl}): [${req.requestContext.cacheKey}] = ${req.requestContext.data}`,
     )

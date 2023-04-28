@@ -3,7 +3,7 @@ import { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import pino from 'pino'
 import { BaseSettingsDefinition } from '../config'
-import { InputParametersDefinition } from '../validation/input-params'
+import { EmptyInputParameters } from '../validation/input-params'
 import CensorList, { CensorKeyValue } from './censor/censor-list'
 import { AdapterRequest } from './types'
 
@@ -122,7 +122,7 @@ export const loggingContextMiddleware = (
   res: FastifyReply,
   done: HookHandlerDoneFunction,
 ) => {
-  const req = rawReq as AdapterRequest<InputParametersDefinition>
+  const req = rawReq as AdapterRequest<EmptyInputParameters>
   const correlationId = req.headers['x-correlation-id'] || randomUUID()
   asyncLocalStorage.run({ correlationId: correlationId }, () => {
     done()

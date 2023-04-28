@@ -4,7 +4,8 @@ import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { AdapterConfig, SettingsDefinitionFromConfig } from '../../src/config'
 import { AdapterRequest } from '../../src/util'
-import { assertEqualResponses, NopTransport, TestAdapter } from '../util'
+import { TypeFromDefinition } from '../../src/validation/input-params'
+import { NopTransport, TestAdapter, assertEqualResponses } from '../util'
 import { CacheTestTransportTypes } from './helper'
 
 const test = untypedTest as TestFn<{
@@ -49,7 +50,7 @@ test.serial('sensitive settings are censored in the response cache', async (t) =
         name: 'test',
         transport: new (class extends NopTransport<CacheTestTransportTypes> {
           override async foregroundExecute(
-            req: AdapterRequest<CacheTestTransportTypes['Parameters']>,
+            req: AdapterRequest<TypeFromDefinition<CacheTestTransportTypes['Parameters']>>,
           ): Promise<void> {
             await this.responseCache.write(this.name, [
               {
@@ -97,7 +98,7 @@ test.serial('writes error response when censoring fails', async (t) => {
         name: 'test',
         transport: new (class extends NopTransport<CacheTestTransportTypes> {
           override async foregroundExecute(
-            req: AdapterRequest<CacheTestTransportTypes['Parameters']>,
+            req: AdapterRequest<TypeFromDefinition<CacheTestTransportTypes['Parameters']>>,
           ): Promise<void> {
             const circular: { circular?: unknown } = {}
             circular.circular = circular

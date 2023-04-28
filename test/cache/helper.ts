@@ -4,6 +4,7 @@ import { Cache } from '../../src/cache'
 import { EmptyCustomSettings } from '../../src/config'
 import { AdapterRequest } from '../../src/util'
 import { InputParameters } from '../../src/validation'
+import { TypeFromDefinition } from '../../src/validation/input-params'
 import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
 
 export const test = untypedTest as TestFn<{
@@ -36,7 +37,7 @@ export type CacheTestTransportTypes = {
 
 export class BasicCacheSetterTransport extends NopTransport<CacheTestTransportTypes> {
   override async foregroundExecute(
-    req: AdapterRequest<typeof cacheTestInputParameters.definition>,
+    req: AdapterRequest<TypeFromDefinition<typeof cacheTestInputParameters.definition>>,
   ): Promise<void> {
     await this.responseCache.write(this.name, [
       {
@@ -57,7 +58,7 @@ export class BasicCacheSetterTransport extends NopTransport<CacheTestTransportTy
 
 export class DifferentResultTransport extends NopTransport<CacheTestTransportTypes> {
   override async foregroundExecute(
-    req: AdapterRequest<typeof cacheTestInputParameters.definition>,
+    req: AdapterRequest<TypeFromDefinition<typeof cacheTestInputParameters.definition>>,
   ): Promise<void> {
     await this.responseCache.write(this.name, [
       {
