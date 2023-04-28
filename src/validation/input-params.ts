@@ -195,8 +195,22 @@ type EmptyDefinition = {} // eslint-disable-line
  * Given an input parameter definition, results in the type for the actual params object.
  */
 export type TypeFromDefinition<T extends InputParametersDefinition> = {
-  -readonly [K in keyof T]: TypeFromParameter<T[K]>
+  -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
+    ? K
+    : never]: TypeFromParameter<T[K]>
+} & {
+  -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
+    ? never
+    : K]?: TypeFromParameter<T[K]>
 }
+
+type TypeFromDefinitionIsDefined<T extends InputParameter> = T['required'] extends true
+  ? true
+  : T['array'] extends true
+  ? true
+  : IsUnknown<T['default']> extends false
+  ? true
+  : false
 
 /**
  * Util type to represent the absence of input parameters for an adapter endpoint.
