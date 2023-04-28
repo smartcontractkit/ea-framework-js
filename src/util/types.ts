@@ -62,14 +62,13 @@ export type AdapterRouteGeneric = {
 /**
  * Structure for all requests incoming to this adapter
  */
-export type AdapterRequest<T extends InputParametersDefinition> =
-  FastifyRequest<AdapterRouteGeneric> & {
-    /** Set to an empty record so the user does not access the raw request data and uses the Validated data from the context instead */
-    body: EmptyBody
+export type AdapterRequest<T> = FastifyRequest<AdapterRouteGeneric> & {
+  /** Set to an empty record so the user does not access the raw request data and uses the Validated data from the context instead */
+  body: EmptyBody
 
-    /** Container for all validated information that will be used by the framework across this request's lifecycle */
-    requestContext: AdapterRequestContext<TypeFromDefinition<T>>
-  }
+  /** Container for all validated information that will be used by the framework across this request's lifecycle */
+  requestContext: AdapterRequestContext<T>
+}
 
 /**
  * Metadata for a particular request

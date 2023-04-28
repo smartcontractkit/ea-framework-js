@@ -4,6 +4,7 @@ import { TransportRoutes } from '../transports'
 import { AdapterRequest, AdapterRequestData, Overrides, makeLogger } from '../util'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
+import { TypeFromDefinition } from '../validation/input-params'
 import {
   AdapterDependencies,
   AdapterEndpointInterface,
@@ -31,7 +32,10 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   customInputValidation?: CustomInputValidator<T>
   requestTransforms: RequestTransform<T>[]
   overrides?: Record<string, string> | undefined
-  customRouter?: (req: AdapterRequest<T['Parameters']>, settings: T['Settings']) => string
+  customRouter?: (
+    req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
+    settings: T['Settings'],
+  ) => string
   defaultTransport?: string
 
   constructor(params: AdapterEndpointParams<T>) {
@@ -94,7 +98,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @param req - the current adapter request
    * @returns the request after passing through all request transforms
    */
-  runRequestTransforms(req: AdapterRequest<T['Parameters']>): void {
+  runRequestTransforms(req: AdapterRequest<TypeFromDefinition<T['Parameters']>>): void {
     for (const transform of this.requestTransforms) {
       transform(req)
     }
@@ -107,7 +111,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @param req - the current adapter request
    * @returns the modified (or new) request
    */
-  symbolOverrider(req: AdapterRequest<T['Parameters']>) {
+  symbolOverrider(req: AdapterRequest<TypeFromDefinition<T['Parameters']>>) {
     const rawRequestBody = req.body as { data?: { overrides?: Overrides } }
     const requestOverrides = rawRequestBody.data?.overrides?.[this.adapterName.toLowerCase()]
     const data = req.requestContext.data as Record<string, string>
@@ -124,7 +128,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   }
 
   getTransportNameForRequest(
-    req: AdapterRequest<T['Parameters']>,
+    req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
     settings: T['Settings'],
   ): string {
     // If there's only one transport, return it
@@ -168,7 +172,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @param req - The current adapter request
    * @returns the transport param if present
    */
-  private defaultRouter(req: AdapterRequest<T['Parameters']>) {
+  private defaultRouter(req: AdapterRequest<TypeFromDefinition<T['Parameters']>>) {
     const rawRequestBody = req.body as unknown as { data: AdapterRequestData }
     return rawRequestBody.data?.transport
   }

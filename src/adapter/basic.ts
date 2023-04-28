@@ -17,7 +17,7 @@ import { RateLimiterFactory, RateLimitingStrategy } from '../rate-limiting/facto
 import { AdapterRequest, AdapterResponse, SubscriptionSetFactory, makeLogger } from '../util'
 import { Requester } from '../util/requester'
 import { AdapterTimeoutError } from '../validation/error'
-import { InputParametersDefinition } from '../validation/input-params'
+import { EmptyInputParameters } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import {
   AdapterDependencies,
@@ -312,7 +312,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
    * @returns the cached value if exists
    */
   async findResponseInCache(
-    req: AdapterRequest<InputParametersDefinition>,
+    req: AdapterRequest<EmptyInputParameters>,
   ): Promise<Readonly<AdapterResponse> | undefined> {
     const response = await (this.dependencies.cache as Cache<AdapterResponse>).get(
       req.requestContext.cacheKey,
@@ -355,7 +355,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
    * @returns a simple Promise when it's done
    */
   async handleRequest(
-    req: AdapterRequest<InputParametersDefinition>,
+    req: AdapterRequest<EmptyInputParameters>,
     replySent: Promise<unknown>,
   ): Promise<Readonly<AdapterResponse>> {
     // Get transport, must be here because it's already checked in the validator

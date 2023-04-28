@@ -7,7 +7,7 @@ import { AdapterSettings, SettingsDefinitionMap } from './config'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
 import { AdapterRequest, AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
-import { InputParametersDefinition } from './validation/input-params'
+import { EmptyInputParameters } from './validation/input-params'
 
 export { FastifyInstance as ServerInstance }
 
@@ -186,7 +186,7 @@ async function buildRestApi(adapter: Adapter) {
       method: 'POST',
       handler: async (req, reply) => {
         const response = await adapter.handleRequest(
-          req as AdapterRequest<InputParametersDefinition>,
+          req as AdapterRequest<EmptyInputParameters>,
           reply as unknown as Promise<unknown>,
         )
         return reply.code(response.statusCode || 200).send(response)

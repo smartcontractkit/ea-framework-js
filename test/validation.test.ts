@@ -4,7 +4,7 @@ import { BaseAdapterSettings } from '../src/config'
 import { AdapterRequest, AdapterResponse } from '../src/util'
 import { InputParameters } from '../src/validation'
 import { AdapterInputError } from '../src/validation/error'
-import { EmptyInputParameters, TypeFromDefinition } from '../src/validation/input-params'
+import { EmptyInputParameters } from '../src/validation/input-params'
 import { validator } from '../src/validation/utils'
 import { NopTransport, NopTransportTypes, TestAdapter } from './util'
 
@@ -434,7 +434,7 @@ test.serial('correctly typed params returns 200', async (t) => {
   })
 
   // We declare it here to also test the types
-  const testObject: TypeFromDefinition<typeof inputParameters.definition> = {
+  const testObject: typeof inputParameters.validated = {
     string: 'asd',
     array: [1, 2, 3],
     object: {

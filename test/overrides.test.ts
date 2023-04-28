@@ -4,6 +4,7 @@ import { ResponseCache } from '../src/cache/response'
 import { Transport, TransportGenerics } from '../src/transports'
 import { AdapterRequest } from '../src/util'
 import { InputParameters } from '../src/validation'
+import { TypeFromDefinition } from '../src/validation/input-params'
 import { TestAdapter } from './util'
 
 const test = untypedTest as TestFn<{
@@ -42,7 +43,9 @@ class OverrideTestTransport implements Transport<TestTransportGenerics> {
   async initialize() {
     return
   }
-  async foregroundExecute(req: AdapterRequest<TestTransportGenerics['Parameters']>) {
+  async foregroundExecute(
+    req: AdapterRequest<TypeFromDefinition<TestTransportGenerics['Parameters']>>,
+  ) {
     return {
       data: {
         base: req.requestContext.data.base,

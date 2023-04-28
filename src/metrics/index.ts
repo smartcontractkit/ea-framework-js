@@ -5,7 +5,7 @@ import { AdapterSettings } from '../config'
 import { getMTLSOptions, httpsOptions } from '../index'
 import { AdapterRequest, makeLogger } from '../util'
 import { AdapterError } from '../validation/error'
-import { InputParametersDefinition } from '../validation/input-params'
+import { EmptyInputParameters } from '../validation/input-params'
 import { HttpRequestType, requestDurationBuckets } from './constants'
 
 const logger = makeLogger('Metrics')
@@ -59,7 +59,7 @@ export const buildMetricsMiddleware = (
   res: FastifyReply,
   done: HookHandlerDoneFunction,
 ) => {
-  const req = rawReq as AdapterRequest<InputParametersDefinition>
+  const req = rawReq as AdapterRequest<EmptyInputParameters>
 
   // The request context can technically be empty if the input validation failed
   const feedId = req.requestContext?.meta?.metrics?.feedId || 'N/A'

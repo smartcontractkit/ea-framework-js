@@ -74,7 +74,7 @@ type NonArrayInputType<P extends InputParameter> = ShouldBeUndefinable<P>
  * accounting for configurations like required, array, defaults, etc.
  */
 type TypeFromParameter<P extends InputParameter, T = NonArrayInputType<P>> = P['array'] extends true
-  ? T[]
+  ? Exclude<T, undefined>[]
   : T
 
 /**
@@ -193,10 +193,37 @@ type EmptyDefinition = {} // eslint-disable-line
 
 /**
  * Given an input parameter definition, results in the type for the actual params object.
+ *
+ * The use of any is to avoid problems stemming from the heterogeneous array of [[AdapterEndpoint]]
+ * in the [[AdapterParams]]. What we're doing is basically saying that if the definition provided to this
+ * type is `any`, then the resulting type for that definition should be `any` as well.
+ * For more details, please look at said `endpoints` param and the explanations there.
  */
-export type TypeFromDefinition<T extends InputParametersDefinition> = {
-  -readonly [K in keyof T]: TypeFromParameter<T[K]>
-}
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export type TypeFromDefinition<T extends InputParametersDefinition> = unknown extends T
+  ? any
+  : {
+      -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
+        ? K
+        : never]: TypeFromParameter<T[K]>
+    } & {
+      -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
+        ? never
+        : K]?: TypeFromParameter<T[K]>
+    }
+/* eslint-enable */
+
+/**
+ * Checks whether the definition for a single input parameter should include undefined in its options or not.
+ * This is to discern while computing the type from input param definitions to make them optional keys as well.
+ */
+type TypeFromDefinitionIsDefined<T extends InputParameter> = T['required'] extends true
+  ? true
+  : T['array'] extends true
+  ? true
+  : IsUnknown<T['default']> extends false
+  ? true
+  : false
 
 /**
  * Util type to represent the absence of input parameters for an adapter endpoint.
@@ -345,6 +372,10 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
 }
 
 export class InputParameters<const T extends ProperInputParametersDefinition> {
+  // Helper type to avoid doing TypeFromDefinition<typeof inputParameters.definition>
+  // Should not be used in practice
+  readonly validated!: TypeFromDefinition<T>
+
   params: ProcessedParam[]
 
   constructor(public definition: T) {

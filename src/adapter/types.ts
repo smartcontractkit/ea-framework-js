@@ -8,6 +8,7 @@ import { AdapterRequest, SubscriptionSetFactory } from '../util'
 import { Requester } from '../util/requester'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
+import { TypeFromDefinition } from '../validation/input-params'
 import { Adapter } from './basic'
 import { AdapterEndpoint } from './endpoint'
 
@@ -66,7 +67,7 @@ export interface AdapterRateLimitingConfig {
  * Type to perform arbitrary modifications on an adapter request
  */
 export type RequestTransform<T extends EndpointGenerics> = (
-  req: AdapterRequest<T['Parameters']>,
+  req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
 ) => void
 
 /**
@@ -118,7 +119,7 @@ export interface EndpointRateLimitingConfig {
 export type EndpointGenerics = TransportGenerics
 
 export type CustomInputValidator<T extends EndpointGenerics> = (
-  input: AdapterRequest<T['Parameters']>,
+  input: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
   adapterSettings: T['Settings'],
 ) => AdapterError | undefined
 
@@ -162,7 +163,10 @@ type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
   transportRoutes: TransportRoutes<T>
 
   /** Custom function to direct an incoming request to the appropriate transport from the transports map */
-  customRouter?: (req: AdapterRequest<T['Parameters']>, settings: T['Settings']) => string
+  customRouter?: (
+    req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
+    settings: T['Settings'],
+  ) => string
 
   /** If no value is returned from the custom router or the default (transport param), which transport to use */
   defaultTransport?: string

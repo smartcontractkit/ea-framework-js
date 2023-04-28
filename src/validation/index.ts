@@ -12,7 +12,12 @@ import {
   AdapterRequestContext,
 } from '../util/types'
 import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
-import { InputParametersDefinition, TypeFromDefinition, validateOverrides } from './input-params'
+import {
+  EmptyInputParameters,
+  InputParametersDefinition,
+  TypeFromDefinition,
+  validateOverrides,
+} from './input-params'
 export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
@@ -20,7 +25,7 @@ const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
 export const validatorMiddleware: AdapterMiddlewareBuilder =
   (adapter: Adapter) =>
   (rawRequest: FastifyRequest, reply: FastifyReply, done: HookHandlerDoneFunction) => {
-    const req = rawRequest as AdapterRequest<InputParametersDefinition>
+    const req = rawRequest as AdapterRequest<EmptyInputParameters>
 
     if (req.headers['content-type'] !== 'application/json') {
       throw new AdapterInputError({
