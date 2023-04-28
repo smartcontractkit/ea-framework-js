@@ -74,7 +74,7 @@ type NonArrayInputType<P extends InputParameter> = ShouldBeUndefinable<P>
  * accounting for configurations like required, array, defaults, etc.
  */
 type TypeFromParameter<P extends InputParameter, T = NonArrayInputType<P>> = P['array'] extends true
-  ? T[]
+  ? Exclude<T, undefined>[]
   : T
 
 /**
@@ -200,7 +200,7 @@ type EmptyDefinition = {} // eslint-disable-line
  * For more details, please look at said `endpoints` param and the explanations there.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export type TypeFromDefinition<T extends InputParametersDefinition> = T extends any
+export type TypeFromDefinition<T extends InputParametersDefinition> = unknown extends T
   ? any
   : {
       -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
@@ -224,62 +224,6 @@ type TypeFromDefinitionIsDefined<T extends InputParameter> = T['required'] exten
   : IsUnknown<T['default']> extends false
   ? true
   : false
-
-const asd = {} as TypeFromDefinition<{
-  string: {
-    type: 'string'
-    description: 'stuff'
-    required: true
-  }
-  array: {
-    type: 'number'
-    array: true
-    description: 'stuff'
-  }
-  object: {
-    type: {
-      test: {
-        type: 'string'
-        description: 'stuff'
-      }
-    }
-    description: 'stuff'
-    required: true
-  }
-  boolean: {
-    type: 'boolean'
-    description: 'stuff'
-    required: true
-  }
-  number: {
-    type: 'number'
-    description: 'stuff'
-    required: true
-  }
-  stringOptions: {
-    type: 'string'
-    description: 'stuff[]'
-    options: ['123', 'sdfoij']
-  }
-  numberOptions: {
-    type: 'number'
-    description: 'stuff[]'
-    options: [123, 234]
-  }
-  arrayOfObjects: {
-    type: {
-      address: {
-        type: 'string'
-        required: true
-        description: 'inner stuff'
-      }
-    }
-    array: true
-    description: 'an array of address objects'
-  }
-}>
-
-asd
 
 /**
  * Util type to represent the absence of input parameters for an adapter endpoint.
