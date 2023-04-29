@@ -328,7 +328,7 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
         if (this.definition.required || input != null) {
           throw this.validationError('input value must be a non-empty array')
         } else {
-          return input
+          return []
         }
       }
 

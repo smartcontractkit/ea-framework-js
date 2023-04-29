@@ -518,7 +518,7 @@ test.serial('non-required array param coerces null value to empty array', async 
   }) as unknown as InputParameters<EmptyInputParameters>
 
   const data = t.context.adapterEndpoint.inputParameters.validateInput({})
-  t.deepEqual(data['list'] as unknown, undefined)
+  t.deepEqual(data['list'] as unknown, [])
 })
 
 test.serial('non-required number allows default 0', async (t) => {
