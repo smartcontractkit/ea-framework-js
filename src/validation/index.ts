@@ -38,6 +38,9 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     // by setting its type to EmptyBody, and we cast here (and only here)
     const requestBody = req.body as unknown as AdapterRequestBody
 
+    // Assign empty object to data if it does not exist in the request
+    requestBody.data = requestBody.data ?? {}
+
     // Make endpoints case insensitive
     const endpointParam =
       requestBody.endpoint?.toLowerCase() ||

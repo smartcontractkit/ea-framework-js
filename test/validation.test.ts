@@ -56,18 +56,11 @@ test.serial('any content-type other than application/json throws 400', async (t)
   t.is(error.statusCode, 400)
 })
 
-test.serial('no body in request throws 400', async (t) => {
+test.serial('no data body in request succeeds', async (t) => {
   t.context.adapterEndpoint.inputParameters = new InputParameters({})
-
-  const error = await t.context.testAdapter.api.inject({
-    url: '/',
-    method: 'post',
-    payload: '',
-    headers: {
-      'content-type': 'application/json',
-    },
-  })
-  t.is(error.statusCode, 400)
+  t.context.testAdapter.adapter.defaultEndpoint = 'test'
+  const error = await t.context.testAdapter.request()
+  t.is(error.statusCode, 200)
 })
 
 test.serial('invalid endpoint name throws 404', async (t) => {
