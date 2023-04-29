@@ -330,7 +330,7 @@ export class TestAdapter<T extends SettingsDefinitionMap = SettingsDefinitionMap
     return context.testAdapter
   }
 
-  async request(data: object, headers?: Record<string, string>) {
+  async request(data?: object, headers?: Record<string, string>) {
     const makeRequest = async () =>
       this.api.inject({
         method: 'post',
