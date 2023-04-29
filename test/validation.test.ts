@@ -521,6 +521,19 @@ test.serial('non-required array param coerces null value to empty array', async 
   t.deepEqual(data['list'] as unknown, [])
 })
 
+test.serial('non-required number allows default 0', async (t) => {
+  t.context.adapterEndpoint.inputParameters = new InputParameters({
+    default0: {
+      type: 'number',
+      description: 'stuff',
+      default: 0,
+    },
+  }) as unknown as InputParameters<EmptyInputParameters>
+
+  const data = t.context.adapterEndpoint.inputParameters.validateInput({})
+  t.deepEqual(data['default0'], 0)
+})
+
 test.serial('missing dependency fails validation', async (t) => {
   const error: AdapterInputError | undefined = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({

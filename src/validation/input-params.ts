@@ -319,7 +319,7 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
       throw this.validationError('param is required but no value was provided')
     }
 
-    if (this.definition.default && input == null) {
+    if (this.definition.default != null && input == null) {
       return this.definition.default
     }
 
