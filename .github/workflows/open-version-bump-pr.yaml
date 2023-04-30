@@ -119,6 +119,55 @@ jobs:
             --field sha="$NEW_TAG_SHA"
           fi
           echo "VERSION_BRANCH=$VERSION_BRANCH" >> $GITHUB_OUTPUT
+      - name: Update code coverage badge
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # get the current and new code coverage result and update the coverage badge if needed
+          VERSION_BRANCH="${{ steps.create-commit.outputs.VERSION_BRANCH }}"
+          COVERAGE_BRANCH="coverage-pr-${{ github.event.number }}"
+          COVERAGE_FILE="coverage/coverage-summary.json"
+
+          # read the content of readme from $VERSION_BRANCH
+          README_CONTENT=$(gh api --method GET /repos/:owner/:repo/contents/README.md \
+              -f "ref=refs/heads/$VERSION_BRANCH" \
+              | jq -r '.content' \
+              | base64 -d)
+
+          CURRENT_COVERAGE=$(echo "$README_CONTENT" | grep -o 'coverage-[0-9]*\(\.[0-9]\{1,\}\)\?%' | sed 's/coverage-\(.*\)%/\1/')
+
+          echo "Current code coverage - $CURRENT_COVERAGE"
+
+          # read the content of coverage-report.json from $COVERAGE_BRANCH and get the coverage number for statements
+          COVERAGE_REPORT=$(gh api --method GET /repos/:owner/:repo/contents/$COVERAGE_FILE \
+              -f "ref=refs/heads/$COVERAGE_BRANCH" \
+              | jq -r '.content' \
+              | base64 -d)
+
+          NEW_COVERAGE=$(echo "$COVERAGE_REPORT" | jq '.total.statements.pct')
+
+          echo "New code coverage - $NEW_COVERAGE"
+
+          if [ "$NEW_COVERAGE" != "$CURRENT_COVERAGE" ]; then
+            # change the README content by replacing coverage percentage 
+            FILE_TO_COMMIT="README.md"
+            awk -v new_coverage="$NEW_COVERAGE" '{gsub(/!\[Coverage\]\(https:\/\/img\.shields\.io\/badge\/coverage-[0-9]{1,3}(\.[0-9]{1,4})?%25-green\)/,"![Coverage](https://img.shields.io/badge/coverage-" new_coverage "%25-green)")}1' "$FILE_TO_COMMIT" > tmp && mv tmp "$FILE_TO_COMMIT"
+
+            # commit changes to repo
+            SHA=$(gh api --method GET /repos/:owner/:repo/contents/$FILE_TO_COMMIT \
+              -f "ref=refs/heads/$VERSION_BRANCH" \
+              --jq '.sha')
+          
+            CONTENT=$( base64 -i $FILE_TO_COMMIT )
+          
+            gh api --method PUT /repos/:owner/:repo/contents/$FILE_TO_COMMIT \
+                --field message="update code coverage badge" \
+                 --field content="$CONTENT" \
+                --field encoding="base64" \
+                --field branch="$VERSION_BRANCH" \
+                --field sha="$SHA"   
+          fi
       - name: Create PR
         id: create-pr
         if: inputs.dry-run != 'true'
@@ -174,6 +223,23 @@ jobs:
               ...needs?.preflight?.outputs,
               ...needs?.createVersionBumpPR?.outputs,
             }
+            
+            // delete the coverage-pr branch if it exists
+            const ref = `heads/coverage-pr-${context.payload.pull_request.number}`
+            try {
+            const coverageRef = await github.rest.git.getRef({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               ref,
+            });
+            if (coverageRef && coverageRef.data && coverageRef.data.ref) {
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo:  context.repo.repo,
+                  ref,
+                });
+            }
+            }catch(error) {}
 
             // This workflow always runs on PR close, and this job always runs because of always(). 
             // We have limited access to PR context, so check for a universally set param to determine if the PR was merged

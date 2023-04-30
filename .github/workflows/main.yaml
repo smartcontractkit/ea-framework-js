@@ -47,7 +47,9 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: coverage-reports
-          path: ./**/coverage/tmp/*.json
+          path: |
+            ./**/coverage/tmp/*.json
+            ./**/coverage/coverage-summary.json
   # Only run if tests have run and completed successfully
   code-coverage:
     needs: test
@@ -60,3 +62,13 @@ jobs:
         with:
           name: coverage-reports
       - run: yarn code-coverage
+      - uses: ./.github/actions/set-git-credentials
+      - run: |
+          # save coverage summary in a branch 'coverage-pr-PR_NUMBER' so we can have access to it in a different workflow
+          BRANCH="coverage-pr-${{ github.event.pull_request.number }}"
+          git checkout -b $BRANCH          
+          git add -f coverage/coverage-summary.json
+          git commit -m "coverage summary report"
+          git push --set-upstream origin $BRANCH --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
