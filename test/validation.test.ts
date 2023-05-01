@@ -653,37 +653,37 @@ test.serial('throws on repeated options', async (t) => {
 test.serial('Test port validator', async (t) => {
   const portValidator = validator.port()
   let value = 8080
-  let error = portValidator(value)
+  let error = portValidator.fn(value)
   t.is(error, undefined)
   value = 1000000
-  error = portValidator(value)
+  error = portValidator.fn(value)
   t.is(error, 'Maximum allowed value is 65535. Received 1000000')
 })
 
 test.serial('Test url validator', async (t) => {
   const urlValidator = validator.url()
   let value = 'redis://:authpassword@127.0.0.1:6380/4'
-  let error = urlValidator(value)
+  let error = urlValidator.fn(value)
   t.is(error, undefined)
   value = 'unknown_url'
-  error = urlValidator(value)
-  t.is(error, 'Value should be valid URL. Received unknown_url')
+  error = urlValidator.fn(value)
+  t.is(error, 'Value must be valid URL. Received unknown_url')
 })
 
 test.serial('Test host validator', async (t) => {
   const hostValidator = validator.host()
   let value = '127.0.0.1'
-  let error = hostValidator(value)
+  let error = hostValidator.fn(value)
   t.is(error, undefined)
   value = '23124.32.42.24'
-  error = hostValidator(value)
+  error = hostValidator.fn(value)
   t.is(error, 'Value is not valid IP address. Received 23124.32.42.24')
 })
 
 test.serial('Test response timestamp validator', async (t) => {
   const timestampValidator = validator.responseTimestamp()
   let value = new Date().getTime()
-  let error = timestampValidator(value)
+  let error = timestampValidator.fn(value)
   t.is(error, undefined)
   // Test reasonable limit over current timestamp
   error = timestampValidator(value + 30)
@@ -693,7 +693,7 @@ test.serial('Test response timestamp validator', async (t) => {
   t.is(error, `Maximum allowed value is ${value + 50}. Received ${value + 1000}`)
   // Test under minimum timestamp
   value = 0
-  error = timestampValidator(value)
+  error = timestampValidator.fn(value)
   t.is(error, 'Minimum allowed value is 1514764861000. Received 0')
 })
 
@@ -701,46 +701,46 @@ test.serial('Test base64 validator', async (t) => {
   const base64Validator = validator.base64()
   // @ts-expect-error - testing invalid input
   let value: string = -1
-  let error = base64Validator(value)
+  let error = base64Validator.fn(value)
   t.is(error, 'Value is not valid base64 string.')
   // @ts-expect-error - testing invalid input
   value = undefined
-  error = base64Validator(value)
+  error = base64Validator.fn(value)
   t.is(error, 'Value is not valid base64 string.')
   value = 'test'
-  error = base64Validator(value)
+  error = base64Validator.fn(value)
   t.is(error, 'Value is not valid base64 string.')
   value = 'dGVzdA=='
-  error = base64Validator(value)
+  error = base64Validator.fn(value)
   t.is(error, undefined)
 })
 
 test.serial('Test integer validator', async (t) => {
   const integerValidator = validator.integer({ min: 10, max: 20 })
   let value: string | number = 11
-  let error = integerValidator(value)
+  let error = integerValidator.fn(value)
   t.is(error, undefined)
   value = 3.141
-  error = integerValidator(value)
-  t.is(error, 'Value should be an integer (no floating point)., Received number 3.141')
+  error = integerValidator.fn(value)
+  t.is(error, 'Value must be an integer (no floating point)., Received number 3.141')
 
   value = 4
-  error = integerValidator(value)
+  error = integerValidator.fn(value)
   t.is(error, 'Minimum allowed value is 10. Received 4')
 
   value = 24
-  error = integerValidator(value)
+  error = integerValidator.fn(value)
   t.is(error, 'Maximum allowed value is 20. Received 24')
 })
 
 test.serial('Test positive integer validator', async (t) => {
   const positiveIntegerValidator = validator.positiveInteger()
   let value = 11
-  let error = positiveIntegerValidator(value)
+  let error = positiveIntegerValidator.fn(value)
   t.is(error, undefined)
   value = -2
-  error = positiveIntegerValidator(value)
-  t.is(error, 'Value should be positive number, Received -2')
+  error = positiveIntegerValidator.fn(value)
+  t.is(error, 'Value must be positive number, Received -2')
 })
 
 test.serial('custom input validation', async (t) => {

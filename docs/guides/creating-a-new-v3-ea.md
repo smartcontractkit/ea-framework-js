@@ -39,7 +39,7 @@ adapter // Name after the adapter
 
 Once the folder structure has been set up, a transport can be defined in its respective endpoint file. The v3 framework provides different types of transports to allow data retrieval through different protocols, such as HTTP, Websocket, and SSE.
 
-To learn more about transports and their specifications, please refer to the [Transports Guide](./v3-ea-components/transports.md).
+To learn more about transports and their specifications, please refer to the [Transports Guide](../components/transports.md).
 
 For the purpose of this guide, an example HTTP transport is shown below.
 
@@ -81,7 +81,7 @@ const transport = new HttpTransport<EndpointTypes>({
 
 The endpoint can be defined referring to the transport created in the previous step as shown in the example below.
 
-To learn more about `AdapterEndpoint` and its parameters, please refer to the [Endpoints Guide](./v3-ea-components/endpoints.md).
+To learn more about `AdapterEndpoint` and its parameters, please refer to the [Endpoints Guide](../components/endpoints.md).
 
 ```typescript
 import { AdapterEndpoint } from '@chainlink/external-adapter-framework/adapter'
@@ -97,7 +97,7 @@ export const endpoint = new AdapterEndpoint<EndpointTypes>({
 
 Finally, create the adapter in the root-level `index.ts` file. Reference the endpoint created in the previous step as shown in the example below.
 
-To learn more about `Adapter` and its parameters, please refer to the [Adapter Guide](./v3-ea-components/adapter.md).
+To learn more about `Adapter` and its parameters, please refer to the [Adapter Guide](../components/adapter.md).
 
 ```typescript
 import { expose } from '@chainlink/external-adapter-framework'

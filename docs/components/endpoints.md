@@ -94,7 +94,7 @@ function cacheKeyGenerator(data) {
 }
 ```
 
-To understand where the cache key generator is applied, please refer to the [Request Validation & Transformation Diagram](./adapter.md/#request-validation--transformation)
+To understand where the cache key generator is applied, please refer to the [Request Validation & Transformation Diagram](./adapter.md#request-validation--transformation)
 
 ## Custom input validation
 
@@ -117,7 +117,7 @@ function customInputValidation(
 }
 ```
 
-To understand where these validations are applied, please refer to the [Request Validation & Transformation Diagram](./adapter.md/#request-validation--transformation)
+To understand where these validations are applied, please refer to the [Request Validation & Transformation Diagram](./adapter.md#request-validation--transformation)
 
 ## Price Endpoint
 

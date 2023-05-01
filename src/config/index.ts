@@ -1,5 +1,5 @@
 import CensorList, { CensorKeyValue } from '../util/censor/censor-list'
-import { validator } from '../validation/utils'
+import { Validator, validator } from '../validation/utils'
 
 export const BaseSettingsDefinition = {
   // V2 compat
@@ -387,7 +387,9 @@ const validateSetting = (
   } else if (value && settingsDefinition.validate) {
     // Cast validate to unknown because TS can't select one of multiple variants of the validate function signature
     const validationRes = (
-      settingsDefinition.validate as unknown as (value?: SettingValueType) => ValidationErrorMessage
+      settingsDefinition.validate.fn as unknown as (
+        value?: SettingValueType,
+      ) => ValidationErrorMessage
     )(value)
     if (validationRes) {
       validationErrors.push(`${key}: ${validationRes}`)
@@ -454,7 +456,7 @@ export type SettingDefinition =
       description: string
       options?: never
       default?: string
-      validate?: (value?: string) => ValidationErrorMessage
+      validate?: Validator<string>
       required?: false
       sensitive?: boolean
     }
@@ -463,7 +465,7 @@ export type SettingDefinition =
       description: string
       options?: never
       default?: string
-      validate?: (value: string) => ValidationErrorMessage
+      validate?: Validator<string>
       required: true
       sensitive?: boolean
     }
@@ -472,7 +474,7 @@ export type SettingDefinition =
       description: string
       options?: never
       default?: number
-      validate?: (value?: number) => ValidationErrorMessage
+      validate?: Validator<number>
       required?: false
     }
   | {
@@ -480,7 +482,7 @@ export type SettingDefinition =
       description: string
       options?: never
       default?: number
-      validate?: (value: number) => ValidationErrorMessage
+      validate?: Validator<number>
       required: true
     }
   | {
@@ -488,7 +490,7 @@ export type SettingDefinition =
       description: string
       options?: never
       default?: boolean
-      validate?: (value?: boolean) => ValidationErrorMessage
+      validate?: Validator<boolean>
       required?: false
     }
   | {
@@ -496,7 +498,7 @@ export type SettingDefinition =
       description: string
       options?: never
       default?: boolean
-      validate?: (value: boolean) => ValidationErrorMessage
+      validate?: Validator<boolean>
       required: true
     }
   | {
@@ -504,7 +506,7 @@ export type SettingDefinition =
       description: string
       default?: string
       options: readonly string[]
-      validate?: (value?: string) => ValidationErrorMessage
+      validate?: Validator<string>
       required?: false
     }
   | {
@@ -512,7 +514,7 @@ export type SettingDefinition =
       description: string
       default?: string
       options: readonly string[]
-      validate?: (value: string) => ValidationErrorMessage
+      validate?: Validator<string>
       required: true
     }
 
