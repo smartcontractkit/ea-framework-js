@@ -63,7 +63,9 @@ jobs:
           name: coverage-reports
       - run: yarn code-coverage
       - uses: ./.github/actions/set-git-credentials
-      - run: |
+      - name: Save coverage summary
+        if: github.event.pull_request.number # check if the context is pull request
+        run: |
           # save coverage summary in a branch 'coverage-pr-PR_NUMBER' so we can have access to it in a different workflow
           BRANCH="coverage-pr-${{ github.event.pull_request.number }}"
           git checkout -b $BRANCH          
