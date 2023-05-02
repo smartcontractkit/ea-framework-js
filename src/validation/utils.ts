@@ -1,78 +1,129 @@
 import { isIP } from 'net'
 import { ValidationErrorMessage } from '../config'
 
-export type Validator<V> = (value?: V) => ValidationErrorMessage
+export type ValidatorMeta = {
+  min?: number
+  max?: number
+  details?: string
+}
+
+export type Validator<V> = {
+  meta: ValidatorMeta
+  fn: (value?: V) => ValidationErrorMessage
+}
 export type ValidatorWithParams<P, V> = (param: P, customError?: string) => Validator<V>
 
 // Composes complex validator function that runs each validator in order and returns first occurred error description and skips the rest of validation
-const compose: <T>(f: Validator<T>[]) => Validator<T> = <T>(validatorFunctions: Validator<T>[]) => {
-  return (value: T | undefined) => {
-    for (const validator of validatorFunctions) {
-      const errorText = validator(value)
-      if (errorText?.length) {
-        return errorText
+const compose: (f: Validator<string | number>[]) => Validator<number | string> = (
+  validatorFunctions: Validator<number | string>[],
+) => {
+  const meta: ValidatorMeta = {}
+  const details: string[] = []
+
+  for (const validator of validatorFunctions) {
+    if (validator.meta.min !== undefined) {
+      meta.min = validator.meta.min
+    }
+    if (validator.meta.max !== undefined) {
+      meta.max = validator.meta.max
+    }
+    if (validator.meta.details) {
+      details.push(validator.meta.details)
+    }
+  }
+
+  meta.details = details.join(', ')
+
+  return {
+    meta: meta,
+    fn: (value) => {
+      for (const validator of validatorFunctions) {
+        const errorText = validator.fn(value)
+        if (errorText?.length) {
+          return errorText
+        }
       }
-    }
-    return
+      return
+    },
   }
 }
 
-const _integer: () => Validator<number> = () => {
-  return (value) => {
+const _integer: () => Validator<number | string> = () => ({
+  meta: {
+    details: 'Value must be an integer',
+  },
+  fn: (value) => {
     if (!Number.isInteger(value)) {
-      return `Value should be an integer (no floating point)., Received ${typeof value} ${value}`
+      return `Value must be an integer (no floating point)., Received ${typeof value} ${value}`
     }
     return
-  }
-}
+  },
+})
 
-const positive: () => Validator<number> = () => {
-  return (value) => {
+const positive: () => Validator<number | string> = () => ({
+  meta: {
+    details: 'Value must be a positive number',
+  },
+  fn: (value) => {
     if (value !== undefined && Number(value) < 0) {
-      return `Value should be positive number, Received ${value}`
+      return `Value must be positive number, Received ${value}`
     }
     return
-  }
-}
+  },
+})
 
-const minNumber: ValidatorWithParams<number, number> = (param) => {
-  return (value) => {
+const minNumber: ValidatorWithParams<number, number | string> = (param) => ({
+  meta: {
+    details: 'Value must be above the minimum',
+    min: param,
+  },
+  fn: (value) => {
     if (value !== undefined && Number(value) < param) {
       return `Minimum allowed value is ${param}. Received ${value}`
     }
     return
-  }
-}
+  },
+})
 
-const maxNumber: ValidatorWithParams<number, number> = (param) => {
-  return (value) => {
+const maxNumber: ValidatorWithParams<number, number | string> = (param) => ({
+  meta: {
+    details: 'Value must be below the maximum',
+    max: param,
+  },
+  fn: (value) => {
     if (value !== undefined && Number(value) > param) {
       return `Maximum allowed value is ${param}. Received ${value}`
     }
     return
-  }
-}
+  },
+})
 
-const url: () => Validator<string> = () => {
-  return (value) => {
+const url: () => Validator<string> = () => ({
+  meta: {
+    details: 'Value must be a valid URL',
+  },
+  fn: (value) => {
     try {
       value && new URL(value)
     } catch (e) {
-      return `Value should be valid URL. Received ${value}`
+      return `Value must be valid URL. Received ${value}`
     }
     return
-  }
-}
+  },
+})
 
-const host: () => Validator<string> = () => {
-  return (value) => {
+const host: () => Validator<string> = () => ({
+  meta: {
+    details: 'Value must be a valid IP address',
+  },
+  fn: (value) => {
     const result = isIP(value || '')
     if (result === 0 && value !== 'localhost') {
       return `Value is not valid IP address. Received ${value}`
     }
     return
-  }
-}
+  },
+})
 
 const positiveInteger = () => compose([_integer(), positive()])
 
@@ -92,8 +143,11 @@ const port = () => integer({ min: 1, max: 65535 })
 // Validates that value is a valid timestamp from 2018-01-01 to now + 50ms to account for clock drift
 const responseTimestamp = () => integer({ min: 1514764861000, max: new Date().getTime() + 50 })
 
-const base64: () => Validator<string> = () => {
-  return (value) => {
+const base64: () => Validator<string> = () => ({
+  meta: {
+    details: 'Value must be a valid base64 string',
+  },
+  fn: (value) => {
     const errorMessage = `Value is not valid base64 string.`
     if (!value) {
       return errorMessage
@@ -105,8 +159,8 @@ const base64: () => Validator<string> = () => {
     } catch (err) {
       return errorMessage
     }
-  }
-}
+  },
+})
 
 export const validator = {
   integer,

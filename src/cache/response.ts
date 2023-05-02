@@ -109,7 +109,7 @@ export class ResponseCache<
 
       if (response.timestamps?.providerIndicatedTimeUnixMs !== undefined) {
         const timestampValidator = validator.responseTimestamp()
-        const error = timestampValidator(response.timestamps?.providerIndicatedTimeUnixMs)
+        const error = timestampValidator.fn(response.timestamps?.providerIndicatedTimeUnixMs)
         if (error) {
           logger.warn(`Provider indicated time is invalid: ${error}`)
         }

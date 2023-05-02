@@ -95,6 +95,10 @@ export class Metrics<T extends Record<string, unknown>> {
     }
   }
 
+  getMetricsDefinition() {
+    return this.metrics
+  }
+
   get<K extends keyof T>(name: K): T[K] {
     const metric = this.metrics?.[name]
     if (!metric) {
