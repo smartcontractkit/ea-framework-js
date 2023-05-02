@@ -195,6 +195,9 @@ export class WebSocketTransport<
       close: (event: WebSocket.CloseEvent) => {
         // If the connection closed with 1000, it's a usual closure
         const level = event.code === 1000 ? 'debug' : 'info'
+        console.log('code is: ', event.code)
+        console.log('reason is: ', event.reason)
+        console.log('level is: ', level)
         logger[level](
           `Closed websocket connection. Code: ${event.code} ; reason: ${event.reason?.toString()}`,
         )
@@ -297,6 +300,7 @@ export class WebSocketTransport<
     const connectionUnresponsive =
       timeSinceLastActivity > 0 &&
       timeSinceLastActivity > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
+    console.log('connection unresponsive: ', connectionUnresponsive)
     let connectionClosed = this.connectionClosed()
     logger.trace(`WS conn staleness info: 
       now: ${now} |
@@ -323,7 +327,7 @@ export class WebSocketTransport<
         )
         await sleep(1000 - timeSinceConnectionOpened)
       }
-      this.wsConnection?.close()
+      this.wsConnection?.close(1000)
       connectionClosed = true
 
       if (subscriptions.desired.length) {
