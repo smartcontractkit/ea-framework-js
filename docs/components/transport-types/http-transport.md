@@ -137,12 +137,10 @@ const transport = new HttpTransport<EndpointTypes>({
 Example structure of `EndpointTypes`
 
 ```typescript
-export type EndpointTypes = {  
- Request: {  
-	Params: CryptoRequestParams // type for the EA endpoint input parameters
-  }  
+export type EndpointTypes = {
+ Parameters: typeof inputParameters.definition // type for the EA endpoint input parameters
+ Settings: typeof config.settings // type of adapter config 
  Response: SingleNumberResultResponse // type of External Adapter response. `SingleNumberResultResponse` is a built in type that indicates that both `data` and `result` are numbers
- Settings: BaseAdapterSettings // type of adapter config
  Provider: { 
   RequestBody: never // type of request body in the case of POST requests. This is usually `never` for GET requests, and is *not* the same as query params
   ResponseBody: ProviderResponseBody // interface of raw response body from Data Provider
