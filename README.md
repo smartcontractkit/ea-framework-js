@@ -31,18 +31,22 @@ yarn # Install yarn dependencies
 ## Guides & Docs
 
 - [Basics](./docs/basics.md)
-- [Porting a v2 EA to v3](./docs/porting-a-v2-ea-to-v3.md)
-- [Creating a new v3 EA](./docs/creating-a-new-v3-ea.md)
-- Framework components
-  - [Adapter](./docs/v3-ea-components/adapter.md)
-  - [Endpoints](./docs/v3-ea-components/endpoints.md)
-  - [Tests](./docs/v3-ea-components/tests.md)
-  - [Transports](./docs/v3-ea-components/transports.md)
-    - Basic
-      - [HTTP](./docs/v3-ea-components/transport-types/http-transport.md)
-      - [WebSocket](./docs/v3-ea-components/transport-types/websocket-transport.md)
-      - [SSE](./docs/v3-ea-components/transport-types/sse-transport.md)
-      - [Custom](./docs/v3-ea-components/transport-types/custom-transport.md)
+- Components
+  - [Adapter](./docs/components/adapter.md)
+  - [Endpoints](./docs/components/endpoints.md)
+  - [Tests](./docs/components/tests.md)
+  - [Transports](./docs/components/transports.md)
+  - Transport Types
+    - [HTTP](./docs/components/transport-types/http-transport.md)
+    - [WebSocket](./docs/components/transport-types/websocket-transport.md)
+    - [SSE](./docs/components/transport-types/sse-transport.md)
+    - [Custom](./docs/components/transport-types/custom-transport.md)
+- Guides
+  - [Porting a v2 EA to v3](./docs/guides/porting-a-v2-ea-to-v3.md)
+  - [Creating a new v3 EA](./docs/guides/creating-a-new-v3-ea.md)
+- Reference Tables
+  - [EA Settings](./docs//reference-tables/ea-settings.md)
+  - [Metrics](./docs/reference-tables/metrics.md)
 
 ## Testing
 
