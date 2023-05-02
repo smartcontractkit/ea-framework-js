@@ -1,7 +1,7 @@
 # EA Framework v3
 
 [![NPM version](https://img.shields.io/npm/v/@chainlink/external-adapter-framework.svg?style=flat)](https://www.npmjs.com/package/@chainlink/external-adapter-framework)
-![Coverage](https://img.shields.io/badge/coverage-99.21%25-green)
+![Coverage](https://img.shields.io/badge/coverage-99.17%25-green)
 
 > **Warning**
 > This framework is in a Beta state, and under active development. While many of the features from version 2 are present, they have not been tested extensively enough to mark this as production ready. You can find v2 in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js)
@@ -31,18 +31,22 @@ yarn # Install yarn dependencies
 ## Guides & Docs
 
 - [Basics](./docs/basics.md)
-- [Porting a v2 EA to v3](./docs/porting-a-v2-ea-to-v3.md)
-- [Creating a new v3 EA](./docs/creating-a-new-v3-ea.md)
-- Framework components
-  - [Adapter](./docs/v3-ea-components/adapter.md)
-  - [Endpoints](./docs/v3-ea-components/endpoints.md)
-  - [Tests](./docs/v3-ea-components/tests.md)
-  - [Transports](./docs/v3-ea-components/transports.md)
-    - Basic
-      - [HTTP](./docs/v3-ea-components/transport-types/http-transport.md)
-      - [WebSocket](./docs/v3-ea-components/transport-types/websocket-transport.md)
-      - [SSE](./docs/v3-ea-components/transport-types/sse-transport.md)
-      - [Custom](./docs/v3-ea-components/transport-types/custom-transport.md)
+- Components
+  - [Adapter](./docs/components/adapter.md)
+  - [Endpoints](./docs/components/endpoints.md)
+  - [Tests](./docs/components/tests.md)
+  - [Transports](./docs/components/transports.md)
+  - Transport Types
+    - [HTTP](./docs/components/transport-types/http-transport.md)
+    - [WebSocket](./docs/components/transport-types/websocket-transport.md)
+    - [SSE](./docs/components/transport-types/sse-transport.md)
+    - [Custom](./docs/components/transport-types/custom-transport.md)
+- Guides
+  - [Porting a v2 EA to v3](./docs/guides/porting-a-v2-ea-to-v3.md)
+  - [Creating a new v3 EA](./docs/guides/creating-a-new-v3-ea.md)
+- Reference Tables
+  - [EA Settings](./docs//reference-tables/ea-settings.md)
+  - [Metrics](./docs/reference-tables/metrics.md)
 
 ## Testing
 
