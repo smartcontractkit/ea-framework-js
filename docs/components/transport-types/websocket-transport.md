@@ -7,7 +7,7 @@ Example usage of WebSocketTransport
 ```typescript
  export const wsTransport = new WebSocketTransport<EndpointTypes>({
   // url of the Data Provider WS connection
-  url: (context, desiredSubs) => context.adapterConfig.WS_API_ENDPOINT,
+  url: (context, desiredSubs) => context.adapterSettings.WS_API_ENDPOINT,
   handlers: {
     // Data Provider messages are handled in message method.
     message(message) {
@@ -49,17 +49,17 @@ Some Data Providers support subscribing to feeds directly using url, without a s
 ```typescript
     url: (context, desiredSubs) => {
         const params = desiredSubs.map((sub) => `${sub.base}-${sub.quote}`).join(',')
-        return `${context.adapterConfig.WS_API_ENDPOINT}/${params}`
+        return `${context.adapterSettings.WS_API_ENDPOINT}/${params}`
       }
 ```
 
 In some cases it is necessary to pass headers as well (e.g. authentication). The `options` method can be used to pass additional information for the WS connection.
 
 ```typescript
-      url: (context) => context.adapterConfig.WS_API_ENDPOINT,
+      url: (context) => context.adapterSettings.WS_API_ENDPOINT,
       options: async (context) => ({
         headers: {
-          'x-auth-token': context.adapterConfig.API_KEY
+          'x-auth-token': context.adapterSettings.API_KEY
         },
       })
 ```
@@ -84,7 +84,7 @@ handlers: {
       const options = {
         jsonrpc: '2.0',
         method: 'login',
-        params: { api_key: context.adapterConfig.API_KEY },
+        params: { api_key: context.adapterSettings.API_KEY },
       }
       connection.send(JSON.stringify(options))
     })
@@ -238,12 +238,10 @@ const wsTransport = new WebSocketTransport<EndpointTypes>({
 Example structure of `EndpointTypes`
 
 ```typescript
-export type EndpointTypes = {  
- Request: {  
-	Params: CryptoRequestParams // type for the EA endpoint input parameters
- }  
+export type EndpointTypes = {
+ Parameters: typeof inputParameters.definition // type for the EA endpoint input parameters
+ Settings: typeof config.settings // type of adapter config   
  Response: SingleNumberResultResponse // type of External Adapter response. `SingleNumberResultResponse` is a built in type that indicates that both `data` and `result` are numbers
- Settings: BaseAdapterSettings  // type of adapter config
  Provider: {  
   WsMessage: WsMessage  // type of message that will come through the websocket connection
  }  
