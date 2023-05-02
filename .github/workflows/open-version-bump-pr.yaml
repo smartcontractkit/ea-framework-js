@@ -51,7 +51,7 @@ jobs:
           ref: ${{ github.base_ref || github.ref }} # Explicit ref required to push from PR because of github internals
       - uses: ./.github/actions/set-git-credentials
       - uses: ./.github/actions/setup
-        run: yarn generate-ref-tables
+      - run: yarn generate-ref-tables
       - id: tick-version
         run: |
           VERSION_INSTRUCTION=${{ needs.preflight.outputs.VERSION_INSTRUCTION }}
