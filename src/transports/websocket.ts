@@ -297,6 +297,7 @@ export class WebSocketTransport<
     const connectionUnresponsive =
       timeSinceLastActivity > 0 &&
       timeSinceLastActivity > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
+
     let connectionClosed = this.connectionClosed()
     logger.trace(`WS conn staleness info: 
       now: ${now} |
@@ -323,7 +324,7 @@ export class WebSocketTransport<
         )
         await sleep(1000 - timeSinceConnectionOpened)
       }
-      this.wsConnection?.close()
+      this.wsConnection?.close(1000)
       connectionClosed = true
 
       if (subscriptions.desired.length) {

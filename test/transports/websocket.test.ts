@@ -636,6 +636,46 @@ test.serial('does not crash the server when new connection errors', async (t) =>
   await t.context.clock.runAllAsync()
 })
 
+test.serial('closed ws connection should have a 1000 status code', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 1000
+  process.env['METRICS_ENABLED'] = 'true'
+  eaMetrics.clear()
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(URL, { mock: false })
+
+  const adapter = createAdapter({
+    WS_SUBSCRIPTION_TTL: 30000,
+    WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.request({
+    base,
+    quote,
+  })
+
+  // The WS connection should not send any messages to the EA, so we advance the clock until
+  // we reach the point where the EA will consider it unhealthy and reconnect.
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+
+  const metrics = await testAdapter.getMetrics()
+
+  metrics.assert(t, {
+    name: 'ws_connection_closures',
+    labels: { code: '1000', url: 'wss://test-ws.com/asd' },
+    expectedValue: 1,
+  })
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
 test.serial('does not hang the background execution if the open handler hangs', async (t) => {
   const base = 'ETH'
   const quote = 'DOGE'
