@@ -3,6 +3,7 @@ import { ExecutionContext } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { ReplyError } from 'ioredis'
 import { WebSocket } from 'mock-socket'
+import * as client from 'prom-client'
 import { start } from '../src'
 import { Adapter, AdapterDependencies } from '../src/adapter'
 import { Cache, LocalCache } from '../src/cache'
@@ -416,8 +417,8 @@ export class TestAdapter<T extends SettingsDefinitionMap = SettingsDefinitionMap
         'An attempt was made to fetch metrics, but the adapter was started without metrics enabled',
       )
     }
-    const response = await this.metricsApi.inject('/metrics')
-    return new TestMetrics(response.body)
+    const response = await client.register.metrics()
+    return new TestMetrics(response)
   }
 
   async getHealth() {
