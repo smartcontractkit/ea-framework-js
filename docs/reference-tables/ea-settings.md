@@ -1,6 +1,6 @@
 # EA Settings
 
-|Name|Type|Default|Description|Validation|Min|Max
+|Name|Type|Default|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Validation&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|Min|Max
 |---|---|---|---|---|---|---|
 |API_TIMEOUT|number|30000|The number of milliseconds a request can be pending before returning a timeout error for data provider request|- Value must be an integer<br> - Value must be above the minimum<br> - Value must be below the maximum|0|60000
 |API_VERBOSE|boolean|false|Toggle whether the response from the EA should contain just the results or also include the full response body from the queried API.|||
@@ -37,11 +37,11 @@
 |METRICS_PORT|number|9080|Port metrics will be exposed to|- Value must be an integer<br> - Value must be above the minimum<br> - Value must be below the maximum|1|65535
 |METRICS_USE_BASE_URL|boolean|undefined|Flag to specify whether or not to prepend the BASE_URL to the metrics endpoint|||
 |MTLS_ENABLED|boolean|false|Flag to specify whether mutual TLS/SSL is enabled or not|||
-|RATE_LIMITING_STRATEGY|enum|fixed-interval|The rate limiting strategy to use for outbound requests|||
 |RATE_LIMIT_API_TIER|string|undefined|Rate limiting tier to use from the available options for the adapter. If not present, the adapter will run using the first tier on the list.|||
 |RATE_LIMIT_CAPACITY|number|undefined|Used as rate limit capacity per minute and ignores tier settings if defined|- Value must be an integer<br> - Value must be above the minimum|0|
 |RATE_LIMIT_CAPACITY_MINUTE|number|undefined|Used as rate limit capacity per minute and ignores tier settings if defined. Supercedes RATE_LIMIT_CAPACITY if both vars are set|- Value must be an integer<br> - Value must be above the minimum|0|
 |RATE_LIMIT_CAPACITY_SECOND|number|undefined|Used as rate limit capacity per second and ignores tier settings if defined|- Value must be an integer<br> - Value must be above the minimum|0|
+|RATE_LIMITING_STRATEGY|enum|fixed-interval|The rate limiting strategy to use for outbound requests|||
 |REQUESTER_SLEEP_BEFORE_REQUEUEING_MS|number|0|Time to sleep after a failed HTTP request before re-queueing the request (in ms)|- Value must be an integer<br> - Value must be above the minimum<br> - Value must be below the maximum|0|120000
 |RETRY|number|1|Retry count for failed HTTP requests|- Value must be an integer<br> - Value must be above the minimum<br> - Value must be below the maximum|0|10
 |SSE_KEEPALIVE_SLEEP|number|60000|Maximum amount of time (in ms) between each SSE keepalive request|- Value must be an integer<br> - Value must be above the minimum<br> - Value must be below the maximum|0|120000
