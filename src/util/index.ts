@@ -141,3 +141,30 @@ export const deferredPromise = <T>(): [Promise<T>, DeferredResolve<T>, DeferredR
  * @returns whether the array has duplicate items
  */
 export const hasRepeatedValues = (array: string[]) => array.length !== new Set(array).size
+
+/**
+ * Splits an array into smaller arrays of a specified size.
+ *
+ * @param array - any array to be chunked
+ * @param size - the maximum size of each chunk
+ * @returns an array of arrays, each of which contains up to `size` elements
+ */
+export const  splitArrayIntoChunks = <T>(array: T[], size: number): T[][] =>
+  (array.length > size ? [array.slice(0, size), ...splitArrayIntoChunks(array.slice(size), size)] : [array])
+
+
+/**
+ * Groups an array of objects by a specified key
+ * @param  array - The array of objects to group
+ * @param  key - The name of the key to group by
+ * @returns An object where the keys are the unique values of the specified key
+ * and the values are array of items with that key
+ */
+export const groupArrayByKey = <T extends Record<string, string>, K extends keyof T>(array: T[], key: K) => {
+  return array.reduce((groupedItems, item) => {
+    const keyValue = item[key];
+    groupedItems[keyValue] ??= []
+    groupedItems[keyValue].push(item);
+    return groupedItems;
+  }, {} as Record<T[K], T[]>);
+};
