@@ -149,9 +149,11 @@ export const hasRepeatedValues = (array: string[]) => array.length !== new Set(a
  * @param size - the maximum size of each chunk
  * @returns an array of arrays, each of which contains up to `size` elements
  */
-export const  splitArrayIntoChunks = <T>(array: T[], size: number): T[][] =>
-  (array.length > size ? [array.slice(0, size), ...splitArrayIntoChunks(array.slice(size), size)] : [array])
-
+export const splitArrayIntoChunks = <T>(array: T[], size: number): T[][] => {
+  return array.length > size
+    ? [array.slice(0, size), ...splitArrayIntoChunks(array.slice(size), size)]
+    : [array]
+}
 
 /**
  * Groups an array of objects by a specified key
@@ -160,11 +162,14 @@ export const  splitArrayIntoChunks = <T>(array: T[], size: number): T[][] =>
  * @returns An object where the keys are the unique values of the specified key
  * and the values are array of items with that key
  */
-export const groupArrayByKey = <T extends Record<string, string>, K extends keyof T>(array: T[], key: K) => {
+export const groupArrayByKey = <T extends Record<string, string>, K extends keyof T>(
+  array: T[],
+  key: K,
+) => {
   return array.reduce((groupedItems, item) => {
-    const keyValue = item[key];
+    const keyValue = item[key]
     groupedItems[keyValue] ??= []
-    groupedItems[keyValue].push(item);
-    return groupedItems;
-  }, {} as Record<T[K], T[]>);
-};
+    groupedItems[keyValue].push(item)
+    return groupedItems
+  }, {} as Record<T[K], T[]>)
+}
