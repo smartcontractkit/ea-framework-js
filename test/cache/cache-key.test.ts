@@ -176,13 +176,15 @@ test.serial('custom cache key is truncated if over max size', async (t) => {
   const response = await t.context.testAdapter.request({
     endpoint: 'test-custom-cache-key-long',
   })
-  t.is(response.json().result, `test:custom_cache_key_long_${'a'.repeat(123)}`)
+  // Long (over max size) custom cache keys are hashed
+  t.is(response.json().result, `246jgkr8izMcjuWe+ziM65i7LWc=`)
 })
 
 test.serial('throws error when cache data is not object', async (t) => {
   try {
     calculateCacheKey({
       transportName: 'test',
+      // @ts-expect-error we want to test the runtime error
       data: 'test',
       inputParameters: new InputParameters({
         base: { type: 'string', description: 'base', required: true },

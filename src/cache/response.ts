@@ -98,7 +98,6 @@ export class ResponseCache<
           metrics: {
             feedId: calculateFeedId(
               {
-                inputParameters: this.inputParameters,
                 adapterSettings: this.adapterSettings,
               },
               r.params,
@@ -119,7 +118,6 @@ export class ResponseCache<
         key: calculateCacheKey({
           transportName,
           data: r.params,
-          inputParameters: this.inputParameters,
           adapterName: this.adapterName,
           endpointName: this.endpointName,
           adapterSettings: this.adapterSettings,
