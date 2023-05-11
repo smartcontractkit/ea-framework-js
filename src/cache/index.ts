@@ -1,7 +1,6 @@
 import crypto from 'crypto'
 import { EndpointContext, EndpointGenerics } from '../adapter'
 import { AdapterResponse, makeLogger, sleep } from '../util'
-import { InputParameters } from '../validation'
 import { CacheTypes as CacheType } from './metrics'
 
 export * from './factory'
@@ -65,14 +64,12 @@ export interface Cache<T = unknown> {
 // Uses calculateKey to generate a unique key from the endpoint name, data, and input parameters
 export const calculateCacheKey = <T extends EndpointGenerics>({
   data,
-  inputParameters,
   adapterName,
   endpointName,
   adapterSettings,
   transportName,
 }: {
-  data: unknown
-  inputParameters: InputParameters<T['Parameters']>
+  data: Record<string, unknown>
   adapterName: string
   endpointName: string
   adapterSettings: T['Settings']
@@ -83,7 +80,6 @@ export const calculateCacheKey = <T extends EndpointGenerics>({
     adapterSettings,
     endpointName,
     transportName,
-    inputParameters,
   })
   const cacheKey = `${adapterName}-${calculatedKey}`
   logger.trace(`Generated cache key for request: "${cacheKey}"`)
@@ -97,7 +93,7 @@ export const calculateHttpRequestKey = <T extends EndpointGenerics>({
   transportName,
 }: {
   context: EndpointContext<T>
-  data: unknown
+  data: Record<string, unknown> | Record<string, unknown>[]
   transportName: string
 }): string => {
   const key = calculateKey({
@@ -105,7 +101,6 @@ export const calculateHttpRequestKey = <T extends EndpointGenerics>({
     transportName,
     adapterSettings: context.adapterSettings,
     endpointName: context.endpointName,
-    inputParameters: context.inputParameters,
   })
   logger.trace(`Generated HTTP request queue key: "${key}"`)
   return key
@@ -116,15 +111,13 @@ const calculateKey = <T extends EndpointGenerics>({
   endpointName,
   transportName,
   adapterSettings,
-  inputParameters,
 }: {
-  data: unknown
+  data: Record<string, unknown> | Record<string, unknown>[]
   endpointName: string
   transportName: string
   adapterSettings: T['Settings']
-  inputParameters: InputParameters<T['Parameters']>
 }) => {
-  const paramsKey = inputParameters.params.length
+  const paramsKey = Object.keys(data).length
     ? calculateParamsKey(data, adapterSettings.MAX_COMMON_KEY_SIZE)
     : adapterSettings.DEFAULT_CACHE_KEY
   return `${endpointName}-${transportName}-${paramsKey}`
@@ -132,16 +125,14 @@ const calculateKey = <T extends EndpointGenerics>({
 
 export const calculateFeedId = <T extends EndpointGenerics>(
   {
-    inputParameters,
     adapterSettings,
   }: {
-    inputParameters: InputParameters<T['Parameters']>
     adapterSettings: T['Settings']
   },
-  data: unknown,
+  data: Record<string, unknown>,
 ): string => {
-  if (inputParameters.params.length === 0) {
-    logger.trace(`Cannot generate Feed ID without input parameters`)
+  if (Object.keys(data).length === 0) {
+    logger.trace(`Cannot generate Feed ID without data`)
     return 'N/A'
   }
   return calculateParamsKey(data, adapterSettings.MAX_COMMON_KEY_SIZE)

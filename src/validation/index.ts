@@ -18,6 +18,7 @@ import {
   TypeFromDefinition,
   validateOverrides,
 } from './input-params'
+import { createHash } from 'crypto'
 export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
@@ -113,7 +114,9 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
         errorCatcherLogger.warn(
           `Generated custom cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be truncated`,
         )
-        cacheKey = cacheKey.slice(0, adapter.config.settings.MAX_COMMON_KEY_SIZE)
+        const shasum = createHash('sha1')
+        shasum.update(cacheKey)
+        cacheKey = shasum.digest('base64')
       }
       req.requestContext.cacheKey = cacheKey
     } else {
@@ -123,7 +126,6 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
         adapterName: adapter.name,
         endpointName: endpoint.name,
         transportName,
-        inputParameters: endpoint.inputParameters,
         adapterSettings: adapter.config.settings,
       })
     }
