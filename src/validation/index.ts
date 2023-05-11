@@ -148,6 +148,7 @@ export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: Fa
       stack: err.stack,
       message: err.message,
     },
+    reqBody: req.body,
   }
 
   if (err instanceof AdapterTimeoutError) {
