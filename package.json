@@ -18,7 +18,7 @@
     "build": "mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc",
     "dev": "DEBUG=true tsnd --respawn --transpile-only --project tsconfig.json './src/test.ts'",
     "generate-docs": "typedoc src/**/*.ts",
-    "generate-ref-tables": "ts-node scripts/metrics-table.ts > docs/reference-tables/metrics.md && ts-node scripts/ea-settings-table.ts > docs/reference-tables/ea-settings.md",
+    "generate-ref-tables": "ts-node scripts/metrics-table.ts > docs/reference-tables/metrics.md && ts-node scripts/ea-settings-table.ts > docs/reference-tables/ea-settings.md && yarn prettier --write docs/reference-tables",
     "lint-fix": "eslint --max-warnings=0 --fix . && prettier --write ./src/**/*.ts ./test/**/*.ts ./*.{json,js,yaml}",
     "lint": "eslint --max-warnings=0 . && prettier --check ./src/**/*.ts ./test/**/*.ts ./*.{json,js,yaml}",
     "portal-path": "echo \"portal:$(readlink -f ./dist/src)\"",
