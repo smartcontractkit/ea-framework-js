@@ -215,6 +215,13 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
   initializeDependencies(inputDependencies?: Partial<AdapterDependencies>): AdapterDependencies {
     const dependencies = inputDependencies || {}
 
+    if (
+      this.config.settings.EA_MODE !== 'reader-writer' &&
+      this.config.settings.CACHE_TYPE === 'local'
+    ) {
+      throw new Error(`EA mode cannot be ${this.config.settings.EA_MODE} while cache type is local`)
+    }
+
     if (this.config.settings.CACHE_TYPE === 'redis' && !dependencies.redisClient) {
       const maxCooldown = this.config.settings.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
       const redisOptions = {
