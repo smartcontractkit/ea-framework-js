@@ -2,7 +2,7 @@ import untypedTest, { ExecutionContext, TestFn } from 'ava'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
 import { AdapterResponse, sleep } from '../src/util'
 import { Store, asyncLocalStorage } from '../src/util/logger'
-import { NopTransport, NopTransportTypes, TestAdapter } from './util'
+import { NopTransport, NopTransportTypes, TestAdapter } from '../src/util/testing-utils'
 
 type TestContext = {
   testAdapter: TestAdapter

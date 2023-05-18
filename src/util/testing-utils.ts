@@ -4,19 +4,19 @@ import { FastifyInstance } from 'fastify'
 import { ReplyError } from 'ioredis'
 import { WebSocket } from 'mock-socket'
 import * as client from 'prom-client'
-import { start } from '../src'
-import { Adapter, AdapterDependencies } from '../src/adapter'
-import { Cache, LocalCache } from '../src/cache'
-import { ResponseCache } from '../src/cache/response'
-import { EmptyCustomSettings, SettingsDefinitionMap } from '../src/config'
+import { start } from '../index'
+import { Adapter, AdapterDependencies } from '../adapter'
+import { Cache, LocalCache } from '../cache'
+import { ResponseCache } from '../cache/response'
+import { EmptyCustomSettings, SettingsDefinitionMap } from '../config'
 import {
   Transport,
   TransportDependencies,
   TransportGenerics,
   WebSocketClassProvider,
-} from '../src/transports'
-import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from '../src/util'
-import { EmptyInputParameters, TypeFromDefinition } from '../src/validation/input-params'
+} from '../transports'
+import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from './index'
+import { EmptyInputParameters, TypeFromDefinition } from '../validation/input-params'
 
 export type NopTransportTypes = {
   Parameters: EmptyInputParameters
@@ -27,6 +27,7 @@ export type NopTransportTypes = {
   Settings: EmptyCustomSettings
 }
 
+/* c8 ignore start */ // eslint-disable-line
 export class NopTransport<T extends TransportGenerics = NopTransportTypes> implements Transport<T> {
   name!: string
   responseCache!: ResponseCache<T>
@@ -473,3 +474,10 @@ export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): 
   // Need to disable typing, the mock-socket impl does not implement the ws interface fully
   provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
 }
+
+export function setEnvVariables(envVariables: NodeJS.ProcessEnv): void {
+  for (const key in envVariables) {
+    process.env[key] = envVariables[key]
+  }
+}
+/* c8 ignore stop */ // eslint-disable-line
