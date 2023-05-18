@@ -475,7 +475,6 @@ export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): 
   provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
-
 export function setEnvVariables(envVariables: NodeJS.ProcessEnv): void {
   for (const key in envVariables) {
     process.env[key] = envVariables[key]
