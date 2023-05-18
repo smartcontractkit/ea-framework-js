@@ -89,6 +89,7 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
 })
 
 test('Adapter writer mode api disabled', async (t) => {
+  process.env['CACHE_TYPE'] = 'redis'
   const config = new AdapterConfig(
     {},
     {
@@ -140,5 +141,34 @@ test('Initialize adapter twice (error)', async (t) => {
     t.fail()
   } catch (e: unknown) {
     t.is((e as Error).message, 'This adapter has already been initialized!')
+  }
+})
+
+test('Throw error if EA mode is not RW and cache type is local', async (t) => {
+  process.env['CACHE_TYPE'] = 'local'
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        EA_MODE: 'writer',
+      },
+    },
+  )
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+
+  try {
+    await expose(adapter)
+  } catch (e: unknown) {
+    t.is((e as Error).message, 'EA mode cannot be writer while cache type is local')
   }
 })
