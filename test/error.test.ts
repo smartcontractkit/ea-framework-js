@@ -11,7 +11,12 @@ import {
   AdapterRateLimitError,
   AdapterTimeoutError,
 } from '../src/validation/error'
-import { NopTransport, NopTransportTypes, TestAdapter, assertEqualResponses } from '../src/util/testing-utils'
+import {
+  NopTransport,
+  NopTransportTypes,
+  TestAdapter,
+  assertEqualResponses,
+} from '../src/util/testing-utils'
 
 type TestContext = {
   testAdapter: TestAdapter
