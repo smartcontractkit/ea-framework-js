@@ -15,7 +15,7 @@ import { HttpTransport, Transport } from '../src/transports'
 import { AdapterRequest, AdapterResponse, SingleNumberResultResponse } from '../src/util'
 import { InputParameters } from '../src/validation'
 import { TypeFromDefinition } from '../src/validation/input-params'
-import { NopTransport, TestAdapter } from './util'
+import { NopTransport, TestAdapter } from '../src/util/testing-utils'
 
 type TestContext = {
   testAdapter: TestAdapter

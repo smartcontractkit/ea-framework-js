@@ -2,7 +2,7 @@ import untypedTest, { TestFn } from 'ava'
 import { expose, start } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
 import { AdapterConfig } from '../src/config'
-import { NopTransport, TestAdapter } from './util'
+import { NopTransport, TestAdapter } from '../src/util/testing-utils'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter

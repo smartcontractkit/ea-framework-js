@@ -1,7 +1,7 @@
 import test from 'ava'
 import { expose, start } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
-import { NopTransport, TestAdapter } from './util'
+import { NopTransport, TestAdapter } from '../src/util/testing-utils'
 
 test('duplicate endpoint names throw error on startup', async (t) => {
   const adapter = new Adapter({

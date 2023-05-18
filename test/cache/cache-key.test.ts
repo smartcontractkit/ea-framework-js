@@ -5,7 +5,7 @@ import { AdapterConfig, BaseAdapterSettings, BaseSettingsDefinition } from '../.
 import { AdapterRequest, AdapterResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { InputParametersDefinition } from '../../src/validation/input-params'
-import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
+import { NopTransport, NopTransportTypes, TestAdapter } from '../../src/util/testing-utils'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter

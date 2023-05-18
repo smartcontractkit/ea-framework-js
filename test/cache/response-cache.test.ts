@@ -5,7 +5,7 @@ import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { AdapterConfig, SettingsDefinitionFromConfig } from '../../src/config'
 import { AdapterRequest } from '../../src/util'
 import { TypeFromDefinition } from '../../src/validation/input-params'
-import { NopTransport, TestAdapter, assertEqualResponses } from '../util'
+import { NopTransport, TestAdapter, assertEqualResponses } from '../../src/util/testing-utils'
 import { CacheTestTransportTypes } from './helper'
 
 const test = untypedTest as TestFn<{

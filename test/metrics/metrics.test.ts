@@ -7,7 +7,7 @@ import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { Metrics, retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { TestAdapter } from '../util'
+import { TestAdapter } from '../../src/util/testing-utils'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter

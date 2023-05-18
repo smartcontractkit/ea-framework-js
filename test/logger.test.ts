@@ -4,7 +4,7 @@ import { Adapter, AdapterEndpoint } from '../src/adapter'
 import { AdapterConfig, SettingsDefinitionMap } from '../src/config'
 import CensorList from '../src/util/censor/censor-list'
 import { COLORS, censor, colorFactory } from '../src/util/logger'
-import { NopTransport } from './util'
+import { NopTransport } from '../src/util/testing-utils'
 
 test.before(async () => {
   const customSettings = {

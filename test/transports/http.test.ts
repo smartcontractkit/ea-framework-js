@@ -11,7 +11,13 @@ import { RateLimitingStrategy } from '../../src/rate-limiting/factory'
 import { HttpTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse, sleep } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { MockCache, TestAdapter, assertEqualResponses, runAllUntil, runAllUntilTime } from '../util'
+import {
+  MockCache,
+  TestAdapter,
+  assertEqualResponses,
+  runAllUntil,
+  runAllUntilTime,
+} from '../../src/util/testing-utils'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
