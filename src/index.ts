@@ -48,7 +48,7 @@ export const getTLSOptions = (adapterSettings: AdapterSettings) => {
       passphrase: adapterSettings.TLS_PASSPHRASE,
       requestCert: adapterSettings.MTLS_ENABLED,
     }
-    return httpsOptions
+    return { https: httpsOptions }
   }
   return {}
 }
