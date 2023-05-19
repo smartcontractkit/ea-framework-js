@@ -54,7 +54,7 @@ test('MTLS_ENABLED with no TLS params should error', async (t) => {
   } catch (e: unknown) {
     t.is(
       (e as Error).message,
-      'TLS_PRIVATE_KEY , TLS_PUBLIC_KEY and  TLS_CA environment variables are required when MTLS_ENABLED is set to true.',
+      'TLS_PRIVATE_KEY, TLS_PUBLIC_KEY, and TLS_CA environment variables are required when MTLS_ENABLED is set to true.',
     )
   }
 })
