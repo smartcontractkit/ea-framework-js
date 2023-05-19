@@ -2,7 +2,7 @@ import fastify, { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from '
 import { join } from 'path'
 import * as client from 'prom-client'
 import { AdapterSettings } from '../config'
-import { getMTLSOptions, httpsOptions } from '../index'
+import { getTLSOptions, httpsOptions } from '../index'
 import { AdapterRequest, makeLogger } from '../util'
 import { AdapterError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
@@ -17,7 +17,7 @@ export enum CMD_SENT_STATUS {
 }
 
 export function setupMetricsServer(name: string, adapterSettings: AdapterSettings) {
-  const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(adapterSettings)
+  const mTLSOptions: httpsOptions | Record<string, unknown> = getTLSOptions(adapterSettings)
   const metricsApp = fastify({
     ...mTLSOptions,
     logger: false,
