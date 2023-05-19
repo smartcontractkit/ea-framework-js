@@ -2,7 +2,7 @@ import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { CacheFactory, RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
-import { NopTransport, RedisMock, TestAdapter } from '../util'
+import { NopTransport, RedisMock, TestAdapter } from '../../src/util/testing-utils'
 import {
   BasicCacheSetterTransport,
   buildDiffResultAdapter,

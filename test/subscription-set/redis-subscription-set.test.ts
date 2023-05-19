@@ -8,7 +8,7 @@ import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { HttpTransport, TransportRoutes } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { TestAdapter, assertEqualResponses, runAllUntilTime } from '../util'
+import { TestAdapter, assertEqualResponses, runAllUntilTime } from '../../src/util/testing-utils'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter

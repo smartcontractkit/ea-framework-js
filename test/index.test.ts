@@ -2,7 +2,7 @@ import untypedTest, { TestFn } from 'ava'
 import { expose, getTLSOptions, start } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
 import { AdapterConfig, buildAdapterSettings } from '../src/config'
-import { NopTransport, TestAdapter } from './util'
+import { NopTransport, TestAdapter } from '../src/util/testing-utils'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -155,6 +155,7 @@ test('requestCert should be true when MTLS_ENABLED is set to true', async (t) =>
 })
 
 test('Adapter writer mode api disabled', async (t) => {
+  process.env['CACHE_TYPE'] = 'redis'
   const config = new AdapterConfig(
     {},
     {
@@ -206,5 +207,34 @@ test('Initialize adapter twice (error)', async (t) => {
     t.fail()
   } catch (e: unknown) {
     t.is((e as Error).message, 'This adapter has already been initialized!')
+  }
+})
+
+test('Throw error if EA mode is not RW and cache type is local', async (t) => {
+  process.env['CACHE_TYPE'] = 'local'
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        EA_MODE: 'writer',
+      },
+    },
+  )
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+
+  try {
+    await expose(adapter)
+  } catch (e: unknown) {
+    t.is((e as Error).message, 'EA mode cannot be writer while cache type is local')
   }
 })

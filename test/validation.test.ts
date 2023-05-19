@@ -6,7 +6,7 @@ import { InputParameters } from '../src/validation'
 import { AdapterInputError } from '../src/validation/error'
 import { EmptyInputParameters } from '../src/validation/input-params'
 import { validator } from '../src/validation/utils'
-import { NopTransport, NopTransportTypes, TestAdapter } from './util'
+import { NopTransport, NopTransportTypes, TestAdapter } from '../src/util/testing-utils'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter

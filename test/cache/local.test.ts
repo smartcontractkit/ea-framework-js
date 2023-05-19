@@ -4,7 +4,7 @@ import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter
 import { Cache, CacheFactory, LocalCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
 import { PartialAdapterResponse } from '../../src/util'
-import { NopTransport, TestAdapter, runAllUntilTime } from '../util'
+import { NopTransport, TestAdapter, runAllUntilTime } from '../../src/util/testing-utils'
 import { BasicCacheSetterTransport, cacheTestInputParameters } from './helper'
 
 const test = untypedTest as TestFn<{
