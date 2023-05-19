@@ -8,7 +8,7 @@ import {
   highestRateLimitTiers,
 } from '../src/rate-limiting'
 import { RateLimiterFactory, RateLimitingStrategy } from '../src/rate-limiting/factory'
-import { NopTransport } from './util'
+import { NopTransport } from '../src/util/testing-utils'
 
 test('empty tiers in rate limiting fails on startup', async (t) => {
   const adapter = new Adapter({

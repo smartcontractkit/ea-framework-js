@@ -1,6 +1,6 @@
 import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
 import untypedTest, { TestFn } from 'ava'
-import { TestAdapter } from '../util'
+import { TestAdapter } from '../../src/util/testing-utils'
 import { buildHttpAdapter } from './helper'
 import MockAdapter from 'axios-mock-adapter'
 import axios from 'axios'

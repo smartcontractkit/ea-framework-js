@@ -5,7 +5,7 @@ import { Transport, TransportGenerics } from '../src/transports'
 import { AdapterRequest } from '../src/util'
 import { InputParameters } from '../src/validation'
 import { TypeFromDefinition } from '../src/validation/input-params'
-import { TestAdapter } from './util'
+import { TestAdapter } from '../src/util/testing-utils'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
