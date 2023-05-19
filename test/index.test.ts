@@ -1,7 +1,7 @@
 import untypedTest, { TestFn } from 'ava'
-import { expose, start } from '../src'
+import { expose, getTLSOptions, start } from '../src'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
-import { AdapterConfig } from '../src/config'
+import { AdapterConfig, buildAdapterSettings } from '../src/config'
 import { NopTransport, TestAdapter } from './util'
 
 const test = untypedTest as TestFn<{
@@ -59,6 +59,33 @@ test('MTLS_ENABLED with no TLS params should error', async (t) => {
   }
 })
 
+test('Having both TLS_ENABLED and MTLS_ENABLED should throw an error', async (t) => {
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        MTLS_ENABLED: true,
+        TLS_ENABLED: true,
+      },
+    },
+  )
+  const adapter = new Adapter({
+    name: 'TEST',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+  try {
+    await start(adapter)
+  } catch (e: unknown) {
+    t.is((e as Error).message, 'TLS_ENABLED and MTLS_ENABLED cannot both be set to true.')
+  }
+})
+
 test('MTLS_ENABLED connection with incorrect params should error', async (t) => {
   const config = new AdapterConfig(
     {},
@@ -86,6 +113,45 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
   } catch (e: unknown) {
     t.pass()
   }
+})
+
+test('getTLSOptions should return an empty object if TLS and mTLS are not enabled', async (t) => {
+  const adapterSettings = buildAdapterSettings({})
+  t.deepEqual(getTLSOptions(adapterSettings), {})
+})
+
+test('requestCert should be false when TLS_ENABLED is set to true', async (t) => {
+  const adapterSettings = buildAdapterSettings({})
+  adapterSettings.TLS_ENABLED = true
+  adapterSettings.TLS_PRIVATE_KEY = 'dGVzdA=='
+  adapterSettings.TLS_PUBLIC_KEY = 'dGVzdA=='
+  adapterSettings.TLS_CA = 'dGVzdA=='
+  t.deepEqual(getTLSOptions(adapterSettings), {
+    https: {
+      key: 'dGVzdA==',
+      cert: 'dGVzdA==',
+      ca: 'dGVzdA==',
+      passphrase: '',
+      requestCert: false,
+    },
+  })
+})
+
+test('requestCert should be true when MTLS_ENABLED is set to true', async (t) => {
+  const adapterSettings = buildAdapterSettings({})
+  adapterSettings.MTLS_ENABLED = true
+  adapterSettings.TLS_PRIVATE_KEY = 'dGVzdA=='
+  adapterSettings.TLS_PUBLIC_KEY = 'dGVzdA=='
+  adapterSettings.TLS_CA = 'dGVzdA=='
+  t.deepEqual(getTLSOptions(adapterSettings), {
+    https: {
+      key: 'dGVzdA==',
+      cert: 'dGVzdA==',
+      ca: 'dGVzdA==',
+      passphrase: '',
+      requestCert: true,
+    },
+  })
 })
 
 test('Adapter writer mode api disabled', async (t) => {
