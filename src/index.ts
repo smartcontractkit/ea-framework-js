@@ -26,31 +26,33 @@ export interface httpsOptions {
 }
 
 export const getTLSOptions = (adapterSettings: AdapterSettings) => {
+  if (!adapterSettings.TLS_ENABLED && !adapterSettings.MTLS_ENABLED) {
+    return {}
+  }
+
   if (adapterSettings.TLS_ENABLED && adapterSettings.MTLS_ENABLED) {
     throw new Error('TLS_ENABLED and MTLS_ENABLED cannot both be set to true.')
   }
 
-  if (adapterSettings.TLS_ENABLED || adapterSettings.MTLS_ENABLED) {
-    if (
-      !adapterSettings.TLS_PRIVATE_KEY ||
-      !adapterSettings.TLS_PUBLIC_KEY ||
-      !adapterSettings.TLS_CA
-    ) {
-      const TLSOption = adapterSettings.TLS_ENABLED ? 'TLS_ENABLED' : 'MTLS_ENABLED'
-      throw new Error(
-        `TLS_PRIVATE_KEY, TLS_PUBLIC_KEY, and TLS_CA environment variables are required when ${TLSOption} is set to true.`,
-      )
-    }
-    const httpsOptions = {
-      key: adapterSettings.TLS_PRIVATE_KEY,
-      cert: adapterSettings.TLS_PUBLIC_KEY,
-      ca: adapterSettings.TLS_CA,
-      passphrase: adapterSettings.TLS_PASSPHRASE,
-      requestCert: adapterSettings.MTLS_ENABLED,
-    }
-    return { https: httpsOptions }
+  if (
+    !adapterSettings.TLS_PRIVATE_KEY ||
+    !adapterSettings.TLS_PUBLIC_KEY ||
+    !adapterSettings.TLS_CA
+  ) {
+    const TLSOption = adapterSettings.TLS_ENABLED ? 'TLS_ENABLED' : 'MTLS_ENABLED'
+    throw new Error(
+      `TLS_PRIVATE_KEY, TLS_PUBLIC_KEY, and TLS_CA environment variables are required when ${TLSOption} is set to true.`,
+    )
   }
-  return {}
+
+  const httpsOptions = {
+    key: adapterSettings.TLS_PRIVATE_KEY,
+    cert: adapterSettings.TLS_PUBLIC_KEY,
+    ca: adapterSettings.TLS_CA,
+    passphrase: adapterSettings.TLS_PASSPHRASE,
+    requestCert: adapterSettings.MTLS_ENABLED,
+  }
+  return { https: httpsOptions }
 }
 
 /**
