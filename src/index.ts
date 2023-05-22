@@ -25,26 +25,34 @@ export interface httpsOptions {
   }
 }
 
-export const getMTLSOptions = (adapterSettings: AdapterSettings) => {
-  if (
-    adapterSettings.MTLS_ENABLED &&
-    (!adapterSettings.TLS_PRIVATE_KEY || !adapterSettings.TLS_PUBLIC_KEY || !adapterSettings.TLS_CA)
-  ) {
-    throw new Error(
-      `TLS_PRIVATE_KEY , TLS_PUBLIC_KEY and  TLS_CA environment variables are required when MTLS_ENABLED is set to true.`,
-    )
-  } else if (adapterSettings.MTLS_ENABLED) {
-    return {
-      https: {
-        key: adapterSettings.TLS_PRIVATE_KEY,
-        cert: adapterSettings.TLS_PUBLIC_KEY,
-        ca: adapterSettings.TLS_CA,
-        passphrase: adapterSettings.TLS_PASSPHRASE,
-        requestCert: true,
-      },
-    }
+export const getTLSOptions = (adapterSettings: AdapterSettings) => {
+  if (!adapterSettings.TLS_ENABLED && !adapterSettings.MTLS_ENABLED) {
+    return {}
   }
-  return {}
+
+  if (adapterSettings.TLS_ENABLED && adapterSettings.MTLS_ENABLED) {
+    throw new Error('TLS_ENABLED and MTLS_ENABLED cannot both be set to true.')
+  }
+
+  if (
+    !adapterSettings.TLS_PRIVATE_KEY ||
+    !adapterSettings.TLS_PUBLIC_KEY ||
+    !adapterSettings.TLS_CA
+  ) {
+    const TLSOption = adapterSettings.TLS_ENABLED ? 'TLS_ENABLED' : 'MTLS_ENABLED'
+    throw new Error(
+      `TLS_PRIVATE_KEY, TLS_PUBLIC_KEY, and TLS_CA environment variables are required when ${TLSOption} is set to true.`,
+    )
+  }
+
+  const httpsOptions = {
+    key: adapterSettings.TLS_PRIVATE_KEY,
+    cert: adapterSettings.TLS_PUBLIC_KEY,
+    ca: adapterSettings.TLS_CA,
+    passphrase: adapterSettings.TLS_PASSPHRASE,
+    requestCert: adapterSettings.MTLS_ENABLED,
+  }
+  return { https: httpsOptions }
 }
 
 /**
@@ -152,11 +160,9 @@ export const expose = async <T extends SettingsDefinitionMap>(
 }
 
 async function buildRestApi(adapter: Adapter) {
-  const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(
-    adapter.config.settings,
-  )
+  const TLSOptions: httpsOptions | Record<string, unknown> = getTLSOptions(adapter.config.settings)
   const app = fastify({
-    ...mTLSOptions,
+    ...TLSOptions,
     bodyLimit: adapter.config.settings.MAX_PAYLOAD_SIZE_LIMIT,
   })
 

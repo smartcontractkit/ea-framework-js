@@ -276,6 +276,11 @@ export const BaseSettingsDefinition = {
     type: 'boolean',
     default: false,
   },
+  TLS_ENABLED: {
+    description: 'Flag to specify whether TLS/SSL is enabled or not',
+    type: 'boolean',
+    default: false,
+  },
   TLS_PRIVATE_KEY: {
     description: 'Base64 Private Key of TSL/SSL certificate',
     type: 'string',
