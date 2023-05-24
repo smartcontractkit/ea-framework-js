@@ -3,7 +3,7 @@ import { join } from 'path'
 import * as client from 'prom-client'
 import { AdapterSettings } from '../config'
 import { getTLSOptions, httpsOptions } from '../index'
-import { AdapterRequest, makeLogger } from '../util'
+import { AdapterRequest, censorLogs, makeLogger } from '../util'
 import { AdapterError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
 import { HttpRequestType, requestDurationBuckets } from './constants'
@@ -74,7 +74,7 @@ export const buildMetricsMiddleware = (
 
   // Record response time of request through entire EA
   metrics.get('httpRequestDurationSeconds').observe(res.getResponseTime() / 1000)
-  logger.debug(`Response time for ${feedId}: ${res.getResponseTime()}ms`)
+  censorLogs(() => logger.debug(`Response time for ${feedId}: ${res.getResponseTime()}ms`))
   done()
 }
 

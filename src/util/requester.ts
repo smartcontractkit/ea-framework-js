@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { makeLogger, sleep } from '.'
+import { censorLogs, makeLogger, sleep } from '.'
 import { AdapterSettings } from '../config'
 import { dataProviderMetricsLabel, metrics } from '../metrics'
 import { RateLimiter } from '../rate-limiting'
@@ -115,8 +115,10 @@ export class Requester {
     const overflowedRequest = this.queue.add(queuedRequest as QueuedRequest<unknown>)
     if (overflowedRequest) {
       // If we have overflow, it means the oldest request needs to be rejected because the queue is at its limits
-      logger.debug(
-        `Request (Key: ${overflowedRequest.key}, Retry #: ${overflowedRequest.retries}) was removed from the queue to make room for a newer one (Size: ${this.queue.length})`,
+      censorLogs(() =>
+        logger.debug(
+          `Request (Key: ${overflowedRequest.key}, Retry #: ${overflowedRequest.retries}) was removed from the queue to make room for a newer one (Size: ${this.queue.length})`,
+        ),
       )
       metrics.get('requesterQueueOverflow').inc()
       overflowedRequest.reject(
@@ -134,8 +136,10 @@ export class Requester {
 
     // The item was successfully added to the queue, so we can also add it to our map
     // If the request is being re-added because it will be retried, this will have no practical effect
-    logger.trace(
-      `Added request (Key: ${queuedRequest.key}, Retry #: ${queuedRequest.retries}) to the queue (Size: ${this.queue.length})`,
+    censorLogs(() =>
+      logger.trace(
+        `Added request (Key: ${queuedRequest.key}, Retry #: ${queuedRequest.retries}) to the queue (Size: ${this.queue.length})`,
+      ),
     )
     this.map[queuedRequest.key] = queuedRequest as QueuedRequest
 
@@ -160,7 +164,9 @@ export class Requester {
     // If there's already a queued request, reuse it's existing promise
     const existingQueuedRequest = this.map[key]
     if (existingQueuedRequest) {
-      logger.trace(`Request already exists, returning queued promise (Key: ${key})`)
+      censorLogs(() =>
+        logger.trace(`Request already exists, returning queued promise (Key: ${key})`),
+      )
       return existingQueuedRequest.promise as Promise<RequesterResult<T>>
     }
 
@@ -199,8 +205,10 @@ export class Requester {
       return
     }
 
-    logger.trace(
-      `Popped next request (Key: ${next.key}, Retry #: ${next.retries}) from the queue (Size: ${this.queue.length})`,
+    censorLogs(() =>
+      logger.trace(
+        `Popped next request (Key: ${next.key}, Retry #: ${next.retries}) from the queue (Size: ${this.queue.length})`,
+      ),
     )
 
     // Wait until the rate limiter allows the request to be executed
@@ -222,9 +230,9 @@ export class Requester {
     config.timeout = config.timeout || this.timeout
 
     try {
-      logger.trace(`Sending request (Key: ${key}) to data provider`)
+      censorLogs(() => logger.trace(`Sending request (Key: ${key}) to data provider`))
       const response = await axios.request(config)
-      logger.trace(`Request (Key: ${key}) was successful `)
+      censorLogs(() => logger.trace(`Request (Key: ${key}) was successful `))
       resolve({
         response,
         timestamps: {
@@ -243,14 +251,16 @@ export class Requester {
         .inc()
     } catch (e) {
       const err = e as AxiosError
-      logger.info({
-        msg: 'Request failed',
-        response: {
-          statusCode: err.response?.status,
-          data: err.response?.data,
-          text: err.response?.statusText,
-        },
-      })
+      censorLogs(() =>
+        logger.info({
+          msg: 'Request failed',
+          response: {
+            statusCode: err.response?.status,
+            data: err.response?.data,
+            text: err.response?.statusText,
+          },
+        }),
+      )
 
       // Record count of failed data provider request
       metrics
