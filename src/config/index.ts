@@ -138,6 +138,11 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: 'info',
   },
+  LOG_INPUT_PARAMS: {
+    description: 'Controls whether logging of the input parameters object is enabled or disabled',
+    type: 'boolean',
+    default: true,
+  },
   MAX_PAYLOAD_SIZE_LIMIT: {
     description: 'Max payload size limit for the Fastify server',
     type: 'number',
