@@ -215,6 +215,10 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
   initializeDependencies(inputDependencies?: Partial<AdapterDependencies>): AdapterDependencies {
     const dependencies = inputDependencies || {}
 
+    if (this.config.settings.LOG_INPUT_PARAMS === true) {
+      process.env['LOG_INPUT_PARAMS'] = 'true'
+    }
+
     if (
       this.config.settings.EA_MODE !== 'reader-writer' &&
       this.config.settings.CACHE_TYPE === 'local'
