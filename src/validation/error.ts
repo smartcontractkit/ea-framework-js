@@ -10,15 +10,6 @@ type ErrorFull = ErrorBasic & {
   cause: string
 }
 
-export type ErrorWithContext = {
-  error: {
-    name: string
-    stack: string | undefined
-    message: string
-  }
-  reqBody?: unknown
-}
-
 export type AdapterErrorResponse = {
   status: string
   statusCode: number
