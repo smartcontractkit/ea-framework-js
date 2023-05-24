@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { FastifyError, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { ReplyError as RedisError } from 'ioredis'
 import { Adapter } from '../adapter'
@@ -11,14 +12,13 @@ import {
   AdapterRequestBody,
   AdapterRequestContext,
 } from '../util/types'
-import { AdapterError, AdapterInputError, AdapterTimeoutError } from './error'
+import { AdapterError, AdapterInputError, AdapterTimeoutError, ErrorWithContext } from './error'
 import {
   EmptyInputParameters,
   InputParametersDefinition,
   TypeFromDefinition,
   validateOverrides,
 } from './input-params'
-import { createHash } from 'crypto'
 export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
@@ -141,14 +141,17 @@ export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: Fa
   }
 
   // Add the request context to the error so that we can check things like incoming params, endpoint, etc
-  const errorWithContext = {
+  const errorWithContext: ErrorWithContext = {
     ...req.requestContext,
     error: {
       name: err.name,
       stack: err.stack,
       message: err.message,
     },
-    reqBody: req.body,
+  }
+
+  if (process.env['LOG_INPUT_PARAMS'] === 'true') {
+    errorWithContext.reqBody = req.body
   }
 
   if (err instanceof AdapterTimeoutError) {
