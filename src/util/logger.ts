@@ -156,7 +156,7 @@ export function censor(obj: any, censorList: CensorKeyValue[], throwOnError = fa
 }
 
 export const censorLogs = (logFunc: () => void) => {
-  if (process.env['LOG_INPUT_PARAMS'] === 'true') {
+  if (process.env['LOG_CENSOR'] === 'false') {
     logFunc()
   }
   return
