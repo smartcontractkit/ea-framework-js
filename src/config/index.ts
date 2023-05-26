@@ -138,7 +138,7 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: 'info',
   },
-  LOG_CENSOR: {
+  CENSOR_SENSITIVE_LOGS: {
     description: 'Controls whether the logging of sensitive information is enabled or disabled',
     type: 'boolean',
     default: false,
