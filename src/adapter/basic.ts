@@ -221,10 +221,6 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
   initializeDependencies(inputDependencies?: Partial<AdapterDependencies>): AdapterDependencies {
     const dependencies = inputDependencies || {}
 
-    if (this.config.settings.LOG_CENSOR === false) {
-      process.env['LOG_CENSOR'] = 'false'
-    }
-
     if (
       this.config.settings.EA_MODE !== 'reader-writer' &&
       this.config.settings.CACHE_TYPE === 'local'
