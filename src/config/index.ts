@@ -138,6 +138,11 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: 'info',
   },
+  CENSOR_SENSITIVE_LOGS: {
+    description: 'Controls whether the logging of sensitive information is enabled or disabled',
+    type: 'boolean',
+    default: false,
+  },
   MAX_PAYLOAD_SIZE_LIMIT: {
     description: 'Max payload size limit for the Fastify server',
     type: 'number',

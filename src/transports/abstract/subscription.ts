@@ -2,7 +2,7 @@ import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
 import { ResponseCache } from '../../cache/response'
 import { metrics } from '../../metrics'
-import { SubscriptionSet, makeLogger } from '../../util'
+import { SubscriptionSet, censorLogs, makeLogger } from '../../util'
 import { AdapterRequest } from '../../util/types'
 import { TypeFromDefinition } from '../../validation/input-params'
 
@@ -38,8 +38,10 @@ export abstract class SubscriptionTransport<const T extends TransportGenerics>
     req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
     _: T['Settings'],
   ): Promise<void> {
-    logger.debug(
-      `Adding entry to subscription set (ttl ${this.subscriptionTtl}): [${req.requestContext.cacheKey}] = ${req.requestContext.data}`,
+    censorLogs(() =>
+      logger.debug(
+        `Adding entry to subscription set (ttl ${this.subscriptionTtl}): [${req.requestContext.cacheKey}] = ${req.requestContext.data}`,
+      ),
     )
 
     // This might need coalescing to avoid too frequent ttl updates

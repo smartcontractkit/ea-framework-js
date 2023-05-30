@@ -1,10 +1,11 @@
+import { createHash } from 'crypto'
 import { FastifyError, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { ReplyError as RedisError } from 'ioredis'
 import { Adapter } from '../adapter'
 import { calculateCacheKey } from '../cache'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { getMetricsMeta } from '../metrics/util'
-import { makeLogger } from '../util'
+import { censorLogs, makeLogger } from '../util'
 import {
   AdapterMiddlewareBuilder,
   AdapterRequest,
@@ -18,7 +19,6 @@ import {
   TypeFromDefinition,
   validateOverrides,
 } from './input-params'
-import { createHash } from 'crypto'
 export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
@@ -154,26 +154,26 @@ export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: Fa
   if (err instanceof AdapterTimeoutError) {
     // AdapterTimeoutError are somewhat expected when the adapter doesn't find a response in the cache within the specified polling interval
     // This is common on startup so logging these errors as debug to help alleviate logs getting flooded in the beginning
-    errorCatcherLogger.debug(errorWithContext)
+    censorLogs(() => errorCatcherLogger.debug(errorWithContext))
     res.status(err.statusCode).send(err.toJSONResponse())
   } else if (err instanceof AdapterError) {
     // We want to log these as warn, because although they are to be expected, NOPs should
     // Only use "correct" job specs and therefore not hit adapters with invalid requests.
-    errorCatcherLogger.warn(errorWithContext)
+    censorLogs(() => errorCatcherLogger.warn(errorWithContext))
     res.status(err.statusCode).send(err.toJSONResponse())
   } else if (err instanceof RedisError) {
     // Native ioredis error
-    errorCatcherLogger.warn(errorWithContext)
+    censorLogs(() => errorCatcherLogger.warn(errorWithContext))
     const replyError = err as typeof RedisError
     if (process.env['METRICS_ENABLED']) {
       recordRedisCommandMetric(CMD_SENT_STATUS.FAIL, replyError.command?.name)
     }
     res.status(500).send(replyError.message || 'There was an unexpected error with the Redis cache')
   } else if (err.name === 'FastifyError') {
-    errorCatcherLogger.error(errorWithContext)
+    censorLogs(() => errorCatcherLogger.error(errorWithContext))
     res.status((err as FastifyError).statusCode as number).send(err.message)
   } else {
-    errorCatcherLogger.error(errorWithContext)
+    censorLogs(() => errorCatcherLogger.error(errorWithContext))
     res.status(500).send(err.message || 'There was an unexpected error in the adapter.')
   }
 }

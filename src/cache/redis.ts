@@ -1,8 +1,8 @@
 import Redis, { Result } from 'ioredis'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
-import { AdapterResponse, makeLogger } from '../util'
+import { AdapterResponse, censorLogs, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
-import { cacheMetricsLabel, cacheSet, CacheTypes } from './metrics'
+import { CacheTypes, cacheMetricsLabel, cacheSet } from './metrics'
 
 declare module 'ioredis' {
   interface RedisCommander<Context> {
@@ -46,14 +46,16 @@ export class RedisCache<T = unknown> implements Cache<T> {
   }
 
   async get(key: string): Promise<Readonly<T> | undefined> {
-    logger.trace(`Getting key ${key}`)
+    censorLogs(() => logger.trace(`Getting key ${key}`))
     const value = await this.client.get(key)
 
     // Record get command sent to Redis
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'get')
 
     if (!value) {
-      logger.debug(`No entry in redis cache for key "${key}", returning undefined`)
+      censorLogs(() =>
+        logger.debug(`No entry in redis cache for key "${key}", returning undefined`),
+      )
       return undefined
     }
 
@@ -61,7 +63,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
   }
 
   async delete(key: string): Promise<void> {
-    logger.trace(`Deleting key ${key}`)
+    censorLogs(() => logger.trace(`Deleting key ${key}`))
     await this.client.del(key)
 
     // Record delete command sent to Redis
@@ -69,7 +71,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
   }
 
   async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
-    logger.trace(`Setting key ${key}`)
+    censorLogs(() => logger.trace(`Setting key ${key}`))
     await this.client.setExternalAdapterResponse(key, JSON.stringify(value), ttl)
 
     // Record set command sent to Redis

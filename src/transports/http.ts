@@ -3,7 +3,7 @@ import { TransportDependencies, TransportGenerics } from '.'
 import { EndpointContext } from '../adapter'
 import { calculateHttpRequestKey } from '../cache'
 import { metrics, retrieveCost } from '../metrics'
-import { makeLogger, sleep } from '../util'
+import { censorLogs, makeLogger, sleep } from '../util'
 import { Requester } from '../util/requester'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
@@ -259,7 +259,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
         const err = e as AdapterDataProviderError
         const cause = err.cause as AxiosError
         const errorMessage = `Provider request failed with status ${cause.status}: "${cause.response?.data}"`
-        logger.info(errorMessage)
+        censorLogs(() => logger.info(errorMessage))
         return {
           results: requestConfig.params.map((entry) => ({
             params: entry,
@@ -272,7 +272,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
         }
       } else if (e instanceof AdapterRateLimitError) {
         const err = e as AdapterRateLimitError
-        logger.info(err.message)
+        censorLogs(() => logger.info(err.message))
         return {
           results: requestConfig.params.map((entry) => ({
             params: entry,
@@ -289,7 +289,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
           msUntilNextExecution: err.msUntilNextExecution,
         }
       } else {
-        logger.error(e)
+        censorLogs(() => logger.error(e))
         return { results: [] }
       }
     }

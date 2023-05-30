@@ -14,7 +14,13 @@ import {
   highestRateLimitTiers,
 } from '../rate-limiting'
 import { RateLimiterFactory, RateLimitingStrategy } from '../rate-limiting/factory'
-import { AdapterRequest, AdapterResponse, SubscriptionSetFactory, makeLogger } from '../util'
+import {
+  AdapterRequest,
+  AdapterResponse,
+  SubscriptionSetFactory,
+  censorLogs,
+  makeLogger,
+} from '../util'
 import { Requester } from '../util/requester'
 import { AdapterTimeoutError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
@@ -390,7 +396,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           return await transport.registerRequest!(req, this.config.settings)
         } catch (err) {
-          logger.error(`Error registering request: ${err}`)
+          censorLogs(() => logger.error(`Error registering request: ${err}`))
           requestRegistrationError = err as Error
         }
       }

@@ -1,7 +1,7 @@
 import WebSocket, { ClientOptions, RawData } from 'ws'
 import { EndpointContext } from '../adapter'
 import { metrics } from '../metrics'
-import { deferredPromise, makeLogger, sleep, timeoutPromise } from '../util'
+import { censorLogs, deferredPromise, makeLogger, sleep, timeoutPromise } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TypeFromDefinition } from '../validation/input-params'
 import { TransportGenerics } from './'
@@ -157,7 +157,7 @@ export class WebSocketTransport<
       // Called when any message is received by the open connection
       message: async (event: WebSocket.MessageEvent) => {
         const parsed = this.deserializeMessage(event.data)
-        logger.trace(`Got ws message: ${event.data}`)
+        censorLogs(() => logger.trace(`Got ws message: ${event.data}`))
         const providerDataReceived = Date.now()
         const results = this.config.handlers.message(parsed, context)?.map((r) => {
           const result = r as TimestampedProviderResult<T>
@@ -184,8 +184,10 @@ export class WebSocketTransport<
 
       // Called when an error is thrown by the connection
       error: async (event: WebSocket.ErrorEvent) => {
-        logger.debug(
-          `Error occurred in web socket connection. Error: ${event.error} ; Message: ${event.message}`,
+        censorLogs(() =>
+          logger.debug(
+            `Error occurred in web socket connection. Error: ${event.error} ; Message: ${event.message}`,
+          ),
         )
         // Record connection error count
         metrics.get('wsConnectionErrors').labels(connectionErrorLabels(event.message)).inc()
@@ -313,7 +315,7 @@ export class WebSocketTransport<
       const reason = urlChanged
         ? `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`
         : `Last message was received ${timeSinceLastMessage} ago, exceeding the threshold of ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}ms, closing connection...`
-      logger.info(reason)
+      censorLogs(() => logger.info(reason))
 
       // Check if connection was opened very recently; if so, wait a bit before continuing.
       // This is so if we just opened the connection and are waiting to receive some messages,
@@ -328,10 +330,12 @@ export class WebSocketTransport<
       connectionClosed = true
 
       if (subscriptions.desired.length) {
-        logger.trace(
-          `Connection will be reopened and will subscribe to new and resubscribe to existing: ${JSON.stringify(
-            subscriptions.desired,
-          )}`,
+        censorLogs(() =>
+          logger.trace(
+            `Connection will be reopened and will subscribe to new and resubscribe to existing: ${JSON.stringify(
+              subscriptions.desired,
+            )}`,
+          ),
         )
       }
     }

@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { EndpointContext, EndpointGenerics } from '../adapter'
-import { AdapterResponse, makeLogger, sleep } from '../util'
+import { AdapterResponse, censorLogs, makeLogger, sleep } from '../util'
 import { CacheTypes as CacheType } from './metrics'
 
 export * from './factory'
@@ -82,7 +82,7 @@ export const calculateCacheKey = <T extends EndpointGenerics>({
     transportName,
   })
   const cacheKey = `${adapterName}-${calculatedKey}`
-  logger.trace(`Generated cache key for request: "${cacheKey}"`)
+  censorLogs(() => logger.trace(`Generated cache key for request: "${cacheKey}"`))
   return cacheKey
 }
 
@@ -102,7 +102,7 @@ export const calculateHttpRequestKey = <T extends EndpointGenerics>({
     adapterSettings: context.adapterSettings,
     endpointName: context.endpointName,
   })
-  logger.trace(`Generated HTTP request queue key: "${key}"`)
+  censorLogs(() => logger.trace(`Generated HTTP request queue key: "${key}"`))
   return key
 }
 

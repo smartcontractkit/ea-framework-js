@@ -154,3 +154,10 @@ export function censor(obj: any, censorList: CensorKeyValue[], throwOnError = fa
   })
   return JSON.parse(result)
 }
+
+export const censorLogs = (logFunc: () => void) => {
+  if (process.env['CENSOR_SENSITIVE_LOGS'] === 'true') {
+    return
+  }
+  logFunc()
+}

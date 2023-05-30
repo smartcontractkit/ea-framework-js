@@ -5,7 +5,13 @@ import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
 import { AdapterSettings, SettingsDefinitionMap } from './config'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
-import { AdapterRequest, AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
+import {
+  AdapterRequest,
+  AdapterRouteGeneric,
+  censorLogs,
+  loggingContextMiddleware,
+  makeLogger,
+} from './util'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
 import { EmptyInputParameters } from './validation/input-params'
 
@@ -109,11 +115,13 @@ export const start = async <T extends SettingsDefinitionMap>(
 
   // Listener for unhandled promise rejections that are bubbling up to the top
   process.on('unhandledRejection', (err: Error) => {
-    logger.error({
-      name: err.name,
-      stack: err.stack,
-      message: err.message,
-    })
+    censorLogs(() =>
+      logger.error({
+        name: err.name,
+        stack: err.stack,
+        message: err.message,
+      }),
+    )
   })
 
   if (
@@ -143,7 +151,7 @@ export const expose = async <T extends SettingsDefinitionMap>(
       try {
         await app.listen({ port, host: adapter.config.settings.EA_HOST })
       } catch (err) {
-        logger.fatal(`There was an error when starting the server: ${err}`)
+        censorLogs(() => logger.fatal(`There was an error when starting the server: ${err}`))
         process.exit()
       }
 

@@ -1,4 +1,4 @@
-import { AdapterResponse, DoubleLinkedList, LinkedListNode, makeLogger } from '../util'
+import { AdapterResponse, DoubleLinkedList, LinkedListNode, censorLogs, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
 import { CacheTypes } from './metrics'
 
@@ -34,7 +34,7 @@ export class LocalCache<T = unknown> implements Cache<T> {
   }
 
   async get(key: string): Promise<Readonly<T> | undefined> {
-    logger.trace(`Getting key ${key}`)
+    censorLogs(() => logger.trace(`Getting key ${key}`))
     if (this.cache.has(key)) {
       const node = this.cache.get(key) as LinkedListNode<LocalCacheEntry<T>>
       const expired = node.data.expirationTimestamp <= Date.now()
@@ -47,13 +47,15 @@ export class LocalCache<T = unknown> implements Cache<T> {
         return node.data.value
       }
     } else {
-      logger.debug(`No entry in local cache for key "${key}", returning undefined`)
+      censorLogs(() =>
+        logger.debug(`No entry in local cache for key "${key}", returning undefined`),
+      )
       return undefined
     }
   }
 
   async delete(key: string): Promise<void> {
-    logger.trace(`Deleting key ${key}`)
+    censorLogs(() => logger.trace(`Deleting key ${key}`))
     if (this.cache.has(key)) {
       const node = this.cache.get(key) as LinkedListNode<LocalCacheEntry<T>>
       this.list.remove(node)
@@ -62,9 +64,9 @@ export class LocalCache<T = unknown> implements Cache<T> {
   }
 
   async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
-    logger.trace(`Setting key ${key} with ttl ${ttl}`)
+    censorLogs(() => logger.trace(`Setting key ${key} with ttl ${ttl}`))
     if (this.cache.has(key)) {
-      logger.trace(`Found existing key ${key}. Updating value...`)
+      censorLogs(() => logger.trace(`Found existing key ${key}. Updating value...`))
       const node = this.cache.get(key) as LinkedListNode<LocalCacheEntry<T>>
       const isCacheExpired = node.data.expirationTimestamp <= Date.now()
       // If the new value is an error, we don't want to overwrite the current active(not expired) 'successful' cache. If both cached and new values are errors or successful entries, the cache will be updated.
@@ -73,7 +75,9 @@ export class LocalCache<T = unknown> implements Cache<T> {
         !isCacheExpired &&
         !('errorMessage' in (node.data.value as AdapterResponse))
       ) {
-        logger.trace(`New value for key ${key} is an error, not updating existing value`)
+        censorLogs(() =>
+          logger.trace(`New value for key ${key} is an error, not updating existing value`),
+        )
       } else {
         node.data = {
           value,
