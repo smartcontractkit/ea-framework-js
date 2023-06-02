@@ -8,11 +8,7 @@ import { Adapter, AdapterDependencies } from '../adapter'
 import { Cache, LocalCache } from '../cache'
 import { ResponseCache } from '../cache/response'
 import { EmptyCustomSettings, SettingsDefinitionMap } from '../config'
-import {
-  Transport,
-  TransportDependencies,
-  TransportGenerics,
-} from '../transports'
+import { Transport, TransportDependencies, TransportGenerics } from '../transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from './index'
 import { EmptyInputParameters, TypeFromDefinition } from '../validation/input-params'
 
