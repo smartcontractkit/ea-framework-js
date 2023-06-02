@@ -17,7 +17,8 @@ import {
   WebSocketTransport,
 } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { TestAdapter, mockWebSocketProvider } from '../../src/util/testing-utils'
+import { TestAdapter } from '../../src/util/testing-utils'
+import { mockWebSocketProvider } from '../utl'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter<SettingsDefinitionFromConfig<typeof adapterConfig>>

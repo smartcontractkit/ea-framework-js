@@ -11,7 +11,8 @@ import {
 } from '../../src/transports'
 import { SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { TestAdapter, mockWebSocketProvider, runAllUntilTime } from '../../src/util/testing-utils'
+import { TestAdapter, runAllUntilTime } from '../../src/util/testing-utils'
+import { mockWebSocketProvider } from '../utl'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
