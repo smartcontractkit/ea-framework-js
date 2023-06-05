@@ -92,6 +92,11 @@ export const BaseSettingsDefinition = {
     default: 'local',
     options: ['local', 'redis'],
   },
+  CACHE_PREFIX: {
+    description: 'Specifies a prefix to use for the cache',
+    type: 'string',
+    default: '',
+  },
   SUBSCRIPTION_SET_MAX_ITEMS: {
     type: 'number',
     description: 'The maximum number of subscriptions set',

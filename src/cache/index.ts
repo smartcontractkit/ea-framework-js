@@ -81,7 +81,10 @@ export const calculateCacheKey = <T extends EndpointGenerics>({
     endpointName,
     transportName,
   })
-  const cacheKey = `${adapterName}-${calculatedKey}`
+
+  const cachePrefix = process.env['CACHE_PREFIX'] ? `${process.env['CACHE_PREFIX']}-` : ''
+
+  const cacheKey = `${cachePrefix}${adapterName}-${calculatedKey}`
   censorLogs(() => logger.trace(`Generated cache key for request: "${cacheKey}"`))
   return cacheKey
 }
