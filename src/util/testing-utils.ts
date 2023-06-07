@@ -2,7 +2,6 @@ import { InstalledClock } from '@sinonjs/fake-timers'
 import { ExecutionContext } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { ReplyError } from 'ioredis'
-import { WebSocket } from 'mock-socket'
 import * as client from 'prom-client'
 import { start } from '../index'
 import { Adapter, AdapterDependencies } from '../adapter'
@@ -17,6 +16,8 @@ import {
 } from '../transports'
 import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from './index'
 import { EmptyInputParameters, TypeFromDefinition } from '../validation/input-params'
+import { WebSocket } from 'mock-socket'
+export { WebSocket as MockWebsocket, Server as MockWebsocketServer } from 'mock-socket'
 
 export type NopTransportTypes = {
   Parameters: EmptyInputParameters
@@ -445,6 +446,12 @@ export async function waitUntilResolved<T>(
   return result
 }
 
+export function setEnvVariables(envVariables: NodeJS.ProcessEnv): void {
+  for (const key in envVariables) {
+    process.env[key] = envVariables[key]
+  }
+}
+
 /**
  * Sets the mocked websocket instance in the provided provider class.
  * We need this here, because the tests will connect using their instance of WebSocketClassProvider;
@@ -473,11 +480,5 @@ export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): 
 
   // Need to disable typing, the mock-socket impl does not implement the ws interface fully
   provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
-}
-
-export function setEnvVariables(envVariables: NodeJS.ProcessEnv): void {
-  for (const key in envVariables) {
-    process.env[key] = envVariables[key]
-  }
 }
 /* c8 ignore stop */ // eslint-disable-line
