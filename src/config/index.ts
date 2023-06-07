@@ -93,7 +93,7 @@ export const BaseSettingsDefinition = {
     options: ['local', 'redis'],
   },
   CACHE_PREFIX: {
-    description: 'Specifies a prefix to use for the cache',
+    description: 'Specifies a prefix to use for cache keys',
     type: 'string',
     default: '',
   },
