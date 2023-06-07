@@ -3,9 +3,9 @@ import { Adapter, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache, calculateCacheKey } from '../../src/cache'
 import { AdapterConfig, BaseAdapterSettings, BaseSettingsDefinition } from '../../src/config'
 import { AdapterRequest, AdapterResponse } from '../../src/util'
+import { NopTransport, NopTransportTypes, TestAdapter } from '../../src/util/testing-utils'
 import { InputParameters } from '../../src/validation'
 import { InputParametersDefinition } from '../../src/validation/input-params'
-import { NopTransport, NopTransportTypes, TestAdapter } from '../../src/util/testing-utils'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -197,4 +197,78 @@ test.serial('throws error when cache data is not object', async (t) => {
   } catch (e: unknown) {
     t.pass()
   }
+})
+
+test.serial('adds cache prefix to cache keys', async (t) => {
+  process.env['CACHE_PREFIX'] = 'prefix'
+  const config = new AdapterConfig({})
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        transport: new (class extends NopTransport {
+          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Parameters']>) {
+            return {
+              data: null,
+              statusCode: 200,
+              result: req.requestContext.cacheKey as unknown as null,
+              timestamps: {
+                providerDataRequestedUnixMs: 0,
+                providerDataReceivedUnixMs: 0,
+                providerIndicatedTimeUnixMs: undefined,
+              },
+            }
+          }
+        })(),
+      }),
+      new AdapterEndpoint({
+        name: 'test-custom-cache-key',
+        cacheKeyGenerator: (_) => {
+          return `test:custom_cache_key`
+        },
+        transport: new (class extends NopTransport {
+          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Parameters']>) {
+            return {
+              data: null,
+              statusCode: 200,
+              result: req.requestContext.cacheKey as unknown,
+            } as AdapterResponse<NopTransportTypes['Response']>
+          }
+        })(),
+      }),
+      new AdapterEndpoint({
+        name: 'test-custom-cache-key-long',
+        cacheKeyGenerator: (_) => {
+          return `test:custom_cache_key_long_${'a'.repeat(200)}`
+        },
+        transport: new (class extends NopTransport {
+          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Parameters']>) {
+            return {
+              data: null,
+              statusCode: 200,
+              result: req.requestContext.cacheKey as unknown,
+            } as AdapterResponse<NopTransportTypes['Response']>
+          }
+        })(),
+      }),
+    ],
+  })
+
+  t.context.adapterEndpoint = adapter.endpoints[0]
+  t.context.testAdapter = await TestAdapter.start(adapter, t.context)
+
+  const response = await t.context.testAdapter.request({
+    endpoint: 'test-custom-cache-key',
+  })
+
+  t.is(response.json().result, 'prefix-test:custom_cache_key')
+
+  const response2 = await t.context.testAdapter.request({
+    endpoint: 'test-custom-cache-key-long',
+  })
+
+  t.is(response2.json().result, `prefix-test:custom_cache_key_long_${'a'.repeat(200)}`)
 })
