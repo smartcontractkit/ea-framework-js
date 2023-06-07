@@ -1,7 +1,7 @@
 # EA Framework v3
 
 [![NPM version](https://img.shields.io/npm/v/@chainlink/external-adapter-framework.svg?style=flat)](https://www.npmjs.com/package/@chainlink/external-adapter-framework)
-![Coverage](https://img.shields.io/badge/coverage-99.19%25-green)
+![Coverage](https://img.shields.io/badge/coverage-99.14%25-green)
 
 > **Warning**
 > This framework is in a Beta state, and under active development. While many of the features from version 2 are present, they have not been tested extensively enough to mark this as production ready. You can find v2 in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js)
