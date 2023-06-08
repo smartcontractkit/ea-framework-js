@@ -1,4 +1,5 @@
 import Redis from 'ioredis'
+import Redlock from 'redlock'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
 import {
@@ -105,6 +106,28 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     }
 
     this.dependencies = this.initializeDependencies(dependencies)
+
+    // Console.log('redis client:', this.dependencies.cache)
+
+    if (this.config.settings.EA_MODE !== 'reader') {
+      const redlock = new Redlock([this.dependencies.cache as any], {
+        driftFactor: 0.01, // Multiplied by lock ttl to determine drift time
+        retryCount: 10,
+        retryDelay: 200, // Time in ms
+        retryJitter: 200, // Time in ms
+        automaticExtensionThreshold: 500, // Time in ms
+      })
+
+      // Console.log('redlock:', redlock)
+
+      const redlockKey = `${this.name}-${this.config.settings.CACHE_PREFIX}`
+
+      // Console.log('key:', redlockKey)
+
+      await redlock.acquire([redlockKey], 5000)
+
+      // Console.log('lock:', lock)
+    }
 
     for (const endpoint of this.endpoints) {
       // Add aliases to map to use in validation
