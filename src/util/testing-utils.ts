@@ -2,21 +2,21 @@ import { InstalledClock } from '@sinonjs/fake-timers'
 import { ExecutionContext } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { ReplyError } from 'ioredis'
+import { WebSocket } from 'mock-socket'
 import * as client from 'prom-client'
-import { start } from '../index'
 import { Adapter, AdapterDependencies } from '../adapter'
 import { Cache, LocalCache } from '../cache'
 import { ResponseCache } from '../cache/response'
 import { EmptyCustomSettings, SettingsDefinitionMap } from '../config'
+import { start } from '../index'
 import {
   Transport,
   TransportDependencies,
   TransportGenerics,
   WebSocketClassProvider,
 } from '../transports'
-import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from './index'
 import { EmptyInputParameters, TypeFromDefinition } from '../validation/input-params'
-import { WebSocket } from 'mock-socket'
+import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from './index'
 export { WebSocket as MockWebsocket, Server as MockWebsocketServer } from 'mock-socket'
 
 export type NopTransportTypes = {
