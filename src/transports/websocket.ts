@@ -376,7 +376,9 @@ export class WebSocketTransport<
           unsubscribeMessage ? subscriptions.stale.map(unsubscribeMessage) : subscriptions.stale,
         )
       } else {
-        await this.sendMessages(context, subscriptions.new, subscriptions.stale)
+        logger.trace(
+          "This ws transport has no builders configured, so we're not sending any messages",
+        )
       }
     }
 
