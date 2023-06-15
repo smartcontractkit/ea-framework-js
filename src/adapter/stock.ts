@@ -8,10 +8,10 @@ import { AdapterEndpoint } from './endpoint'
  */
 export type StockEndpointInputParametersDefinition = InputParametersDefinition & {
   base: {
-    aliases: readonly ['from', 'symbol', 'asset', 'coin', 'ticker', ...string[]],
-    type: 'string',
-    description: 'The stock ticker to query',
-    required: boolean,
+    aliases: readonly ['from', 'symbol', 'asset', 'coin', 'ticker', ...string[]]
+    type: 'string'
+    description: 'The stock ticker to query'
+    required: boolean
   }
 }
 
@@ -22,7 +22,7 @@ export const stockEndpointInputParametersDefinition = {
   base: {
     aliases: ['from', 'symbol', 'asset', 'coin', 'ticker'],
     type: 'string',
-    description:  'The stock ticker to query',
+    description: 'The stock ticker to query',
     required: true,
   },
 } as const satisfies StockEndpointInputParametersDefinition
