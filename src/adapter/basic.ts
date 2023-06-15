@@ -1,4 +1,4 @@
-import Redis from 'ioredis'
+import { default as Redis } from 'ioredis'
 import Redlock from 'redlock'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
@@ -107,26 +107,34 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
     this.dependencies = this.initializeDependencies(dependencies)
 
-    // Console.log('redis client:', this.dependencies.cache)
-
     if (this.config.settings.EA_MODE !== 'reader') {
-      const redlock = new Redlock([this.dependencies.cache as any], {
-        driftFactor: 0.01, // Multiplied by lock ttl to determine drift time
-        retryCount: 10,
-        retryDelay: 200, // Time in ms
-        retryJitter: 200, // Time in ms
-        automaticExtensionThreshold: 500, // Time in ms
+      const redlock = new Redlock([this.dependencies.redisClient], {
+        // DriftFactor: 0.01, // Multiplied by lock ttl to determine drift time
+        // retryCount: 5,
+        // RetryDelay: 1000, // Time in ms
+        // retryJitter: 200, // Time in ms
+        // automaticExtensionThreshold: 500, // Time in ms
       })
 
-      // Console.log('redlock:', redlock)
+      const redlockKey = `${this.config.settings.CACHE_PREFIX}-${this.name}`
 
-      const redlockKey = `${this.name}-${this.config.settings.CACHE_PREFIX}`
+      logger.info(`redlock key is: ${redlockKey}`)
 
-      // Console.log('key:', redlockKey)
+      // Await redlock.using([redlockKey], 5000, async (signal) => {
+      //   // Make sure any attempted lock extension has not failed.
+      //   if (signal.aborted) {
+      //     throw signal.error
+      //   }
+      // })
 
-      await redlock.acquire([redlockKey], 5000)
+      redlock.acquire([redlockKey], 15000)
 
-      // Console.log('lock:', lock)
+      redlock.on('error', async (error) => {
+        logger.info(`Redlock: ${error}`)
+        process.exit()
+      })
+
+      logger.info('Success acquiring lock')
     }
 
     for (const endpoint of this.endpoints) {
