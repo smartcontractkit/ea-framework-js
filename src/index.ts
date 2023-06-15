@@ -114,6 +114,10 @@ export const start = async <T extends SettingsDefinitionMap>(
   }
 
   // Listener for unhandled promise rejections that are bubbling up to the top
+  // The tests will add many listeners since multiple adapters are started in the same process
+  if (process.env['NODE_ENV'] === 'test') {
+    process.setMaxListeners(0)
+  }
   process.on('unhandledRejection', (err: Error) => {
     censorLogs(() =>
       logger.error({
