@@ -192,6 +192,7 @@ export const metrics = new Metrics(() => ({
   httpRequestsPerBgExecute: new client.Gauge({
     name: 'http_requests_per_bg_execute',
     help: 'The number of HTTP requests made in a single background execute cycle',
+    labelNames: ['adapter_endpoint'] as const,
   }),
   dataProviderRequests: new client.Counter({
     name: 'data_provider_requests',

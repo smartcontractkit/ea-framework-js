@@ -160,6 +160,9 @@ test.serial('test basic metrics', async (t) => {
   // Test http request count per background execute
   metrics.assertPositiveNumber(t, {
     name: 'http_requests_per_bg_execute',
+    labels: {
+      adapter_endpoint: 'test',
+    },
   })
 
   // Test data provider requests metrics
