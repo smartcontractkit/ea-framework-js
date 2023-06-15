@@ -200,3 +200,9 @@ export class CryptoPriceEndpoint<T extends PriceEndpointGenerics> extends PriceE
     super(params)
   }
 }
+
+/**
+ * A ForexPriceEndpoint expands on the existing [[PriceEndpoint]] and provides more descriptive name for
+ *  endpoints that provide forex prices.
+ */
+export class ForexPriceEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {}
