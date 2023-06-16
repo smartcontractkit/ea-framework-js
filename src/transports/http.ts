@@ -150,6 +150,11 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     const rawRequests = this.config.prepareRequests(entries, context.adapterSettings)
     const requests = Array.isArray(rawRequests) ? rawRequests : [rawRequests]
 
+    metrics
+      .get('httpRequestsPerBgExecute')
+      .labels({ adapter_endpoint: context.endpointName })
+      .set(requests.length)
+
     // We're awaiting these promises because although we have request coalescing, new entries
     // could be added to the subscription set if not blocking this operation, so the next time the
     // background execute is triggered if the request is for a fully batched endpoint, we could end up

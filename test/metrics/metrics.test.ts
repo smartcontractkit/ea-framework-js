@@ -107,6 +107,7 @@ test.before(async (t) => {
     {
       envDefaultOverrides: {
         RATE_LIMIT_CAPACITY_SECOND: 10,
+        CACHE_MAX_ITEMS: 1000,
       },
     },
   )
@@ -154,6 +155,14 @@ test.serial('test basic metrics', async (t) => {
   // Test http request duration metrics
   metrics.assertPositiveNumber(t, {
     name: 'http_request_duration_seconds_sum',
+  })
+
+  // Test http request count per background execute
+  metrics.assertPositiveNumber(t, {
+    name: 'http_requests_per_bg_execute',
+    labels: {
+      adapter_endpoint: 'test',
+    },
   })
 
   // Test data provider requests metrics
@@ -311,5 +320,23 @@ test.serial('validate response.meta has the correct properties', async (t) => {
   t.deepEqual(response.meta, {
     adapterName: 'TEST',
     metrics: { feedId: '{"from":"eth","to":"usd"}' },
+  })
+})
+
+test.serial('test cache overflow metric', async (t) => {
+  for (let i = 0; i < 1100; i++) {
+    axiosMock
+      .onGet(`${URL}/price`, {
+        base: `${from}${i}`,
+        quote: to,
+      })
+      .reply(200, {
+        price,
+      })
+    await t.context.testAdapter.request({ from: `${from}${i}`, to })
+  }
+  const metrics = await t.context.testAdapter.getMetrics()
+  metrics.assertPositiveNumber(t, {
+    name: 'cache_overflow_count',
   })
 })
