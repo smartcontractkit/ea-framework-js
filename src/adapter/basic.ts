@@ -134,7 +134,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
         process.exit()
       })
 
-      logger.info('Success acquiring lock')
+      // Logger.info('Success acquiring lock')
     }
 
     for (const endpoint of this.endpoints) {
