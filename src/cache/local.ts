@@ -1,3 +1,4 @@
+import { metrics } from '../metrics'
 import { AdapterResponse, DoubleLinkedList, LinkedListNode, censorLogs, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
 import { CacheTypes } from './metrics'
@@ -113,6 +114,7 @@ export class LocalCache<T = unknown> implements Cache<T> {
       const node = this.list.removeHead()
       if (node) {
         this.cache.delete(node.key)
+        metrics.get('cacheOverflowCount').inc()
       }
     }
   }

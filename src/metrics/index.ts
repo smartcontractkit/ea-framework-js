@@ -189,6 +189,11 @@ export const metrics = new Metrics(() => ({
     help: 'A histogram bucket of the distribution of http request durations',
     buckets: requestDurationBuckets,
   }),
+  httpRequestsPerBgExecute: new client.Gauge({
+    name: 'http_requests_per_bg_execute',
+    help: 'The number of HTTP requests made in a single background execute cycle',
+    labelNames: ['adapter_endpoint'] as const,
+  }),
   dataProviderRequests: new client.Counter({
     name: 'data_provider_requests',
     help: 'The number of http requests that are made to a data provider',
@@ -251,6 +256,10 @@ export const metrics = new Metrics(() => ({
     name: 'cache_data_staleness_seconds',
     help: 'Observes the cache staleness of the data returned (i.e., time since the data was written to the cache)',
     labelNames: cacheMetricsLabels,
+  }),
+  cacheOverflowCount: new client.Counter({
+    name: 'cache_overflow_count',
+    help: 'A counter that increments every time an item overflows in local cache',
   }),
   totalDataStalenessSeconds: new client.Gauge({
     name: 'total_data_staleness_seconds',
