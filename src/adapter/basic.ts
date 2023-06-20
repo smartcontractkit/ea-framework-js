@@ -109,32 +109,35 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
     if (this.config.settings.EA_MODE !== 'reader') {
       const redlock = new Redlock([this.dependencies.redisClient], {
-        // DriftFactor: 0.01, // Multiplied by lock ttl to determine drift time
-        // retryCount: 5,
-        // RetryDelay: 1000, // Time in ms
-        // retryJitter: 200, // Time in ms
-        // automaticExtensionThreshold: 500, // Time in ms
+        // The expected clock drift
+        driftFactor: 0.01,
+        // The max number of times Redlock will attempt to lock a resource before erroring.
+        retryCount: 5,
+        // The time in ms between attempts
+        retryDelay: 1000,
+        // The max time in ms randomly added to retries to improve performance under high contention
+        retryJitter: 200,
       })
 
       const redlockKey = `${this.config.settings.CACHE_PREFIX}-${this.name}`
 
       logger.info(`redlock key is: ${redlockKey}`)
 
-      // Await redlock.using([redlockKey], 5000, async (signal) => {
-      //   // Make sure any attempted lock extension has not failed.
-      //   if (signal.aborted) {
-      //     throw signal.error
-      //   }
-      // })
-
-      redlock.acquire([redlockKey], 15000)
-
       redlock.on('error', async (error) => {
-        logger.info(`Redlock: ${error}`)
+        logger.info(`Redlock error: ${error}`)
         process.exit()
       })
 
-      // Logger.info('Success acquiring lock')
+      let lock = await redlock.acquire([redlockKey], 5000)
+      logger.info('Lock acquired')
+
+      const acquireLock = async () => {
+        // eslint-disable-next-line require-atomic-updates
+        lock = await lock.extend(5000)
+        logger.info('Lock extended')
+      }
+
+      setInterval(acquireLock, 4000)
     }
 
     for (const endpoint of this.endpoints) {
