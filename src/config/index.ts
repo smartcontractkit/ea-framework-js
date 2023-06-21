@@ -25,6 +25,11 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: '/',
   },
+  CACHE_LOCK_DURATION: {
+    description: 'Time (in ms) used as a baseline for the acquisition and extension of cache locks',
+    type: 'number',
+    default: 5000,
+  },
   CACHE_MAX_AGE: {
     description: 'Maximum amount of time (in ms) that a response will stay cached',
     type: 'number',
