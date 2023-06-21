@@ -1,4 +1,5 @@
 import Redis, { Result } from 'ioredis'
+import Redlock from 'redlock'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { AdapterResponse, censorLogs, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
@@ -107,5 +108,34 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
     // Record exec command sent to Redis
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'exec')
+  }
+
+  async lock(key: string, client: Redis, cacheLockDuration: number): Promise<void> {
+    const redlock = new Redlock([client], {
+      // The expected clock drift
+      driftFactor: 0.01,
+      // The max number of times Redlock will attempt to lock a resource before erroring.
+      retryCount: 10,
+      // The time in ms between attempts
+      retryDelay: cacheLockDuration / 5,
+      // The max time in ms randomly added to retries to improve performance under high contention
+      retryJitter: 200,
+    })
+
+    redlock.on('error', async (error) => {
+      logger.error(`Redlock error: ${error}`)
+      process.exit()
+    })
+
+    let lock = await redlock.acquire([key], cacheLockDuration)
+    logger.info(`Lock acquired with key: ${key}`)
+
+    const extendLock = async () => {
+      // eslint-disable-next-line require-atomic-updates
+      lock = await lock.extend(cacheLockDuration)
+      logger.trace(`Lock extended with key: ${key}`)
+    }
+
+    setInterval(extendLock, cacheLockDuration * 0.8)
   }
 }
