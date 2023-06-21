@@ -1,5 +1,4 @@
 import { default as Redis } from 'ioredis'
-import Redlock from 'redlock'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
 import {
@@ -108,36 +107,15 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     this.dependencies = this.initializeDependencies(dependencies)
 
     if (this.config.settings.EA_MODE !== 'reader') {
-      const redlock = new Redlock([this.dependencies.redisClient], {
-        // The expected clock drift
-        driftFactor: 0.01,
-        // The max number of times Redlock will attempt to lock a resource before erroring.
-        retryCount: 5,
-        // The time in ms between attempts
-        retryDelay: 1000,
-        // The max time in ms randomly added to retries to improve performance under high contention
-        retryJitter: 200,
-      })
+      const redlockKey = this.config.settings.CACHE_PREFIX
+        ? `${this.config.settings.CACHE_PREFIX}-${this.name}`
+        : this.name
 
-      const redlockKey = `${this.config.settings.CACHE_PREFIX}-${this.name}`
-
-      logger.info(`redlock key is: ${redlockKey}`)
-
-      redlock.on('error', async (error) => {
-        logger.info(`Redlock error: ${error}`)
-        process.exit()
-      })
-
-      let lock = await redlock.acquire([redlockKey], 5000)
-      logger.info('Lock acquired')
-
-      const acquireLock = async () => {
-        // eslint-disable-next-line require-atomic-updates
-        lock = await lock.extend(5000)
-        logger.info('Lock extended')
-      }
-
-      setInterval(acquireLock, 4000)
+      this.dependencies.cache.lock(
+        redlockKey,
+        this.dependencies.redisClient,
+        this.config.settings.CACHE_LOCK_DURATION,
+      )
     }
 
     for (const endpoint of this.endpoints) {
