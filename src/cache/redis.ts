@@ -110,8 +110,8 @@ export class RedisCache<T = unknown> implements Cache<T> {
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'exec')
   }
 
-  async lock(key: string, client: Redis, cacheLockDuration: number): Promise<void> {
-    const redlock = new Redlock([client], {
+  async lock(key: string, cacheLockDuration: number): Promise<void> {
+    const redlock = new Redlock([this.client], {
       // The expected clock drift
       driftFactor: 0.01,
       // The max number of times Redlock will attempt to lock a resource before erroring.
