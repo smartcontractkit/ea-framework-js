@@ -109,6 +109,7 @@ export async function runAllUntilTime(clock: InstalledClock, time: number): Prom
 
 export class RedisMock {
   store = new LocalCache<string>(10000)
+  keys: { [key: string]: string } = {}
 
   get(key: string) {
     return this.store.get(key)
@@ -138,6 +139,20 @@ export class RedisMock {
 
   setExternalAdapterResponse(key: string, value: string, ttl: number) {
     return this.set(key, value, 'PX', ttl)
+  }
+
+  evalsha(...args: never[]) {
+    const redlockKey = args[2][0]
+    console.log('redlock key:', redlockKey)
+
+    if (this.keys[redlockKey] === undefined) {
+      this.keys[redlockKey] = redlockKey
+      console.log('return 1')
+      return 1
+    } else {
+      console.log('return 0')
+      return 0
+    }
   }
 }
 
