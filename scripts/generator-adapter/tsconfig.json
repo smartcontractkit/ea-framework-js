@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "rootDir": "./../",
+    "outDir": "../../dist/src",
+    "target": "es2020",
+    "esModuleInterop": false,
+    "moduleResolution": "node",
+    "module": "CommonJS",
+    "resolveJsonModule": true
+  },
+  "files": [
+    "./generators/app/index.ts"
+  ]
+}

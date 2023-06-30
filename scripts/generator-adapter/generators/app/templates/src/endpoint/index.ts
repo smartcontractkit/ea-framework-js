@@ -1,0 +1,1 @@
+<% for(let i=0; i<endpoints.length; i++) {%>export { endpoint as <%- endpoints[i].normalizedEndpointName %> } from './<%= endpoints[i].endpointName %>' <%- '\n' %><%}%>
