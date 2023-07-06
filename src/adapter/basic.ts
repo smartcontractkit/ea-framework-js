@@ -17,6 +17,7 @@ import { RateLimiterFactory, RateLimitingStrategy } from '../rate-limiting/facto
 import {
   AdapterRequest,
   AdapterResponse,
+  LoggerFactoryProvider,
   SubscriptionSetFactory,
   censorLogs,
   makeLogger,
@@ -83,6 +84,10 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
    * Additionally, it builds a map out of all the endpoint names and aliases (checking for duplicates).
    */
   async initialize(dependencies?: Partial<AdapterDependencies>) {
+    // We initialize the logger first, separate from the rest of the dependency initialization
+    // since we could have a custom logger to document the EA lifecycle since the beginning.
+    LoggerFactoryProvider.set(dependencies?.loggerFactory)
+
     if (this.initialized) {
       throw new Error('This adapter has already been initialized!')
     }
@@ -90,6 +95,9 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     if (this.name !== this.name.toUpperCase()) {
       throw new Error('Adapter name must be uppercase')
     }
+
+    // We do this after we have the logging factory provider initialized
+    this.logRateLimitAllocations()
 
     // Initialize metrics to register them with the prom-client
     metrics.initialize()
@@ -167,7 +175,6 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
     const implicitAllocation = 100 - totalExplicitAllocation
 
-    logger.debug('Adapter rate limit allocations:')
     for (const endpoint of this.endpoints) {
       if (!endpoint.rateLimiting) {
         endpoint.rateLimiting = {
@@ -175,7 +182,12 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
             implicitAllocation / (numberOfEndpoints - endpointsWithExplicitAllocations.length),
         }
       }
+    }
+  }
 
+  private logRateLimitAllocations() {
+    logger.debug('Adapter rate limit allocations:')
+    for (const endpoint of this.endpoints) {
       logger.debug(`Endpoint [${endpoint.name}] - ${endpoint.rateLimiting?.allocationPercentage}%`)
     }
   }

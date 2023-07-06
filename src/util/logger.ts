@@ -94,6 +94,91 @@ export const colorFactory = (colors: string[]) => {
 const getNextColor = colorFactory(COLORS)
 
 /**
+ * Object that will provide logger instances upon requests, based on the basic pino logger.
+ */
+export interface LoggerFactory {
+  child(params: { layer: string; color?: string }): Omit<pino.BaseLogger, 'level' | 'silent'>
+}
+
+const defaultLoggerFactory = baseLogger
+
+/**
+ * Global class that will hold the logger factory.
+ * This is easier than refactoring the entire framework to use a dependency injection framework,
+ * and probably safer since all the popular ones use decorators that are still in the experimental stage.
+ */
+export class LoggerFactoryProvider {
+  private static factory: LoggerFactory
+
+  static set(factory: LoggerFactory = defaultLoggerFactory) {
+    // If the factory has already been set, we want to warn the user because
+    // the code might be calling this twice
+    if (this.factory) {
+      factory
+        .child({ layer: 'LoggerFactory' })
+        .warn(
+          'The logger factory has been set twice in the provider, this will not affect existing global loggers',
+        )
+    }
+    this.factory = factory
+  }
+
+  static get(): LoggerFactory {
+    return this.factory
+  }
+}
+
+/**
+ * Instance of a logger, that will defer the construction of its methods until the first time any of them are called.
+ * This is done so we can freely create these instances before the adapter is initialized, and allow
+ * the global logger factory to be injected if the user so desires.
+ */
+class PlaceholderLogger {
+  private levels = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'] as const
+
+  constructor(layer: string) {
+    const color = process.env['DEBUG'] === 'true' ? getNextColor() : undefined
+
+    for (const level of this.levels) {
+      this[level] = ((...args: Parameters<pino.LogFn>) => {
+        // This is the first time any method is called for this logger.
+        // We want to store the original arguments while we create the actual logger to call later.
+        const firstExecutionArgs = args
+
+        // If a logger factory was not set in the provider, error out.
+        const factory = LoggerFactoryProvider.get()
+        if (!factory) {
+          throw new Error(
+            'The logger factory provider does not have a factory set, you need to set one before executing any logging methods.',
+          )
+        }
+
+        // We have a logger factory, so first we create a new child logger
+        const logger = factory.child({
+          layer,
+          color,
+        })
+
+        // Replace all of this object's methods with the actual logger instance
+        for (const _level of this.levels) {
+          this[_level] = logger[_level].bind(logger)
+        }
+
+        // Finally, call the original intended logging function
+        this[level](...firstExecutionArgs)
+      }) as pino.LogFn
+    }
+  }
+
+  fatal!: pino.LogFn
+  error!: pino.LogFn
+  warn!: pino.LogFn
+  info!: pino.LogFn
+  debug!: pino.LogFn
+  trace!: pino.LogFn
+}
+
+/**
  * Instead of using a global logger instance, we want to force using a child logger
  * with a specific layer set in it, so that we can filter logs by where they're output from.
  *
@@ -111,11 +196,7 @@ const getNextColor = colorFactory(COLORS)
  * @param layer - the layer name to include in the logs (e.g. "SomeMiddleware", "RedisCache", etc.)
  * @returns a layer specific logger
  */
-export const makeLogger = (layer: string) =>
-  baseLogger.child({
-    layer,
-    color: process.env['DEBUG'] === 'true' ? getNextColor() : undefined,
-  })
+export const makeLogger = (layer: string) => new PlaceholderLogger(layer)
 
 export const loggingContextMiddleware = (
   rawReq: FastifyRequest,
