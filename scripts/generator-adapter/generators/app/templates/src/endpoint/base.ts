@@ -1,3 +1,4 @@
+<% if (includeComments) { %>// Input parameters define the structure of the request expected by the endpoint.<% } %>
 export const inputParameters = new InputParameters({
   base: {
     aliases: ['from', 'coin', 'symbol', 'market'],
@@ -12,7 +13,7 @@ export const inputParameters = new InputParameters({
     description: 'The symbol of the currency to convert to',
   },
 })
-
+<% if (includeComments) { %>// Endpoints contain a type parameter that allows specifying relevant types of an endpoint, for example, request payload type, Adapter response type and Adapter configuration (environment variables) type<% } %>
 export type BaseEndpointTypes = {
   Parameters: typeof inputParameters.definition
   Response: SingleNumberResultResponse

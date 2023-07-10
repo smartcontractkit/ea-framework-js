@@ -14,11 +14,11 @@ describe('websocket', () => {
   let testAdapter: TestAdapter
   const wsEndpoint = 'ws://localhost:9090'
   let oldEnv: NodeJS.ProcessEnv
-<% for(let i=0; i<wsEndpoints.length; i++) {%>
-  const data<%- wsEndpoints[i].normalizedEndpointNameCap %> = {
+<% for(let i=0; i<endpoints.length; i++) {%>
+  const data<%- endpoints[i].normalizedEndpointNameCap %> = {
     base: 'ETH',
     quote: 'USD',
-    endpoint: '<%- wsEndpoints[i].endpointName %>',
+    endpoint: '<%- endpoints[i].inputEndpointName %>',
     transport: 'ws'
   }
 <% } %>
@@ -36,9 +36,9 @@ describe('websocket', () => {
     })
 
     // Send initial request to start background execute and wait for cache to be filled with results
-<% for(var i=0; i<wsEndpoints.length; i++) {%>
-    await testAdapter.request(data<%- wsEndpoints[i].normalizedEndpointNameCap %>) <% } %>
-    await testAdapter.waitForCache(<%- wsEndpoints.length %>)
+<% for(var i=0; i<endpoints.length; i++) {%>
+    await testAdapter.request(data<%- endpoints[i].normalizedEndpointNameCap %>) <% } %>
+    await testAdapter.waitForCache(<%- endpoints.length %>)
   })
 
   afterAll(async () => {
@@ -47,10 +47,10 @@ describe('websocket', () => {
     testAdapter.clock?.uninstall()
     await testAdapter.api.close()
   })
-<% for(var i=0; i<wsEndpoints.length; i++) {%>
-  describe('<%= wsEndpoints[i].endpointName %> endpoint', () => {
+<% for(var i=0; i<endpoints.length; i++) {%>
+  describe('<%= endpoints[i].inputEndpointName %> endpoint', () => {
     it('should return success', async () => {
-      const response = await testAdapter.request(data<%- wsEndpoints[i].normalizedEndpointNameCap %>)
+      const response = await testAdapter.request(data<%- endpoints[i].normalizedEndpointNameCap %>)
       expect(response.json()).toMatchSnapshot()
     })
   })

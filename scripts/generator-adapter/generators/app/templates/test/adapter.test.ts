@@ -31,14 +31,14 @@ describe('execute', () => {
     spy.mockRestore()
   })
 
-  <% for(var i=0; i<httpEndpoints.length; i++) {%>
-  describe('<%= httpEndpoints[i].endpointName %> endpoint', () => {
+  <% for(var i=0; i<endpoints.length; i++) {%>
+  describe('<%= endpoints[i].inputEndpointName %> endpoint', () => {
     it('should return success', async () => {
       const data = {
         base: 'ETH',
         quote: 'USD',
-        endpoint: '<%= httpEndpoints[i].endpointName %>',
-        transport: 'rest'
+        endpoint: '<%= endpoints[i].inputEndpointName %>',
+        transport: '<%= transportName %>'
       }
       mockResponseSuccess()
       const response = await testAdapter.request(data)

@@ -4,7 +4,11 @@ This guide outlines the steps needed to setup a basic adapter.
 
 This guide carries stylistic biases, mainly in the context of the collection of EAs found in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js) under `packages/sources/`. That being said, this framework can be used outside of that to build standalone adapters, in which case its organization does not need to follow the structure laid out in this guide.
 
-## Steps
+## Creating A New Adapter
+The framework provides an interactive EA generator script to help create new adapters.
+To create a new adapter in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js) run `yarn generate-v3-adapter`. It will ask several questions regarding adapter and endpoints and will generate the file structure with all the boilerplate code.
+
+## Steps to create a new Adapter manually
 
 1. [Create the Folder Structure](#create-the-folder-structure)
 2. [Create a Transport](#create-a-transport)
@@ -23,8 +27,10 @@ adapter // Name after the adapter
 │  ├─ index.ts // Custom settings. Optional but very common
 │  ├─ overrides.json // Overrides file. Optional
 |  └─ includes.json // Includes file (e.x. inverses). Optional
-├─ endpoints
-│  └─ endpoint.ts // Endpoint and Transport defined here. Name after API endpoint
+├─ endpoint
+│  └─ endpoint.ts // Endpoint is defined here. Name after API endpoint
+├─ transport
+│  └─ transport.ts // Transport is defined here. Name as associated endpoint name
 ├─ index.ts // Adapter defined here
 ├─ test
 ├─ package.json
@@ -37,14 +43,15 @@ adapter // Name after the adapter
 
 ## Create a Transport
 
-Once the folder structure has been set up, a transport can be defined in its respective endpoint file. The v3 framework provides different types of transports to allow data retrieval through different protocols, such as HTTP, Websocket, and SSE.
+Once the folder structure has been set up, a transport can be defined in its respective transport file in `transport` folder. The v3 framework provides different types of transports to allow data retrieval through different protocols, such as HTTP, Websocket, and SSE.
 
 To learn more about transports and their specifications, please refer to the [Transports Guide](../components/transports.md).
 
 For the purpose of this guide, an example HTTP transport is shown below.
 
 ```typescript
-const transport = new HttpTransport<EndpointTypes>({
+
+const transport = new HttpTransport<HttpTransportTypes>({
   // Return list of ProviderRequestConfigs
   prepareRequests: (params, config) => {
     return params.map((param) => {
@@ -52,7 +59,7 @@ const transport = new HttpTransport<EndpointTypes>({
       const url = `/price/${symbol}`
 
       return {
-        params: param
+        params: param,
         request: {
           baseURL: config.API_ENDPOINT,
           url,
@@ -64,7 +71,7 @@ const transport = new HttpTransport<EndpointTypes>({
   parseResponse: (params, res) => {
     return res.data.map((result) => {
       return {
-        params: { symbol: result.symbol},
+        params: { symbol: result.symbol },
         response: {
           data: {
             result: result.price,
@@ -85,8 +92,9 @@ To learn more about `AdapterEndpoint` and its parameters, please refer to the [E
 
 ```typescript
 import { AdapterEndpoint } from '@chainlink/external-adapter-framework/adapter'
+import { transport } from '../transport/endpoint'
 
-export const endpoint = new AdapterEndpoint<EndpointTypes>({
+export const endpoint = new AdapterEndpoint({
   name: 'endpoint', // The name of this endpoint
   transport: transport, // The transport this endpoint is retrieves data through
   inputParameters, // Input parameters sent in requests to this endpoint

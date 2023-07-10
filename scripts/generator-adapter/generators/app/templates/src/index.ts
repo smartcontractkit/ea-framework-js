@@ -4,10 +4,18 @@ import { config } from './config'
 import { <%= endpointNames %> } from './endpoint'
 
 export const adapter = new Adapter({
-  defaultEndpoint: <%= defaultEndpoint.normalizedEndpointName %>.name,
-  name: '<%= adapterName.toUpperCase() %>',
-  config,
-  endpoints: [<%= endpointNames %>],
+<% if (includeComments) { -%>
+  //Requests will direct to this endpoint if the `endpoint` input parameter is not specified.
+<% } -%><%= ' ' %> defaultEndpoint: <%= defaultEndpoint.normalizedEndpointName %>.name,
+<% if (includeComments) { -%>
+  // Adapter name
+<% } -%><%= ' ' %> name: '<%= adapterName.toUpperCase() %>',
+<% if (includeComments) { -%>
+  // Adapter configuration (environment variables)
+<% } -%><%= ' ' %> config,
+<% if (includeComments) { -%>
+  // List of supported endpoints
+<% } -%><%= ' ' %> endpoints: [<%= endpointNames %>],
 })
 
 export const server = (): Promise<ServerInstance | undefined> => expose(adapter)

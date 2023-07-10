@@ -25,14 +25,13 @@ only being responsible to route to the transport. An EA that supports both WS an
 If a single endpoint supports multiple transports, these transports should be passed to the endpoint like so:
 
 ```typescript
-const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+const endpoint = new AdapterEndpoint({
   inputParameters,
   name: 'price', // /price
-  transports: {
-    rest: httpTransport,
-    ws: wsTransport,
-  },
-  // The custom router is optional; by default the endpoint will attempt to use
+  transportRoutes: new TransportRoutes<BaseEndpointTypes>()
+   .register('ws', wsTransport)
+   .register('rest', httpTransport),
+  // The custom router is optional; it will direct an incoming request to the appropriate transport
   customRouter: (req, config) => { ... },
   // The default transport is also optional
   defaultTransport: 'rest'
@@ -47,12 +46,13 @@ adapter
 │  ├─ index.ts // Common config vars
 │  ├─ overrides.json // Overrides file
 |  └─ includes.json // Includes file (e.x. inverses)
-├─ endpoints
-│  ├─ crypto // Input: {"endpoint": "crypto"} or {"endpoint": "crypto-ws"} (if added as an alias)
-│  │  ├─ HttpTransport
-│  │  └─ WebSocketTransport
-│  └─ volume // Input: {"endpoint": "volume"}
-│     └─ HttpTransport
+├─ endpoint
+│  ├─ crypto.ts // Input: {"endpoint": "crypto"} or {"endpoint": "crypto-ws"} (if added as an alias)
+│  └─ volume.ts // Input: {"endpoint": "volume"}
+├─ transport
+│  ├─ crypto-http.ts // HTTP Transport logic of crypto endpoint
+│  ├─ crypto-ws.ts // WS Transport logic of crypto endpoint
+│  └─ volume.ts // HTTP Transport logic of volume endpoint
 └─ index // References endpoints, rate limit tiers, custom settings, etc.
 ```
 
@@ -61,17 +61,22 @@ adapter
 Each transport will need a type that defines a set of types. This will look something like this:
 
 ```typescript
-export type EndpointTypes = {
-  Parameters: typeof inputParameters.definition // Types of the custom input params. For no parameters, use EmptyInputParameters
-  CustomSettings: typeof customSettings // Types of custom settings. For generic settings, use EmptyCustomSettings
-  Response: SingleNumberResultResponse // Type of the response from the EA
+export type TransportTypes = BaseEndpointTypes & {
   Provider: {
-    ... // Provider specific details, these differ and are defined by each Transport implementation
+    // Provider specific details, these differ and are defined by each Transport implementation
   }
 }
 ```
 
-These types will also be shared with the Endpoint that’s referencing this transport.
+BaseEndpointTypes is typically defined in the corresponding endpoint file and looks like this
+
+```typescript
+export type BaseEndpointTypes = {
+  Parameters: typeof inputParameters.definition // Types of the custom input params. For no parameters, use EmptyInputParameters
+  CustomSettings: typeof customSettings // Types of custom settings. For generic settings, use EmptyCustomSettings
+  Response: SingleNumberResultResponse // Type of the response from the EA
+}
+```
 
 ## Building an HTTP Transport
 
@@ -79,7 +84,7 @@ Building an HTTP transport mainly consists of defining types (above), and defini
 to and from the DP. An example that sends request to a non-batch endpoint:
 
 ```typescript
-const httpTransport = new HttpTransport<EndpointTypes>({
+const httpTransport = new HttpTransport<TransportTypes>({
   prepareRequests: (params, config) => {
     // The `params` param contains all the requests made to the EA that need data fetched from the DP.
     // Using this, return the request config to the DP.
@@ -113,7 +118,7 @@ const httpTransport = new HttpTransport<EndpointTypes>({
 An example to a batch endpoint is not much different:
 
 ```typescript
-const httpTransport = new HttpTransport<EndpointTypes>({
+const httpTransport = new HttpTransport<TransportTypes>({
   prepareRequest: (params, config) => {
     // The `params` param contains an array of the request made to the EA.
     // Using this, return the request config to the DP.
@@ -154,7 +159,7 @@ A WebSocket transport is a bit different from the HttpTransport, but also boils 
 request to the DP and parsing messages to results to be stored in cache.
 
 ```typescript
-export const wsTransport = new WebSocketTransport<EndpointTypes>({
+export const wsTransport = new WebSocketTransport<TransportTypes>({
   url: (context) => context.adapterConfig.WS_API_ENDPOINT || DEFAULT_WS_API_ENDPOINT, // The URL to connect to
   handlers: {
     open(connection) {
@@ -163,7 +168,7 @@ export const wsTransport = new WebSocketTransport<EndpointTypes>({
       // opened. If everything is successful, simply return. For errors,
       // simply throw an error.
     },
-    message(message): ProviderResult<EndpointTypes>[] | undefined {
+    message(message): ProviderResult<TransportTypes>[] | undefined {
       // Parse the message from the WS stream. If it's a price update, return
       // the request params and its result in an array:
       // return [
@@ -192,7 +197,7 @@ export const wsTransport = new WebSocketTransport<EndpointTypes>({
 A v3 Endpoint is the same as a v2 Endpoint in that it routes based on the `endpoint` input parameter. The endpoint can take either a single transport, or a map of transports with an optional router function and default transport.
 
 ```typescript
-export const endpoint = new PriceEndpoint<EndpointTypes>({
+export const endpoint = new PriceEndpoint({
   name: 'crypto', // The name of this endpoint. { "endpoint": "crypto" }
   aliases: ['crypto-ws', 'price'], // Aliases for the endpoint
   transport: httpTransport, // The transport this endpoint is referencing
@@ -285,79 +290,6 @@ Tests in v3 EAs are very similar to how they’re done in v2. Use nock for DP AP
 compare outputs with snapshots.
 
 You should be running integration tests without metrics, and the tests should support the EA running on any arbitrary
-port. The following can be used as a setup helper:
+port. 
+Please refer to [Tests](../components/tests.md) for examples.
 
-```typescript
-import request, { SuperTest, Test } from 'supertest'
-import { AddressInfo } from 'net'
-import * as process from 'process'
-import * as nock from 'nock'
-import { ServerInstance } from '@chainlink/external-adapter-framework'
-
-export type SuiteContext = {
-  req: SuperTest<Test> | null
-  server: () => Promise<ServerInstance>
-  fastify?: ServerInstance
-}
-
-export type EnvVariables = { [key: string]: string }
-
-export type TestOptions = { cleanNock?: boolean; fastify?: boolean }
-
-export const setupExternalAdapterTest = (
-  envVariables: NodeJS.ProcessEnv,
-  context: SuiteContext,
-  options: TestOptions = { cleanNock: true, fastify: false },
-): void => {
-  let fastify: ServerInstance
-
-  beforeAll(async () => {
-    process.env['METRICS_ENABLED'] = 'false'
-    for (const key in envVariables) {
-      process.env[key] = envVariables[key]
-    }
-
-    if (process.env['RECORD']) {
-      nock.recorder.rec()
-    }
-    fastify = await context.server()
-
-    // eslint-disable-next-line require-atomic-updates
-    context.req = request(`localhost:${(fastify.server.address() as AddressInfo).port}`)
-
-    // Only for edge cases when someone needs to use the fastify instance outside this function
-    if (options.fastify) {
-      // eslint-disable-next-line require-atomic-updates
-      context.fastify = fastify
-    }
-  })
-
-  afterAll(async () => {
-    if (process.env['RECORD']) {
-      nock.recorder.play()
-    }
-
-    await fastify.close()
-  })
-}
-```
-
-You can then use this in your tests:
-
-```typescript
-const context: SuiteContext = {
-  req: null,
-  server: async () => {
-    process.env['RATE_LIMIT_CAPACITY_SECOND'] = '6'
-    process.env['METRICS_ENABLED'] = 'false'
-    const server = (await import('../../src')).server
-    return server() as Promise<ServerInstance>
-  },
-}
-
-const envVariables = {
-  CACHE_ENABLED: 'false',
-}
-
-setupExternalAdapterTest(envVariables, context)
-```
