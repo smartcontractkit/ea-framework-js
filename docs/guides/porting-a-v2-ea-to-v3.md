@@ -290,6 +290,5 @@ Tests in v3 EAs are very similar to how they’re done in v2. Use nock for DP AP
 compare outputs with snapshots.
 
 You should be running integration tests without metrics, and the tests should support the EA running on any arbitrary
-port. 
+port.
 Please refer to [Tests](../components/tests.md) for examples.
-

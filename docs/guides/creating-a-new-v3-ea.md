@@ -5,6 +5,7 @@ This guide outlines the steps needed to setup a basic adapter.
 This guide carries stylistic biases, mainly in the context of the collection of EAs found in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js) under `packages/sources/`. That being said, this framework can be used outside of that to build standalone adapters, in which case its organization does not need to follow the structure laid out in this guide.
 
 ## Creating A New Adapter
+
 The framework provides an interactive EA generator script to help create new adapters.
 To create a new adapter in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js) run `yarn generate-v3-adapter`. It will ask several questions regarding adapter and endpoints and will generate the file structure with all the boilerplate code.
 
@@ -50,7 +51,6 @@ To learn more about transports and their specifications, please refer to the [Tr
 For the purpose of this guide, an example HTTP transport is shown below.
 
 ```typescript
-
 const transport = new HttpTransport<HttpTransportTypes>({
   // Return list of ProviderRequestConfigs
   prepareRequests: (params, config) => {

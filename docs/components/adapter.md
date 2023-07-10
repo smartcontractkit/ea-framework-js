@@ -17,22 +17,20 @@ If the EA does not require any custom env vars, this file can be ignored. Instea
 ```typescript
 import { AdapterConfig } from '@chainlink/external-adapter-framework/config'
 
-export const config = new AdapterConfig(
-  {
-    API_KEY: {
-      description: '', // Description of the env var
-      type: 'string', // What type should the value be
-      options: ['foo', 'bar'], // If applicable, a list of valid options this env var could be set to
-      default: 'foo', // If applicable, a default value
-      validate: {
-        meta: {},
-        fn:  () => {}
-      }, // If applicable, a Validator object to validate the env var value. Return an error message for a failed validation, or undefined if it passes.
-      required: true, // If the env var should be required. Default = false
-      sensitive: true, // Set to true to censor this env var from logs. Default = false
-    }
-  }
-)
+export const config = new AdapterConfig({
+  API_KEY: {
+    description: '', // Description of the env var
+    type: 'string', // What type should the value be
+    options: ['foo', 'bar'], // If applicable, a list of valid options this env var could be set to
+    default: 'foo', // If applicable, a default value
+    validate: {
+      meta: {},
+      fn: () => {},
+    }, // If applicable, a Validator object to validate the env var value. Return an error message for a failed validation, or undefined if it passes.
+    required: true, // If the env var should be required. Default = false
+    sensitive: true, // Set to true to censor this env var from logs. Default = false
+  },
+})
 ```
 
 ## Env Var Default Overrides

@@ -59,8 +59,8 @@ export type BaseEndpointTypes = {
   Settings: typeof config.settings
 }
 ```
-Transport files extend BaseEndpointTypes and additionally provide DP specific information like DP request/response type or websocket message types are defined in corresponding transport files.
 
+Transport files extend BaseEndpointTypes and additionally provide DP specific information like DP request/response type or websocket message types are defined in corresponding transport files.
 
 ## Cache Key Generator
 

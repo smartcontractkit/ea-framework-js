@@ -2,7 +2,7 @@
 
 To learn more about what transports are and what they do, please refer to the [EA Basics Doc](../basics.md)
 
-Define transport file in a seperate folder called `transport`. The name of the file is the same as its associated endpoint. In case endpoint supports multiple transports, transport file names can be suffixed with transport types. 
+Define transport file in a seperate folder called `transport`. The name of the file is the same as its associated endpoint. In case endpoint supports multiple transports, transport file names can be suffixed with transport types.
 
 ## Choosing Transports
 
