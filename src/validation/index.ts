@@ -140,11 +140,12 @@ export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: Fa
   if (req.requestContext) {
     req.requestContext.meta = { ...req.requestContext?.meta, error: err }
   } else {
+    const errorLabel = 'inputValidationError'
     req.requestContext = {
-      cacheKey: '',
+      cacheKey: errorLabel,
       data: undefined,
-      endpointName: '',
-      transportName: '',
+      endpointName: errorLabel,
+      transportName: errorLabel,
       meta: { error: err },
     }
   }
