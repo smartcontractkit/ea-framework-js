@@ -1,26 +1,31 @@
 import untypedTest, { TestFn } from 'ava'
 import { calculateFeedId } from '../../src/cache'
 import { AdapterSettings, buildAdapterSettings } from '../../src/config'
+import { LoggerFactoryProvider } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { InputParametersDefinition } from '../../src/validation/input-params'
 
-const feedIdTest = untypedTest as TestFn<{
+const test = untypedTest as TestFn<{
   inputParameters: InputParameters<InputParametersDefinition>
   endpointName: string
   adapterSettings: AdapterSettings
 }>
 
-feedIdTest.beforeEach(async (t) => {
+test.before(() => {
+  LoggerFactoryProvider.set()
+})
+
+test.beforeEach(async (t) => {
   t.context.endpointName = 'TEST'
   t.context.inputParameters = new InputParameters({})
   t.context.adapterSettings = buildAdapterSettings({})
 })
 
-feedIdTest.serial('no parameters returns N/A', async (t) => {
+test.serial('no parameters returns N/A', async (t) => {
   t.is(calculateFeedId(t.context, {}), 'N/A')
 })
 
-feedIdTest.serial('builds feed ID correctly from input params', async (t) => {
+test.serial('builds feed ID correctly from input params', async (t) => {
   t.context.inputParameters = new InputParameters({
     base: {
       type: 'string',

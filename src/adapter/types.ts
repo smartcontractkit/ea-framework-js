@@ -4,7 +4,7 @@ import { Cache } from '../cache'
 import { AdapterConfig, BaseAdapterSettings, SettingsDefinitionMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics, TransportRoutes } from '../transports'
-import { AdapterRequest, SubscriptionSetFactory } from '../util'
+import { AdapterRequest, LoggerFactory, SubscriptionSetFactory } from '../util'
 import { Requester } from '../util/requester'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
@@ -38,6 +38,9 @@ export interface AdapterDependencies {
 
   /** Shared instance to handle sending http requests in a centralized fashion */
   requester: Requester
+
+  /** Factory that will provide logger instances for the adapter. */
+  loggerFactory: LoggerFactory
 }
 
 /**
