@@ -143,7 +143,7 @@ export interface BaseAdapterEndpointParams<T extends EndpointGenerics> {
   rateLimiting?: EndpointRateLimitingConfig
 
   /** Custom function that generates cache keys */
-  cacheKeyGenerator?: (data: Record<string, unknown>) => string
+  cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
 
   /** Custom input validation. Void function that should throw AdapterInputError on validation errors */
   customInputValidation?: CustomInputValidator<T>
