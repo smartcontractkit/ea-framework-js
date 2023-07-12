@@ -20,6 +20,23 @@ test('Generate cache label test', (t) => {
   )
 })
 
+test('Generate http request metrics label test (response status code)', (t) => {
+  const label = buildHttpRequestMetricsLabel(
+    'test-{"base":"eth","quote":"btc"}',
+    undefined,
+    false,
+    400,
+  )
+  const result = {
+    feed_id: 'test-{"base":"eth","quote":"btc"}',
+    method: 'POST',
+    status_code: 400,
+    provider_status_code: 200,
+    type: HttpRequestType.DATA_PROVIDER_HIT,
+  }
+  t.deepEqual(label, result)
+})
+
 test('Generate http request metrics label test (adapter error)', (t) => {
   const label = buildHttpRequestMetricsLabel(
     'test-{"base":"eth","quote":"btc"}',

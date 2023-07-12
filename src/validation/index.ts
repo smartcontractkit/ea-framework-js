@@ -140,9 +140,19 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
 export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: FastifyReply) => {
   // Add adapter or generic error to request meta for metrics use
-  // There's a chance we have no request context if there was an error during input validation
+  // There's a chance we have no request context if there was an error during input validation,
+  // but we still want to include error in meta for metrics
   if (req.requestContext) {
     req.requestContext.meta = { ...req.requestContext?.meta, error: err }
+  } else {
+    const errorLabel = 'inputValidationError'
+    req.requestContext = {
+      cacheKey: errorLabel,
+      data: undefined,
+      endpointName: errorLabel,
+      transportName: errorLabel,
+      meta: { error: err },
+    }
   }
 
   // Add the request context to the error so that we can check things like incoming params, endpoint, etc

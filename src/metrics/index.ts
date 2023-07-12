@@ -67,6 +67,7 @@ export const buildMetricsMiddleware = (
     feedId,
     req.requestContext?.meta?.error,
     req.requestContext?.meta?.metrics?.cacheHit,
+    res.statusCode,
   )
 
   // Record number of requests sent to EA
@@ -128,6 +129,7 @@ export const buildHttpRequestMetricsLabel = (
   feedId: string,
   error?: AdapterError | Error,
   cacheHit?: boolean,
+  responseStatusCode?: number,
 ): Record<string, string | number | undefined> => {
   const labels = {} as Record<(typeof httpRequestsTotalLabels)[number], string | number | undefined>
   labels.method = 'POST'
@@ -143,7 +145,7 @@ export const buildHttpRequestMetricsLabel = (
     labels.status_code = 500
   } else {
     // If no error present, request went as expected
-    labels.status_code = 200
+    labels.status_code = responseStatusCode || 200
     if (cacheHit) {
       labels.type = HttpRequestType.CACHE_HIT
     } else {
