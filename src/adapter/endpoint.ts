@@ -28,7 +28,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   transportRoutes: TransportRoutes<T>
   inputParameters: InputParameters<T['Parameters']>
   rateLimiting?: EndpointRateLimitingConfig | undefined
-  cacheKeyGenerator?: (data: Record<string, unknown>) => string
+  cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
   requestTransforms: RequestTransform<T>[]
   overrides?: Record<string, string> | undefined
