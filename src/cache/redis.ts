@@ -1,5 +1,5 @@
 import Redis, { Result } from 'ioredis'
-import Redlock from 'redlock'
+import Redlock, { ResourceLockedError } from 'redlock'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { AdapterResponse, censorLogs, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
@@ -115,7 +115,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
       // The expected clock drift
       driftFactor: 0.01,
       // The max number of times Redlock will attempt to lock a resource before erroring.
-      retryCount: 0,
+      retryCount: 10,
       // The time in ms between attempts
       retryDelay: cacheLockDuration / 5,
       // The max time in ms randomly added to retries to improve performance under high contention
@@ -124,16 +124,16 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
     redlock.on('error', async (error) => {
       logger.error(`Redlock error: ${error}`)
+      if (error instanceof ResourceLockedError) {
+        return
+      }
       throw new Error(error)
     })
-
-    console.log('acquiring lock...')
 
     let lock = await redlock.acquire([key], cacheLockDuration)
     logger.info(`Lock acquired with key: ${key}`)
 
     const extendLock = async () => {
-      console.log('extending...')
       // eslint-disable-next-line require-atomic-updates
       lock = await lock.extend(cacheLockDuration)
       logger.trace(`Lock extended with key: ${key}`)
