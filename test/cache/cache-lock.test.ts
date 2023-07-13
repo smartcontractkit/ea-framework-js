@@ -1,4 +1,5 @@
 import Redis from 'ioredis'
+import { ExecutionError } from 'redlock'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
@@ -58,16 +59,17 @@ test.serial(
       redisClient,
     }
 
-    t.context.cache = cache
-
     try {
       await TestAdapter.start(adapter, t.context, dependencies)
       await TestAdapter.start(adapter2, t.context, dependencies)
 
-      t.fail('Resource locked error should have been thrown')
+      t.fail('An ExecutionError should have been thrown')
     } catch (error) {
-      console.log('error is:', error)
-      t.pass()
+      if (error instanceof ExecutionError) {
+        t.is(error.message, 'The operation was unable to achieve a quorum during its retry window.')
+      } else {
+        t.fail('An ExecutionError should have been thrown')
+      }
     }
   },
 )
@@ -125,16 +127,13 @@ test.serial(
       redisClient,
     }
 
-    t.context.cache = cache
-
     try {
       await TestAdapter.start(adapter, t.context, dependencies)
       await TestAdapter.start(adapter2, t.context, dependencies)
 
       t.pass()
     } catch (error) {
-      t.fail('An error should not have been thrown')
-      console.log('error is:', error)
+      t.fail(`The following error should not have been thrown: ${error}`)
     }
   },
 )
@@ -203,8 +202,7 @@ test.serial(
 
       t.pass()
     } catch (error) {
-      t.fail('An error should not have been thrown')
-      console.log('error is:', error)
+      t.fail(`The following error should not have been thrown: ${error}`)
     }
   },
 )
@@ -261,17 +259,18 @@ test.serial(
       redisClient,
     }
 
-    t.context.cache = cache
-
     try {
       await TestAdapter.start(adapter, t.context, dependencies)
       await sleep(5000)
       await TestAdapter.start(adapter2, t.context, dependencies)
 
-      t.fail('An error should have been thrown')
+      t.fail('An ExecutionError should have been thrown')
     } catch (error) {
-      t.pass()
-      console.log('error is:', error)
+      if (error instanceof ExecutionError) {
+        t.is(error.message, 'The operation was unable to achieve a quorum during its retry window.')
+      } else {
+        t.fail('An ExecutionError should have been thrown')
+      }
     }
   },
 )
