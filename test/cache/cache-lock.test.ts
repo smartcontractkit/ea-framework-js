@@ -2,6 +2,7 @@ import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
+import { sleep } from '../../src/util'
 import { MockCache, NopTransport, RedisMock, TestAdapter } from '../../src/util/testing-utils'
 import { test } from './helper'
 
@@ -203,6 +204,73 @@ test.serial(
       t.pass()
     } catch (error) {
       t.fail('An error should not have been thrown')
+      console.log('error is:', error)
+    }
+  },
+)
+
+test.serial(
+  'A lock should automatically extend and prevent another adapter from acquiring a lock with the same key',
+  async (t) => {
+    const config = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          CACHE_TYPE: 'redis',
+          CACHE_REDIS_PORT: 6000,
+        },
+      },
+    )
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config,
+      endpoints: [
+        new AdapterEndpoint({
+          name: 'nowork',
+          transport: new NopTransport(),
+        }),
+      ],
+    })
+
+    const config2 = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          CACHE_TYPE: 'redis',
+          CACHE_REDIS_PORT: 6000,
+        },
+      },
+    )
+    const adapter2 = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config: config2,
+      endpoints: [
+        new AdapterEndpoint({
+          name: 'nowork',
+          transport: new NopTransport(),
+        }),
+      ],
+    })
+
+    const redisClient = new RedisMock() as unknown as Redis
+    const cache = new RedisCache(redisClient) // Fake redis
+    const dependencies: Partial<AdapterDependencies> = {
+      cache,
+      redisClient,
+    }
+
+    t.context.cache = cache
+
+    try {
+      await TestAdapter.start(adapter, t.context, dependencies)
+      await sleep(5000)
+      await TestAdapter.start(adapter2, t.context, dependencies)
+
+      t.fail('An error should have been thrown')
+    } catch (error) {
+      t.pass()
       console.log('error is:', error)
     }
   },
