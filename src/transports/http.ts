@@ -239,7 +239,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
           transportName: this.name,
         }),
         requestConfig.request,
-        requestConfig.cost
+        requestConfig.cost,
       )
 
       // Parse responses and apply timestamps

@@ -96,7 +96,6 @@ export class ApiCreditsRateLimiter implements RateLimiter {
     this.creditsThisSecond += creditCost
     this.creditsThisMinute += creditCost
 
-
     logger.trace(
       `Request is now ready to go, updated count: (S = ${this.creditsThisSecond} | M = ${this.creditsThisMinute})`,
     )

@@ -104,7 +104,7 @@ class MockHttpTransport extends HttpTransport<HttpTransportTypes> {
             pairs: params.map((p) => ({ base: p.from, quote: p.to })),
           },
         },
-        cost: requestCost
+        cost: requestCost,
       }),
       parseResponse: (
         params,
@@ -147,7 +147,6 @@ const to = 'USD'
 const price = 1234
 const volume = 4567
 const requestCost = 2 // Static API credit cost of the request
-
 
 axiosMock
   .onPost(URL + endpoint, {
@@ -336,7 +335,7 @@ test.serial(
     await subtest(RateLimitingStrategy.FIXED_INTERVAL, expected)
     await subtest(RateLimitingStrategy.BURST, expected)
     // For API_CREDIT we need to divide the credit limit to the cost of one request
-    expected = 60 * Math.ceil(rateLimit1s/requestCost) + 1
+    expected = 60 * Math.ceil(rateLimit1s / requestCost) + 1
     await subtest(RateLimitingStrategy.API_CREDIT, expected)
   },
 )

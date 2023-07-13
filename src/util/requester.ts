@@ -162,7 +162,11 @@ export class Requester {
    * @param cost - Data Provider API credit cost of the request
    * @returns a promise that will resolve whenever the request is popped from the queue, sent, and a response is received
    */
-  async request<T>(key: string, req: AxiosRequestConfig, cost?: number): Promise<RequesterResult<T>> {
+  async request<T>(
+    key: string,
+    req: AxiosRequestConfig,
+    cost?: number,
+  ): Promise<RequesterResult<T>> {
     // If there's already a queued request, reuse it's existing promise
     const existingQueuedRequest = this.map[key]
     if (existingQueuedRequest) {
@@ -176,7 +180,7 @@ export class Requester {
       key,
       config: req,
       retries: 0,
-      cost
+      cost,
     } as QueuedRequest<T>
 
     // This dual promise layer is built so the queuedRequest can hold both the resolve and reject handlers,
