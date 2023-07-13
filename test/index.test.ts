@@ -1,8 +1,10 @@
 import untypedTest, { TestFn } from 'ava'
+import { Redis } from 'ioredis'
 import { expose, getTLSOptions, start } from '../src'
-import { Adapter, AdapterEndpoint } from '../src/adapter'
+import { Adapter, AdapterDependencies, AdapterEndpoint } from '../src/adapter'
+import { RedisCache } from '../src/cache'
 import { AdapterConfig, buildAdapterSettings } from '../src/config'
-import { NopTransport, TestAdapter } from '../src/util/testing-utils'
+import { NopTransport, RedisMock, TestAdapter } from '../src/util/testing-utils'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -176,7 +178,12 @@ test('Adapter writer mode api disabled', async (t) => {
     ],
   })
 
-  const api = await expose(adapter)
+  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const dependencies: Partial<AdapterDependencies> = {
+    cache,
+  }
+
+  const api = await expose(adapter, dependencies)
   t.is(api, undefined)
 })
 
@@ -201,9 +208,15 @@ test('Initialize adapter twice (error)', async (t) => {
       }),
     ],
   })
+
+  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const dependencies: Partial<AdapterDependencies> = {
+    cache,
+  }
+
   try {
-    await start(adapter)
-    await start(adapter)
+    await start(adapter, dependencies)
+    await start(adapter, dependencies)
     t.fail()
   } catch (e: unknown) {
     t.is((e as Error).message, 'This adapter has already been initialized!')
