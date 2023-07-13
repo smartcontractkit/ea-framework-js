@@ -145,22 +145,17 @@ export class RedisMock {
     const redlockKey = args[2][0]
     const instanceKey = args[2][1]
 
-    console.log('redlock key:', redlockKey)
-    console.log('instance key:', instanceKey)
-
     // If key has been used to acquire a lock, and the instance key matches, extend it
     if (this.keys[redlockKey] === instanceKey) {
-      console.log('extending, return 1')
       return 1
     }
 
     // If key has not been used to acquire a lock, set it
     if (this.keys[redlockKey] === undefined) {
       this.keys[redlockKey] = instanceKey
-      console.log('return 1')
       return 1
     } else {
-      console.log('return 0')
+      // If key has already been used, reject lock acquisition
       return 0
     }
   }
