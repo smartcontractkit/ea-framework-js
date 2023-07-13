@@ -126,6 +126,8 @@ export class RedisCache<T = unknown> implements Cache<T> {
       if (error instanceof ResourceLockedError) {
         logger.error(`Redlock error: ${error}`)
         return
+      } else {
+        logger.error(`Redlock error: ${error}`)
       }
     })
 
