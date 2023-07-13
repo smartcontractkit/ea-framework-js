@@ -341,7 +341,7 @@ export const BaseSettingsDefinition = {
   RATE_LIMITING_STRATEGY: {
     description: 'The rate limiting strategy to use for outbound requests',
     type: 'enum',
-    options: ['burst', 'fixed-interval'],
+    options: ['burst', 'fixed-interval', 'api-credit'],
     default: 'fixed-interval',
   },
   REQUESTER_SLEEP_BEFORE_REQUEUEING_MS: {
