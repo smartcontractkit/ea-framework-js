@@ -75,17 +75,25 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
      * Builds a WS message that will be sent to subscribe to a specific feed
      *
      * @param params - the body of the adapter request
+     * @param context - the background context for the Adapter
      * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
      */
-    subscribeMessage?: (params: TypeFromDefinition<T['Parameters']>) => unknown
+    subscribeMessage?: (
+      params: TypeFromDefinition<T['Parameters']>,
+      context: EndpointContext<T>,
+    ) => unknown
 
     /**
      * Builds a WS message that will be sent to unsubscribe to a specific feed
      *
      * @param params - the body of the adapter request
+     * @param context - the background context for the Adapter
      * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
      */
-    unsubscribeMessage?: (params: TypeFromDefinition<T['Parameters']>) => unknown
+    unsubscribeMessage?: (
+      params: TypeFromDefinition<T['Parameters']>,
+      context: EndpointContext<T>,
+    ) => unknown
   }
 }
 
@@ -372,8 +380,12 @@ export class WebSocketTransport<
         const { subscribeMessage, unsubscribeMessage } = builders
         await this.sendMessages(
           context,
-          subscribeMessage ? subscriptions.new.map(subscribeMessage) : subscriptions.new,
-          unsubscribeMessage ? subscriptions.stale.map(unsubscribeMessage) : subscriptions.stale,
+          subscribeMessage
+            ? subscriptions.new.map((sub) => subscribeMessage(sub, context))
+            : subscriptions.new,
+          unsubscribeMessage
+            ? subscriptions.stale.map((sub) => unsubscribeMessage(sub, context))
+            : subscriptions.stale,
         )
       } else {
         logger.trace(
