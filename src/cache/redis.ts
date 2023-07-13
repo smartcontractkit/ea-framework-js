@@ -123,11 +123,10 @@ export class RedisCache<T = unknown> implements Cache<T> {
     })
 
     redlock.on('error', async (error) => {
-      logger.error(`Redlock error: ${error}`)
       if (error instanceof ResourceLockedError) {
+        logger.error(`Redlock error: ${error}`)
         return
       }
-      throw new Error(error)
     })
 
     let lock = await redlock.acquire([key], cacheLockDuration)
