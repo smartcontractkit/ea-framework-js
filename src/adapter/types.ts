@@ -68,6 +68,7 @@ export interface AdapterRateLimitingConfig {
  */
 export type RequestTransform<T extends EndpointGenerics> = (
   req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
+  settings: T['Settings'],
 ) => void
 
 /**

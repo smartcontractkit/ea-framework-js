@@ -88,7 +88,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     // Run any request transforms that might have been defined in the adapter.
     // This is the last time modifications are supposed to happen to the request.
-    endpoint.runRequestTransforms(req)
+    endpoint.runRequestTransforms(req, adapter.config.settings)
 
     if (
       adapter.config.settings.METRICS_ENABLED &&
