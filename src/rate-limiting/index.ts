@@ -32,7 +32,7 @@ export interface RateLimiter {
    * This method will block (if necessary) until the rate limiter can make sure the
    * next outbound request will be within the specified limits.
    *
-   * @param cost - cost of API credit for a request. Used only for API credit limit based rate limiter.
+   * @param cost - credit cost of an API request sent to Data Provider. Used for burst rate limiter
    */
   waitForRateLimit(cost?: number): Promise<void>
 

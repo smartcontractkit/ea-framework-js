@@ -49,7 +49,7 @@ export type ProviderRequestConfig<T extends HttpTransportGenerics> = {
   endpointNameOverride?: string
 
   /** The API credit cost of the request sent to the data provider.
-   * Applies only for 'api-credit' rate limit strategy and is ignored if another strategy is used. */
+   * Applies only for burst rate limit strategy and is ignored if another strategy is used. */
   cost?: number
 }
 

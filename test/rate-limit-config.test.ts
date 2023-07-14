@@ -495,14 +495,6 @@ test('returns 0 when limit is set to infinity, no tier limit specified (burst ra
   t.is(time, 0)
 })
 
-test('returns 0 when limit is set to infinity, no tier limit specified (api credit rate limiter)', async (t) => {
-  const burstRateLimiter = RateLimiterFactory.buildRateLimiter(
-    RateLimitingStrategy.API_CREDIT,
-  ).initialize([], {})
-  const time = burstRateLimiter.msUntilNextExecution()
-  t.is(time, 0)
-})
-
 test('highestRateLimitTiers errors when no tiers are provided', async (t) => {
   await t.throwsAsync(async () => highestRateLimitTiers({}), {
     message: 'The tiers object is defined, but has no entries',
