@@ -122,7 +122,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
       retryJitter: 200,
     })
 
-    redlock.on('error', async (error) => {
+    redlock.on('error', async (error: Error) => {
       if (error instanceof ResourceLockedError) {
         logger.error(`Redlock error: ${error}`)
         return

@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.json",
-  "include": ["./**/*.ts"],
+  "include": ["./**/*.ts", "../redlock.d.ts"],
   "exclude": ["../src/**/*.ts"]
 }

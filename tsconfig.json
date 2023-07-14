@@ -23,5 +23,5 @@
     "strict": true
   },
   "exclude": ["src/**/test/**/*"],
-  "include": ["./src/**/*"]
+  "include": ["./src/**/*", "redlock.d.ts"]
 }
