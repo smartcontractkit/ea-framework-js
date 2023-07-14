@@ -254,6 +254,18 @@ test.serial('adds cache prefix to cache keys', async (t) => {
           }
         })(),
       }),
+      new AdapterEndpoint({
+        name: 'no-generator-cache-key',
+        transport: new (class extends NopTransport {
+          override async foregroundExecute(req: AdapterRequest<NopTransportTypes['Parameters']>) {
+            return {
+              data: null,
+              statusCode: 200,
+              result: req.requestContext.cacheKey as unknown,
+            } as AdapterResponse<NopTransportTypes['Response']>
+          }
+        })(),
+      }),
     ],
   })
 
@@ -271,4 +283,13 @@ test.serial('adds cache prefix to cache keys', async (t) => {
   })
 
   t.is(response2.json().result, `prefix-test:custom_cache_key_long_${'a'.repeat(200)}`)
+
+  const response3 = await t.context.testAdapter.request({
+    endpoint: 'no-generator-cache-key',
+  })
+
+  t.is(
+    response3.json().result,
+    'prefix-TEST-no-generator-cache-key-default_single_transport-DEFAULT_CACHE_KEY',
+  )
 })
