@@ -1,5 +1,5 @@
 import Redis, { Result } from 'ioredis'
-import Redlock, { ResourceLockedError } from 'redlock'
+import Redlock from 'redlock'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { AdapterResponse, censorLogs, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
@@ -112,23 +112,18 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
   async lock(key: string, cacheLockDuration: number): Promise<void> {
     const redlock = new Redlock([this.client], {
-      // The expected clock drift
+      // // The expected clock drift
       driftFactor: 0.01,
       // The max number of times Redlock will attempt to lock a resource before erroring.
       retryCount: 10,
-      // The time in ms between attempts
+      // // The time in ms between attempts
       retryDelay: cacheLockDuration / 5,
-      // The max time in ms randomly added to retries to improve performance under high contention
+      // // The max time in ms randomly added to retries to improve performance under high contention
       retryJitter: 200,
     })
 
     redlock.on('error', async (error) => {
-      if (error instanceof ResourceLockedError) {
-        logger.error(`Redlock error: ${error}`)
-        return
-      } else {
-        logger.error(`Redlock error: ${error}`)
-      }
+      logger.error(`Redlock error: ${error}`)
     })
 
     let lock = await redlock.acquire([key], cacheLockDuration)
