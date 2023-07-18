@@ -111,6 +111,8 @@ export class RedisCache<T = unknown> implements Cache<T> {
   }
 
   async lock(key: string, cacheLockDuration: number): Promise<void> {
+    const start = Date.now()
+    const log = (msg: string) => console.log(`\n\n[${(Date.now() - start) / 1000}]: ${msg}`)
     const redlock = new Redlock([this.client], {
       // // The expected clock drift
       driftFactor: 0.01,
@@ -126,15 +128,34 @@ export class RedisCache<T = unknown> implements Cache<T> {
       logger.error(`Redlock error: ${error}`)
     })
 
+    log('acquiring')
     let lock = await redlock.acquire([key], cacheLockDuration)
     logger.info(`Lock acquired with key: ${key}`)
+    log(
+      `acquired ${lock.value}, ttl ${(lock.expiration - Date.now()) / 1000}, attempts ${
+        lock.attempts
+      }`,
+    )
 
     const extendLock = async () => {
+      if (adapter is closed) {
+        return
+      }
+      log(`extending ${lock.value}`)
       // eslint-disable-next-line require-atomic-updates
       lock = await lock.extend(cacheLockDuration)
+      log(`extended ${lock.value}`)
       logger.trace(`Lock extended with key: ${key}`)
+
+      setTimeout(extendLock, cacheLockDuration * 0.8)
     }
 
-    setInterval(extendLock, cacheLockDuration * 0.8)
+    // Handing promise on purpose, infinite loop.
+    // We extend immediately after acquiring because redlock does not calculate
+    // the start time properly if it cannot acquire on the first attempt.
+    // TODO: add escape condition, otherwise tests won't work
+    extendLock()
+
+    adapter.close()
   }
 }
