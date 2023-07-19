@@ -28,7 +28,12 @@ export const BaseSettingsDefinition = {
   CACHE_LOCK_DURATION: {
     description: 'Time (in ms) used as a baseline for the acquisition and extension of cache locks',
     type: 'number',
-    default: 5000,
+    default: 10000,
+  },
+  CACHE_LOCK_RETRIES: {
+    description: 'Number of retries to acquire a cache lock',
+    type: 'number',
+    default: 10,
   },
   CACHE_MAX_AGE: {
     description: 'Maximum amount of time (in ms) that a response will stay cached',

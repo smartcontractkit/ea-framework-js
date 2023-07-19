@@ -67,7 +67,7 @@ export interface Cache<T = unknown> {
    * @param cacheLockDuration - the time (in ms) used for the acquisition and extension of the lock
    * @returns an empty Promise that resolves upon error or exiting the adapter
    */
-  lock?: (key: string, cacheLockDuration: number) => Promise<void>
+  lock?: (key: string, cacheLockDuration: number, retryCount: number) => Promise<void>
 }
 
 // Uses calculateKey to generate a unique key from the endpoint name, data, and input parameters

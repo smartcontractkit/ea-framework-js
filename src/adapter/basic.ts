@@ -119,7 +119,11 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
         ? `${this.config.settings.CACHE_PREFIX}-${this.name}`
         : this.name
 
-      await this.dependencies.cache.lock(redlockKey, this.config.settings.CACHE_LOCK_DURATION)
+      await this.dependencies.cache.lock(
+        redlockKey,
+        this.config.settings.CACHE_LOCK_DURATION,
+        this.config.settings.CACHE_LOCK_RETRIES,
+      )
     }
 
     for (const endpoint of this.endpoints) {
