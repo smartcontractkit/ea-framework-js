@@ -110,17 +110,19 @@ export class RedisCache<T = unknown> implements Cache<T> {
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'exec')
   }
 
-  async lock(key: string, cacheLockDuration: number): Promise<void> {
+  async lock(key: string, cacheLockDuration: number, retryCount: number): Promise<void> {
     const start = Date.now()
-    const log = (msg: string) => console.log(`\n\n[${(Date.now() - start) / 1000}]: ${msg}`)
+    const log = (msg: string) => `[${(Date.now() - start) / 1000}]: ${msg}`
+    const durationBuffer = cacheLockDuration * 0.8
+
     const redlock = new Redlock([this.client], {
-      // // The expected clock drift
+      // The expected clock drift
       driftFactor: 0.01,
       // The max number of times Redlock will attempt to lock a resource before erroring.
-      retryCount: 10,
-      // // The time in ms between attempts
-      retryDelay: cacheLockDuration / 5,
-      // // The max time in ms randomly added to retries to improve performance under high contention
+      retryCount: retryCount,
+      // The time in ms between attempts
+      retryDelay: durationBuffer / retryCount,
+      // The max time in ms randomly added to retries to improve performance under high contention
       retryJitter: 200,
     })
 
@@ -128,26 +130,22 @@ export class RedisCache<T = unknown> implements Cache<T> {
       logger.error(`Redlock error: ${error}`)
     })
 
-    log('acquiring')
     let lock = await redlock.acquire([key], cacheLockDuration)
     logger.info(`Lock acquired with key: ${key}`)
-    log(
-      `acquired ${lock.value}, ttl ${(lock.expiration - Date.now()) / 1000}, attempts ${
-        lock.attempts
-      }`,
-    )
+    logger.info(log(`Acquired lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`))
 
     const extendLock = async () => {
-      if (adapter is closed) {
-        return
-      }
-      log(`extending ${lock.value}`)
+      // If (adapter is closed) {
+      // return
+      // }
+
       // eslint-disable-next-line require-atomic-updates
       lock = await lock.extend(cacheLockDuration)
-      log(`extended ${lock.value}`)
-      logger.trace(`Lock extended with key: ${key}`)
+      logger.info(
+        log(`Extended lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`),
+      )
 
-      setTimeout(extendLock, cacheLockDuration * 0.8)
+      setTimeout(extendLock, durationBuffer)
     }
 
     // Handing promise on purpose, infinite loop.
@@ -155,7 +153,5 @@ export class RedisCache<T = unknown> implements Cache<T> {
     // the start time properly if it cannot acquire on the first attempt.
     // TODO: add escape condition, otherwise tests won't work
     extendLock()
-
-    adapter.close()
   }
 }
