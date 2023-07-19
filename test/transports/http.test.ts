@@ -104,6 +104,7 @@ class MockHttpTransport extends HttpTransport<HttpTransportTypes> {
             pairs: params.map((p) => ({ base: p.from, quote: p.to })),
           },
         },
+        cost: requestCost,
       }),
       parseResponse: (
         params,
@@ -145,6 +146,7 @@ const from = 'ETH'
 const to = 'USD'
 const price = 1234
 const volume = 4567
+const requestCost = 2 // Static API credit cost of the request
 
 axiosMock
   .onPost(URL + endpoint, {
@@ -254,16 +256,18 @@ test.serial(
       t.is(transport.backgroundExecuteCalls, expectedValue)
     }
 
+    let expected = rateLimit1m * Math.ceil(WARMUP_SUBSCRIPTION_TTL / 60_000)
+    await subtest(RateLimitingStrategy.FIXED_INTERVAL, expected)
+
     /**
-     * The expected number of requests is at follows:
-     * - At minute 0, a burst of `rateLimit1m` requests will be fired.
+     * The expected number of requests using burst limiter is at follows:
+     * - At minute 0, a burst of N requests will be fired, until the number of used API credits equals or exceeds `rateLimit1m`.
      * - The next request after those will be attempted immediately, only to hit the rate limiter blocking sleep.
      * - This will be repeated at the beginning of each minute interval (hence the rounding up when dividing the TTL).
      * - Finally, the +1 for the burst strategy will be the last request that was attempted to be fired then blocked,
      *     and by the time it's fired the subscription is no longer active.
      */
-    const expected = rateLimit1m * Math.ceil(WARMUP_SUBSCRIPTION_TTL / 60_000)
-    await subtest(RateLimitingStrategy.FIXED_INTERVAL, expected)
+    expected = Math.ceil(rateLimit1m / requestCost) * Math.ceil(WARMUP_SUBSCRIPTION_TTL / 60_000)
     await subtest(RateLimitingStrategy.BURST, expected + 1)
   },
 )
@@ -319,8 +323,10 @@ test.serial(
       t.is(transport.backgroundExecuteCalls, expectedValue)
     }
 
-    const expected = 60 * rateLimit1s + 1
+    let expected = 60 * rateLimit1s + 1
     await subtest(RateLimitingStrategy.FIXED_INTERVAL, expected)
+    // For burst rate limiter, we need to divide the credit limit to the cost of one request
+    expected = 60 * Math.ceil(rateLimit1s / requestCost) + 1
     await subtest(RateLimitingStrategy.BURST, expected)
   },
 )
@@ -871,9 +877,9 @@ test.serial(
       await testAdapter.api.close()
     }
 
-    // With the burst rate limiter, the result should be 2 requests, since we're advancing the clock
+    // With the burst rate limiter, the result should be 2 requests divided by the cost, since we're advancing the clock
     // less time than the per minute interval, but we're still in the same minute window and have capacity
-    await subtest(RateLimitingStrategy.BURST, 2)
+    await subtest(RateLimitingStrategy.BURST, 2 / requestCost)
     // The fixed interval rate limiter on the other hand should not have executed the same request yet, since it
     // will wait for 30s before actually getting the result
     // await subtest(RateLimitingStrategy.FIXED_INTERVAL, 1)
