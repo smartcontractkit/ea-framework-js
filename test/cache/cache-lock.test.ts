@@ -8,7 +8,7 @@ import { MockCache, NopTransport, RedisMock, TestAdapter } from '../../src/util/
 import { test } from './helper'
 
 test.serial(
-  'An adapter with the same name and no cache prefix should fail to acquire a lock',
+  'An adapter with a duplicate name and no cache prefix should fail to acquire a lock',
   async (t) => {
     const config = new AdapterConfig(
       {},
@@ -16,6 +16,8 @@ test.serial(
         envDefaultOverrides: {
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_DURATION: 2000,
+          CACHE_LOCK_RETRIES: 2,
         },
       },
     )
@@ -37,6 +39,8 @@ test.serial(
         envDefaultOverrides: {
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_DURATION: 2000,
+          CACHE_LOCK_RETRIES: 2,
         },
       },
     )
@@ -75,7 +79,7 @@ test.serial(
 )
 
 test.serial(
-  'An adapter with the same name and a cache prefix should acquire successfully acquire a lock',
+  'An adapter with a duplicate name but a unique cache prefix should acquire successfully acquire a lock',
   async (t) => {
     const config = new AdapterConfig(
       {},
@@ -139,7 +143,7 @@ test.serial(
 )
 
 test.serial(
-  'An adapter with the same name but using a local cache should not attempt to acquire a lock',
+  'An adapter with a duplicate name but using a local cache should not attempt to acquire a lock',
   async (t) => {
     const config = new AdapterConfig(
       {},
@@ -216,6 +220,7 @@ test.serial(
         envDefaultOverrides: {
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_DURATION: 1000,
         },
       },
     )
@@ -237,6 +242,8 @@ test.serial(
         envDefaultOverrides: {
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_DURATION: 100,
+          CACHE_LOCK_RETRIES: 1,
         },
       },
     )
@@ -261,7 +268,7 @@ test.serial(
 
     try {
       await TestAdapter.start(adapter, t.context, dependencies)
-      await sleep(5000)
+      await sleep(1500)
       await TestAdapter.start(adapter2, t.context, dependencies)
 
       t.fail('An ExecutionError should have been thrown')
@@ -271,6 +278,86 @@ test.serial(
       } else {
         t.fail('An ExecutionError should have been thrown')
       }
+    }
+  },
+)
+
+test.serial(
+  'If an adapter shuts down, an adapter with the same key should successfully acquire a lock on retries',
+  async (t) => {
+    const config = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          CACHE_TYPE: 'redis',
+          CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_DURATION: 1000,
+        },
+      },
+    )
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config,
+      endpoints: [
+        new AdapterEndpoint({
+          name: 'nowork',
+          transport: new NopTransport(),
+        }),
+      ],
+    })
+
+    const config2 = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          CACHE_TYPE: 'redis',
+          CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_DURATION: 1000,
+          CACHE_LOCK_RETRIES: 10,
+        },
+      },
+    )
+    const adapter2 = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config: config2,
+      endpoints: [
+        new AdapterEndpoint({
+          name: 'nowork',
+          transport: new NopTransport(),
+        }),
+      ],
+    })
+
+    const redisMock = new RedisMock()
+    const redisClient = redisMock as unknown as Redis
+    const cache = new RedisCache(redisClient) // Fake redis
+    const dependencies: Partial<AdapterDependencies> = {
+      cache,
+      redisClient,
+    }
+
+    try {
+      const testAdapter = await TestAdapter.start(adapter, t.context, dependencies)
+      // Sleep for 1 second to allow the lock to be extended
+      await sleep(1000)
+      // Store the unique ID of the first adapter
+      const firstAdapterID = redisMock.keys['TEST']
+      // Shut down the first adapter
+      await testAdapter.api.close()
+      // Start the second adapter before deleting the old key
+      TestAdapter.start(adapter2, t.context, dependencies)
+      // Sleep to allow for retries
+      await sleep(500)
+      // Delete the old key from the first adapter
+      delete redisMock.keys['TEST']
+      // Sleep to allow the second adapter to acquire the lock on retry and extend
+      await sleep(500)
+      // Assert that the second adapters unique ID is stored in the redisMock
+      t.is(redisMock.keys['TEST'] !== firstAdapterID, true)
+    } catch (error) {
+      t.fail(`The following error should not have been thrown: ${error}`)
     }
   },
 )
