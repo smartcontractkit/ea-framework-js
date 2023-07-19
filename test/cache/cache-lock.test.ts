@@ -354,8 +354,12 @@ test.serial(
       delete redisMock.keys['TEST']
       // Sleep to allow the second adapter to acquire the lock on retry and extend
       await sleep(500)
+      const secondAdapterID = redisMock.keys['TEST']
       // Assert that the second adapters unique ID is stored in the redisMock
-      t.is(redisMock.keys['TEST'] !== firstAdapterID, true)
+      t.is(
+        redisMock.keys['TEST'] !== firstAdapterID && redisMock.keys['TEST'] === secondAdapterID,
+        true,
+      )
     } catch (error) {
       t.fail(`The following error should not have been thrown: ${error}`)
     }
