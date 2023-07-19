@@ -487,7 +487,7 @@ test('test build highest rate limits from config second, minute)', async (t) => 
   t.is(highestRateLimitTier, 4)
 })
 
-test('returns 0 when limit is set to infinity, no tier limit specified', async (t) => {
+test('returns 0 when limit is set to infinity, no tier limit specified (burst rate limiter)', async (t) => {
   const burstRateLimiter = RateLimiterFactory.buildRateLimiter(
     RateLimitingStrategy.BURST,
   ).initialize([], {})

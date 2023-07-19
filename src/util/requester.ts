@@ -66,6 +66,7 @@ interface QueuedRequest<T = unknown> {
   key: string
   config: AxiosRequestConfig
   retries: number
+  cost?: number
   promise: Promise<RequesterResult<T>>
   reject: (err: unknown) => void
   resolve: (req: RequesterResult<T>) => void
@@ -158,9 +159,14 @@ export class Requester {
    *
    * @param key - a key to uniquely identify this request, and coalesce new ones that match
    * @param req - a request to send to a data provider
+   * @param cost - Data Provider API credit cost of the request
    * @returns a promise that will resolve whenever the request is popped from the queue, sent, and a response is received
    */
-  async request<T>(key: string, req: AxiosRequestConfig): Promise<RequesterResult<T>> {
+  async request<T>(
+    key: string,
+    req: AxiosRequestConfig,
+    cost?: number,
+  ): Promise<RequesterResult<T>> {
     // If there's already a queued request, reuse it's existing promise
     const existingQueuedRequest = this.map[key]
     if (existingQueuedRequest) {
@@ -174,6 +180,7 @@ export class Requester {
       key,
       config: req,
       retries: 0,
+      cost,
     } as QueuedRequest<T>
 
     // This dual promise layer is built so the queuedRequest can hold both the resolve and reject handlers,
@@ -212,7 +219,7 @@ export class Requester {
     )
 
     // Wait until the rate limiter allows the request to be executed
-    await this.rateLimiter.waitForRateLimit()
+    await this.rateLimiter.waitForRateLimit(next.cost)
 
     // Fire off to complete in the background. We don't wait here to be able to fire off multiple requests concurrently
     this.executeRequest.bind(this)(next)

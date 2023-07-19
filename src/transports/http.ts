@@ -47,6 +47,10 @@ export type ProviderRequestConfig<T extends HttpTransportGenerics> = {
 
   /** An endpoint name override for the requester key to allow the coalescing of requests across endpoints */
   endpointNameOverride?: string
+
+  /** The API credit cost of the request sent to the data provider.
+   * Applies only for burst rate limit strategy and is ignored if another strategy is used. */
+  cost?: number
 }
 
 /**
@@ -235,6 +239,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
           transportName: this.name,
         }),
         requestConfig.request,
+        requestConfig.cost,
       )
 
       // Parse responses and apply timestamps
