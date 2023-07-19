@@ -1,5 +1,6 @@
 import Redis, { Result } from 'ioredis'
 import Redlock from 'redlock'
+import { apiEmitter } from '../index'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { AdapterResponse, censorLogs, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
@@ -113,7 +114,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
   async lock(key: string, cacheLockDuration: number, retryCount: number): Promise<void> {
     const start = Date.now()
     const log = (msg: string) => `[${(Date.now() - start) / 1000}]: ${msg}`
-    const durationBuffer = cacheLockDuration * 0.8
+    const durationBuffer = cacheLockDuration * 0.7
 
     const redlock = new Redlock([this.client], {
       // The expected clock drift
@@ -131,21 +132,25 @@ export class RedisCache<T = unknown> implements Cache<T> {
     })
 
     let lock = await redlock.acquire([key], cacheLockDuration)
-    logger.info(`Lock acquired with key: ${key}`)
-    logger.info(log(`Acquired lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`))
+    logger.info(
+      log(
+        `Acquired lock: ${lock.value}, key: ${key}, TTL: ${(lock.expiration - Date.now()) / 1000}`,
+      ),
+    )
 
     const extendLock = async () => {
-      // If (adapter is closed) {
-      // return
-      // }
-
       // eslint-disable-next-line require-atomic-updates
       lock = await lock.extend(cacheLockDuration)
-      logger.info(
+      logger.trace(
         log(`Extended lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`),
       )
 
-      setTimeout(extendLock, durationBuffer)
+      const lockTimeout = setTimeout(extendLock, durationBuffer)
+
+      // Clear timeout on close for testing purposes
+      apiEmitter.on('onClose', () => {
+        clearTimeout(lockTimeout)
+      })
     }
 
     // Handing promise on purpose, infinite loop.
