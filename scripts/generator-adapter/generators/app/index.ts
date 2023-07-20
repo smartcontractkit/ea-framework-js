@@ -262,7 +262,7 @@ module.exports = class extends Generator<{rootPath: string}> {
       pkgJson.devDependencies['@babel/preset-env'] = '7.20.2'
       pkgJson.devDependencies['@babel/preset-typescript'] = "7.21.5"
       pkgJson.devDependencies['jest'] = '29.5.0'
-      pkgJson.scripts['test'] = 'EA_PORT=0 METRICS_ENABLED=false jest'
+      pkgJson.scripts['test'] = 'EA_PORT=0 METRICS_ENABLED=false jest --updateSnapshot'
     }
 
     this.fs.extendJSON(this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/package.json`), pkgJson)
