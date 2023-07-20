@@ -34,12 +34,12 @@ module.exports = class extends Generator<{rootPath: string}> {
   // When EXTERNAL_ADAPTER_GENERATOR_NO_INTERACTIVE is set to true, the generator will not prompt the user and will use the
   // default values to create one endpoint with all transports. This is useful for testing the generator in CI, or in cases
   // where the user wants to quickly generate the boilerplate code.
-  promptDisabled = Boolean(process.env.EXTERNAL_ADAPTER_GENERATOR_NO_INTERACTIVE)
+  promptDisabled = process.env.EXTERNAL_ADAPTER_GENERATOR_NO_INTERACTIVE === 'true'
   // When EXTERNAL_ADAPTER_GENERATOR_STANDALONE is set to true, tsconfig files (tsconfig.json and tsconfig.test.json) will not
   // extend tsconfig.base.json which is present in external-adapters-js monorepo, but rather generator will create new tsconfig.base.json
   // with the same content in the same directory and extend from it. Also, new packages and config files (jest, babel) will be added
   // to be able to run the tests
-  standalone = Boolean(process.env.EXTERNAL_ADAPTER_GENERATOR_STANDALONE)
+  standalone = process.env.EXTERNAL_ADAPTER_GENERATOR_STANDALONE === 'true'
 
   constructor(args, opts) {
     super(args, opts)
