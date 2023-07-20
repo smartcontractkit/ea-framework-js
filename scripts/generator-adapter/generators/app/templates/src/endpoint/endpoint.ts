@@ -6,7 +6,7 @@ import overrides from '../config/overrides.json'
 import { <%= inputTransports[0].name %> } from '../transport/<%= inputEndpointName %>'
 
 <%- include ./base.ts %>
-<%/* [THIS WILL NOT BE RENDERED]. Indeed, below is a very unpleasant code, but the main purpose of it is to have everything nicely formatted, otherwise EJS puts unwanted new-lines for every 'if' placeholder */%>
+
 export const endpoint = new AdapterEndpoint({
 <% if (includeComments) { -%>
   // Endpoint name
