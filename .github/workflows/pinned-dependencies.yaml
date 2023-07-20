@@ -10,7 +10,7 @@ jobs:
         uses: sergeysova/jq-action@v2
         id: versions
         with:
-          cmd: 'jq ''[getpath(["dependencies"],["devDependencies"],["optionalDependencies"])] | del(..|nulls) | map(.[]) | join(",")'' package.json -r'
+          cmd: "jq '[getpath([\"dependencies\"],[\"devDependencies\"],[\"optionalDependencies\"])] | del(..|nulls) | map(.[]) | join(\",\")' package.json -r"
           multiline: true
       - name: Check for un-pinned versions
         run: |
