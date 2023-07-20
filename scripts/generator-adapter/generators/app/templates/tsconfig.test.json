@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "<%- standalone ? "./tsconfig.base.json" : "../../tsconfig.base.json" %>",
   "include": ["src/**/*", "**/test", "src/**/*.json"],
   "compilerOptions": {
     "noEmit": true

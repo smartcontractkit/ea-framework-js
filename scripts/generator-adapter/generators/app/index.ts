@@ -1,9 +1,11 @@
 import * as Generator from 'yeoman-generator'
+
 interface InputTransport {
   type: string
   name: string
 }
-interface EndpointGenerator {
+
+interface GeneratorEndpointContext {
   // The name of endpoint from user input. Spaces replaced with '-'
   inputEndpointName: string
   // Endpoint name converted to normalized name that can be used in imports/exports, i.e. crypto-one-two -> cryptoOneTwo
@@ -16,82 +18,57 @@ interface EndpointGenerator {
   normalizedEndpointNameCap: string
 }
 
-module.exports = class extends Generator {
+
+module.exports = class extends Generator<{rootPath: string}> {
   props: {
     // Current ea-framework version in package.json
     frameworkVersion: string
     adapterName: string,
-    endpoints: Record<string, EndpointGenerator>,
+    endpoints: Record<string, GeneratorEndpointContext>,
     // Comma seperated list of endpoints
     endpointNames: string,
-    defaultEndpoint: EndpointGenerator
+    defaultEndpoint: GeneratorEndpointContext
     // Whether to include explanation comments for different parts of adapter components
     includeComments: boolean
   }
+  // When EXTERNAL_ADAPTER_GENERATOR_NO_INTERACTIVE is set to true, the generator will not prompt the user and will use the
+  // default values to create one endpoint with all transports. This is useful for testing the generator in CI, or in cases
+  // where the user wants to quickly generate the boilerplate code.
+  promptDisabled = Boolean(process.env.EXTERNAL_ADAPTER_GENERATOR_NO_INTERACTIVE)
+  // When EXTERNAL_ADAPTER_GENERATOR_STANDALONE is set to true, tsconfig files (tsconfig.json and tsconfig.test.json) will not
+  // extend tsconfig.base.json which is present in external-adapters-js monorepo, but rather generator will create new tsconfig.base.json
+  // with the same content in the same directory and extend from it. Also, new packages and config files (jest, babel) will be added
+  // to be able to run the tests
+  standalone = Boolean(process.env.EXTERNAL_ADAPTER_GENERATOR_STANDALONE)
 
   constructor(args, opts) {
-    super(args, opts);
-    this.argument("rootPath", { type: String, required: false, default: './', description: 'Root path where new External Adapter will be created'});
+    super(args, opts)
+    this.argument('rootPath', {
+      type: String,
+      required: false,
+      default: './',
+      description: 'Root path where new External Adapter will be created',
+    })
+
   }
+
   // prompting stage is used to get input from the user, validate and store it to use it for next stages
   async prompting() {
     const adapterName = await this._promptAdapterName()
     const endpointCount = await this._promptEndpointCount()
-    const endpoints: Record<string, EndpointGenerator> = {}
+    const endpoints: Record<string, GeneratorEndpointContext> = {}
 
     for (let i = 0; i < endpointCount; i++) {
-      let inputEndpointName = await this._promptEndpointName(i)
-      const existingEndpoint = this._checkExistingEndpoint(endpoints, inputEndpointName)
-
-      // If the user provides the same endpoint name for a different endpoint, try prompting again a few times to use another name.
-      if (existingEndpoint) {
-        let retries = 3
-        while (retries !== 0) {
-          inputEndpointName = await this._promptEndpointName(i, inputEndpointName)
-          const existingEndpointRetry = this._checkExistingEndpoint(endpoints, inputEndpointName)
-
-          if (!existingEndpointRetry) {
-            break;
-          }
-          --retries
-
-          if (retries === 0) {
-            throw new Error(`There is already configured endpoint with name '${inputEndpointName}'`)
-          }
-        }
-      }
-
-      let endpointAliases = await this._promptAliases(inputEndpointName)
-
-      // Check each alias to make sure there are no other registered endpoints with that name/alias
-      let existingAliasEndpoint = this._checkExistingEndpointAliases(endpoints, endpointAliases)
-
-      if (existingAliasEndpoint) {
-        let retries = 3
-        while (retries !== 0) {
-          endpointAliases = await this._promptAliases(inputEndpointName, true)
-
-          const existingAliasEndpointRetry = this._checkExistingEndpointAliases(endpoints, endpointAliases)
-
-          if (!existingAliasEndpointRetry) {
-            break;
-          }
-          --retries
-
-          if (retries === 0) {
-            throw new Error(`There is already configured endpoint with provided one or more aliases (${endpointAliases}). Endpoint ${existingAliasEndpointRetry.inputEndpointName} , aliases - ${existingAliasEndpointRetry.endpointAliases}`)
-          }
-        }
-      }
-
-     const inputTransports = await this._promptTransports(inputEndpointName)
+      let inputEndpointName = await this._promptEndpointName(i, endpoints)
+      let endpointAliases = await this._promptAliases(inputEndpointName, endpoints)
+      const inputTransports = await this._promptTransports(inputEndpointName)
 
       endpoints[i] = {
         inputEndpointName,
         normalizedEndpointName: this._normalizeEndpointName(inputEndpointName),
         inputTransports,
         normalizedEndpointNameCap: '',
-        endpointAliases
+        endpointAliases,
       }
       endpoints[i].normalizedEndpointNameCap = endpoints[i].normalizedEndpointName.charAt(0).toUpperCase() + endpoints[i].normalizedEndpointName.slice(1)
     }
@@ -108,8 +85,8 @@ module.exports = class extends Generator {
       endpoints,
       endpointNames,
       defaultEndpoint: endpoints[0],
-      includeComments
-    };
+      includeComments,
+    }
   }
 
   // writing stage is used to create new folder/files with templates based on user-provided input
@@ -122,15 +99,23 @@ module.exports = class extends Generator {
       'test-payload.json',
       'tsconfig.json',
       'tsconfig.test.json',
-      'src/index.ts'
+      'src/index.ts',
     ]
+
+    // If the generator is in standalone mode, also create tsconfig.base.json in the same directory
+    // so that both tsconfig and tsconfig.test can extend it. If the generator is not in standalone mode,
+    // tsconfig files will extend base settings from external-adapter-js monorepo base tsconfig.
+    // Same way jest and babel config files are also created to be able to run the integration tests
+    if (this.standalone) {
+      baseFiles.push('tsconfig.base.json', 'babel.config.js', 'jest.config.js')
+    }
 
     baseFiles.forEach(fileName => {
       this.fs.copyTpl(
         this.templatePath(fileName),
         this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/${fileName}`),
-        this.props
-      );
+        {...this.props, standalone: this.standalone}
+      )
     })
 
     // Copy config
@@ -141,40 +126,51 @@ module.exports = class extends Generator {
     this.fs.copyTpl(
       this.templatePath('src/config/overrides.json'),
       this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/config/overrides.json`),
-      this.props
+      this.props,
     )
 
-
     // Create endpoint and transport files
-    Object.values(this.props.endpoints).forEach(({inputEndpointName, inputTransports, endpointAliases}) => {
+    Object.values(this.props.endpoints).forEach(({ inputEndpointName, inputTransports, endpointAliases }) => {
       if (inputTransports.length > 1) {
         // Router endpoints
         this.fs.copyTpl(
           this.templatePath('src/endpoint/endpoint-router.ts'),
           this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/endpoint/${inputEndpointName}.ts`),
-          {inputEndpointName, inputTransports, endpointAliases, adapterName: this.props.adapterName, includeComments: this.props.includeComments}
-        );
+          {
+            inputEndpointName,
+            inputTransports,
+            endpointAliases,
+            adapterName: this.props.adapterName,
+            includeComments: this.props.includeComments,
+          },
+        )
 
         inputTransports.forEach(transport => {
           this.fs.copyTpl(
             this.templatePath(`src/transport/${transport.type}.ts`),
             this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/transport/${inputEndpointName}-${transport.type}.ts`),
-            {inputEndpointName, includeComments: this.props.includeComments}
-          );
+            { inputEndpointName, includeComments: this.props.includeComments },
+          )
         })
-      }else {
+      } else {
         // Single transport endpoints
         this.fs.copyTpl(
           this.templatePath('src/endpoint/endpoint.ts'),
           this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/endpoint/${inputEndpointName}.ts`),
-          {inputEndpointName, inputTransports, endpointAliases, adapterName: this.props.adapterName, includeComments: this.props.includeComments}
-        );
+          {
+            inputEndpointName,
+            inputTransports,
+            endpointAliases,
+            adapterName: this.props.adapterName,
+            includeComments: this.props.includeComments,
+          },
+        )
 
         this.fs.copyTpl(
           this.templatePath(`src/transport/${inputTransports[0].type}.ts`),
           this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/transport/${inputEndpointName}.ts`),
-          {inputEndpointName, includeComments: this.props.includeComments}
-        );
+          { inputEndpointName, includeComments: this.props.includeComments },
+        )
       }
     })
 
@@ -182,22 +178,22 @@ module.exports = class extends Generator {
     this.fs.copyTpl(
       this.templatePath(`src/endpoint/index.ts`),
       this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/endpoint/index.ts`),
-      {endpoints: Object.values(this.props.endpoints)}
-    );
+      { endpoints: Object.values(this.props.endpoints) },
+    )
 
 
     // Create test files
-    const httpEndpoints = Object.values(this.props.endpoints).filter((e: EndpointGenerator) => e.inputTransports.some(t => t.type === 'http'))
-    const wsEndpoints = Object.values(this.props.endpoints).filter((e: EndpointGenerator) => e.inputTransports.some(t => t.type === 'ws'))
-    const customEndpoints = Object.values(this.props.endpoints).filter((e: EndpointGenerator) => e.inputTransports.some(t => t.type === 'custom'))
+    const httpEndpoints = Object.values(this.props.endpoints).filter((e: GeneratorEndpointContext) => e.inputTransports.some(t => t.type === 'http'))
+    const wsEndpoints = Object.values(this.props.endpoints).filter((e: GeneratorEndpointContext) => e.inputTransports.some(t => t.type === 'ws'))
+    const customEndpoints = Object.values(this.props.endpoints).filter((e: GeneratorEndpointContext) => e.inputTransports.some(t => t.type === 'custom'))
 
     // Create adapter.test.ts if there is at least one endpoint with httpTransport
     if (httpEndpoints.length) {
       this.fs.copyTpl(
         this.templatePath(`test/adapter.test.ts`),
         this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/adapter.test.ts`),
-        {endpoints: httpEndpoints, transportName: 'rest'}
-      );
+        { endpoints: httpEndpoints, transportName: 'rest' },
+      )
     }
 
     // Create adapter.test.ts or adapter-ws.test.ts if there is at least one endpoint with wsTransport
@@ -209,8 +205,8 @@ module.exports = class extends Generator {
       this.fs.copyTpl(
         this.templatePath(`test/adapter-ws.test.ts`),
         this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/${fileName}`),
-        {endpoints: wsEndpoints}
-      );
+        { endpoints: wsEndpoints },
+      )
     }
 
     // Create adapter.test.ts or adapter-custom.test.ts if there is at least one endpoint with customTransport.
@@ -225,29 +221,33 @@ module.exports = class extends Generator {
       this.fs.copyTpl(
         this.templatePath(`test/adapter.test.ts`),
         this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/${fileName}`),
-        {endpoints: customEndpoints, transportName: 'custom'}
-      );
+        { endpoints: customEndpoints, transportName: 'custom' },
+      )
     }
 
     // Copy test fixtures
     this.fs.copyTpl(
       this.templatePath(`test/fixtures.ts`),
       this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/fixtures.ts`),
-      {includeWsFixtures: wsEndpoints.length > 0, includeHttpFixtures: httpEndpoints.length > 0 || customEndpoints.length > 0}
-    );
+      {
+        includeWsFixtures: wsEndpoints.length > 0,
+        includeHttpFixtures: httpEndpoints.length > 0 || customEndpoints.length > 0,
+      },
+    )
 
     // Add dependencies to existing package.json
     const pkgJson = {
       devDependencies: {
-        "@types/jest": "27.5.2",
-        "@types/node": "16.11.51",
-        nock: "13.2.9",
-        typescript: "5.0.4"
+        '@types/jest': '27.5.2',
+        '@types/node': '16.11.51',
+        nock: '13.2.9',
+        typescript: '5.0.4',
       },
       dependencies: {
-        "@chainlink/external-adapter-framework": this.props.frameworkVersion,
-        tslib: "2.4.1"
-      }
+        '@chainlink/external-adapter-framework': this.props.frameworkVersion,
+        tslib: '2.4.1',
+      },
+      scripts: {}
     }
 
     // If EA has websocket transports add additional packages for tests.
@@ -255,145 +255,184 @@ module.exports = class extends Generator {
       pkgJson.devDependencies['@sinonjs/fake-timers'] = '9.1.2'
       pkgJson.devDependencies['@types/sinonjs__fake-timers'] = '8.1.2'
     }
-    this.fs.extendJSON(this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/package.json`), pkgJson);
+
+    // If the generator is in standalone mode, add additional packages and a script for running the tests with jest
+    if (this.standalone) {
+      pkgJson.devDependencies['@babel/core'] = '7.21.8'
+      pkgJson.devDependencies['@babel/preset-env'] = '7.20.2'
+      pkgJson.devDependencies['@babel/preset-typescript'] = "7.21.5"
+      pkgJson.devDependencies['jest'] = '29.5.0'
+      pkgJson.scripts['test'] = 'EA_PORT=0 METRICS_ENABLED=false jest'
+    }
+
+    this.fs.extendJSON(this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/package.json`), pkgJson)
   }
 
   // install stage is used to run npm or yarn install scripts
   install() {
-    this.yarnInstall()
+    this.yarnInstall([], {cwd: `${this.options.rootPath}/${this.props.adapterName}`})
   }
 
   // end is the last stage. can be used for messages or cleanup
   end() {
-    this.log(`🚀 Adapter '${this.props.adapterName}' was successfully created.📍${this.options.rootPath}/${this.props.adapterName}`)
+    this.log(`🚀 Adapter '${this.props.adapterName}' was successfully created. 📍${this.options.rootPath}/${this.props.adapterName}`)
   }
 
   private async _promptAdapterName(): Promise<string> {
-    let { adapterName } = await this.prompt( {
-      type: "input",
-      name: "adapterName",
-      message: "What is the name of adapter?:",
-      default: "example-adapter"
+    if (this.promptDisabled) {
+      return 'example-adapter'
+    }
+    let { adapterName } = await this.prompt({
+      type: 'input',
+      name: 'adapterName',
+      message: 'What is the name of adapter?:',
+      default: 'example-adapter',
     })
 
     adapterName = this._normalizeStringInput(adapterName)
     if (adapterName === '') {
-      throw new Error('Adapter name cannot be empty')
+      this.log('Adapter name cannot be empty')
+      return this._promptAdapterName()
     }
     return adapterName
   }
 
   private async _promptEndpointCount(): Promise<number> {
+    if (this.promptDisabled) {
+      return 1
+    }
     let { endpointCount } = await this.prompt({
-      type: "input",
-      name: "endpointCount",
-      message: "How many endpoints does adapter have?:",
-      default: "1"
+      type: 'input',
+      name: 'endpointCount',
+      message: 'How many endpoints does adapter have?:',
+      default: '1',
     })
 
     endpointCount = parseInt(endpointCount)
 
     if (isNaN(endpointCount) || endpointCount <= 0) {
-      throw new Error('Adapter should have at least one endpoint')
+      this.log('Adapter should have at least one endpoint')
+      return this._promptEndpointCount()
     }
-
     return endpointCount
   }
 
-  private async _promptEndpointName(index, existingEndpointName?): Promise<string> {
-    let message =  `What is the name of endpoint #${index+1}:`
-    if (existingEndpointName) {
-      message =  `Endpoint named or aliased '${existingEndpointName}' already exists. Please use another name for endpoint #${index+1}:`
+  private async _promptEndpointName(index, endpoints = {}): Promise<string> {
+    if (this.promptDisabled) {
+      return 'price'
     }
-    let { inputEndpointName } = await this.prompt<{inputEndpointName: string}>({
-      type: "input",
-      name: "inputEndpointName",
-      message,
-      default: "price"
+    const { inputEndpointName } = await this.prompt<{ inputEndpointName: string }>({
+      type: 'input',
+      name: 'inputEndpointName',
+      message: `What is the name of endpoint #${index + 1}:`,
+      default: 'price',
     })
 
-    inputEndpointName = this._normalizeStringInput(inputEndpointName)
+    const endpointName = this._normalizeStringInput(inputEndpointName)
 
-    if (inputEndpointName === '') {
-      throw new Error('Endpoint name cannot be empty')
+    if (endpointName === '') {
+      this.log('Endpoint name cannot be empty')
+      return this._promptEndpointName(index, endpoints)
     }
-    return inputEndpointName
+
+    const existingEndpoint = this._checkExistingEndpoint(endpoints, endpointName)
+    if (existingEndpoint) {
+      this.log(`Endpoint named or aliased '${endpointName}' already exists`)
+      return this._promptEndpointName(index, endpoints)
+    }
+
+    return endpointName
   }
 
-  private async _promptAliases(inputEndpointName, retry = false): Promise<string[]> {
-    let message = `Comma separated aliases for endpoint '${inputEndpointName}':`
-    if (retry) {
-      message = `There is already registered endpoint that contains one or more provided aliases. Please use different values:`
+  private async _promptAliases(inputEndpointName, endpoints = {}): Promise<string[]> {
+    if (this.promptDisabled) {
+      return []
     }
-    const { endpointAliasesAnswer } = await this.prompt<{endpointAliasesAnswer: string}>({
-      type: "input",
-      name: "endpointAliasesAnswer",
-      message,
-      default: "empty"
+    const { endpointAliasesAnswer } = await this.prompt<{ endpointAliasesAnswer: string }>({
+      type: 'input',
+      name: 'endpointAliasesAnswer',
+      message: `Comma separated aliases for endpoint '${inputEndpointName}':`,
+      default: 'empty',
     })
     let endpointAliases
 
-    if (endpointAliasesAnswer === 'empty') {
-      endpointAliases = []
-    }else {
-      endpointAliases = endpointAliasesAnswer.split(',').map(a => this._normalizeStringInput(a.trim()))
+    if (endpointAliasesAnswer === 'empty' || endpointAliasesAnswer.trim().length === 0) {
+      return []
+    } else {
+      endpointAliases = new Set(...[endpointAliasesAnswer.split(',').map(a => this._normalizeStringInput(a.trim()))])
+      endpointAliases = [...endpointAliases]
+    }
+
+    let existingEndpoint = this._checkExistingEndpointAliases(endpoints, endpointAliases)
+    if (existingEndpoint) {
+      this.log(`Endpoint '${existingEndpoint.inputEndpointName}' already contains one or more provided aliases.`)
+      return this._promptAliases(inputEndpointName, endpoints)
     }
     return endpointAliases
   }
 
   private async _promptTransports(inputEndpointName: string): Promise<InputTransport[]> {
-    const { inputTransports } = await this.prompt<{inputTransports: InputTransport[]}>(   {
-      type: "checkbox",
-      name: "inputTransports",
+    if (this.promptDisabled) {
+      return [
+        {type: 'http',  name: 'httpTransport'}, { type: 'ws', name: 'wsTransport' }, {type: 'custom', name: 'customTransport',}
+      ]
+    }
+    const { inputTransports } = await this.prompt<{ inputTransports: InputTransport[] }>({
+      type: 'checkbox',
+      name: 'inputTransports',
       message: `Select transports that endpoint '${inputEndpointName}' supports:`,
       choices: [
         {
-          name: "Http",
+          name: 'Http',
           value: {
             type: 'http',
             name: 'httpTransport',
           },
-          checked: true
+          checked: true,
         },
         {
-          name: "Websocket",
+          name: 'Websocket',
           value: {
             type: 'ws',
-            name: 'wsTransport'
-          }
+            name: 'wsTransport',
+          },
         },
         {
-          name: "Custom",
+          name: 'Custom',
           value: {
             type: 'custom',
-            name: 'customTransport'
-          }
+            name: 'customTransport',
+          },
 
-        }
-      ]
+        },
+      ],
     })
 
     if (!inputTransports.length) {
-      throw new Error('Endpoint should have at least one transport')
+      this.log('Endpoint should have at least one transport')
+      return this._promptTransports(inputEndpointName)
     }
     return inputTransports
   }
 
   private async _promptConfirmation(adapterName: string, endpointNames: string): Promise<boolean> {
-    const { useComments }  = await this.prompt({
-      type: "confirm",
-      name: "useComments",
-      default: false,
-      message: `Do you want helpful comments to be included in the source code ?:`
+    if (this.promptDisabled) {
+      return true
+    }
+    const { useComments } = await this.prompt({
+      type: 'confirm',
+      name: 'useComments',
+      default: true,
+      message: `Do you want helpful explicative comments to be included along with the source code? (These are usually not included with adapters but can be helpful if you're new to EA development):`,
     })
 
-    const { confirmed }  = await this.prompt({
-      type: "confirm",
-      name: "confirmed",
-      message: `New adapter '${adapterName}' will be created with following endpoints '${endpointNames}'`
+    const { confirmed } = await this.prompt({
+      type: 'confirm',
+      name: 'confirmed',
+      message: `New adapter '${adapterName}' will be created with following endpoints '${endpointNames}'`,
     })
 
-    if(!confirmed) {
+    if (!confirmed) {
       process.exit(0)
     }
 
@@ -401,13 +440,13 @@ module.exports = class extends Generator {
   }
 
   // Based on user input for endpoint name check if there is already registered endpoint/aliases with that name
-  private _checkExistingEndpoint(endpoints: Record<string, EndpointGenerator>, newEndpointNameInput: string): EndpointGenerator | undefined {
-    return  Object.values(endpoints).find(e => {
+  private _checkExistingEndpoint(endpoints: Record<string, GeneratorEndpointContext>, newEndpointNameInput: string): GeneratorEndpointContext | undefined {
+    return Object.values(endpoints).find(e => {
       return e.inputEndpointName === newEndpointNameInput || e.endpointAliases.includes(newEndpointNameInput)
     })
   }
 
-  private _checkExistingEndpointAliases(endpoints: Record<string, EndpointGenerator>, aliases: string[]): EndpointGenerator | undefined {
+  private _checkExistingEndpointAliases(endpoints: Record<string, GeneratorEndpointContext>, aliases: string[]): GeneratorEndpointContext | undefined {
     let existingEndpoint
     for (let i = 0; i < aliases.length; i++) {
       const alias = aliases[i]
@@ -426,11 +465,11 @@ module.exports = class extends Generator {
 
     const capitalizedWords = words.map((word, index) => {
       if (index === 0) {
-        return word;
+        return word
       } else {
-        return word.charAt(0).toUpperCase() + word.slice(1);
+        return word.charAt(0).toUpperCase() + word.slice(1)
       }
-    });
+    })
     return capitalizedWords.join('')
   }
 

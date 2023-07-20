@@ -74,3 +74,24 @@ jobs:
           git push --set-upstream origin $BRANCH --force
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  generate-example-adapter:
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.head_ref, 'version-bump') }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup
+      - name: Generate new adapter, build, run the tests
+        run: |
+          yarn build
+          path_to_generator="$GITHUB_WORKSPACE/dist/src/generator-adapter"
+          npm install -g yo
+          # The command bellow will generate new EA with default name 'example-adapter' in specified directory 'examples'
+          yo "$path_to_generator" examples
+          cd examples/example-adapter
+          yarn build
+          yarn test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXTERNAL_ADAPTER_GENERATOR_NO_INTERACTIVE: 'true'
+          EXTERNAL_ADAPTER_GENERATOR_STANDALONE: 'true'

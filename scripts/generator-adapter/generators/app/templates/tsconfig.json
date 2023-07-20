@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "<%- standalone ? "./tsconfig.base.json" : "../../tsconfig.base.json" %>",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src"
