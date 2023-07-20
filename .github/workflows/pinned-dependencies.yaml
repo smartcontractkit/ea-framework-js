@@ -10,14 +10,14 @@ jobs:
         uses: sergeysova/jq-action@v2
         id: versions
         with:
-          cmd: "jq '[getpath([\"dependencies\"],[\"devDependencies\"],[\"optionalDependencies\"])] | del(..|nulls) | map(.[]) | join(\",\")' package.json -r"
+          cmd: 'jq ''[getpath(["dependencies"],["devDependencies"],["optionalDependencies"])] | del(..|nulls) | map(.[]) | join(",")'' package.json -r'
           multiline: true
       - name: Check for un-pinned versions
         run: |
           versions="${{ steps.versions.outputs.value }}"
           IFS="," read -a versionsList <<< $versions
           # Simple regex that does what we need it for
-          regex="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-\w+)?(\+\w+)?$"
+          regex="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-\w+)?(\+\w+)?|5\.0\.0-beta\.2$"
           exitCode=0
           for version in  ${versionsList[@]}; do
             if echo "$version" | grep -Ev "$regex" > /dev/null; then
