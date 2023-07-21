@@ -66,6 +66,8 @@ export interface Cache<T = unknown> {
    *
    * @param key - the key used to identify the lock, composed of the cache prefix (if set) and adapter name
    * @param cacheLockDuration - the time (in ms) used for the acquisition and extension of the lock
+   * @param retryCount - the number of retries for acquiring the lock
+   * @param shutdownNotifier - an EventEmitter that emits an event when the adapter is shutting down
    * @returns an empty Promise that resolves upon error or exiting the adapter
    */
   lock?: (
