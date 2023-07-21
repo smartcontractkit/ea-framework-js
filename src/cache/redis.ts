@@ -116,47 +116,51 @@ export class RedisCache<T = unknown> implements Cache<T> {
     const log = (msg: string) => `[${(Date.now() - start) / 1000}]: ${msg}`
     const durationBuffer = cacheLockDuration * 0.7
 
-    const redlock = new Redlock([this.client], {
-      // The expected clock drift
-      driftFactor: 0.01,
-      // The max number of times Redlock will attempt to lock a resource before erroring.
-      retryCount: retryCount,
-      // The time in ms between attempts
-      retryDelay: durationBuffer / retryCount,
-      // The max time in ms randomly added to retries to improve performance under high contention
-      retryJitter: 200,
-    })
+    try {
+      const redlock = new Redlock([this.client], {
+        // The expected clock drift
+        driftFactor: 0.01,
+        // The max number of times Redlock will attempt to lock a resource before erroring.
+        retryCount: retryCount,
+        // The time in ms between attempts
+        retryDelay: durationBuffer / retryCount,
+        // The max time in ms randomly added to retries to improve performance under high contention
+        retryJitter: 200,
+      })
 
-    redlock.on('error', async (error) => {
-      logger.error(`Redlock error: ${error}`)
-    })
+      redlock.on('error', async (error) => {
+        logger.error(`Redlock error: ${error}`)
+      })
 
-    let lock = await redlock.acquire([key], cacheLockDuration)
-    logger.info(
-      log(
-        `Acquired lock: ${lock.value}, key: ${key}, TTL: ${(lock.expiration - Date.now()) / 1000}`,
-      ),
-    )
-
-    const extendLock = async () => {
-      // eslint-disable-next-line require-atomic-updates
-      lock = await lock.extend(cacheLockDuration)
-      logger.trace(
-        log(`Extended lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`),
+      let lock = await redlock.acquire([key], cacheLockDuration)
+      logger.info(
+        log(
+          `Acquired lock: ${lock.value}, key: ${key}, TTL: ${
+            (lock.expiration - Date.now()) / 1000
+          }`,
+        ),
       )
 
-      const lockTimeout = setTimeout(extendLock, durationBuffer)
+      const extendLock = async () => {
+        // eslint-disable-next-line require-atomic-updates
+        lock = await lock.extend(cacheLockDuration)
+        logger.trace(
+          log(`Extended lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`),
+        )
 
-      // Clear timeout on close for testing purposes
-      apiEmitter.on('onClose', () => {
-        clearTimeout(lockTimeout)
-      })
+        const lockTimeout = setTimeout(extendLock, durationBuffer)
+
+        // Clear timeout on close for testing purposes
+        apiEmitter.on('onClose', () => {
+          clearTimeout(lockTimeout)
+        })
+      }
+
+      extendLock()
+    } catch (error) {
+      throw new Error(
+        'The adapter failed to acquire a lock on the cache. Please check if you are running another instance of the adapter with the same name and cache prefix.',
+      )
     }
-
-    // Handing promise on purpose, infinite loop.
-    // We extend immediately after acquiring because redlock does not calculate
-    // the start time properly if it cannot acquire on the first attempt.
-    // TODO: add escape condition, otherwise tests won't work
-    extendLock()
   }
 }
