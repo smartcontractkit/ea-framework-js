@@ -2,7 +2,7 @@ import EventEmitter from 'events'
 import Redis, { Result } from 'ioredis'
 import Redlock from 'redlock'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
-import { AdapterResponse, censorLogs, makeLogger } from '../util'
+import { AdapterResponse, censorLogs, makeLogger, sleep } from '../util'
 import { Cache, CacheEntry } from './index'
 import { CacheTypes, cacheMetricsLabel, cacheSet } from './metrics'
 
@@ -119,34 +119,45 @@ export class RedisCache<T = unknown> implements Cache<T> {
   ): Promise<void> {
     const start = Date.now()
     const log = (msg: string) => `[${(Date.now() - start) / 1000}]: ${msg}`
-    const durationBuffer = cacheLockDuration * 0.7
+    // Ensures lock is able to be extended in time
+    const durationBuffer = cacheLockDuration * 0.8
 
-    try {
-      const redlock = new Redlock([this.client], {
-        // The expected clock drift
-        driftFactor: 0.01,
-        // The max number of times Redlock will attempt to lock a resource before erroring.
-        retryCount: retryCount,
-        // The time in ms between attempts
-        retryDelay: durationBuffer / retryCount,
-        // The max time in ms randomly added to retries to improve performance under high contention
-        retryJitter: 200,
-      })
+    const redlock = new Redlock([this.client], {
+      retryCount: 0,
+    })
 
-      redlock.on('error', async (error) => {
-        logger.error(`Redlock error: ${error}`)
-      })
+    const acquireLock = async () => {
+      // For the number of retries, try to acquire the lock
+      for (let retryAttempt = 1; retryAttempt <= retryCount; retryAttempt++) {
+        try {
+          const lock = await redlock.acquire([key], cacheLockDuration)
+          logger.info(
+            log(
+              `Acquired lock: ${lock.value}, key: ${key}, TTL: ${
+                (lock.expiration - Date.now()) / 1000
+              }`,
+            ),
+          )
+          // If successful, return lock and break loop
+          return lock
+        } catch (error) {
+          logger.error(`Failed to acquire lock on attempt ${retryAttempt}/${retryCount}: ${error}`)
+          // If the last retry fails, throw error
+          if (retryAttempt === retryCount) {
+            throw new Error(
+              'The adapter failed to acquire a lock on the cache. Please check if you are running another instance of the adapter with the same name and cache prefix.',
+            )
+          }
+          // On error, sleep before retrying again
+          await sleep(cacheLockDuration / retryCount)
+        }
+      }
+    }
 
-      let lock = await redlock.acquire([key], cacheLockDuration)
-      logger.info(
-        log(
-          `Acquired lock: ${lock.value}, key: ${key}, TTL: ${
-            (lock.expiration - Date.now()) / 1000
-          }`,
-        ),
-      )
+    let lock = await acquireLock()
 
-      const extendLock = async () => {
+    const extendLock = async () => {
+      if (lock) {
         // eslint-disable-next-line require-atomic-updates
         lock = await lock.extend(cacheLockDuration)
         logger.trace(
@@ -160,12 +171,8 @@ export class RedisCache<T = unknown> implements Cache<T> {
           clearTimeout(lockTimeout)
         })
       }
-
-      extendLock()
-    } catch (error) {
-      throw new Error(
-        'The adapter failed to acquire a lock on the cache. Please check if you are running another instance of the adapter with the same name and cache prefix.',
-      )
     }
+
+    await extendLock()
   }
 }
