@@ -1,5 +1,4 @@
 import Redis from 'ioredis'
-import { ExecutionError } from 'redlock'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
@@ -67,13 +66,12 @@ test.serial(
       await TestAdapter.start(adapter, t.context, dependencies)
       await TestAdapter.start(adapter2, t.context, dependencies)
 
-      t.fail('An ExecutionError should have been thrown')
-    } catch (error) {
-      if (error instanceof ExecutionError) {
-        t.is(error.message, 'The operation was unable to achieve a quorum during its retry window.')
-      } else {
-        t.fail('An ExecutionError should have been thrown')
-      }
+      t.fail('An error should have been thrown')
+    } catch (error: unknown) {
+      t.is(
+        (error as Error).message,
+        'The adapter failed to acquire a lock on the cache. Please check if you are running another instance of the adapter with the same name and cache prefix.',
+      )
     }
   },
 )
@@ -272,12 +270,11 @@ test.serial(
       await TestAdapter.start(adapter2, t.context, dependencies)
 
       t.fail('An ExecutionError should have been thrown')
-    } catch (error) {
-      if (error instanceof ExecutionError) {
-        t.is(error.message, 'The operation was unable to achieve a quorum during its retry window.')
-      } else {
-        t.fail('An ExecutionError should have been thrown')
-      }
+    } catch (error: unknown) {
+      t.is(
+        (error as Error).message,
+        'The adapter failed to acquire a lock on the cache. Please check if you are running another instance of the adapter with the same name and cache prefix.',
+      )
     }
   },
 )
