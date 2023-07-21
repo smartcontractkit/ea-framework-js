@@ -115,12 +115,12 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     this.dependencies = this.initializeDependencies(dependencies)
 
     if (this.config.settings.EA_MODE !== 'reader' && this.dependencies.cache.lock) {
-      const redlockKey = this.config.settings.CACHE_PREFIX
+      const cacheLockKey = this.config.settings.CACHE_PREFIX
         ? `${this.config.settings.CACHE_PREFIX}-${this.name}`
         : this.name
 
       await this.dependencies.cache.lock(
-        redlockKey,
+        cacheLockKey,
         this.config.settings.CACHE_LOCK_DURATION,
         this.config.settings.CACHE_LOCK_RETRIES,
       )
