@@ -1,4 +1,3 @@
-import EventEmitter from 'events'
 import fastify, { FastifyInstance } from 'fastify'
 import { AddressInfo } from 'net'
 import { join } from 'path'
@@ -17,7 +16,6 @@ import { errorCatchingMiddleware, validatorMiddleware } from './validation'
 import { EmptyInputParameters } from './validation/input-params'
 
 export { FastifyInstance as ServerInstance }
-export const apiEmitter = new EventEmitter()
 
 const logger = makeLogger('Main')
 
@@ -111,7 +109,7 @@ export const start = async <T extends SettingsDefinitionMap>(
     apiShutdownPromise = new Promise<void>((resolve) => {
       api?.addHook('onClose', async () => {
         // Used in the RedisCache lock method for testing purposes
-        apiEmitter.emit('onClose')
+        adapter.shutdownNotifier.emit('onClose')
         resolve()
       })
     })

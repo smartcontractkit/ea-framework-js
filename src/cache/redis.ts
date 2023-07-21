@@ -1,6 +1,6 @@
+import EventEmitter from 'events'
 import Redis, { Result } from 'ioredis'
 import Redlock from 'redlock'
-import { apiEmitter } from '../index'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { AdapterResponse, censorLogs, makeLogger } from '../util'
 import { Cache, CacheEntry } from './index'
@@ -111,7 +111,12 @@ export class RedisCache<T = unknown> implements Cache<T> {
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'exec')
   }
 
-  async lock(key: string, cacheLockDuration: number, retryCount: number): Promise<void> {
+  async lock(
+    key: string,
+    cacheLockDuration: number,
+    retryCount: number,
+    shutdownNotifier: EventEmitter,
+  ): Promise<void> {
     const start = Date.now()
     const log = (msg: string) => `[${(Date.now() - start) / 1000}]: ${msg}`
     const durationBuffer = cacheLockDuration * 0.7
@@ -151,7 +156,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
         const lockTimeout = setTimeout(extendLock, durationBuffer)
 
         // Clear timeout on close for testing purposes
-        apiEmitter.on('onClose', () => {
+        shutdownNotifier.on('onClose', () => {
           clearTimeout(lockTimeout)
         })
       }

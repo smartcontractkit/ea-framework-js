@@ -1,3 +1,4 @@
+import EventEmitter from 'events'
 import { default as Redis } from 'ioredis'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
@@ -61,6 +62,8 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
   /** Configuration params for various adapter properties */
   config: AdapterConfig<CustomSettingsDefinition>
 
+  shutdownNotifier: EventEmitter
+
   /** Bootstrap function that will run when initializing the adapter */
   private readonly bootstrap?: (adapter: Adapter<CustomSettingsDefinition>) => Promise<void>
 
@@ -77,6 +80,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     this.config.initialize()
     this.normalizeEndpointNames()
     this.calculateRateLimitAllocations()
+    this.shutdownNotifier = new EventEmitter()
   }
 
   /**
@@ -123,6 +127,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
         cacheLockKey,
         this.config.settings.CACHE_LOCK_DURATION,
         this.config.settings.CACHE_LOCK_RETRIES,
+        this.shutdownNotifier,
       )
     }
 

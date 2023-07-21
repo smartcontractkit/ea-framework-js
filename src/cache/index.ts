@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { EventEmitter } from 'events'
 import { EndpointContext, EndpointGenerics } from '../adapter'
 import { AdapterResponse, censorLogs, makeLogger, sleep } from '../util'
 import { CacheTypes as CacheType } from './metrics'
@@ -67,7 +68,12 @@ export interface Cache<T = unknown> {
    * @param cacheLockDuration - the time (in ms) used for the acquisition and extension of the lock
    * @returns an empty Promise that resolves upon error or exiting the adapter
    */
-  lock?: (key: string, cacheLockDuration: number, retryCount: number) => Promise<void>
+  lock?: (
+    key: string,
+    cacheLockDuration: number,
+    retryCount: number,
+    shutdownNotifier: EventEmitter,
+  ) => Promise<void>
 }
 
 // Uses calculateKey to generate a unique key from the endpoint name, data, and input parameters
