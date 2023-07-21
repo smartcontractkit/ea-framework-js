@@ -141,9 +141,8 @@ export class RedisMock {
     return this.set(key, value, 'PX', ttl)
   }
 
-  evalsha(...args: never[]) {
-    const redlockKey = args[2][0]
-    const instanceKey = args[2][1]
+  evalsha(...args: [string, number, [string, string, number]]) {
+    const [redlockKey, instanceKey] = args[2]
 
     // If key has been used to acquire a lock, and the instance key matches, extend it
     if (this.keys[redlockKey] === instanceKey) {
