@@ -22,13 +22,13 @@ The workflow is triggered by the following events: None of the jobs will run if 
 
 - workflow_dispatch: Manually triggered when needed.
 - pull_request: Triggered when a new pull request is opened or updated.
-- push to the main branch: Triggered when code is pushed to the main branch.
+- push to the main branch
 
 #### Jobs
 
 #### 1. Build
 
-This job runs the application's build process.
+This job runs the build process.
 
 #### 2. Lint
 
@@ -37,11 +37,11 @@ This job checks the codebase for linting issues and code formatting.
 
 #### 3. Test
 
-This job runs the test suite for the application.
+This job runs the tests.
 
 #### 4. Code Coverage
 
-This job handles code coverage reports. Triggered after the `test` job has run successfully
+This job generates code coverage report and saves it to `coverage-pr-{pr_number}` branch. Triggered after the `test` job has run successfully
 
 
 
@@ -98,7 +98,7 @@ This job is responsible for creating a new pull request with a version bump comm
 ##### Steps for Create Version Bump PR:
 
 
-1. Tick Version: This step is the core of the job. It determines the version bump instruction based on the labels present on the pull request. If the version bump instruction is "none," no version bump is required, and the job exits successfully with a 0 status code. If a valid version bump instruction is provided, it uses the `npm version` command to update the package version according to the instruction.
+1. Tick Version: Determines the version bump instruction based on the labels present on the pull request. If the version bump instruction is "none," no version bump is required, and the job exits successfully with a 0 status code. If a valid version bump instruction is provided, it uses the `npm version` command to update the package version according to the instruction.
 
 2. Create Commit: If a valid version bump is detected in the previous step, and that detected version is higher than the current version, this step creates a new commit with the updated package.json file, reflecting the version bump. The new commit is made on a new branch named `version-bump`. If the branch already exists, it updates the reference to the branch's head commit.
 
