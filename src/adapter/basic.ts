@@ -62,6 +62,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
   /** Configuration params for various adapter properties */
   config: AdapterConfig<CustomSettingsDefinition>
 
+  /** Used on api shutdown for testing purposes*/
   shutdownNotifier: EventEmitter
 
   /** Bootstrap function that will run when initializing the adapter */
