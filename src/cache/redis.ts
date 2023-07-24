@@ -119,10 +119,9 @@ export class RedisCache<T = unknown> implements Cache<T> {
   ): Promise<void> {
     const start = Date.now()
     const log = (msg: string) => `[${(Date.now() - start) / 1000}]: ${msg}`
-    // Ensures lock is able to be extended in time
-    const durationBuffer = cacheLockDuration * 0.8
 
     const redlock = new Redlock([this.client], {
+      // Implementing retries manually due to redlock bug in edge cases
       retryCount: 0,
     })
 
@@ -142,16 +141,14 @@ export class RedisCache<T = unknown> implements Cache<T> {
           return lock
         } catch (error) {
           logger.error(`Failed to acquire lock on attempt ${retryAttempt}/${retryCount}: ${error}`)
-          // If the last retry fails, throw error
-          if (retryAttempt === retryCount) {
-            throw new Error(
-              'The adapter failed to acquire a lock on the cache. Please check if you are running another instance of the adapter with the same name and cache prefix.',
-            )
-          }
           // On error, sleep before retrying again
           await sleep(cacheLockDuration / retryCount)
         }
       }
+      // If the last retry fails, throw error
+      throw new Error(
+        'The adapter failed to acquire a lock on the cache. Please check if you are running another instance of the adapter with the same name and cache prefix.',
+      )
     }
 
     let lock = await acquireLock()
@@ -160,19 +157,18 @@ export class RedisCache<T = unknown> implements Cache<T> {
       if (lock) {
         // eslint-disable-next-line require-atomic-updates
         lock = await lock.extend(cacheLockDuration)
-        logger.trace(
+        logger.info(
           log(`Extended lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`),
         )
-
-        const lockTimeout = setTimeout(extendLock, durationBuffer)
-
-        // Clear timeout on close for testing purposes
-        shutdownNotifier.on('onClose', () => {
-          clearTimeout(lockTimeout)
-        })
       }
     }
 
-    await extendLock()
+    // Lock duration multiplied by .8 to ensure lock is able to be extended before expiry
+    const extendInterval = setInterval(extendLock, cacheLockDuration * 0.8)
+
+    // Clear timeout on close for testing purposes
+    shutdownNotifier.on('onClose', () => {
+      clearInterval(extendInterval)
+    })
   }
 }
