@@ -157,7 +157,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
       if (lock) {
         // eslint-disable-next-line require-atomic-updates
         lock = await lock.extend(cacheLockDuration)
-        logger.info(
+        logger.trace(
           log(`Extended lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`),
         )
       }
