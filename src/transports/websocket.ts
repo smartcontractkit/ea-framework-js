@@ -213,10 +213,13 @@ export class WebSocketTransport<
         // Using URL in label since connection_key is removed from v3
         metrics.get('wsConnectionActive').dec()
 
-        // Also, register that the connection was closed and the reason why
+        // Also, register that the connection was closed and the reason why.
+        // We need to filter out query params from the URL to avoid having
+        // the cardinality of the metric go out of control.
+        const filteredUrl = this.currentUrl.split('?')[0]
         metrics.get('wsConnectionClosures').inc({
           code: event.code,
-          url: this.currentUrl,
+          url: filteredUrl,
         })
       },
     }
