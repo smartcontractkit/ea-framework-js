@@ -99,7 +99,6 @@ module.exports = class extends Generator<{rootPath: string}> {
       'test-payload.json',
       'tsconfig.json',
       'tsconfig.test.json',
-      'src/index.ts',
     ]
 
     // If the generator is in standalone mode, also create tsconfig.base.json in the same directory
@@ -118,6 +117,13 @@ module.exports = class extends Generator<{rootPath: string}> {
       )
     })
 
+    // copy main index.ts file
+    this.fs.copyTpl(
+      this.templatePath(`src/index.ts.ejs`),
+      this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/index.ts`),
+      this.props
+    )
+
     // Copy config
     this.fs.copy(
       this.templatePath('src/config/index.ts'),
@@ -134,7 +140,7 @@ module.exports = class extends Generator<{rootPath: string}> {
       if (inputTransports.length > 1) {
         // Router endpoints
         this.fs.copyTpl(
-          this.templatePath('src/endpoint/endpoint-router.ts'),
+          this.templatePath('src/endpoint/endpoint-router.ts.ejs'),
           this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/endpoint/${inputEndpointName}.ts`),
           {
             inputEndpointName,
@@ -147,7 +153,7 @@ module.exports = class extends Generator<{rootPath: string}> {
 
         inputTransports.forEach(transport => {
           this.fs.copyTpl(
-            this.templatePath(`src/transport/${transport.type}.ts`),
+            this.templatePath(`src/transport/${transport.type}.ts.ejs`),
             this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/transport/${inputEndpointName}-${transport.type}.ts`),
             { inputEndpointName, includeComments: this.props.includeComments },
           )
@@ -155,7 +161,7 @@ module.exports = class extends Generator<{rootPath: string}> {
       } else {
         // Single transport endpoints
         this.fs.copyTpl(
-          this.templatePath('src/endpoint/endpoint.ts'),
+          this.templatePath('src/endpoint/endpoint.ts.ejs'),
           this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/endpoint/${inputEndpointName}.ts`),
           {
             inputEndpointName,
@@ -167,7 +173,7 @@ module.exports = class extends Generator<{rootPath: string}> {
         )
 
         this.fs.copyTpl(
-          this.templatePath(`src/transport/${inputTransports[0].type}.ts`),
+          this.templatePath(`src/transport/${inputTransports[0].type}.ts.ejs`),
           this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/transport/${inputEndpointName}.ts`),
           { inputEndpointName, includeComments: this.props.includeComments },
         )
@@ -176,7 +182,7 @@ module.exports = class extends Generator<{rootPath: string}> {
 
     // Create endpoint barrel file
     this.fs.copyTpl(
-      this.templatePath(`src/endpoint/index.ts`),
+      this.templatePath(`src/endpoint/index.ts.ejs`),
       this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/endpoint/index.ts`),
       { endpoints: Object.values(this.props.endpoints) },
     )
@@ -190,7 +196,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     // Create adapter.test.ts if there is at least one endpoint with httpTransport
     if (httpEndpoints.length) {
       this.fs.copyTpl(
-        this.templatePath(`test/adapter.test.ts`),
+        this.templatePath(`test/adapter.test.ts.ejs`),
         this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/adapter.test.ts`),
         { endpoints: httpEndpoints, transportName: 'rest' },
       )
@@ -203,7 +209,7 @@ module.exports = class extends Generator<{rootPath: string}> {
         fileName = 'adapter-ws.test.ts'
       }
       this.fs.copyTpl(
-        this.templatePath(`test/adapter-ws.test.ts`),
+        this.templatePath(`test/adapter-ws.test.ts.ejs`),
         this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/${fileName}`),
         { endpoints: wsEndpoints },
       )
@@ -219,7 +225,7 @@ module.exports = class extends Generator<{rootPath: string}> {
         fileName = 'adapter-custom.test.ts'
       }
       this.fs.copyTpl(
-        this.templatePath(`test/adapter.test.ts`),
+        this.templatePath(`test/adapter.test.ts.ejs`),
         this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/${fileName}`),
         { endpoints: customEndpoints, transportName: 'custom' },
       )
@@ -227,7 +233,7 @@ module.exports = class extends Generator<{rootPath: string}> {
 
     // Copy test fixtures
     this.fs.copyTpl(
-      this.templatePath(`test/fixtures.ts`),
+      this.templatePath(`test/fixtures.ts.ejs`),
       this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/fixtures.ts`),
       {
         includeWsFixtures: wsEndpoints.length > 0,

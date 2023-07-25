@@ -1,14 +1,11 @@
 import { AdapterEndpoint } from '@chainlink/external-adapter-framework/adapter'
 import { InputParameters } from '@chainlink/external-adapter-framework/validation'
 import { SingleNumberResultResponse } from '@chainlink/external-adapter-framework/util'
-import { TransportRoutes } from '@chainlink/external-adapter-framework/transports'
 import { config } from '../config'
 import overrides from '../config/overrides.json'
-<% for(let i=0; i<inputTransports.length; i++) {%>
-import { <%= inputTransports[i].name %> } from '../transport/<%= inputEndpointName %>-<%= inputTransports[i].type %>' <% }
-%>
+import { <%= inputTransports[0].name %> } from '../transport/<%= inputEndpointName %>'
 
-<%- include ./base.ts %>
+<%- include ./base.ts.ejs %>
 
 export const endpoint = new AdapterEndpoint({
 <% if (includeComments) { -%>
@@ -18,12 +15,8 @@ export const endpoint = new AdapterEndpoint({
   // Alternative endpoint names for this endpoint
 <% } -%><%= ' ' %> aliases: <%- endpointAliases.length ? JSON.stringify(endpointAliases) : JSON.stringify([]) -%>,
 <% if (includeComments) { -%>
-  // Transport handles incoming requests, data processing and communication for this endpoint.
-  // In case endpoint supports multiple transports (i.e. http and websocket) TransportRoutes is used to register all supported transports.
-  // To use specific transport, provide `transport: [transportName]` in the request
-<% } -%><%= ' ' %> transportRoutes: new TransportRoutes<BaseEndpointTypes>()
-<% for(let i=0; i<inputTransports.length; i++) {-%>
-  .register('<%- inputTransports[i].type === "http" ? `rest` : inputTransports[i].type %>', <%- inputTransports[i].name %>)<%}%>,
+  // Transport handles incoming requests, data processing and communication for this endpoint
+<% } -%><%= ' ' %> transport: <%= inputTransports[0].name %>,
 <% if (includeComments) { -%>
   // Supported input parameters for this endpoint
 <% } -%><%= ' ' %> inputParameters,
