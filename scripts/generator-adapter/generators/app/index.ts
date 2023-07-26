@@ -31,6 +31,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     // Whether to include explanation comments for different parts of adapter components
     includeComments: boolean
   }
+  endpointsAndAliases = new Set<string>()
   // When EXTERNAL_ADAPTER_GENERATOR_NO_INTERACTIVE is set to true, the generator will not prompt the user and will use the
   // default values to create one endpoint with all transports. This is useful for testing the generator in CI, or in cases
   // where the user wants to quickly generate the boilerplate code.
@@ -59,8 +60,12 @@ module.exports = class extends Generator<{rootPath: string}> {
     const endpoints: Record<string, GeneratorEndpointContext> = {}
 
     for (let i = 0; i < endpointCount; i++) {
-      let inputEndpointName = await this._promptEndpointName(i, endpoints)
-      let endpointAliases = await this._promptAliases(inputEndpointName, endpoints)
+      let inputEndpointName = await this._promptEndpointName(i)
+      this.endpointsAndAliases.add(inputEndpointName)
+
+      let endpointAliases = await this._promptAliases(inputEndpointName)
+      endpointAliases.forEach(alias => this.endpointsAndAliases.add(alias))
+
       const inputTransports = await this._promptTransports(inputEndpointName)
 
       endpoints[i] = {
@@ -323,7 +328,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     return endpointCount
   }
 
-  private async _promptEndpointName(index, endpoints = {}): Promise<string> {
+  private async _promptEndpointName(index): Promise<string> {
     if (this.promptDisabled) {
       return 'price'
     }
@@ -338,19 +343,18 @@ module.exports = class extends Generator<{rootPath: string}> {
 
     if (endpointName === '') {
       this.log('Endpoint name cannot be empty')
-      return this._promptEndpointName(index, endpoints)
+      return this._promptEndpointName(index)
     }
 
-    const existingEndpoint = this._checkExistingEndpoint(endpoints, endpointName)
-    if (existingEndpoint) {
+    if (this.endpointsAndAliases.has(endpointName)) {
       this.log(`Endpoint named or aliased '${endpointName}' already exists`)
-      return this._promptEndpointName(index, endpoints)
+      return this._promptEndpointName(index)
     }
 
     return endpointName
   }
 
-  private async _promptAliases(inputEndpointName, endpoints = {}): Promise<string[]> {
+  private async _promptAliases(inputEndpointName): Promise<string[]> {
     if (this.promptDisabled) {
       return []
     }
@@ -360,19 +364,18 @@ module.exports = class extends Generator<{rootPath: string}> {
       message: `Comma separated aliases for endpoint '${inputEndpointName}':`,
       default: 'empty',
     })
-    let endpointAliases
+    let endpointAliases: string[]
 
     if (endpointAliasesAnswer === 'empty' || endpointAliasesAnswer.trim().length === 0) {
       return []
     } else {
-      endpointAliases = new Set(...[endpointAliasesAnswer.split(',').map(a => this._normalizeStringInput(a.trim()))])
-      endpointAliases = [...endpointAliases]
+      endpointAliases = [...new Set(...[endpointAliasesAnswer.split(',').map(a => this._normalizeStringInput(a.trim()))])]
     }
 
-    let existingEndpoint = this._checkExistingEndpointAliases(endpoints, endpointAliases)
+    let existingEndpoint = endpointAliases.some(a => this.endpointsAndAliases.has(a))
     if (existingEndpoint) {
-      this.log(`Endpoint '${existingEndpoint.inputEndpointName}' already contains one or more provided aliases.`)
-      return this._promptAliases(inputEndpointName, endpoints)
+      this.log(`One of endpoints already contains one or more provided aliases.`)
+      return this._promptAliases(inputEndpointName)
     }
     return endpointAliases
   }
@@ -443,26 +446,6 @@ module.exports = class extends Generator<{rootPath: string}> {
     }
 
     return useComments
-  }
-
-  // Based on user input for endpoint name check if there is already registered endpoint/aliases with that name
-  private _checkExistingEndpoint(endpoints: Record<string, GeneratorEndpointContext>, newEndpointNameInput: string): GeneratorEndpointContext | undefined {
-    return Object.values(endpoints).find(e => {
-      return e.inputEndpointName === newEndpointNameInput || e.endpointAliases.includes(newEndpointNameInput)
-    })
-  }
-
-  private _checkExistingEndpointAliases(endpoints: Record<string, GeneratorEndpointContext>, aliases: string[]): GeneratorEndpointContext | undefined {
-    let existingEndpoint
-    for (let i = 0; i < aliases.length; i++) {
-      const alias = aliases[i]
-      existingEndpoint = this._checkExistingEndpoint(endpoints, alias)
-      if (existingEndpoint) {
-        break
-      }
-    }
-    return existingEndpoint
-
   }
 
   //convert endpoint name to normalized name that can be used in imports/exports, i.e. crypto-one-two -> cryptoOneTwo

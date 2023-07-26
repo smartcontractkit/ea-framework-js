@@ -3,6 +3,7 @@
     "rootDir": "./../",
     "outDir": "../../dist/src",
     "target": "es2020",
+    "downlevelIteration": true,
     "esModuleInterop": false,
     "moduleResolution": "node",
     "module": "CommonJS",
