@@ -51,7 +51,6 @@ jobs:
           ref: ${{ github.base_ref || github.ref }} # Explicit ref required to push from PR because of github internals
       - uses: ./.github/actions/set-git-credentials
       - uses: ./.github/actions/setup
-      - run: yarn generate-ref-tables
       - id: tick-version
         run: |
           VERSION_INSTRUCTION=${{ needs.preflight.outputs.VERSION_INSTRUCTION }}
@@ -78,13 +77,14 @@ jobs:
             | awk -F: '{ print $2 }' \
             | sed 's/[", ]//g')  
           echo "VERSION_TAG=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+      - run: yarn generate-ref-tables
       - name: Create commit
         id: create-commit
         if: inputs.dry-run != 'true' && ${{ steps.tick-version.outputs.VERSION_TAG != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FILE_TO_COMMIT: package.json
-          VERSION_BRANCH: "version-bump"
+          VERSION_BRANCH: 'version-bump'
         run: |
           # start with creating new branch 'version-bump', also update the reference to the origin if it doesn't exist
           git checkout -b $VERSION_BRANCH
@@ -92,28 +92,28 @@ jobs:
             echo "creating new branch $VERSION_BRANCH"
             gh api -X POST /repos/:owner/:repo/git/refs -f ref="refs/heads/main" -f sha="$GITHUB_SHA" -f "ref=refs/heads/$VERSION_BRANCH"
           fi
-          
+
           # get the content of package.json from $VERSION_BRANCH to get the current bump version
           PACKAGE_JSON_CONTENT=$(gh api --method GET /repos/:owner/:repo/contents/$FILE_TO_COMMIT \
               -f "ref=refs/heads/$VERSION_BRANCH" \
               | jq -r '.content' \
               | base64 -d)
-          
+
           BUMP_VERSION=$(echo "$PACKAGE_JSON_CONTENT" | jq -r '.version')
           NEW_VERSION="${{ steps.tick-version.outputs.VERSION_TAG }}"
-          
+
           echo "BUMP_VERSION $BUMP_VERSION"
           echo "NEW_VERSION $NEW_VERSION"
-          
+
           #We need to compare and update the package version in version bump PR only if the new version is higher then current bump version. 
           #For example if PR labeled as 'minor' is merged, then only 'major' labeled PR will overwrite the version change, not the 'patch' or 'minor' labeled PRs. 
-          
+
           # Split versions into major, minor, and patch components
           IFS='.' read -r -a bump <<< "$BUMP_VERSION"
           IFS='.' read -r -a new <<< "$NEW_VERSION"
-          
+
           HIGHEST_VERSION="equal"
-          
+
           # Compare major version number
           if (( bump[0] > new[0] )); then
             HIGHEST_VERSION="bump"
@@ -134,39 +134,39 @@ jobs:
               fi
             fi
           fi
-          
+
           if [[ "$HIGHEST_VERSION" == "new" ]]; then
            #new version is greater than current bump version, creating new commit 
-          
+
            # move the branch pointer one commit backwards so that we can manually commit changes done by 'npm version ...' command
             git reset HEAD~
-          
+
             # create a commit with content of package.json. This will give us 'verified' commit label from github actions bot
             MESSAGE="${{ steps.tick-version.outputs.VERSION_TAG }}"
             SHA=$(gh api --method GET /repos/:owner/:repo/contents/$FILE_TO_COMMIT \
                 -f "ref=refs/heads/$VERSION_BRANCH" \
                 --jq '.sha')
-          
+
             CONTENT=$( base64 -i $FILE_TO_COMMIT )
-          
+
             NEW_COMMIT_SHA=$(gh api --method PUT /repos/:owner/:repo/contents/$FILE_TO_COMMIT \
              --field message="$MESSAGE" \
              --field content="$CONTENT" \
             --field encoding="base64" \
             --field branch="$VERSION_BRANCH" \
             --field sha="$SHA" | jq -r '.commit.sha')
-          
+
             echo "UPDATED_VERSION_TAG=$NEW_VERSION" >> $GITHUB_OUTPUT
-          
+
             # create a tag from VERSION_TAG
             TAG_RESPONSE=$(gh api --method POST /repos/:owner/:repo/git/tags \
             --field tag="v${{ steps.tick-version.outputs.VERSION_TAG }}" \
             --field message="${{ steps.tick-version.outputs.VERSION_TAG }}" \
             --field object="$NEW_COMMIT_SHA" \
             --field type="commit")
-          
+
             NEW_TAG_SHA=$(echo "$TAG_RESPONSE" | jq -r '.sha')
-          
+
             # update the reference so that the tag is visible in github
             gh api --method POST /repos/:owner/:repo/git/refs \
             --field ref="refs/tags/v${{ steps.tick-version.outputs.VERSION_TAG }}" \
@@ -231,7 +231,7 @@ jobs:
         run: |
           # at this point either new branch with new commit is created so we open PR, or we get the open PR and set the outputs
           pullRequest=$(gh api --method GET "/repos/:owner/:repo/pulls" --jq ".[] | select(.head.ref == \"${{ steps.create-commit.outputs.VERSION_BRANCH }}\" and .state == \"open\") | {url: .html_url, number: .number}")
-          
+
           if [[ -z "$pullRequest" ]]; then
             echo "No pull requests found for branch ${{ steps.create-commit.outputs.VERSION_BRANCH }}, creating new PR"
             response=$(gh api --method POST /repos/:owner/:repo/pulls \
@@ -239,30 +239,30 @@ jobs:
             --field body="This PR bumps the version to ${{ steps.tick-version.outputs.VERSION_TAG }}" \
             --field head="${{ steps.create-commit.outputs.VERSION_BRANCH }}" \
             --field base="${{ github.base_ref || 'main' }}")
-          
+
             pr_url=$(echo $response | jq -r '.html_url')
             pr_number=$(echo $response | jq -r '.number')
-          
+
             echo "pull-request-number=$pr_number" >> $GITHUB_OUTPUT
             echo "pull-request-url=$pr_url" >> $GITHUB_OUTPUT
-          
+
             # as a last step we create a label for PR
             gh api --method POST "/repos/:owner/:repo/issues/$pr_number/labels" -F "labels[]=version-bump"
           else
             echo "Pull requests found for branch ${{ steps.create-commit.outputs.VERSION_BRANCH }}, setting outputs"
-          
+
             pr_url=$(echo "$pullRequest" | jq -r '.url')
             pr_number=$(echo "$pullRequest" | jq -r '.number')
-          
+
            #update the title and description of PR if there is new version bump commit 
            if [ "${{ steps.create-commit.outputs.UPDATED_VERSION_TAG }}" != "" ]; then
             echo "Found new version tag ${{ steps.create-commit.outputs.UPDATED_VERSION_TAG }} for PR, updating title and description"
-          
+
             gh api --method PATCH /repos/:owner/:repo/pulls/$pr_number \
             --field title="Bump version to ${{ steps.create-commit.outputs.UPDATED_VERSION_TAG }}" \
             --field body="This PR bumps the version to ${{ steps.create-commit.outputs.UPDATED_VERSION_TAG }}"
            fi
-          
+
             echo "pull-request-number=$pr_number" >> $GITHUB_OUTPUT
             echo "pull-request-url=$pr_url" >> $GITHUB_OUTPUT
           fi
