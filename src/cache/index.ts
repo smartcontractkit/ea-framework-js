@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { EventEmitter } from 'events'
 import { EndpointContext, EndpointGenerics } from '../adapter'
 import { AdapterResponse, censorLogs, makeLogger, sleep } from '../util'
 import { CacheTypes as CacheType } from './metrics'
@@ -53,12 +54,28 @@ export interface Cache<T = unknown> {
   setMany: (entries: CacheEntry<Readonly<T>>[], ttl: number) => Promise<void>
 
   /**
-   * Deletes the specified item from the Cache
+   * Deletes the specified item from the Cache.
    *
    * @param key - the key of the entry to be deleted
    * @returns an empty Promise that resolves when the entry has been deleted
    */
   delete: (key: string) => Promise<void>
+
+  /**
+   * Sets a lock on the Cache.
+   *
+   * @param key - the key used to identify the lock, composed of the cache prefix (if set) and adapter name
+   * @param cacheLockDuration - the time (in ms) used for the acquisition and extension of the lock
+   * @param retryCount - the number of retries for acquiring the lock
+   * @param shutdownNotifier - an EventEmitter that emits an event when the adapter is shutting down
+   * @returns an empty Promise that resolves upon error or exiting the adapter
+   */
+  lock?: (
+    key: string,
+    cacheLockDuration: number,
+    retryCount: number,
+    shutdownNotifier: EventEmitter,
+  ) => Promise<void>
 }
 
 // Uses calculateKey to generate a unique key from the endpoint name, data, and input parameters
@@ -81,7 +98,10 @@ export const calculateCacheKey = <T extends EndpointGenerics>({
     endpointName,
     transportName,
   })
-  const cacheKey = `${adapterName}-${calculatedKey}`
+
+  const cachePrefix = adapterSettings.CACHE_PREFIX ? `${adapterSettings.CACHE_PREFIX}-` : ''
+  const cacheKey = `${cachePrefix}${adapterName}-${calculatedKey}`
+
   censorLogs(() => logger.trace(`Generated cache key for request: "${cacheKey}"`))
   return cacheKey
 }

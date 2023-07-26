@@ -25,6 +25,16 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: '/',
   },
+  CACHE_LOCK_DURATION: {
+    description: 'Time (in ms) used as a baseline for the acquisition and extension of cache locks',
+    type: 'number',
+    default: 10000,
+  },
+  CACHE_LOCK_RETRIES: {
+    description: 'Number of retries to acquire a cache lock',
+    type: 'number',
+    default: 10,
+  },
   CACHE_MAX_AGE: {
     description: 'Maximum amount of time (in ms) that a response will stay cached',
     type: 'number',
@@ -91,6 +101,11 @@ export const BaseSettingsDefinition = {
     type: 'enum',
     default: 'local',
     options: ['local', 'redis'],
+  },
+  CACHE_PREFIX: {
+    description: 'Specifies a prefix to use for cache keys',
+    type: 'string',
+    default: '',
   },
   SUBSCRIPTION_SET_MAX_ITEMS: {
     type: 'number',

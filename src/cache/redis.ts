@@ -1,6 +1,8 @@
+import EventEmitter from 'events'
 import Redis, { Result } from 'ioredis'
+import Redlock from 'redlock'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
-import { AdapterResponse, censorLogs, makeLogger } from '../util'
+import { AdapterResponse, censorLogs, makeLogger, sleep } from '../util'
 import { Cache, CacheEntry } from './index'
 import { CacheTypes, cacheMetricsLabel, cacheSet } from './metrics'
 
@@ -107,5 +109,66 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
     // Record exec command sent to Redis
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'exec')
+  }
+
+  async lock(
+    key: string,
+    cacheLockDuration: number,
+    retryCount: number,
+    shutdownNotifier: EventEmitter,
+  ): Promise<void> {
+    const start = Date.now()
+    const log = (msg: string) => `[${(Date.now() - start) / 1000}]: ${msg}`
+
+    const redlock = new Redlock([this.client], {
+      // Implementing retries manually due to redlock bug in edge cases
+      retryCount: 0,
+    })
+
+    const acquireLock = async () => {
+      // For the number of retries, try to acquire the lock
+      for (let retryAttempt = 1; retryAttempt <= retryCount; retryAttempt++) {
+        try {
+          const lock = await redlock.acquire([key], cacheLockDuration)
+          logger.info(
+            log(
+              `Acquired lock: ${lock.value}, key: ${key}, TTL: ${
+                (lock.expiration - Date.now()) / 1000
+              }`,
+            ),
+          )
+          // If successful, return lock and break loop
+          return lock
+        } catch (error) {
+          logger.error(`Failed to acquire lock on attempt ${retryAttempt}/${retryCount}: ${error}`)
+          // On error, sleep before retrying again
+          await sleep(cacheLockDuration / retryCount)
+        }
+      }
+      // If the last retry fails, throw error
+      throw new Error(
+        'The adapter failed to acquire a lock on the cache. Please check if you are running another instance of the adapter with the same name and cache prefix.',
+      )
+    }
+
+    let lock = await acquireLock()
+
+    const extendLock = async () => {
+      if (lock) {
+        // eslint-disable-next-line require-atomic-updates
+        lock = await lock.extend(cacheLockDuration)
+        logger.trace(
+          log(`Extended lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`),
+        )
+      }
+    }
+
+    // Lock duration multiplied by .8 to ensure lock is able to be extended before expiry
+    const extendInterval = setInterval(extendLock, cacheLockDuration * 0.8)
+
+    // Clear timeout on close for testing purposes
+    shutdownNotifier.on('onClose', () => {
+      clearInterval(extendInterval)
+    })
   }
 }

@@ -107,7 +107,11 @@ export const start = async <T extends SettingsDefinitionMap>(
 
     // Add a hook on close to use on the background execution loop to stop it
     apiShutdownPromise = new Promise<void>((resolve) => {
-      api?.addHook('onClose', async () => resolve())
+      api?.addHook('onClose', async () => {
+        // Used in the RedisCache lock method for testing purposes
+        adapter.shutdownNotifier.emit('onClose')
+        resolve()
+      })
     })
   } else {
     logger.info('REST API is disabled; this instance will not process incoming requests.')

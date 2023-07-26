@@ -118,7 +118,12 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
         shasum.update(cacheKey)
         cacheKey = shasum.digest('base64')
       }
-      req.requestContext.cacheKey = cacheKey
+
+      const cachePrefix = adapter.config.settings.CACHE_PREFIX
+        ? `${adapter.config.settings.CACHE_PREFIX}-`
+        : ''
+
+      req.requestContext.cacheKey = `${cachePrefix}${cacheKey}`
     } else {
       const transportName = endpoint.getTransportNameForRequest(req, adapter.config.settings)
       req.requestContext.cacheKey = calculateCacheKey({
