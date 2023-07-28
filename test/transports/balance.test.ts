@@ -6,7 +6,10 @@ import { Adapter } from '../../src/adapter'
 import { AdapterConfig, CustomSettingsDefinition, EmptyCustomSettings } from '../../src/config'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../../src/util/testing-utils'
-import { BalanceTransport, balanceTransportInputParametersDefinition } from '../../src/transports/balance'
+import {
+  BalanceTransport,
+  balanceTransportInputParametersDefinition,
+} from '../../src/transports/balance'
 import { BalanceEndpoint, BalanceResponse } from '../../src/adapter/balance'
 
 const URL = 'http://test-url.com'
@@ -61,14 +64,15 @@ export const balanceEndpoint = new BalanceEndpoint({
   inputParameters,
 })
 
-
 axiosMock
-  .onGet(`${URL}/address/${mockAddresses[0]}`).reply(200, {
-  balance: 123,
-})
-  .onGet(`${URL}/address/${mockAddresses[1]}`).reply(200, {
-  balance: 456,
-})
+  .onGet(`${URL}/address/${mockAddresses[0]}`)
+  .reply(200, {
+    balance: 123,
+  })
+  .onGet(`${URL}/address/${mockAddresses[1]}`)
+  .reply(200, {
+    balance: 456,
+  })
 
 test.serial('gets balances of addresses from DP', async (t) => {
   const adapter = new Adapter({
@@ -81,7 +85,7 @@ test.serial('gets balances of addresses from DP', async (t) => {
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
   const res = await testAdapter.request({
-    addresses: mockAddresses.map(addr => ({address: addr}))
+    addresses: mockAddresses.map((addr) => ({ address: addr })),
   })
   const response = res.json()
 
@@ -100,12 +104,10 @@ test.serial('gets balances of addresses from DP', async (t) => {
     data: {
       result: [
         { address: mockAddresses[0], balance: '123', chain: 'mainnet', coin: 'btc' },
-        { address: mockAddresses[1], balance: '456', chain: 'mainnet', coin: 'btc' }
-      ]
+        { address: mockAddresses[1], balance: '456', chain: 'mainnet', coin: 'btc' },
+      ],
     },
     result: null,
     statusCode: 200,
   })
-
 })
-

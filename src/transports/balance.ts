@@ -2,12 +2,13 @@ import { Transport, TransportDependencies, TransportGenerics } from './'
 import { Requester } from '../util/requester'
 import { ResponseCache } from '../cache/response'
 import { AdapterRequest, AdapterResponse } from '../util'
-import { InputParameters, InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
-import { AxiosRequestConfig, AxiosResponse } from 'axios'
 import {
-  Balance,
-  BalanceResponse,
-} from '../adapter/balance'
+  InputParameters,
+  InputParametersDefinition,
+  TypeFromDefinition,
+} from '../validation/input-params'
+import { AxiosRequestConfig, AxiosResponse } from 'axios'
+import { Balance, BalanceResponse } from '../adapter/balance'
 import { calculateHttpRequestKey } from '../cache'
 
 export type BalanceTransportInputParametersDefinition = InputParametersDefinition & {
@@ -35,12 +36,12 @@ export type BalanceTransportInputParametersDefinition = InputParametersDefinitio
         default: string
       }
     }
-  },
+  }
   confirmations: {
     required: boolean
-    description: 'The number of confirmations to query data from',
-    default: number,
-    type: 'number',
+    description: 'The number of confirmations to query data from'
+    default: number
+    type: 'number'
   }
 }
 
@@ -52,22 +53,23 @@ export const balanceTransportInputParametersDefinition = {
       address: {
         type: 'string',
         description: 'an address to get the balance of',
-        required: true
+        required: true,
       },
       coin: {
         required: false,
         type: 'string',
         description: 'currency to query',
-        default: 'btc'
+        default: 'btc',
       },
       chain: {
         required: false,
         type: 'string',
         description: 'chain to query',
         default: 'mainnet',
-      }
+      },
     },
-    description: 'An array of addresses to get the balances of (as an object with string `address` as an attribute)',
+    description:
+      'An array of addresses to get the balances of (as an object with string `address` as an attribute)',
     required: true,
   },
   confirmations: {
@@ -75,7 +77,7 @@ export const balanceTransportInputParametersDefinition = {
     type: 'number',
     description: 'The number of confirmations to query data from',
     default: 6,
-  }
+  },
 } as const satisfies BalanceTransportInputParametersDefinition
 
 export type BalanceTransportGenerics = TransportGenerics & {
@@ -103,7 +105,7 @@ export type BalanceTransportGenerics = TransportGenerics & {
   }
 }
 
-export interface BalanceAddress  {
+export interface BalanceAddress {
   chain: string
   address: string
   coin: string
@@ -126,19 +128,21 @@ export interface BalanceTransportConfig<T extends BalanceTransportGenerics> {
     balanceAddress: BalanceAddress,
     confirmations: number,
     adapterSettings: T['Settings'],
-  ) =>  BalanceRequestConfig<T>
+  ) => BalanceRequestConfig<T>
 }
-
 
 /**
  * Structure containing the association between input address and a provider request.
  */
-export interface BalanceRequestConfig<T extends BalanceTransportGenerics>  {
+export interface BalanceRequestConfig<T extends BalanceTransportGenerics> {
   /** The request that will be sent to the data provider to fetch the balance of an address */
-  request: AxiosRequestConfig<T['Provider']['RequestBody']>,
+  request: AxiosRequestConfig<T['Provider']['RequestBody']>
   /** Function that will be called when request for an address is executed. It receives the response from the data provider
    * and adapter settings and should return [Balance] object*/
-  onResponse: (res:  AxiosResponse<T['Provider']['ResponseBody']>, adapterSettings: T['Settings'],) => Balance
+  onResponse: (
+    res: AxiosResponse<T['Provider']['ResponseBody']>,
+    adapterSettings: T['Settings'],
+  ) => Balance
 }
 
 interface InputData {
@@ -159,8 +163,7 @@ export class BalanceTransport<T extends BalanceTransportGenerics> implements Tra
   requester!: Requester
   responseCache!: ResponseCache<T>
 
-  constructor(private config: BalanceTransportConfig<T>) {
-  }
+  constructor(private config: BalanceTransportConfig<T>) {}
 
   async initialize(
     dependencies: TransportDependencies<T>,
@@ -175,32 +178,38 @@ export class BalanceTransport<T extends BalanceTransportGenerics> implements Tra
 
   async foregroundExecute(
     req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
-    settings: T['Settings']
+    settings: T['Settings'],
   ): Promise<AdapterResponse<T['Response']>> {
     const addresses: BalanceAddress[] = (req.requestContext.data as unknown as InputData).addresses
     const confirmations: number = (req.requestContext.data as unknown as InputData).confirmations
 
-    const balanceConfigs = addresses.map(address => this.config.getBalance(address, confirmations, settings))
+    const balanceConfigs = addresses.map((address) =>
+      this.config.getBalance(address, confirmations, settings),
+    )
 
     const providerDataRequestedUnixMs = Date.now()
     const result: Balance[] = []
 
-    const requestsPromise = balanceConfigs.map(balanceConfig => {
-      return this.requester.request<T>(
-        calculateHttpRequestKey({
-          context: {
-            adapterSettings: settings,
-            inputParameters: new InputParameters<T["Parameters"]>(balanceTransportInputParametersDefinition),
-            endpointName: req.requestContext.endpointName,
-          },
-          data: req.requestContext.data,
-          transportName: this.name,
-        }),
-        balanceConfig.request,
-      ).then(response => {
-        const balance = balanceConfig.onResponse(response.response, settings);
-        result.push(balance)
-      })
+    const requestsPromise = balanceConfigs.map((balanceConfig) => {
+      return this.requester
+        .request<T>(
+          calculateHttpRequestKey({
+            context: {
+              adapterSettings: settings,
+              inputParameters: new InputParameters<T['Parameters']>(
+                balanceTransportInputParametersDefinition,
+              ),
+              endpointName: req.requestContext.endpointName,
+            },
+            data: req.requestContext.data,
+            transportName: this.name,
+          }),
+          balanceConfig.request,
+        )
+        .then((response) => {
+          const balance = balanceConfig.onResponse(response.response, settings)
+          result.push(balance)
+        })
     })
 
     await Promise.all(requestsPromise)
@@ -220,5 +229,4 @@ export class BalanceTransport<T extends BalanceTransportGenerics> implements Tra
     await this.responseCache.write(this.name, [{ params: req.requestContext.data, response }])
     return response
   }
-
 }

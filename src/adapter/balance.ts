@@ -43,10 +43,11 @@ export const balanceEndpointInputParametersDefinition = {
       address: {
         type: 'string',
         description: 'an address to get the balance of',
-        required: true
-      }
+        required: true,
+      },
     },
-    description: 'An array of addresses to get the balances of (as an object with string `address` as an attribute)',
+    description:
+      'An array of addresses to get the balances of (as an object with string `address` as an attribute)',
     required: true,
   },
 } as const satisfies BalanceEndpointInputParametersDefinition
@@ -65,7 +66,6 @@ export type BalanceEndpointGenerics = TransportGenerics & {
  */
 export class BalanceEndpoint<T extends BalanceEndpointGenerics> extends AdapterEndpoint<T> {}
 
-
 /**
  * Helper type structure that contains the different types passed to the generic parameters of TotalBalanceEndpoint
  */
@@ -82,4 +82,6 @@ export type TotalBalanceEndpointGenerics = BalanceEndpointGenerics & {
  * A TotalBalanceEndpoint is a specific type of BalanceEndpoint. Meant to comply with standard practices for
  * Data Feeds, its InputParameters must extend the basic ones (addresses) and the response type must be numeric string.
  */
-export class TotalBalanceEndpoint<T extends TotalBalanceEndpointGenerics> extends BalanceEndpoint<T> {}
+export class TotalBalanceEndpoint<
+  T extends TotalBalanceEndpointGenerics,
+> extends BalanceEndpoint<T> {}
