@@ -10,7 +10,7 @@ import {
 } from '../adapter/balance'
 import { calculateHttpRequestKey } from '../cache'
 
-export type BalanceTransportParametersDefinition = InputParametersDefinition & {
+export type BalanceTransportInputParametersDefinition = InputParametersDefinition & {
   addresses: {
     aliases: readonly ['result', ...string[]]
     required: boolean
@@ -76,13 +76,13 @@ export const balanceTransportInputParametersDefinition = {
     description: 'The number of confirmations to query data from',
     default: 6,
   }
-} as const satisfies BalanceTransportParametersDefinition
+} as const satisfies BalanceTransportInputParametersDefinition
 
 export type BalanceTransportGenerics = TransportGenerics & {
   /**
    * Type details about incoming Adapter requests to this Transport
    */
-  Parameters: BalanceTransportParametersDefinition
+  Parameters: BalanceTransportInputParametersDefinition
   /**
    * Type details about outbound responses from this Transport
    */
