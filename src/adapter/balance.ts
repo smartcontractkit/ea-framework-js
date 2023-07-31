@@ -2,21 +2,21 @@ import { InputParametersDefinition } from '../validation/input-params'
 import { TransportGenerics } from '../transports'
 import { AdapterEndpoint } from './endpoint'
 
-export type Balance = Record<string, unknown> & {
+export type PoRBalance = Record<string, unknown> & {
   balance: string
 }
 
-export type BalanceResponse = {
+export type PoRBalanceResponse = {
   Result: null
   Data: {
-    result: Balance[]
+    result: PoRBalance[]
   }
 }
 
 /**
- * Type for the base input parameter config that any [[BalanceEndpoint]] must extend
+ * Type for the base input parameter config that any [[PoRBalanceEndpoint]] must extend
  */
-export type BalanceEndpointInputParametersDefinition = InputParametersDefinition & {
+export type PoRBalanceEndpointInputParametersDefinition = InputParametersDefinition & {
   addresses: {
     aliases: readonly ['result', ...string[]]
     required: boolean
@@ -33,9 +33,9 @@ export type BalanceEndpointInputParametersDefinition = InputParametersDefinition
 }
 
 /**
- * Base input parameter config that any [[BalanceEndpoint]] must extend
+ * Base input parameter config that any [[PoRBalanceEndpoint]] must extend
  */
-export const balanceEndpointInputParametersDefinition = {
+export const porBalanceEndpointInputParametersDefinition = {
   addresses: {
     aliases: ['result'],
     array: true,
@@ -50,26 +50,27 @@ export const balanceEndpointInputParametersDefinition = {
       'An array of addresses to get the balances of (as an object with string `address` as an attribute)',
     required: true,
   },
-} as const satisfies BalanceEndpointInputParametersDefinition
+} as const satisfies PoRBalanceEndpointInputParametersDefinition
 
 /**
  * Helper type structure that contains the different types passed to the generic parameters of a BalanceEndpoint
  */
-export type BalanceEndpointGenerics = TransportGenerics & {
-  Parameters: BalanceEndpointInputParametersDefinition
-  Response: BalanceResponse
+export type PoRBalanceEndpointGenerics = TransportGenerics & {
+  Parameters: PoRBalanceEndpointInputParametersDefinition
+  Response: PoRBalanceResponse
 }
 
 /**
- * A BalanceEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
- * Data Feeds, its InputParameters must extend the basic ones (addresses) and the response type must be `BalanceResponse`.
+ * A PoRBalanceEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
+ * Data Feeds, its InputParameters must extend the basic ones (addresses) and the response type must be `PoRBalanceResponse`.
  */
-export class BalanceEndpoint<T extends BalanceEndpointGenerics> extends AdapterEndpoint<T> {}
+export class PoRBalanceEndpoint<T extends PoRBalanceEndpointGenerics> extends AdapterEndpoint<T> {}
 
 /**
  * Helper type structure that contains the different types passed to the generic parameters of TotalBalanceEndpoint
  */
-export type TotalBalanceEndpointGenerics = BalanceEndpointGenerics & {
+export type PoRTotalBalanceEndpointGenerics = TransportGenerics & {
+  Parameters: PoRBalanceEndpointInputParametersDefinition
   Response: {
     Result: string
     Data: {
@@ -79,9 +80,9 @@ export type TotalBalanceEndpointGenerics = BalanceEndpointGenerics & {
 }
 
 /**
- * A TotalBalanceEndpoint is a specific type of BalanceEndpoint. Meant to comply with standard practices for
+ * A PoRTotalBalanceEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its InputParameters must extend the basic ones (addresses) and the response type must be numeric string.
  */
-export class TotalBalanceEndpoint<
-  T extends TotalBalanceEndpointGenerics,
-> extends BalanceEndpoint<T> {}
+export class PoRTotalBalanceEndpoint<
+  T extends PoRTotalBalanceEndpointGenerics,
+> extends AdapterEndpoint<T> {}

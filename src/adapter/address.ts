@@ -17,12 +17,12 @@ export type PoRAddressResponse = {
 /**
  * Helper type structure that contains the Response type passed to the generic parameters of an AddressEndpoint
  */
-export type AddressEndpointGenerics = TransportGenerics & {
+export type PoRAddressEndpointGenerics = TransportGenerics & {
   Response: PoRAddressResponse
 }
 
 /**
- * An AddressEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
+ * A PoRAddressEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its response type must be `PoRAddressResponse`
  */
-export class AddressEndpoint<T extends AddressEndpointGenerics> extends AdapterEndpoint<T> {}
+export class PoRAddressEndpoint<T extends PoRAddressEndpointGenerics> extends AdapterEndpoint<T> {}
