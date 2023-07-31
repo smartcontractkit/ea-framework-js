@@ -163,6 +163,7 @@ test('Adapter writer mode api disabled', async (t) => {
     {
       envDefaultOverrides: {
         EA_MODE: 'writer',
+        CACHE_LOCK_DEFERRAL_MS: 0,
       },
     },
   )
