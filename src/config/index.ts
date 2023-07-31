@@ -35,6 +35,11 @@ export const BaseSettingsDefinition = {
     type: 'number',
     default: 10,
   },
+  CACHE_LOCK_DEFERRAL_MS: {
+    description: 'The amount of time (in ms) to wait before attempting to lock the cache',
+    type: 'number',
+    default: 60000,
+  },
   CACHE_MAX_AGE: {
     description: 'Maximum amount of time (in ms) that a response will stay cached',
     type: 'number',

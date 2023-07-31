@@ -171,6 +171,11 @@ export const expose = async <T extends SettingsDefinitionMap>(
   await exposeApp(api, adapter.config.settings.EA_PORT)
   await exposeApp(metricsApi, adapter.config.settings.METRICS_PORT)
 
+  // Make sure the cache lock has been acquired before returning
+  if (adapter.lockAcquiredPromise) {
+    await adapter.lockAcquiredPromise
+  }
+
   // We return only the main API to maintain backwards compatibility
   return api
 }
