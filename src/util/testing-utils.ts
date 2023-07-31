@@ -160,7 +160,7 @@ export class RedisMock {
   }
 
   // For cache lock tests - naive implementation as the necessary error will
-  // already have been thrown the test will end the process
+  // already have been thrown and the test will end the process
   quit() {
     return
   }
