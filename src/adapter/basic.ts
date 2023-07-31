@@ -143,8 +143,9 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
               this.config.settings.CACHE_LOCK_RETRIES,
               this.shutdownNotifier,
             ))
-        } catch (e) {
-          lockAcquiredReject(e)
+        } catch (error) {
+          lockAcquiredReject(error)
+          return
         }
         lockAcquiredResolve(true)
       }, this.config.settings.CACHE_LOCK_DEFERRAL_MS)
