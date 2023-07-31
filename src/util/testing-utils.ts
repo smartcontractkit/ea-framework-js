@@ -158,6 +158,12 @@ export class RedisMock {
       return 0
     }
   }
+
+  // For cache lock tests - naive implementation as the necessary error will
+  // already have been thrown the test will end the process
+  quit() {
+    return
+  }
 }
 
 class CommandChainMock {
