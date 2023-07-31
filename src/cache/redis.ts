@@ -125,6 +125,11 @@ export class RedisCache<T = unknown> implements Cache<T> {
       retryCount: 0,
     })
 
+    // Close redis to allow adapter to shutdown if lock is not acquired
+    shutdownNotifier.on('onClose', () => {
+      this.client.quit()
+    })
+
     const acquireLock = async () => {
       // For the number of retries, try to acquire the lock
       for (let retryAttempt = 1; retryAttempt <= retryCount; retryAttempt++) {
