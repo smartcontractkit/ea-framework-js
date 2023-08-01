@@ -12,7 +12,7 @@ test('PoRAdapter has BACKGROUND_EXECUTE_TIMEOUT setting set to highest value', a
   const adapter = new PoRAdapter({
     name: 'TEST',
     config: new AdapterConfig({
-      test: { description: 'test', type: 'string' }
+      test: { description: 'test', type: 'string' },
     }),
     endpoints: [
       new PoRBalanceEndpoint({
@@ -23,4 +23,3 @@ test('PoRAdapter has BACKGROUND_EXECUTE_TIMEOUT setting set to highest value', a
   })
   t.is(adapter.config.settings.BACKGROUND_EXECUTE_TIMEOUT, 180_000)
 })
-
