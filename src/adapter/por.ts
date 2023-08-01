@@ -29,8 +29,7 @@ export type PoRAddressEndpointGenerics = TransportGenerics & {
  * A PoRAddressEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its response type must be `PoRAddressResponse`
  */
-export class PoRAddressEndpoint<T extends PoRAddressEndpointGenerics> extends AdapterEndpoint<T> {
-}
+export class PoRAddressEndpoint<T extends PoRAddressEndpointGenerics> extends AdapterEndpoint<T> {}
 
 export type PoRBalance = Record<string, unknown> & {
   balance: string
@@ -94,8 +93,7 @@ export type PoRBalanceEndpointGenerics = TransportGenerics & {
  * A PoRBalanceEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its InputParameters must extend the basic ones (addresses) and the response type must be `PoRBalanceResponse`.
  */
-export class PoRBalanceEndpoint<T extends PoRBalanceEndpointGenerics> extends AdapterEndpoint<T> {
-}
+export class PoRBalanceEndpoint<T extends PoRBalanceEndpointGenerics> extends AdapterEndpoint<T> {}
 
 /**
  * Helper type structure that contains the different types passed to the generic parameters of TotalBalanceEndpoint
@@ -116,23 +114,22 @@ export type PoRTotalBalanceEndpointGenerics = TransportGenerics & {
  */
 export class PoRTotalBalanceEndpoint<
   T extends PoRTotalBalanceEndpointGenerics,
-> extends AdapterEndpoint<T> {
-}
-
+> extends AdapterEndpoint<T> {}
 
 /**
  * A PoRAdapter is a specific kind of Adapter that includes at least one PoRTotalBalanceEndpoint,
  * PoRBalanceEndpoint or PoRAddressEndpoint.
  */
-export class PoRAdapter<T extends SettingsDefinitionMap, > extends Adapter<T> {
+export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
   constructor(params: AdapterParams<T>) {
     const porEndpoints = params.endpoints.filter(
-      (e) => e instanceof PoRBalanceEndpoint || e instanceof PoRTotalBalanceEndpoint || e instanceof PoRAddressEndpoint,
+      (e) =>
+        e instanceof PoRBalanceEndpoint ||
+        e instanceof PoRTotalBalanceEndpoint ||
+        e instanceof PoRAddressEndpoint,
     )
     if (!porEndpoints.length) {
-      throw new Error(
-        `This PoRAdapter's list of endpoints does not contain a valid PoR endpoint`,
-      )
+      throw new Error(`This PoRAdapter's list of endpoints does not contain a valid PoR endpoint`)
     }
 
     super(params)
@@ -141,4 +138,3 @@ export class PoRAdapter<T extends SettingsDefinitionMap, > extends Adapter<T> {
     this.config.settings.BACKGROUND_EXECUTE_TIMEOUT = 180_000
   }
 }
-
