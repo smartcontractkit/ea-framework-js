@@ -1,10 +1,14 @@
 import Redis from 'ioredis'
+import { expose } from '../../src'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
 import { sleep } from '../../src/util'
-import { MockCache, NopTransport, RedisMock, TestAdapter } from '../../src/util/testing-utils'
+import { MockCache, NopTransport, RedisMock } from '../../src/util/testing-utils'
 import { test } from './helper'
+
+// This test needs to use expose to wait for the cache lock promise in the basic EA flow
+process.env['EA_PORT'] = '0'
 
 test.serial(
   'An adapter with a duplicate name and no cache prefix should fail to acquire a lock',
@@ -17,6 +21,7 @@ test.serial(
           CACHE_REDIS_PORT: 6000,
           CACHE_LOCK_DURATION: 2000,
           CACHE_LOCK_RETRIES: 2,
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -40,6 +45,7 @@ test.serial(
           CACHE_REDIS_PORT: 6000,
           CACHE_LOCK_DURATION: 2000,
           CACHE_LOCK_RETRIES: 2,
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -63,8 +69,8 @@ test.serial(
     }
 
     try {
-      await TestAdapter.start(adapter, t.context, dependencies)
-      await TestAdapter.start(adapter2, t.context, dependencies)
+      await expose(adapter, dependencies)
+      await expose(adapter2, dependencies)
 
       t.fail('An error should have been thrown')
     } catch (error: unknown) {
@@ -85,6 +91,7 @@ test.serial(
         envDefaultOverrides: {
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -107,6 +114,7 @@ test.serial(
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
           CACHE_PREFIX: 'PREFIX',
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -130,8 +138,8 @@ test.serial(
     }
 
     try {
-      await TestAdapter.start(adapter, t.context, dependencies)
-      await TestAdapter.start(adapter2, t.context, dependencies)
+      await expose(adapter, dependencies)
+      await expose(adapter2, dependencies)
 
       t.pass()
     } catch (error) {
@@ -149,6 +157,7 @@ test.serial(
         envDefaultOverrides: {
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -169,6 +178,7 @@ test.serial(
       {
         envDefaultOverrides: {
           CACHE_TYPE: 'local',
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -199,8 +209,8 @@ test.serial(
     }
 
     try {
-      await TestAdapter.start(adapter, t.context, dependencies)
-      await TestAdapter.start(adapter2, t.context, dependencies2)
+      await expose(adapter, dependencies)
+      await expose(adapter2, dependencies2)
 
       t.pass()
     } catch (error) {
@@ -219,6 +229,7 @@ test.serial(
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
           CACHE_LOCK_DURATION: 1000,
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -242,6 +253,7 @@ test.serial(
           CACHE_REDIS_PORT: 6000,
           CACHE_LOCK_DURATION: 100,
           CACHE_LOCK_RETRIES: 1,
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -265,9 +277,8 @@ test.serial(
     }
 
     try {
-      await TestAdapter.start(adapter, t.context, dependencies)
-      await sleep(1500)
-      await TestAdapter.start(adapter2, t.context, dependencies)
+      await expose(adapter, dependencies)
+      await expose(adapter2, dependencies)
 
       t.fail('An ExecutionError should have been thrown')
     } catch (error: unknown) {
@@ -289,6 +300,7 @@ test.serial(
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
           CACHE_LOCK_DURATION: 1000,
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -312,6 +324,7 @@ test.serial(
           CACHE_REDIS_PORT: 6000,
           CACHE_LOCK_DURATION: 1000,
           CACHE_LOCK_RETRIES: 10,
+          CACHE_LOCK_DEFERRAL_MS: 0,
         },
       },
     )
@@ -336,15 +349,15 @@ test.serial(
     }
 
     try {
-      const testAdapter = await TestAdapter.start(adapter, t.context, dependencies)
+      const api = await expose(adapter, dependencies)
       // Sleep for 1 second to allow the lock to be extended
       await sleep(1000)
       // Store the unique ID of the first adapter
       const firstAdapterID = redisMock.keys['TEST']
       // Shut down the first adapter
-      await testAdapter.api.close()
+      await api?.close()
       // Start the second adapter before deleting the old key
-      TestAdapter.start(adapter2, t.context, dependencies)
+      expose(adapter2, dependencies)
       // Sleep to allow for retries
       await sleep(500)
       // Delete the old key from the first adapter

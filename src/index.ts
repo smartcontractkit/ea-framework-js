@@ -1,6 +1,7 @@
 import fastify, { FastifyInstance } from 'fastify'
 import { AddressInfo } from 'net'
 import { join } from 'path'
+import { ExecutionError } from 'redlock'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
 import { AdapterSettings, SettingsDefinitionMap } from './config'
@@ -123,6 +124,10 @@ export const start = async <T extends SettingsDefinitionMap>(
     process.setMaxListeners(0)
   }
   process.on('unhandledRejection', (err: Error) => {
+    // Throw redlock execution error for testing purposes
+    if (err instanceof ExecutionError) {
+      throw err
+    }
     censorLogs(() =>
       logger.error({
         name: err.name,
@@ -170,6 +175,17 @@ export const expose = async <T extends SettingsDefinitionMap>(
   // Start listening for incoming requests
   await exposeApp(api, adapter.config.settings.EA_PORT)
   await exposeApp(metricsApi, adapter.config.settings.METRICS_PORT)
+
+  // Make sure the cache lock has been acquired before returning
+  if (adapter.lockAcquiredPromise) {
+    try {
+      await adapter.lockAcquiredPromise
+    } catch (error) {
+      await api?.close()
+      await metricsApi?.close()
+      throw error
+    }
+  }
 
   // We return only the main API to maintain backwards compatibility
   return api

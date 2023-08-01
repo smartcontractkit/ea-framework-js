@@ -21,6 +21,7 @@ import {
   LoggerFactoryProvider,
   SubscriptionSetFactory,
   censorLogs,
+  deferredPromise,
   makeLogger,
 } from '../util'
 import { Requester } from '../util/requester'
@@ -64,6 +65,9 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
   /** Used on api shutdown for testing purposes*/
   shutdownNotifier: EventEmitter
+
+  /** Promise that will resolve once the adapter cache has acquired a lock */
+  lockAcquiredPromise?: Promise<boolean>
 
   /** Bootstrap function that will run when initializing the adapter */
   private readonly bootstrap?: (adapter: Adapter<CustomSettingsDefinition>) => Promise<void>
@@ -120,16 +124,31 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     this.dependencies = this.initializeDependencies(dependencies)
 
     if (this.config.settings.EA_MODE !== 'reader' && this.dependencies.cache.lock) {
+      const [lockAcquiredPromise, lockAcquiredResolve, lockAcquiredReject] =
+        deferredPromise<boolean>()
+      this.lockAcquiredPromise = lockAcquiredPromise
       const cacheLockKey = this.config.settings.CACHE_PREFIX
         ? `${this.config.settings.CACHE_PREFIX}-${this.name}`
         : this.name
 
-      await this.dependencies.cache.lock(
-        cacheLockKey,
-        this.config.settings.CACHE_LOCK_DURATION,
-        this.config.settings.CACHE_LOCK_RETRIES,
-        this.shutdownNotifier,
-      )
+      // We need to defer the locking to support rollout strategies where the old container for an
+      // adapter is still running while the new one is starting up, and we don't want to block the
+      // old container from serving requests while the new one is starting up.
+      setTimeout(async () => {
+        try {
+          await (this.dependencies.cache.lock &&
+            this.dependencies.cache.lock(
+              cacheLockKey,
+              this.config.settings.CACHE_LOCK_DURATION,
+              this.config.settings.CACHE_LOCK_RETRIES,
+              this.shutdownNotifier,
+            ))
+        } catch (error) {
+          lockAcquiredReject(error)
+          return
+        }
+        lockAcquiredResolve(true)
+      }, this.config.settings.CACHE_LOCK_DEFERRAL_MS)
     }
 
     for (const endpoint of this.endpoints) {
