@@ -1,18 +1,21 @@
+import { fastifyStatic } from '@fastify/static'
 import fastify, { FastifyInstance } from 'fastify'
 import { AddressInfo } from 'net'
 import { join } from 'path'
 import { ExecutionError } from 'redlock'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
-import { AdapterSettings, SettingsDefinitionMap } from './config'
+import { AdapterSettings, SettingDefinitionDetails, SettingsDefinitionMap } from './config'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
 import {
   AdapterRequest,
   AdapterRouteGeneric,
+  censor,
   censorLogs,
   loggingContextMiddleware,
   makeLogger,
 } from './util'
+import CensorList from './util/censor/censor-list'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
 import { EmptyInputParameters } from './validation/input-params'
 
@@ -202,6 +205,40 @@ async function buildRestApi(adapter: Adapter) {
   app.get(join(adapter.config.settings.BASE_URL, 'health'), (req, res) => {
     res.status(200).send({ message: 'OK', version: VERSION })
   })
+
+  if (adapter.config.settings.DEBUG_ENDPOINTS === true) {
+    logger.info('Serving debug endpoints')
+
+    app.register(fastifyStatic, {
+      root: join(__dirname, '../static'),
+    })
+
+    // Debug endpoint to return the current settings (censoring sensitive values)
+    app.get(join(adapter.config.settings.BASE_URL, '/debug/settings'), async () => {
+      // Censor EA settings
+      const settings = adapter.config.settings
+      const censoredValues = CensorList.getAll()
+      const censoredSettings: Array<SettingDefinitionDetails & { name: string; value: unknown }> =
+        []
+      for (const [key, value] of Object.entries(settings)) {
+        const definitionDetails = adapter.config.getSettingDebugDetails(key)
+        censoredSettings.push({
+          name: key,
+          ...definitionDetails,
+          value: censor(value, censoredValues),
+        })
+      }
+      return JSON.stringify(
+        censoredSettings.sort((a, b) => a.name.localeCompare(b.name)),
+        null,
+        2,
+      )
+    })
+
+    app.get(join(adapter.config.settings.BASE_URL, '/debug'), (req, reply) => {
+      reply.headers({ 'content-type': 'text/html' }).sendFile('debug.html')
+    })
+  }
 
   // Use global error handling
   app.setErrorHandler(errorCatchingMiddleware)
