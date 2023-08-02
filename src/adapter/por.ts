@@ -1,6 +1,6 @@
 import { TransportGenerics } from '../transports'
 import { AdapterEndpoint } from './endpoint'
-import { SettingsDefinitionMap } from '../config'
+import { AdapterConfig, SettingsDefinitionMap } from '../config'
 import { Adapter } from './basic'
 import { AdapterParams } from './types'
 import { InputParametersDefinition } from '../validation/input-params'
@@ -122,6 +122,19 @@ export class PoRTotalBalanceEndpoint<
  */
 export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
   constructor(params: AdapterParams<T>) {
+    // PoR requests take longer to process than normal feeds, that's why by default we set
+    // BACKGROUND_EXECUTE_TIMEOUT to the highest value
+    if (!params.config) {
+      params.config = new AdapterConfig({}, {envDefaultOverrides: {BACKGROUND_EXECUTE_TIMEOUT: 180_000}}) as AdapterConfig<T>
+    }else {
+      params.config.options = {
+        ...(params.config.options || {}),
+        envDefaultOverrides: {
+          ...(params.config.options?.envDefaultOverrides || {}),
+          BACKGROUND_EXECUTE_TIMEOUT: params.config.options?.envDefaultOverrides?.BACKGROUND_EXECUTE_TIMEOUT ?? 180_000
+        }
+      }
+    }
     const porEndpoints = params.endpoints.filter(
       (e) =>
         e instanceof PoRBalanceEndpoint ||
@@ -133,8 +146,5 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
     }
 
     super(params)
-    // PoR requests take longer to process than normal feeds, that's why we set
-    // BACKGROUND_EXECUTE_TIMEOUT to the highest value
-    this.config.settings.BACKGROUND_EXECUTE_TIMEOUT = 180_000
   }
 }

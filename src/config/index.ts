@@ -591,7 +591,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
   constructor(
     /** Map of setting definitions to validate and use to get setting values */
     private settingsDefinition: T,
-    private options?: {
+    public options?: {
       /** Map of overrides to the default config values for an Adapter */
       envDefaultOverrides?: Partial<BaseAdapterSettings>
 
