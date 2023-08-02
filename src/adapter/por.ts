@@ -125,14 +125,18 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
     // PoR requests take longer to process than normal feeds, that's why by default we set
     // BACKGROUND_EXECUTE_TIMEOUT to the highest value
     if (!params.config) {
-      params.config = new AdapterConfig({}, {envDefaultOverrides: {BACKGROUND_EXECUTE_TIMEOUT: 180_000}}) as AdapterConfig<T>
-    }else {
+      params.config = new AdapterConfig(
+        {},
+        { envDefaultOverrides: { BACKGROUND_EXECUTE_TIMEOUT: 180_000 } },
+      ) as AdapterConfig<T>
+    } else {
       params.config.options = {
         ...(params.config.options || {}),
         envDefaultOverrides: {
           ...(params.config.options?.envDefaultOverrides || {}),
-          BACKGROUND_EXECUTE_TIMEOUT: params.config.options?.envDefaultOverrides?.BACKGROUND_EXECUTE_TIMEOUT ?? 180_000
-        }
+          BACKGROUND_EXECUTE_TIMEOUT:
+            params.config.options?.envDefaultOverrides?.BACKGROUND_EXECUTE_TIMEOUT ?? 180_000,
+        },
       }
     }
     const porEndpoints = params.endpoints.filter(
