@@ -165,7 +165,10 @@ export class PriceAdapter<
 
     if (this.includesMap && req.requestContext.priceMeta?.inverse) {
       // We need to search in the reverse order (quote -> base) because the request transform will have inverted the pair
-      const cloneResponse = { ...response }
+
+      // Deep clone the response, as it may contain objects which won't be cloned by simply destructuring
+      const cloneResponse = JSON.parse(JSON.stringify(response))
+
       const inverseResult = 1 / (cloneResponse.result as number)
       cloneResponse.result = inverseResult
       // Check if response data has a result within it

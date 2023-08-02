@@ -234,6 +234,7 @@ test('inverts result if matching includes are present in request', async (t) => 
   })
   t.is(response.statusCode, 200)
   t.is(response.json().result, 1234)
+  t.is(response.json().data.result, 1234)
 })
 
 test('does not invert result if inverse pair sent directly', async (t) => {
@@ -288,6 +289,68 @@ test('does not invert result if inverse pair sent directly', async (t) => {
   })
   t.is(response.statusCode, 200)
   t.is(response.json().result, 1 / 1234)
+})
+
+test('inverting request does not affect cached response', async (t) => {
+  const includes = [
+    {
+      from: 'ETH',
+      to: 'BTC',
+      includes: [
+        {
+          from: 'BTC',
+          to: 'ETH',
+          inverse: true,
+        },
+      ],
+    },
+  ]
+
+  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
+    result: 1 / 1234,
+    data: {
+      result: 1 / 1234,
+    },
+    statusCode: 200,
+    timestamps: {
+      providerDataRequestedUnixMs: 0,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
+    },
+  }
+
+  const testAdapter = await buildAdapter(
+    t.context,
+    (req) => {
+      t.deepEqual(req.requestContext.data, {
+        base: 'BTC',
+        quote: 'ETH',
+      })
+
+      return mockResponse
+    },
+    includes,
+  )
+
+  const invertedResponse = await testAdapter.request({
+    base: 'BTC',
+    quote: 'ETH',
+    endpoint: 'test',
+  })
+
+  t.is(invertedResponse.statusCode, 200)
+  t.is(invertedResponse.json().result, 1 / 1234)
+  t.is(invertedResponse.json().data.result, 1 / 1234)
+
+  const response = await testAdapter.request({
+    base: 'ETH',
+    quote: 'BTC',
+    endpoint: 'test',
+  })
+
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, 1234)
+  t.is(response.json().data.result, 1234)
 })
 
 test('basic adapter endpoints bypass includes logic successfully', async (t) => {
