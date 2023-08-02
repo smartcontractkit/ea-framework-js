@@ -9,5 +9,7 @@ test-payload.json
 .vscode
 .pnp.cjs
 .pnp.loader.mjs
+# don't prettify ea-generator folder since it contains invalid syntax
+scripts/generator-adapter
 
 packages/k6/k8s/templates
