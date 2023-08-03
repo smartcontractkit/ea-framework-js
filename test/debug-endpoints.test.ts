@@ -19,8 +19,8 @@ test.serial('debug endpoints return 404 if env var is omitted', async (t) => {
     t.is(error?.statusCode, 404)
   }
 
-  await expect404ForPath('/debug')
   await expect404ForPath('/debug/settings')
+  await expect404ForPath('/debug/settings/raw')
 })
 
 test.serial('debug endpoints return 404 if env var is false', async (t) => {
@@ -38,11 +38,11 @@ test.serial('debug endpoints return 404 if env var is false', async (t) => {
     t.is(error?.statusCode, 404)
   }
 
-  await expect404ForPath('/debug')
   await expect404ForPath('/debug/settings')
+  await expect404ForPath('/debug/settings/raw')
 })
 
-test.serial('/debug/settings endpoint returns expected values', async (t) => {
+test.serial('/debug/settings/raw endpoint returns expected values', async (t) => {
   process.env['DEBUG_ENDPOINTS'] = 'true'
   process.env['API_KEY'] = '12312341234'
 
@@ -69,7 +69,7 @@ test.serial('/debug/settings endpoint returns expected values', async (t) => {
   })
 
   const { api } = await start(adapter)
-  const settingsResponse = await api?.inject({ path: '/debug/settings' })
+  const settingsResponse = await api?.inject({ path: '/debug/settings/raw' })
   if (!settingsResponse?.body) {
     t.fail()
     return
@@ -118,4 +118,36 @@ test.serial('/debug/settings endpoint returns expected values', async (t) => {
       value: '[API_KEY REDACTED]',
     },
   )
+})
+
+test.serial('/debug/settings returns html response', async (t) => {
+  process.env['DEBUG_ENDPOINTS'] = 'true'
+
+  const config = new AdapterConfig(
+    {
+      API_KEY: {
+        description: 'Api key',
+        type: 'string',
+        sensitive: true,
+        required: true,
+      },
+    },
+    {
+      envDefaultOverrides: {
+        REQUESTER_SLEEP_BEFORE_REQUEUEING_MS: 9999,
+      },
+    },
+  )
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [],
+    config,
+  })
+
+  const { api } = await start(adapter)
+  const settingsResponse = await api?.inject({ path: '/debug/settings' })
+  const text = settingsResponse?.payload.trim()
+  t.is(settingsResponse?.headers['content-type'], 'text/html')
+  t.true(text?.startsWith('<html>') && text?.endsWith('</html>'))
 })

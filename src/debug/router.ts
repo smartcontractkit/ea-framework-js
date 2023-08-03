@@ -12,7 +12,7 @@ import settingsPage, { buildDebugSettingsList } from './settings-page'
  */
 export default function registerDebugEndpoints(app: FastifyInstance, adapter: Adapter) {
   // Debug endpoint to return the current settings in raw JSON (censoring sensitive values)
-  app.get(join(adapter.config.settings.BASE_URL, '/debug/settings'), async () => {
+  app.get(join(adapter.config.settings.BASE_URL, '/debug/settings/raw'), async () => {
     const censoredSettings = buildDebugSettingsList(adapter)
     return JSON.stringify(
       censoredSettings.sort((a, b) => a.name.localeCompare(b.name)),
@@ -22,7 +22,7 @@ export default function registerDebugEndpoints(app: FastifyInstance, adapter: Ad
   })
 
   // Helpful UI to visualize current settings
-  app.get(join(adapter.config.settings.BASE_URL, '/debug'), (req, reply) => {
+  app.get(join(adapter.config.settings.BASE_URL, '/debug/settings'), (req, reply) => {
     const censoredSettings = buildDebugSettingsList(adapter)
     const censoredSettingsPage = settingsPage(censoredSettings)
     reply.headers({ 'content-type': 'text/html' }).send(censoredSettingsPage)
