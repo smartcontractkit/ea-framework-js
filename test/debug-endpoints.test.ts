@@ -1,10 +1,48 @@
 import test from 'ava'
 import { start } from '../src'
-import { Adapter, AdapterEndpoint } from '../src/adapter'
+import { Adapter } from '../src/adapter'
 import { AdapterConfig } from '../src/config'
-import { NopTransport } from '../src/util/testing-utils'
+import { DebugPageSetting } from '../src/debug/settings-page'
 
-test('/debug/settings endpoint returns expected values', async (t) => {
+test.serial('debug endpoints return 404 if env var is omitted', async (t) => {
+  process.env['DEBUG_ENDPOINTS'] = undefined
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [],
+  })
+
+  const { api } = await start(adapter)
+
+  const expect404ForPath = async (path: string) => {
+    const error = await api?.inject({ path })
+    t.is(error?.statusCode, 404)
+  }
+
+  await expect404ForPath('/debug')
+  await expect404ForPath('/debug/settings')
+})
+
+test.serial('debug endpoints return 404 if env var is false', async (t) => {
+  process.env['DEBUG_ENDPOINTS'] = 'false'
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [],
+  })
+
+  const { api } = await start(adapter)
+
+  const expect404ForPath = async (path: string) => {
+    const error = await api?.inject({ path })
+    t.is(error?.statusCode, 404)
+  }
+
+  await expect404ForPath('/debug')
+  await expect404ForPath('/debug/settings')
+})
+
+test.serial('/debug/settings endpoint returns expected values', async (t) => {
   process.env['DEBUG_ENDPOINTS'] = 'true'
   process.env['API_KEY'] = '12312341234'
 
@@ -26,12 +64,7 @@ test('/debug/settings endpoint returns expected values', async (t) => {
 
   const adapter = new Adapter({
     name: 'TEST',
-    endpoints: [
-      new AdapterEndpoint({
-        name: 'test',
-        transport: new NopTransport(),
-      }),
-    ],
+    endpoints: [],
     config,
   })
 
@@ -41,35 +74,48 @@ test('/debug/settings endpoint returns expected values', async (t) => {
     t.fail()
     return
   }
-  const parsedResponse = settingsResponse?.json()
-  console.log(parsedResponse)
+  const parsedResponse = settingsResponse?.json() as DebugPageSetting[]
+
   // Test that framework setting is correctly set
-  t.deepEqual(parsedResponse['DEBUG_ENDPOINTS'], {
-    type: 'boolean',
-    description:
-      'Whether to enable debug enpoints (/debug/*) for this adapter. Enabling them might consume more resources.',
-    required: false,
-    default: false,
-    customSetting: false,
-    value: true,
-  })
+  t.deepEqual(
+    parsedResponse.find((s) => s.name === 'DEBUG_ENDPOINTS'),
+    {
+      type: 'boolean',
+      description:
+        'Whether to enable debug enpoints (/debug/*) for this adapter. Enabling them might consume more resources.',
+      name: 'DEBUG_ENDPOINTS',
+      required: false,
+      default: false,
+      customSetting: false,
+      value: true,
+    },
+  )
   // Test that env override is correctly accounted for
-  t.deepEqual(parsedResponse['REQUESTER_SLEEP_BEFORE_REQUEUEING_MS'], {
-    type: 'number',
-    description: 'Time to sleep after a failed HTTP request before re-queueing the request (in ms)',
-    required: false,
-    default: 0,
-    customSetting: false,
-    envDefaultOverride: 9999,
-    value: 9999,
-  })
+  t.deepEqual(
+    parsedResponse.find((s) => s.name === 'REQUESTER_SLEEP_BEFORE_REQUEUEING_MS'),
+    {
+      type: 'number',
+      description:
+        'Time to sleep after a failed HTTP request before re-queueing the request (in ms)',
+      name: 'REQUESTER_SLEEP_BEFORE_REQUEUEING_MS',
+      required: false,
+      default: 0,
+      customSetting: false,
+      envDefaultOverride: 9999,
+      value: 9999,
+    },
+  )
   // Test that custom adapter setting is correctly set and censored
-  t.deepEqual(parsedResponse['API_KEY'], {
-    type: 'string',
-    description: 'Api key',
-    required: true,
-    sensitive: true,
-    customSetting: true,
-    value: '[API_KEY REDACTED]',
-  })
+  t.deepEqual(
+    parsedResponse.find((s) => s.name === 'API_KEY'),
+    {
+      type: 'string',
+      description: 'Api key',
+      name: 'API_KEY',
+      required: true,
+      sensitive: true,
+      customSetting: true,
+      value: '[API_KEY REDACTED]',
+    },
+  )
 })
