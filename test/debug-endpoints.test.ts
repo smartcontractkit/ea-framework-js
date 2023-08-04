@@ -122,6 +122,7 @@ test.serial('/debug/settings/raw endpoint returns expected values', async (t) =>
 
 test.serial('/debug/settings returns html response', async (t) => {
   process.env['DEBUG_ENDPOINTS'] = 'true'
+  process.env['API_KEY'] = '12312341234'
 
   const config = new AdapterConfig(
     {
