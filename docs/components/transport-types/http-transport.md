@@ -1,48 +1,48 @@
 # HTTP Transport
 
-HttpTransport is used to fetch data from a Provider using HTTP(S) protocol. In order to use HttpTransport you need to provide two methods `prepareRequests` and `parseResponse` that will be used to build requests and parse responses respectively. 
+HttpTransport is used to fetch data from a Provider using HTTP(S) protocol. In order to use HttpTransport you need to provide two methods `prepareRequests` and `parseResponse` that will be used to build requests and parse responses respectively.
 
 Example usage of HttpTransport
 
-```typescript  
-const transport = new HttpTransport<EndpointTypes>({  
-  prepareRequests: (params, config) => {  
-    return params.map((param) => {  
-      const symbol = param.symbol.toLowerCase()  
-      const url = `/price/${symbol}`  
-  
-      return {  
-        params: param  
-		request: {  
-          baseURL: config.API_ENDPOINT,  
-          url,  
-        },  
-      }  
-    })  
-  },  
-  parseResponse: (params, res, config) => {  
-    return res.data.map((result) => {  
-      return {  
-        params: { symbol: result.symbol},  
-        response: {  
-          data: {  
-            result: result.price,  
-          },  
-          result: result.price,  
-        },  
-      }  
-    })  
-  },  
+```typescript
+const transport = new HttpTransport<EndpointTypes>({
+  prepareRequests: (params, config) => {
+    return params.map((param) => {
+      const symbol = param.symbol.toLowerCase()
+      const url = `/price/${symbol}`
+
+      return {
+        params: param
+		request: {
+          baseURL: config.API_ENDPOINT,
+          url,
+        },
+      }
+    })
+  },
+  parseResponse: (params, res, config) => {
+    return res.data.map((result) => {
+      return {
+        params: { symbol: result.symbol},
+        response: {
+          data: {
+            result: result.price,
+          },
+          result: result.price,
+        },
+      }
+    })
+  },
 })
 ```
 
 ### Building requests
 
-The **prepareRequests**  method  takes the list of currently active input parameters in the subscription set and the adapter config. If the Data Provider only supports requesting a single data point for each HTTP request, the method should return a single request config (_ProviderRequestConfig_). However, if the Data Provider supports requesting multiple data points in each HTTP request, the method should return an array of request configs.
+The **prepareRequests** method takes the list of currently active input parameters in the subscription set and the adapter config. If the Data Provider only supports requesting a single data point for each HTTP request, the method should return a single request config (_ProviderRequestConfig_). However, if the Data Provider supports requesting multiple data points in each HTTP request, the method should return an array of request configs.
 
 #### Request config structure
 
-*ProviderRequestConfig* is an object with two keys: `params` and `request`. `params` is the list of currently active input parameters in the subscription set, and will also be available in the **parseResponse** method. `request` is the *axios* request configuration where parameters such as the request URL, request method, query or body params, and headers can be specified.
+_ProviderRequestConfig_ is an object with two keys: `params` and `request`. `params` is the list of currently active input parameters in the subscription set, and will also be available in the **parseResponse** method. `request` is the _axios_ request configuration where parameters such as the request URL, request method, query or body params, and headers can be specified.
 
 #### Send batch request to Data Provider
 
@@ -56,8 +56,8 @@ prepareRequests: (params, config) => {
       baseURL: config.API_ENDPOINT,
       url: '/price',
       params: {
-        symbols: [...new Set(params.map((p) => p.symbol.toLowerCase()))].join(',')
-      }
+        symbols: [...new Set(params.map((p) => p.symbol.toLowerCase()))].join(','),
+      },
     },
   }
 }
@@ -65,13 +65,13 @@ prepareRequests: (params, config) => {
 
 The difference is that instead of returning array of request config objects, only one object is returned where information about input parameters is passed to Data Provider as one query parameter.
 
-###  Parsing and storing the response or errors
+### Parsing and storing the response or errors
 
-The **parseResponse**  method  takes the incoming response from the Data Provider, params from request config, adapter config, and returns a list of response objects (*ProviderResult*) that will be stored in the response cache for an endpoint.
+The **parseResponse** method takes the incoming response from the Data Provider, params from request config, adapter config, and returns a list of response objects (_ProviderResult_) that will be stored in the response cache for an endpoint.
 
 #### Successful response structure
 
-*ProviderResult* is an object with two keys: `params` and `response` . `params` is the set of EA input parameters that uniquely relate to the response . `response` is the value that will be returned as response from External Adapter. `response` should contain the `data` and `result` properties.
+_ProviderResult_ is an object with two keys: `params` and `response` . `params` is the set of EA input parameters that uniquely relate to the response . `response` is the value that will be returned as response from External Adapter. `response` should contain the `data` and `result` properties.
 
 Example response structure
 
@@ -94,7 +94,7 @@ parseResponse: (params, response, config) => {
 
 #### Error response structure
 
-It is also possible to store and return errors as well, in case Data Provider has not returned information that was expected.  In case of error, instead of `data` and `result`, the `resonse` object should contain `statusCode` for the errored response and `errorMessage` that will be sent back from the adapter.
+It is also possible to store and return errors as well, in case Data Provider has not returned information that was expected. In case of error, instead of `data` and `result`, the `resonse` object should contain `statusCode` for the errored response and `errorMessage` that will be sent back from the adapter.
 
 Refactored example that shows both error and success examples
 
@@ -108,8 +108,8 @@ parseResponse: (params, response, config) => {
         params: param,
         response: {
           errorMessage: `Could not retrieve valid data from Data Provider for symbol ${param.symbol}`,
-          statusCode: 502
-        }
+          statusCode: 502,
+        },
       }
     }
     // if everything is ok we send success response
@@ -138,12 +138,12 @@ Example structure of `EndpointTypes`
 
 ```typescript
 export type EndpointTypes = {
- Parameters: typeof inputParameters.definition // type for the EA endpoint input parameters
- Settings: typeof config.settings // type of adapter config 
- Response: SingleNumberResultResponse // type of External Adapter response. `SingleNumberResultResponse` is a built in type that indicates that both `data` and `result` are numbers
- Provider: { 
-  RequestBody: never // type of request body in the case of POST requests. This is usually `never` for GET requests, and is *not* the same as query params
-  ResponseBody: ProviderResponseBody // interface of raw response body from Data Provider
-  }  
+  Parameters: typeof inputParameters.definition // type for the EA endpoint input parameters
+  Settings: typeof config.settings // type of adapter config
+  Response: SingleNumberResultResponse // type of External Adapter response. `SingleNumberResultResponse` is a built in type that indicates that both `data` and `result` are numbers
+  Provider: {
+    RequestBody: never // type of request body in the case of POST requests. This is usually `never` for GET requests, and is *not* the same as query params
+    ResponseBody: ProviderResponseBody // interface of raw response body from Data Provider
+  }
 }
 ```
