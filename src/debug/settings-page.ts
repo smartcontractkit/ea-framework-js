@@ -97,7 +97,9 @@ const settingsPage = (settings: DebugPageSetting[]) => /* HTML */ `
                   <td>${setting.name}</td>
                   <td>${setting.type}</td>
                   <td>${setting.description}</td>
-                  <td class="${setting.default ? 'default' : ''}">${setting.value || ''}</td>
+                  <td class="${setting.default === setting.value ? 'default' : ''}">
+                    ${setting.value || ''}
+                  </td>
                   <td>${setting.required ? '✅' : ''}</td>
                   <td>${setting.default || ''}</td>
                   <td>${setting.customSetting ? '✅' : ''}</td>

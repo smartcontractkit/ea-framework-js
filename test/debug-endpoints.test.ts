@@ -118,6 +118,32 @@ test.serial('/debug/settings/raw endpoint returns expected values', async (t) =>
       value: '[API_KEY REDACTED]',
     },
   )
+  // Test that setting with default is assigned that value if not set in env vars
+  t.deepEqual(
+    parsedResponse.find((s) => s.name === 'API_TIMEOUT'),
+    {
+      type: 'number',
+      default: 30000,
+      description:
+        'The number of milliseconds a request can be pending before returning a timeout error for data provider request',
+      name: 'API_TIMEOUT',
+      required: false,
+      customSetting: false,
+      value: 30000,
+    },
+  )
+  // Test that setting with no default is correctly processed
+  t.deepEqual(
+    parsedResponse.find((s) => s.name === 'RATE_LIMIT_API_TIER'),
+    {
+      type: 'string',
+      description:
+        'Rate limiting tier to use from the available options for the adapter. If not present, the adapter will run using the first tier on the list.',
+      name: 'RATE_LIMIT_API_TIER',
+      required: false,
+      customSetting: false,
+    },
+  )
 })
 
 test.serial('/debug/settings returns html response', async (t) => {
