@@ -15,18 +15,22 @@ The v3 framework allows developers to define env vars that are specific to their
 If the EA does not require any custom env vars, this file can be ignored. Instead using the type `SettingsMap` from `@chainlink/external-adapter-framework/config`, where applicable, would be sufficient.
 
 ```typescript
-export const customSettings = {
-  // Env var name
+import { AdapterConfig } from '@chainlink/external-adapter-framework/config'
+
+export const config = new AdapterConfig({
   API_KEY: {
     description: '', // Description of the env var
     type: 'string', // What type should the value be
     options: ['foo', 'bar'], // If applicable, a list of valid options this env var could be set to
     default: 'foo', // If applicable, a default value
-    validate: (value?: string) => {}, // If applicable, a function to validate the env var value. Return an error message for a failed validation, or undefined if it passes.
+    validate: {
+      meta: {},
+      fn: () => {},
+    }, // If applicable, a Validator object to validate the env var value. Return an error message for a failed validation, or undefined if it passes.
     required: true, // If the env var should be required. Default = false
     sensitive: true, // Set to true to censor this env var from logs. Default = false
   },
-} as const
+})
 ```
 
 ## Env Var Default Overrides

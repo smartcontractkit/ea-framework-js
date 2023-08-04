@@ -3,7 +3,7 @@ import { TransportDependencies, TransportGenerics } from '.'
 import { EndpointContext } from '../adapter'
 import { calculateHttpRequestKey } from '../cache'
 import { metrics, retrieveCost } from '../metrics'
-import { makeLogger, sleep } from '../util'
+import { censorLogs, makeLogger, sleep } from '../util'
 import { Requester } from '../util/requester'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { AdapterDataProviderError, AdapterRateLimitError } from '../validation/error'
@@ -47,6 +47,10 @@ export type ProviderRequestConfig<T extends HttpTransportGenerics> = {
 
   /** An endpoint name override for the requester key to allow the coalescing of requests across endpoints */
   endpointNameOverride?: string
+
+  /** The API credit cost of the request sent to the data provider.
+   * Applies only for burst rate limit strategy and is ignored if another strategy is used. */
+  cost?: number
 }
 
 /**
@@ -150,6 +154,11 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     const rawRequests = this.config.prepareRequests(entries, context.adapterSettings)
     const requests = Array.isArray(rawRequests) ? rawRequests : [rawRequests]
 
+    metrics
+      .get('httpRequestsPerBgExecute')
+      .labels({ adapter_endpoint: context.endpointName })
+      .set(requests.length)
+
     // We're awaiting these promises because although we have request coalescing, new entries
     // could be added to the subscription set if not blocking this operation, so the next time the
     // background execute is triggered if the request is for a fully batched endpoint, we could end up
@@ -230,6 +239,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
           transportName: this.name,
         }),
         requestConfig.request,
+        requestConfig.cost,
       )
 
       // Parse responses and apply timestamps
@@ -259,7 +269,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
         const err = e as AdapterDataProviderError
         const cause = err.cause as AxiosError
         const errorMessage = `Provider request failed with status ${cause.status}: "${cause.response?.data}"`
-        logger.info(errorMessage)
+        censorLogs(() => logger.info(errorMessage))
         return {
           results: requestConfig.params.map((entry) => ({
             params: entry,
@@ -272,7 +282,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
         }
       } else if (e instanceof AdapterRateLimitError) {
         const err = e as AdapterRateLimitError
-        logger.info(err.message)
+        censorLogs(() => logger.info(err.message))
         return {
           results: requestConfig.params.map((entry) => ({
             params: entry,
@@ -289,7 +299,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
           msUntilNextExecution: err.msUntilNextExecution,
         }
       } else {
-        logger.error(e)
+        censorLogs(() => logger.error(e))
         return { results: [] }
       }
     }

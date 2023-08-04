@@ -7,7 +7,7 @@ import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { SSEConfig, SseTransport } from '../../src/transports'
 import { ProviderResult, SingleNumberResultResponse } from '../../src/util'
 import { InputParameters } from '../../src/validation'
-import { TestAdapter } from '../util'
+import { TestAdapter } from '../../src/util/testing-utils'
 const { MockEvent, EventSource } = require('mocksse') // eslint-disable-line
 
 const URL = 'http://test.com'

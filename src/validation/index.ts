@@ -1,10 +1,11 @@
+import { createHash } from 'crypto'
 import { FastifyError, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { ReplyError as RedisError } from 'ioredis'
 import { Adapter } from '../adapter'
 import { calculateCacheKey } from '../cache'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { getMetricsMeta } from '../metrics/util'
-import { makeLogger } from '../util'
+import { censorLogs, makeLogger } from '../util'
 import {
   AdapterMiddlewareBuilder,
   AdapterRequest,
@@ -87,7 +88,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     // Run any request transforms that might have been defined in the adapter.
     // This is the last time modifications are supposed to happen to the request.
-    endpoint.runRequestTransforms(req)
+    endpoint.runRequestTransforms(req, adapter.config.settings)
 
     if (
       adapter.config.settings.METRICS_ENABLED &&
@@ -113,9 +114,16 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
         errorCatcherLogger.warn(
           `Generated custom cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be truncated`,
         )
-        cacheKey = cacheKey.slice(0, adapter.config.settings.MAX_COMMON_KEY_SIZE)
+        const shasum = createHash('sha1')
+        shasum.update(cacheKey)
+        cacheKey = shasum.digest('base64')
       }
-      req.requestContext.cacheKey = cacheKey
+
+      const cachePrefix = adapter.config.settings.CACHE_PREFIX
+        ? `${adapter.config.settings.CACHE_PREFIX}-`
+        : ''
+
+      req.requestContext.cacheKey = `${cachePrefix}${cacheKey}`
     } else {
       const transportName = endpoint.getTransportNameForRequest(req, adapter.config.settings)
       req.requestContext.cacheKey = calculateCacheKey({
@@ -123,7 +131,6 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
         adapterName: adapter.name,
         endpointName: endpoint.name,
         transportName,
-        inputParameters: endpoint.inputParameters,
         adapterSettings: adapter.config.settings,
       })
     }
@@ -133,9 +140,19 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
 export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: FastifyReply) => {
   // Add adapter or generic error to request meta for metrics use
-  // There's a chance we have no request context if there was an error during input validation
+  // There's a chance we have no request context if there was an error during input validation,
+  // but we still want to include error in meta for metrics
   if (req.requestContext) {
     req.requestContext.meta = { ...req.requestContext?.meta, error: err }
+  } else {
+    const errorLabel = 'inputValidationError'
+    req.requestContext = {
+      cacheKey: errorLabel,
+      data: undefined,
+      endpointName: errorLabel,
+      transportName: errorLabel,
+      meta: { error: err },
+    }
   }
 
   // Add the request context to the error so that we can check things like incoming params, endpoint, etc
@@ -146,31 +163,32 @@ export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: Fa
       stack: err.stack,
       message: err.message,
     },
+    reqBody: req.body,
   }
 
   if (err instanceof AdapterTimeoutError) {
     // AdapterTimeoutError are somewhat expected when the adapter doesn't find a response in the cache within the specified polling interval
     // This is common on startup so logging these errors as debug to help alleviate logs getting flooded in the beginning
-    errorCatcherLogger.debug(errorWithContext)
+    censorLogs(() => errorCatcherLogger.debug(errorWithContext))
     res.status(err.statusCode).send(err.toJSONResponse())
   } else if (err instanceof AdapterError) {
     // We want to log these as warn, because although they are to be expected, NOPs should
     // Only use "correct" job specs and therefore not hit adapters with invalid requests.
-    errorCatcherLogger.warn(errorWithContext)
+    censorLogs(() => errorCatcherLogger.warn(errorWithContext))
     res.status(err.statusCode).send(err.toJSONResponse())
   } else if (err instanceof RedisError) {
     // Native ioredis error
-    errorCatcherLogger.warn(errorWithContext)
+    censorLogs(() => errorCatcherLogger.warn(errorWithContext))
     const replyError = err as typeof RedisError
     if (process.env['METRICS_ENABLED']) {
       recordRedisCommandMetric(CMD_SENT_STATUS.FAIL, replyError.command?.name)
     }
     res.status(500).send(replyError.message || 'There was an unexpected error with the Redis cache')
   } else if (err.name === 'FastifyError') {
-    errorCatcherLogger.error(errorWithContext)
+    censorLogs(() => errorCatcherLogger.error(errorWithContext))
     res.status((err as FastifyError).statusCode as number).send(err.message)
   } else {
-    errorCatcherLogger.error(errorWithContext)
+    censorLogs(() => errorCatcherLogger.error(errorWithContext))
     res.status(500).send(err.message || 'There was an unexpected error in the adapter.')
   }
 }

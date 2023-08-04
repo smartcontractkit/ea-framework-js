@@ -28,7 +28,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   transportRoutes: TransportRoutes<T>
   inputParameters: InputParameters<T['Parameters']>
   rateLimiting?: EndpointRateLimitingConfig | undefined
-  cacheKeyGenerator?: (data: Record<string, unknown>) => string
+  cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
   requestTransforms: RequestTransform<T>[]
   overrides?: Record<string, string> | undefined
@@ -98,9 +98,12 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @param req - the current adapter request
    * @returns the request after passing through all request transforms
    */
-  runRequestTransforms(req: AdapterRequest<TypeFromDefinition<T['Parameters']>>): void {
+  runRequestTransforms(
+    req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
+    settings: T['Settings'],
+  ): void {
     for (const transform of this.requestTransforms) {
-      transform(req)
+      transform(req, settings)
     }
   }
 

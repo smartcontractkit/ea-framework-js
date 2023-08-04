@@ -1,0 +1,12 @@
+{
+  "name": "generator-adapter",
+  "version": "0.0.1",
+  "files": [
+    "generators"
+  ],
+  "main": "generators/app/index.js",
+  "keywords": [
+    "yeoman-generator",
+    "extnerl-adapter-generator"
+  ]
+}

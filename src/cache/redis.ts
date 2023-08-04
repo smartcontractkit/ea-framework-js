@@ -1,8 +1,10 @@
+import EventEmitter from 'events'
 import Redis, { Result } from 'ioredis'
+import Redlock from 'redlock'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
-import { AdapterResponse, makeLogger } from '../util'
+import { AdapterResponse, censorLogs, makeLogger, sleep } from '../util'
 import { Cache, CacheEntry } from './index'
-import { cacheMetricsLabel, cacheSet, CacheTypes } from './metrics'
+import { CacheTypes, cacheMetricsLabel, cacheSet } from './metrics'
 
 declare module 'ioredis' {
   interface RedisCommander<Context> {
@@ -46,14 +48,16 @@ export class RedisCache<T = unknown> implements Cache<T> {
   }
 
   async get(key: string): Promise<Readonly<T> | undefined> {
-    logger.trace(`Getting key ${key}`)
+    censorLogs(() => logger.trace(`Getting key ${key}`))
     const value = await this.client.get(key)
 
     // Record get command sent to Redis
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'get')
 
     if (!value) {
-      logger.debug(`No entry in redis cache for key "${key}", returning undefined`)
+      censorLogs(() =>
+        logger.debug(`No entry in redis cache for key "${key}", returning undefined`),
+      )
       return undefined
     }
 
@@ -61,7 +65,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
   }
 
   async delete(key: string): Promise<void> {
-    logger.trace(`Deleting key ${key}`)
+    censorLogs(() => logger.trace(`Deleting key ${key}`))
     await this.client.del(key)
 
     // Record delete command sent to Redis
@@ -69,7 +73,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
   }
 
   async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
-    logger.trace(`Setting key ${key}`)
+    censorLogs(() => logger.trace(`Setting key ${key}`))
     await this.client.setExternalAdapterResponse(key, JSON.stringify(value), ttl)
 
     // Record set command sent to Redis
@@ -105,5 +109,71 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
     // Record exec command sent to Redis
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'exec')
+  }
+
+  async lock(
+    key: string,
+    cacheLockDuration: number,
+    retryCount: number,
+    shutdownNotifier: EventEmitter,
+  ): Promise<void> {
+    const start = Date.now()
+    const log = (msg: string) => `[${(Date.now() - start) / 1000}]: ${msg}`
+
+    const redlock = new Redlock([this.client], {
+      // Implementing retries manually due to redlock bug in edge cases
+      retryCount: 0,
+    })
+
+    // Close redis to allow adapter to shutdown if lock is not acquired
+    shutdownNotifier.on('onClose', () => {
+      this.client.quit()
+    })
+
+    const acquireLock = async () => {
+      // For the number of retries, try to acquire the lock
+      for (let retryAttempt = 1; retryAttempt <= retryCount; retryAttempt++) {
+        try {
+          const lock = await redlock.acquire([key], cacheLockDuration)
+          logger.info(
+            log(
+              `Acquired lock: ${lock.value}, key: ${key}, TTL: ${
+                (lock.expiration - Date.now()) / 1000
+              }`,
+            ),
+          )
+          // If successful, return lock and break loop
+          return lock
+        } catch (error) {
+          logger.error(`Failed to acquire lock on attempt ${retryAttempt}/${retryCount}: ${error}`)
+          // On error, sleep before retrying again
+          await sleep(cacheLockDuration / retryCount)
+        }
+      }
+      // If the last retry fails, throw error
+      throw new Error(
+        'The adapter failed to acquire a lock on the cache. Please check if you are running another instance of the adapter with the same name and cache prefix.',
+      )
+    }
+
+    let lock = await acquireLock()
+
+    const extendLock = async () => {
+      if (lock) {
+        // eslint-disable-next-line require-atomic-updates
+        lock = await lock.extend(cacheLockDuration)
+        logger.trace(
+          log(`Extended lock: ${lock.value}, TTL: ${(lock.expiration - Date.now()) / 1000}`),
+        )
+      }
+    }
+
+    // Lock duration multiplied by .8 to ensure lock is able to be extended before expiry
+    const extendInterval = setInterval(extendLock, cacheLockDuration * 0.8)
+
+    // Clear timeout on close for testing purposes
+    shutdownNotifier.on('onClose', () => {
+      clearInterval(extendInterval)
+    })
   }
 }

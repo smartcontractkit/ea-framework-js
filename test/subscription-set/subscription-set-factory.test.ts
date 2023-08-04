@@ -1,10 +1,14 @@
 import test from 'ava'
 import Redis from 'ioredis'
 import { buildAdapterSettings } from '../../src/config'
-import { SubscriptionSetFactory } from '../../src/util'
+import { LoggerFactoryProvider, SubscriptionSetFactory } from '../../src/util'
 import { ExpiringSortedSet } from '../../src/util/subscription-set/expiring-sorted-set'
 import { RedisSubscriptionSet } from '../../src/util/subscription-set/redis-sorted-set'
-import { RedisMock } from '../util'
+import { RedisMock } from '../../src/util/testing-utils'
+
+test.before(() => {
+  LoggerFactoryProvider.set()
+})
 
 test('subscription set factory (local cache)', async (t) => {
   process.env['CACHE_TYPE'] = 'local'
