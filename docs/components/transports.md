@@ -2,7 +2,7 @@
 
 To learn more about what transports are and what they do, please refer to the [EA Basics Doc](../basics.md)
 
-As seen in the [Endpoints Guide](endpoints.md), every endpoint requires one and only one transport. Define this transport in the same file as its associated endpoint.
+Define transport file in a seperate folder called `transport`. The name of the file is the same as its associated endpoint. In case endpoint supports multiple transports, transport file names can be suffixed with transport types.
 
 ## Choosing Transports
 

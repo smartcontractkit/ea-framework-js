@@ -1,31 +1,32 @@
-import { BaseSettingsDefinition } from '../src/config/index'
+import { BaseSettingsDefinition, SettingDefinition } from '../src/config/index'
 
-let output = `# EA Settings\n\n|Name|Type|Default|Description|Validation|Min|Max\n|---|---|---|---|---|---|---|\n`
+const spacer = Array(30).fill('&nbsp;').join('')
 
-const sortedSettings = Object.keys(BaseSettingsDefinition).sort()
+let output = `# EA Settings\n\n|Name|Type|Default|${spacer}Description${spacer}|${spacer}Validation${spacer}|Min|Max\n|---|---|---|---|---|---|---|\n`
 
-for (const settingName of sortedSettings) {
-  const data = BaseSettingsDefinition[settingName as keyof typeof BaseSettingsDefinition]
-  const settingDefault = data['default' as keyof typeof data]
+const sortedSettings: Array<[string, SettingDefinition]> = Object.entries(
+  BaseSettingsDefinition,
+).sort(([settingName1], [settingName2]) => settingName1.localeCompare(settingName2))
 
-  let details = ''
+for (const [name, setting] of sortedSettings) {
+  let validation = ''
   let min: number | string = ''
   let max: number | string = ''
 
-  if ('validate' in data) {
-    if (data.validate.meta.details) {
-      details = `- ${data.validate.meta.details.split(', ').join('<br> - ')}`
+  if (setting.validate) {
+    if (setting.validate.meta.details) {
+      validation = `- ${setting.validate.meta.details.split(', ').join('<br> - ')}`
     }
 
-    if (typeof data.validate.meta.min === 'number') {
-      min = data.validate.meta.min
+    if (typeof setting.validate.meta.min === 'number') {
+      min = setting.validate.meta.min
     }
-    if (typeof data.validate.meta.max === 'number') {
-      max = data.validate.meta.max
+    if (typeof setting.validate.meta.max === 'number') {
+      max = setting.validate.meta.max
     }
   }
 
-  output += `|${settingName}|${data.type}|${settingDefault}|${data.description}|${details}|${min}|${max}\n`
+  output += `|${name}|${setting.type}|${setting.default}|${setting.description}|${validation}|${min}|${max}\n`
 }
 
 // eslint-disable-next-line no-console

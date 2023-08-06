@@ -2,7 +2,7 @@ import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { CacheFactory, RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
-import { NopTransport, RedisMock, TestAdapter } from '../util'
+import { NopTransport, RedisMock, TestAdapter } from '../../src/util/testing-utils'
 import {
   BasicCacheSetterTransport,
   buildDiffResultAdapter,
@@ -71,7 +71,14 @@ test.serial('redis client is initialized with options', async (t) => {
     ],
   })
 
-  const testAdapter = await TestAdapter.start(adapter, t.context)
+  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const dependencies: Partial<AdapterDependencies> = {
+    cache,
+  }
+
+  t.context.cache = cache
+
+  const testAdapter = await TestAdapter.start(adapter, t.context, dependencies)
   const client = testAdapter.adapter.dependencies.redisClient
   t.is(client instanceof Redis, true)
   t.is(client.options.port, 6542)
@@ -99,7 +106,15 @@ test.serial('redis client is initialized with url', async (t) => {
     ],
   })
 
-  const testAdapter = await TestAdapter.start(adapter, t.context)
+  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const dependencies: Partial<AdapterDependencies> = {
+    cache,
+  }
+
+  t.context.cache = cache
+
+  const testAdapter = await TestAdapter.start(adapter, t.context, dependencies)
+
   const client = testAdapter.adapter.dependencies.redisClient
   t.is(client instanceof Redis, true)
   t.is(client.options.port, 6543)

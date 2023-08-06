@@ -1,6 +1,6 @@
 import { TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
-import { makeLogger } from '../../util'
+import { censorLogs, makeLogger } from '../../util'
 import { TypeFromDefinition } from '../../validation/input-params'
 import { SubscriptionTransport } from './subscription'
 
@@ -56,10 +56,10 @@ export abstract class StreamingTransport<
       `${subscriptions.new.length} new subscriptions; ${subscriptions.stale.length} to unsubscribe`,
     )
     if (subscriptions.new.length) {
-      logger.trace(`Will subscribe to: ${JSON.stringify(subscriptions.new)}`)
+      censorLogs(() => logger.trace(`Will subscribe to: ${JSON.stringify(subscriptions.new)}`))
     }
     if (subscriptions.stale.length) {
-      logger.trace(`Will unsubscribe to: ${JSON.stringify(subscriptions.stale)}`)
+      censorLogs(() => logger.trace(`Will unsubscribe to: ${JSON.stringify(subscriptions.stale)}`))
     }
 
     await this.streamHandler(context, subscriptions)

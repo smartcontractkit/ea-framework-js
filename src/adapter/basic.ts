@@ -1,4 +1,5 @@
-import Redis from 'ioredis'
+import EventEmitter from 'events'
+import { default as Redis } from 'ioredis'
 import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
 import {
@@ -14,7 +15,15 @@ import {
   highestRateLimitTiers,
 } from '../rate-limiting'
 import { RateLimiterFactory, RateLimitingStrategy } from '../rate-limiting/factory'
-import { AdapterRequest, AdapterResponse, SubscriptionSetFactory, makeLogger } from '../util'
+import {
+  AdapterRequest,
+  AdapterResponse,
+  LoggerFactoryProvider,
+  SubscriptionSetFactory,
+  censorLogs,
+  deferredPromise,
+  makeLogger,
+} from '../util'
 import { Requester } from '../util/requester'
 import { AdapterTimeoutError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
@@ -54,6 +63,12 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
   /** Configuration params for various adapter properties */
   config: AdapterConfig<CustomSettingsDefinition>
 
+  /** Used on api shutdown for testing purposes*/
+  shutdownNotifier: EventEmitter
+
+  /** Promise that will resolve once the adapter cache has acquired a lock */
+  lockAcquiredPromise?: Promise<boolean>
+
   /** Bootstrap function that will run when initializing the adapter */
   private readonly bootstrap?: (adapter: Adapter<CustomSettingsDefinition>) => Promise<void>
 
@@ -70,6 +85,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     this.config.initialize()
     this.normalizeEndpointNames()
     this.calculateRateLimitAllocations()
+    this.shutdownNotifier = new EventEmitter()
   }
 
   /**
@@ -77,6 +93,10 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
    * Additionally, it builds a map out of all the endpoint names and aliases (checking for duplicates).
    */
   async initialize(dependencies?: Partial<AdapterDependencies>) {
+    // We initialize the logger first, separate from the rest of the dependency initialization
+    // since we could have a custom logger to document the EA lifecycle since the beginning.
+    LoggerFactoryProvider.set(dependencies?.loggerFactory)
+
     if (this.initialized) {
       throw new Error('This adapter has already been initialized!')
     }
@@ -84,6 +104,9 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     if (this.name !== this.name.toUpperCase()) {
       throw new Error('Adapter name must be uppercase')
     }
+
+    // We do this after we have the logging factory provider initialized
+    this.logRateLimitAllocations()
 
     // Initialize metrics to register them with the prom-client
     metrics.initialize()
@@ -99,6 +122,34 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     }
 
     this.dependencies = this.initializeDependencies(dependencies)
+
+    if (this.config.settings.EA_MODE !== 'reader' && this.dependencies.cache.lock) {
+      const [lockAcquiredPromise, lockAcquiredResolve, lockAcquiredReject] =
+        deferredPromise<boolean>()
+      this.lockAcquiredPromise = lockAcquiredPromise
+      const cacheLockKey = this.config.settings.CACHE_PREFIX
+        ? `${this.config.settings.CACHE_PREFIX}-${this.name}`
+        : this.name
+
+      // We need to defer the locking to support rollout strategies where the old container for an
+      // adapter is still running while the new one is starting up, and we don't want to block the
+      // old container from serving requests while the new one is starting up.
+      setTimeout(async () => {
+        try {
+          await (this.dependencies.cache.lock &&
+            this.dependencies.cache.lock(
+              cacheLockKey,
+              this.config.settings.CACHE_LOCK_DURATION,
+              this.config.settings.CACHE_LOCK_RETRIES,
+              this.shutdownNotifier,
+            ))
+        } catch (error) {
+          lockAcquiredReject(error)
+          return
+        }
+        lockAcquiredResolve(true)
+      }, this.config.settings.CACHE_LOCK_DEFERRAL_MS)
+    }
 
     for (const endpoint of this.endpoints) {
       // Add aliases to map to use in validation
@@ -161,7 +212,6 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
     const implicitAllocation = 100 - totalExplicitAllocation
 
-    logger.debug('Adapter rate limit allocations:')
     for (const endpoint of this.endpoints) {
       if (!endpoint.rateLimiting) {
         endpoint.rateLimiting = {
@@ -169,7 +219,12 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
             implicitAllocation / (numberOfEndpoints - endpointsWithExplicitAllocations.length),
         }
       }
+    }
+  }
 
+  private logRateLimitAllocations() {
+    logger.debug('Adapter rate limit allocations:')
+    for (const endpoint of this.endpoints) {
       logger.debug(`Endpoint [${endpoint.name}] - ${endpoint.rateLimiting?.allocationPercentage}%`)
     }
   }
@@ -214,6 +269,13 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
    */
   initializeDependencies(inputDependencies?: Partial<AdapterDependencies>): AdapterDependencies {
     const dependencies = inputDependencies || {}
+
+    if (
+      this.config.settings.EA_MODE !== 'reader-writer' &&
+      this.config.settings.CACHE_TYPE === 'local'
+    ) {
+      throw new Error(`EA mode cannot be ${this.config.settings.EA_MODE} while cache type is local`)
+    }
 
     if (this.config.settings.CACHE_TYPE === 'redis' && !dependencies.redisClient) {
       const maxCooldown = this.config.settings.CACHE_REDIS_MAX_RECONNECT_COOLDOWN
@@ -383,7 +445,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           return await transport.registerRequest!(req, this.config.settings)
         } catch (err) {
-          logger.error(`Error registering request: ${err}`)
+          censorLogs(() => logger.error(`Error registering request: ${err}`))
           requestRegistrationError = err as Error
         }
       }

@@ -1,11 +1,18 @@
 import fastify, { FastifyInstance } from 'fastify'
 import { AddressInfo } from 'net'
 import { join } from 'path'
+import { ExecutionError } from 'redlock'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
 import { AdapterSettings, SettingsDefinitionMap } from './config'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
-import { AdapterRequest, AdapterRouteGeneric, loggingContextMiddleware, makeLogger } from './util'
+import {
+  AdapterRequest,
+  AdapterRouteGeneric,
+  censorLogs,
+  loggingContextMiddleware,
+  makeLogger,
+} from './util'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
 import { EmptyInputParameters } from './validation/input-params'
 
@@ -25,26 +32,34 @@ export interface httpsOptions {
   }
 }
 
-export const getMTLSOptions = (adapterSettings: AdapterSettings) => {
-  if (
-    adapterSettings.MTLS_ENABLED &&
-    (!adapterSettings.TLS_PRIVATE_KEY || !adapterSettings.TLS_PUBLIC_KEY || !adapterSettings.TLS_CA)
-  ) {
-    throw new Error(
-      `TLS_PRIVATE_KEY , TLS_PUBLIC_KEY and  TLS_CA environment variables are required when MTLS_ENABLED is set to true.`,
-    )
-  } else if (adapterSettings.MTLS_ENABLED) {
-    return {
-      https: {
-        key: adapterSettings.TLS_PRIVATE_KEY,
-        cert: adapterSettings.TLS_PUBLIC_KEY,
-        ca: adapterSettings.TLS_CA,
-        passphrase: adapterSettings.TLS_PASSPHRASE,
-        requestCert: true,
-      },
-    }
+export const getTLSOptions = (adapterSettings: AdapterSettings) => {
+  if (!adapterSettings.TLS_ENABLED && !adapterSettings.MTLS_ENABLED) {
+    return {}
   }
-  return {}
+
+  if (adapterSettings.TLS_ENABLED && adapterSettings.MTLS_ENABLED) {
+    throw new Error('TLS_ENABLED and MTLS_ENABLED cannot both be set to true.')
+  }
+
+  if (
+    !adapterSettings.TLS_PRIVATE_KEY ||
+    !adapterSettings.TLS_PUBLIC_KEY ||
+    !adapterSettings.TLS_CA
+  ) {
+    const TLSOption = adapterSettings.TLS_ENABLED ? 'TLS_ENABLED' : 'MTLS_ENABLED'
+    throw new Error(
+      `TLS_PRIVATE_KEY, TLS_PUBLIC_KEY, and TLS_CA environment variables are required when ${TLSOption} is set to true.`,
+    )
+  }
+
+  const httpsOptions = {
+    key: adapterSettings.TLS_PRIVATE_KEY,
+    cert: adapterSettings.TLS_PUBLIC_KEY,
+    ca: adapterSettings.TLS_CA,
+    passphrase: adapterSettings.TLS_PASSPHRASE,
+    requestCert: adapterSettings.MTLS_ENABLED,
+  }
+  return { https: httpsOptions }
 }
 
 /**
@@ -93,19 +108,33 @@ export const start = async <T extends SettingsDefinitionMap>(
 
     // Add a hook on close to use on the background execution loop to stop it
     apiShutdownPromise = new Promise<void>((resolve) => {
-      api?.addHook('onClose', async () => resolve())
+      api?.addHook('onClose', async () => {
+        // Used in the RedisCache lock method for testing purposes
+        adapter.shutdownNotifier.emit('onClose')
+        resolve()
+      })
     })
   } else {
     logger.info('REST API is disabled; this instance will not process incoming requests.')
   }
 
   // Listener for unhandled promise rejections that are bubbling up to the top
+  // The tests will add many listeners since multiple adapters are started in the same process
+  if (process.env['NODE_ENV'] === 'test') {
+    process.setMaxListeners(0)
+  }
   process.on('unhandledRejection', (err: Error) => {
-    logger.error({
-      name: err.name,
-      stack: err.stack,
-      message: err.message,
-    })
+    // Throw redlock execution error for testing purposes
+    if (err instanceof ExecutionError) {
+      throw err
+    }
+    censorLogs(() =>
+      logger.error({
+        name: err.name,
+        stack: err.stack,
+        message: err.message,
+      }),
+    )
   })
 
   if (
@@ -135,7 +164,7 @@ export const expose = async <T extends SettingsDefinitionMap>(
       try {
         await app.listen({ port, host: adapter.config.settings.EA_HOST })
       } catch (err) {
-        logger.fatal(`There was an error when starting the server: ${err}`)
+        censorLogs(() => logger.fatal(`There was an error when starting the server: ${err}`))
         process.exit()
       }
 
@@ -147,16 +176,25 @@ export const expose = async <T extends SettingsDefinitionMap>(
   await exposeApp(api, adapter.config.settings.EA_PORT)
   await exposeApp(metricsApi, adapter.config.settings.METRICS_PORT)
 
+  // Make sure the cache lock has been acquired before returning
+  if (adapter.lockAcquiredPromise) {
+    try {
+      await adapter.lockAcquiredPromise
+    } catch (error) {
+      await api?.close()
+      await metricsApi?.close()
+      throw error
+    }
+  }
+
   // We return only the main API to maintain backwards compatibility
   return api
 }
 
 async function buildRestApi(adapter: Adapter) {
-  const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(
-    adapter.config.settings,
-  )
+  const TLSOptions: httpsOptions | Record<string, unknown> = getTLSOptions(adapter.config.settings)
   const app = fastify({
-    ...mTLSOptions,
+    ...TLSOptions,
     bodyLimit: adapter.config.settings.MAX_PAYLOAD_SIZE_LIMIT,
   })
 
