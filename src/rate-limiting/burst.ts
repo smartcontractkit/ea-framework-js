@@ -6,6 +6,8 @@ const logger = makeLogger('BurstRateLimiter')
 
 /**
  * This rate limiter is the simplest stateful option.
+ * It will keep track of used API credits (by default, one request equals one credit) and
+ * upon reaching the limits in a fixed time window, will block the requests until API credits are available again.
  * On startup, it'll compare the different thresholds for each tier, calculate them all
  * in the finest window we'll use (seconds), and use the most restrictive one.
  * This is so if the EA were to restart, we don't need to worry about persisting state
@@ -14,9 +16,9 @@ const logger = makeLogger('BurstRateLimiter')
  */
 export class BurstRateLimiter implements RateLimiter {
   latestSecondInterval = 0
-  requestsThisSecond = 0
+  creditsThisSecond = 0
   latestMinuteInterval = 0
-  requestsThisMinute = 0
+  creditsThisMinute = 0
   perSecondLimit!: number
   perMinuteLimit!: number
 
@@ -29,9 +31,8 @@ export class BurstRateLimiter implements RateLimiter {
     this.perMinuteLimit = Math.min(limits?.rateLimit1m || Infinity, perHourLimit)
     this.perSecondLimit = limits?.rateLimit1s || Infinity
     logger.debug(
-      `Using rate limiting settings: perMinute = ${this.perMinuteLimit} | perSecond: = ${this.perSecondLimit}`,
+      `Using API credit limit settings: perMinute = ${this.perMinuteLimit} | perSecond: = ${this.perSecondLimit}`,
     )
-
     return this
   }
 
@@ -46,18 +47,18 @@ export class BurstRateLimiter implements RateLimiter {
     // Ops should be "thread safe". Thank JS and its infinite single threaded dumbness.
     if (nearestSecondInterval !== this.latestSecondInterval) {
       logger.trace(
-        `Clearing latest second interval, # of requests logged was: ${this.requestsThisSecond} `,
+        `Clearing latest second interval, # of credits logged was: ${this.creditsThisSecond} `,
       )
       this.latestSecondInterval = nearestSecondInterval
-      this.requestsThisSecond = 0
+      this.creditsThisSecond = 0
     }
 
     if (nearestMinuteInterval !== this.latestMinuteInterval) {
       logger.trace(
-        `Clearing latest second minute, # of requests logged was: ${this.requestsThisMinute} `,
+        `Clearing latest second minute, # of credits logged was: ${this.creditsThisMinute} `,
       )
       this.latestMinuteInterval = nearestMinuteInterval
-      this.requestsThisMinute = 0
+      this.creditsThisMinute = 0
     }
 
     return {
@@ -76,33 +77,33 @@ export class BurstRateLimiter implements RateLimiter {
     const { now, nextSecondInterval, nextMinuteInterval } = this.updateIntervals()
 
     const timeToWaitForNextSecond =
-      this.requestsThisSecond < this.perSecondLimit ? 0 : nextSecondInterval - now
+      this.creditsThisSecond < this.perSecondLimit ? 0 : nextSecondInterval - now
     const timeToWaitForNextMinute =
-      this.requestsThisMinute < this.perMinuteLimit ? 0 : nextMinuteInterval - now
+      this.creditsThisMinute < this.perMinuteLimit ? 0 : nextMinuteInterval - now
     const timeToWait = Math.max(timeToWaitForNextSecond, timeToWaitForNextMinute)
 
     return timeToWait
   }
 
-  async waitForRateLimit(): Promise<void> {
+  async waitForRateLimit(creditCost = 1): Promise<void> {
     const timeToWait = this.msUntilNextExecution()
 
     if (timeToWait === 0) {
       logger.trace(
-        `Request under limits, current count: (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute})`,
+        `API credits under limits, current count: (S = ${this.creditsThisSecond} | M = ${this.creditsThisMinute}, | C = ${creditCost})`,
       )
     } else {
       logger.trace(
-        `Capacity for provider requests has been reached this interval (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute}), need to wait ${timeToWait}ms`,
+        `Capacity for provider API credits has been reached this interval (S = ${this.creditsThisSecond} | M = ${this.creditsThisMinute} | C = ${creditCost}), need to wait ${timeToWait}ms`,
       )
       await sleep(timeToWait)
       this.updateIntervals()
     }
+    this.creditsThisSecond += creditCost
+    this.creditsThisMinute += creditCost
 
-    this.requestsThisSecond++
-    this.requestsThisMinute++
     logger.trace(
-      `Request is now ready to go, updated count: (S = ${this.requestsThisSecond} | M = ${this.requestsThisMinute})`,
+      `Request is now ready to go, updated count: (S = ${this.creditsThisSecond} | M = ${this.creditsThisMinute})`,
     )
 
     return

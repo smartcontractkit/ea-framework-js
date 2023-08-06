@@ -2,8 +2,8 @@ import fastify, { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from '
 import { join } from 'path'
 import * as client from 'prom-client'
 import { AdapterSettings } from '../config'
-import { getMTLSOptions, httpsOptions } from '../index'
-import { AdapterRequest, makeLogger } from '../util'
+import { getTLSOptions, httpsOptions } from '../index'
+import { AdapterRequest, censorLogs, makeLogger } from '../util'
 import { AdapterError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
 import { HttpRequestType, requestDurationBuckets } from './constants'
@@ -17,7 +17,7 @@ export enum CMD_SENT_STATUS {
 }
 
 export function setupMetricsServer(name: string, adapterSettings: AdapterSettings) {
-  const mTLSOptions: httpsOptions | Record<string, unknown> = getMTLSOptions(adapterSettings)
+  const mTLSOptions: httpsOptions | Record<string, unknown> = getTLSOptions(adapterSettings)
   const metricsApp = fastify({
     ...mTLSOptions,
     logger: false,
@@ -67,6 +67,7 @@ export const buildMetricsMiddleware = (
     feedId,
     req.requestContext?.meta?.error,
     req.requestContext?.meta?.metrics?.cacheHit,
+    res.statusCode,
   )
 
   // Record number of requests sent to EA
@@ -74,7 +75,7 @@ export const buildMetricsMiddleware = (
 
   // Record response time of request through entire EA
   metrics.get('httpRequestDurationSeconds').observe(res.getResponseTime() / 1000)
-  logger.debug(`Response time for ${feedId}: ${res.getResponseTime()}ms`)
+  censorLogs(() => logger.debug(`Response time for ${feedId}: ${res.getResponseTime()}ms`))
   done()
 }
 
@@ -128,6 +129,7 @@ export const buildHttpRequestMetricsLabel = (
   feedId: string,
   error?: AdapterError | Error,
   cacheHit?: boolean,
+  responseStatusCode?: number,
 ): Record<string, string | number | undefined> => {
   const labels = {} as Record<(typeof httpRequestsTotalLabels)[number], string | number | undefined>
   labels.method = 'POST'
@@ -143,7 +145,7 @@ export const buildHttpRequestMetricsLabel = (
     labels.status_code = 500
   } else {
     // If no error present, request went as expected
-    labels.status_code = 200
+    labels.status_code = responseStatusCode || 200
     if (cacheHit) {
       labels.type = HttpRequestType.CACHE_HIT
     } else {
@@ -188,6 +190,11 @@ export const metrics = new Metrics(() => ({
     name: 'http_request_duration_seconds',
     help: 'A histogram bucket of the distribution of http request durations',
     buckets: requestDurationBuckets,
+  }),
+  httpRequestsPerBgExecute: new client.Gauge({
+    name: 'http_requests_per_bg_execute',
+    help: 'The number of HTTP requests made in a single background execute cycle',
+    labelNames: ['adapter_endpoint'] as const,
   }),
   dataProviderRequests: new client.Counter({
     name: 'data_provider_requests',
@@ -251,6 +258,10 @@ export const metrics = new Metrics(() => ({
     name: 'cache_data_staleness_seconds',
     help: 'Observes the cache staleness of the data returned (i.e., time since the data was written to the cache)',
     labelNames: cacheMetricsLabels,
+  }),
+  cacheOverflowCount: new client.Counter({
+    name: 'cache_overflow_count',
+    help: 'A counter that increments every time an item overflows in local cache',
   }),
   totalDataStalenessSeconds: new client.Gauge({
     name: 'total_data_staleness_seconds',

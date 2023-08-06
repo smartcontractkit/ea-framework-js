@@ -3,19 +3,21 @@ import { ExecutionContext } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { ReplyError } from 'ioredis'
 import { WebSocket } from 'mock-socket'
-import { start } from '../src'
-import { Adapter, AdapterDependencies } from '../src/adapter'
-import { Cache, LocalCache } from '../src/cache'
-import { ResponseCache } from '../src/cache/response'
-import { EmptyCustomSettings, SettingsDefinitionMap } from '../src/config'
+import * as client from 'prom-client'
+import { Adapter, AdapterDependencies } from '../adapter'
+import { Cache, LocalCache } from '../cache'
+import { ResponseCache } from '../cache/response'
+import { EmptyCustomSettings, SettingsDefinitionMap } from '../config'
+import { start } from '../index'
 import {
   Transport,
   TransportDependencies,
   TransportGenerics,
   WebSocketClassProvider,
-} from '../src/transports'
-import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from '../src/util'
-import { EmptyInputParameters, TypeFromDefinition } from '../src/validation/input-params'
+} from '../transports'
+import { EmptyInputParameters, TypeFromDefinition } from '../validation/input-params'
+import { AdapterRequest, AdapterResponse, PartialAdapterResponse, sleep } from './index'
+export { WebSocket as MockWebsocket, Server as MockWebsocketServer } from 'mock-socket'
 
 export type NopTransportTypes = {
   Parameters: EmptyInputParameters
@@ -26,6 +28,7 @@ export type NopTransportTypes = {
   Settings: EmptyCustomSettings
 }
 
+/* c8 ignore start */ // eslint-disable-line
 export class NopTransport<T extends TransportGenerics = NopTransportTypes> implements Transport<T> {
   name!: string
   responseCache!: ResponseCache<T>
@@ -106,6 +109,7 @@ export async function runAllUntilTime(clock: InstalledClock, time: number): Prom
 
 export class RedisMock {
   store = new LocalCache<string>(10000)
+  keys: { [key: string]: string } = {}
 
   get(key: string) {
     return this.store.get(key)
@@ -135,6 +139,30 @@ export class RedisMock {
 
   setExternalAdapterResponse(key: string, value: string, ttl: number) {
     return this.set(key, value, 'PX', ttl)
+  }
+
+  evalsha(...args: [string, number, [string, string, number]]) {
+    const [redlockKey, instanceKey] = args[2]
+
+    // If key has been used to acquire a lock, and the instance key matches, extend it
+    if (this.keys[redlockKey] === instanceKey) {
+      return 1
+    }
+
+    // If key has not been used to acquire a lock, set it
+    if (this.keys[redlockKey] === undefined) {
+      this.keys[redlockKey] = instanceKey
+      return 1
+    } else {
+      // If key has already been used, reject lock acquisition
+      return 0
+    }
+  }
+
+  // For cache lock tests - naive implementation as the necessary error will
+  // already have been thrown and the test will end the process
+  quit() {
+    return
   }
 }
 
@@ -416,8 +444,8 @@ export class TestAdapter<T extends SettingsDefinitionMap = SettingsDefinitionMap
         'An attempt was made to fetch metrics, but the adapter was started without metrics enabled',
       )
     }
-    const response = await this.metricsApi.inject('/metrics')
-    return new TestMetrics(response.body)
+    const response = await client.register.metrics()
+    return new TestMetrics(response)
   }
 
   async getHealth() {
@@ -441,6 +469,12 @@ export async function waitUntilResolved<T>(
   }
 
   return result
+}
+
+export function setEnvVariables(envVariables: NodeJS.ProcessEnv): void {
+  for (const key in envVariables) {
+    process.env[key] = envVariables[key]
+  }
 }
 
 /**
@@ -472,3 +506,4 @@ export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): 
   // Need to disable typing, the mock-socket impl does not implement the ws interface fully
   provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
 }
+/* c8 ignore stop */ // eslint-disable-line

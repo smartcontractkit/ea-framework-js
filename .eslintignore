@@ -7,5 +7,8 @@ coverage
 # don't lint eslintrc
 .eslintrc.js
 
+# don't lint ea-generator folder since it contains invalid typescript syntax
+scripts/generator-adapter
+
 .yarn
 .vscode

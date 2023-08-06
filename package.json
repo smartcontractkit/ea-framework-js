@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/external-adapter-framework",
-  "version": "0.29.8",
+  "version": "0.30.3",
   "main": "dist/index.js",
   "license": "MIT",
   "dependencies": {
@@ -12,20 +12,26 @@
     "pino": "8.6.1",
     "pino-pretty": "9.1.0",
     "prom-client": "13.2.0",
-    "ws": "8.9.0"
+    "ws": "8.9.0",
+    "redlock": "5.0.0-beta.2",
+    "mock-socket": "9.1.5",
+    "yeoman-generator": "3.1.1"
   },
   "scripts": {
-    "build": "mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc",
-    "dev": "DEBUG=true tsnd --respawn --transpile-only --project tsconfig.json './src/test.ts'",
+    "build": "mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc && yarn build-generator",
+    "build-generator": "mkdir -p ./dist/src/generator-adapter/generators/app/templates && cp -R scripts/generator-adapter/generators/app/templates dist/src/generator-adapter/generators/app && cp scripts/generator-adapter/package.json dist/src/generator-adapter && tsc --project scripts/generator-adapter/tsconfig.json && tsc scripts/adapter-generator.ts --outDir dist/src",
     "generate-docs": "typedoc src/**/*.ts",
+    "generate-ref-tables": "ts-node scripts/metrics-table.ts > docs/reference-tables/metrics.md && ts-node scripts/ea-settings-table.ts > docs/reference-tables/ea-settings.md && yarn prettier --write docs/reference-tables",
     "lint-fix": "eslint --max-warnings=0 --fix . && prettier --write ./src/**/*.ts ./test/**/*.ts ./*.{json,js,yaml}",
     "lint": "eslint --max-warnings=0 . && prettier --check ./src/**/*.ts ./test/**/*.ts ./*.{json,js,yaml}",
     "portal-path": "echo \"portal:$(readlink -f ./dist/src)\"",
-    "start": "ts-node -e 'import(`./src/examples/${process.argv[1]}/src/index`).then(ea => ea.server())'",
     "test-debug": "EA_HOST=localhost LOG_LEVEL=trace DEBUG=true EA_PORT=0 c8 ava --verbose",
     "test": "EA_HOST=localhost LOG_LEVEL=error EA_PORT=0 c8 ava",
     "verify": "yarn lint && yarn build && yarn build -p ./test/tsconfig.json && yarn test && yarn code-coverage",
     "code-coverage": "c8 check-coverage --statements 95 --lines 95 --functions 95 --branches 90"
+  },
+  "bin": {
+    "create-external-adapter": "adapter-generator.js"
   },
   "devDependencies": {
     "@sinonjs/fake-timers": "9.1.2",
@@ -41,13 +47,13 @@
     "eslint": "8.39.0",
     "eslint-config-prettier": "8.8.0",
     "eslint-plugin-tsdoc": "0.2.17",
-    "mock-socket": "9.1.5",
     "mocksse": "1.0.4",
     "prettier": "2.8.7",
     "ts-node": "10.9.1",
     "ts-node-dev": "2.0.0",
     "typedoc": "0.23.21",
-    "typescript": "5.0.4"
+    "typescript": "5.0.4",
+    "@types/yeoman-generator": "5.2.11"
   },
   "prettier": {
     "semi": false,

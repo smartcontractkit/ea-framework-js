@@ -1,7 +1,7 @@
 import { Adapter, AdapterEndpoint, EndpointContext, EndpointGenerics } from './adapter'
 import { metrics } from './metrics'
 import { Transport, TransportGenerics } from './transports'
-import { asyncLocalStorage, makeLogger, timeoutPromise } from './util'
+import { asyncLocalStorage, censorLogs, makeLogger, timeoutPromise } from './util'
 
 const logger = makeLogger('BackgroundExecutor')
 
@@ -82,7 +82,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
           adapter.config.settings.BACKGROUND_EXECUTE_TIMEOUT,
         )
       } catch (error) {
-        logger.error(error, (error as Error).stack)
+        censorLogs(() => logger.error(error, (error as Error).stack))
         metrics
           .get('bgExecuteErrors')
           .labels({ adapter_endpoint: endpoint.name, transport: transportName })

@@ -37,10 +37,10 @@ const inputParameters = new InputParameters({
 
 ## Endpoint Types
 
-Endpoints contain a type parameter that allows specifying all relevant types in a single structure. The developer can specify types for the adapter request, adapter response, provider request, provider response, and settings. An example is shown below.
+Endpoints contain a type parameter that allows specifying relevant types of an endpoint. The developer can specify types for the adapter request, adapter response, and adapter config. An example is shown below.
 
 ```typescript
-import { customSettings } from './config'
+import { config } from './config'
 
 interface ResponseSchema {
   base: string
@@ -48,18 +48,7 @@ interface ResponseSchema {
   price: number
 }
 
-interface RequestBody {
-  symbol: string
-  convert: string
-}
-
-interface ProviderMessage {
-  from: string
-  to: string
-  result: number
-}
-
-type EndpointTypes = {
+export type BaseEndpointTypes = {
   // Expected adapter request structure received by this endpoint
   Parameters: typeof inputParameters.definition
   // Expected adapter response structure returned by the endpoint
@@ -67,17 +56,11 @@ type EndpointTypes = {
     Data: ResponseSchema
     Result: number
   }
-  // The adapter configs including the custom settings
-  // Set to 'SettingsMap' (provided by the framework) if the adapter does not have custom settings
-  CustomSettings: typeof customSettings
-  // Expected data provider request and response structures. Options for REST and Websocket
-  Provider: {
-    RequestBody: RequestBody // Used for HTTP transports. Set to "never" if API solely uses query parameters.
-    ResponseBody: ResponseSchema // Used for HTTP transports
-    WsMessage: ProviderMessage // Used for Websocket transports
-  }
+  Settings: typeof config.settings
 }
 ```
+
+Transport files extend BaseEndpointTypes and additionally provide DP specific information like DP request/response type or websocket message types are defined in corresponding transport files.
 
 ## Cache Key Generator
 
@@ -140,7 +123,7 @@ type EndpointTypes = {
   ...
 }
 
-export const endpoint = new PriceEndpoint<EndpointTypes>({
+export const endpoint = new PriceEndpoint({
   ...
   inputParameters: priceEndpointInputParameters,
   ...

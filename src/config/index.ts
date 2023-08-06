@@ -25,6 +25,21 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: '/',
   },
+  CACHE_LOCK_DURATION: {
+    description: 'Time (in ms) used as a baseline for the acquisition and extension of cache locks',
+    type: 'number',
+    default: 10000,
+  },
+  CACHE_LOCK_RETRIES: {
+    description: 'Number of retries to acquire a cache lock',
+    type: 'number',
+    default: 10,
+  },
+  CACHE_LOCK_DEFERRAL_MS: {
+    description: 'The amount of time (in ms) to wait before attempting to lock the cache',
+    type: 'number',
+    default: 60000,
+  },
   CACHE_MAX_AGE: {
     description: 'Maximum amount of time (in ms) that a response will stay cached',
     type: 'number',
@@ -92,6 +107,11 @@ export const BaseSettingsDefinition = {
     default: 'local',
     options: ['local', 'redis'],
   },
+  CACHE_PREFIX: {
+    description: 'Specifies a prefix to use for cache keys',
+    type: 'string',
+    default: '',
+  },
   SUBSCRIPTION_SET_MAX_ITEMS: {
     type: 'number',
     description: 'The maximum number of subscriptions set',
@@ -137,6 +157,11 @@ export const BaseSettingsDefinition = {
     description: 'Minimum level required for logs to be output',
     type: 'string',
     default: 'info',
+  },
+  CENSOR_SENSITIVE_LOGS: {
+    description: 'Controls whether the logging of sensitive information is enabled or disabled',
+    type: 'boolean',
+    default: false,
   },
   MAX_PAYLOAD_SIZE_LIMIT: {
     description: 'Max payload size limit for the Fastify server',
@@ -273,6 +298,11 @@ export const BaseSettingsDefinition = {
   },
   MTLS_ENABLED: {
     description: 'Flag to specify whether mutual TLS/SSL is enabled or not',
+    type: 'boolean',
+    default: false,
+  },
+  TLS_ENABLED: {
+    description: 'Flag to specify whether TLS/SSL is enabled or not',
     type: 'boolean',
     default: false,
   },
@@ -561,7 +591,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
   constructor(
     /** Map of setting definitions to validate and use to get setting values */
     private settingsDefinition: T,
-    private options?: {
+    public options?: {
       /** Map of overrides to the default config values for an Adapter */
       envDefaultOverrides?: Partial<BaseAdapterSettings>
 
