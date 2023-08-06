@@ -2,12 +2,13 @@ import { AdapterDependencies } from '../adapter'
 import { AdapterSettings } from '../config'
 import {
   AdapterResponse,
-  censor,
-  makeLogger,
   ResponseGenerics,
   TimestampedAdapterResponse,
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
+  censor,
+  censorLogs,
+  makeLogger,
 } from '../util'
 import CensorList from '../util/censor/censor-list'
 import { InputParameters, InputParametersDefinition } from '../validation/input-params'
@@ -75,7 +76,7 @@ export class ResponseCache<
             T['Response']
           >
         } catch (error) {
-          logger.error(`Error censoring response: ${error}`)
+          censorLogs(() => logger.error(`Error censoring response: ${error}`))
           censoredResponse = {
             statusCode: 502,
             errorMessage: 'Response could not be censored due to an error',
@@ -98,7 +99,6 @@ export class ResponseCache<
           metrics: {
             feedId: calculateFeedId(
               {
-                inputParameters: this.inputParameters,
                 adapterSettings: this.adapterSettings,
               },
               r.params,
@@ -111,7 +111,7 @@ export class ResponseCache<
         const timestampValidator = validator.responseTimestamp()
         const error = timestampValidator.fn(response.timestamps?.providerIndicatedTimeUnixMs)
         if (error) {
-          logger.warn(`Provider indicated time is invalid: ${error}`)
+          censorLogs(() => logger.warn(`Provider indicated time is invalid: ${error}`))
         }
       }
 
@@ -119,7 +119,6 @@ export class ResponseCache<
         key: calculateCacheKey({
           transportName,
           data: r.params,
-          inputParameters: this.inputParameters,
           adapterName: this.adapterName,
           endpointName: this.endpointName,
           adapterSettings: this.adapterSettings,

@@ -5,7 +5,7 @@ import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { WebSocketClassProvider, WebSocketTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
-import { TestAdapter, mockWebSocketProvider } from '../util'
+import { TestAdapter, mockWebSocketProvider } from '../../src/util/testing-utils'
 
 export const test = untypedTest as TestFn<{
   adapterEndpoint: AdapterEndpoint<WebSocketEndpointTypes>

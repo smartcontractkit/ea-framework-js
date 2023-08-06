@@ -37,8 +37,8 @@ export class AdapterError extends Error {
     message = 'There was an unexpected error in the adapter.',
     cause,
     url,
-    errorResponse,
     feedID,
+    errorResponse,
     providerStatusCode,
     metricsLabel = HttpRequestType.ADAPTER_ERROR,
   }: Partial<AdapterError>) {

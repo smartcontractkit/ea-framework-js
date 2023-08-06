@@ -9,9 +9,9 @@ import {
   WebSocketTransport,
   WebsocketReverseMappingTransport,
 } from '../../src/transports'
-import { SingleNumberResultResponse } from '../../src/util'
+import { SingleNumberResultResponse, sleep } from '../../src/util'
+import { TestAdapter, mockWebSocketProvider, runAllUntilTime } from '../../src/util/testing-utils'
 import { InputParameters } from '../../src/validation'
-import { TestAdapter, mockWebSocketProvider, runAllUntilTime } from '../util'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -36,7 +36,7 @@ interface ProviderMessage {
   value: number
 }
 
-const URL = 'wss://test-ws.com/asd'
+const ENDPOINT_URL = 'wss://test-ws.com/asd'
 
 const CACHE_MAX_AGE = 1000
 
@@ -58,7 +58,7 @@ const BACKGROUND_EXECUTE_MS_WS = 5000
 
 const createAdapter = (envDefaultOverrides: Record<string, string | number | symbol>): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
-    url: () => URL,
+    url: () => ENDPOINT_URL,
     options: () => {
       return {
         headers: {
@@ -137,7 +137,7 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
 
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(URL, { mock: false })
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   mockWsServer.on('connection', (socket) => {
     let counter = 0
     const parseMessage = () => {
@@ -192,23 +192,21 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
 test.serial('reconnects when url changed', async (t) => {
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(URL, { mock: false })
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   let connectionCounter = 0
-  mockWsServer.on('connection', (socket) => {
+  mockWsServer.on('connection', async (socket) => {
+    const url = new URL(socket.url)
+    const base = url.searchParams.get('test')?.split(',').at(-1)
+
+    await sleep(100)
     connectionCounter++
 
-    const parseMessage = (message: string | ArrayBuffer | Blob | ArrayBufferView) => {
-      const parsed = JSON.parse(message as string)
-      socket.send(
-        JSON.stringify({
-          pair: `${parsed.base}/${parsed.quote}`,
-          value: price,
-        }),
-      )
-    }
-    socket.on('message', (message) => {
-      parseMessage(message)
-    })
+    socket.send(
+      JSON.stringify({
+        pair: `${base}/USD`,
+        value: price,
+      }),
+    )
   })
 
   const transport = new WebSocketTransport<WebSocketTypes>({
@@ -289,7 +287,7 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
 
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(URL, { mock: false })
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   let connectionCounter = 0
   let messageCounter = 0
 
@@ -334,7 +332,7 @@ test.serial('reconnects if provider stops sending expected messages', async (t) 
 
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(URL, { mock: false })
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   let connectionCounter = 0
 
   mockWsServer.on('connection', (socket) => {
@@ -379,7 +377,7 @@ test.serial('resubscribes after reconnection if server closes connection', async
 
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(URL, { mock: false })
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   let connectionCounter = 0
   let messageCounter = 0
 
@@ -430,7 +428,7 @@ test.serial(
 
     // Mock WS
     mockWebSocketProvider(WebSocketClassProvider)
-    const mockWsServer = new Server(URL, { mock: false })
+    const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
     mockWsServer.on('connection', (socket) => {
       socket.on('message', () => {
         socket.send(
@@ -443,7 +441,7 @@ test.serial(
     })
 
     const transport = new WebSocketTransport<WebSocketTypes>({
-      url: () => URL,
+      url: () => ENDPOINT_URL,
       handlers: {
         async open() {
           return new Promise((res, rej) => {
@@ -545,7 +543,7 @@ test.serial('does not crash the server when new connection errors', async (t) =>
 
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(URL, { mock: false })
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   mockWsServer.on('connection', (socket) => {
     socket.on('message', () => {
       socket.send(
@@ -559,7 +557,7 @@ test.serial('does not crash the server when new connection errors', async (t) =>
 
   const transport = new WebSocketTransport<WebSocketTypes>({
     // Changing the url so that the connection will error on initial request
-    url: () => `${URL}test`,
+    url: () => `${ENDPOINT_URL}test`,
     handlers: {
       message(message) {
         const [curBase, curQuote] = message.pair.split('/')
@@ -636,6 +634,46 @@ test.serial('does not crash the server when new connection errors', async (t) =>
   await t.context.clock.runAllAsync()
 })
 
+test.serial('closed ws connection should have a 1000 status code', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 1000
+  process.env['METRICS_ENABLED'] = 'true'
+  eaMetrics.clear()
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+
+  const adapter = createAdapter({
+    WS_SUBSCRIPTION_TTL: 30000,
+    WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.request({
+    base,
+    quote,
+  })
+
+  // The WS connection should not send any messages to the EA, so we advance the clock until
+  // we reach the point where the EA will consider it unhealthy and reconnect.
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+
+  const metrics = await testAdapter.getMetrics()
+
+  metrics.assert(t, {
+    name: 'ws_connection_closures',
+    labels: { code: '1000', url: 'wss://test-ws.com/asd' },
+    expectedValue: 1,
+  })
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
 test.serial('does not hang the background execution if the open handler hangs', async (t) => {
   const base = 'ETH'
   const quote = 'DOGE'
@@ -644,7 +682,7 @@ test.serial('does not hang the background execution if the open handler hangs', 
 
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(URL, { mock: false })
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   mockWsServer.on('connection', (socket) => {
     socket.on('message', () => {
       socket.send(
@@ -659,7 +697,7 @@ test.serial('does not hang the background execution if the open handler hangs', 
   let execution = 0
 
   const transport = new WebSocketTransport<WebSocketTypes>({
-    url: () => URL,
+    url: () => ENDPOINT_URL,
     handlers: {
       async open() {
         return new Promise((res) => {
@@ -757,7 +795,7 @@ const createReverseMappingAdapter = (
 ): Adapter => {
   const websocketTransport: WebsocketReverseMappingTransport<WebSocketTypes, string> =
     new WebsocketReverseMappingTransport<WebSocketTypes, string>({
-      url: () => URL,
+      url: () => ENDPOINT_URL,
       handlers: {
         message(message) {
           const params = websocketTransport.getReverseMapping(message.pair)
@@ -826,7 +864,7 @@ test.serial('can set reverse mapping and read from it', async (t) => {
 
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(URL, { mock: false })
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   mockWsServer.on('connection', (socket) => {
     let counter = 0
     const parseMessage = () => {

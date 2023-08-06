@@ -4,7 +4,7 @@ import { Adapter, AdapterDependencies, AdapterEndpoint, EndpointGenerics } from 
 import { Cache, RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
 import { BasicCacheSetterTransport, cacheTestInputParameters } from '../cache/helper'
-import { NopTransport, RedisMock, TestAdapter } from '../util'
+import { NopTransport, RedisMock, TestAdapter } from '../../src/util/testing-utils'
 
 export const test = untypedTest as TestFn<{
   testAdapter: TestAdapter

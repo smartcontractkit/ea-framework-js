@@ -5,7 +5,7 @@ import { EmptyCustomSettings } from '../../src/config'
 import { AdapterRequest } from '../../src/util'
 import { InputParameters } from '../../src/validation'
 import { TypeFromDefinition } from '../../src/validation/input-params'
-import { NopTransport, NopTransportTypes, TestAdapter } from '../util'
+import { NopTransport, NopTransportTypes, TestAdapter } from '../../src/util/testing-utils'
 
 export const test = untypedTest as TestFn<{
   cache: Cache

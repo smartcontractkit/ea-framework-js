@@ -1,7 +1,7 @@
 import WebSocket, { ClientOptions, RawData } from 'ws'
 import { EndpointContext } from '../adapter'
 import { metrics } from '../metrics'
-import { deferredPromise, makeLogger, sleep, timeoutPromise } from '../util'
+import { censorLogs, deferredPromise, makeLogger, sleep, timeoutPromise } from '../util'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TypeFromDefinition } from '../validation/input-params'
 import { TransportGenerics } from './'
@@ -75,17 +75,25 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
      * Builds a WS message that will be sent to subscribe to a specific feed
      *
      * @param params - the body of the adapter request
+     * @param context - the background context for the Adapter
      * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
      */
-    subscribeMessage?: (params: TypeFromDefinition<T['Parameters']>) => unknown
+    subscribeMessage?: (
+      params: TypeFromDefinition<T['Parameters']>,
+      context: EndpointContext<T>,
+    ) => unknown
 
     /**
      * Builds a WS message that will be sent to unsubscribe to a specific feed
      *
      * @param params - the body of the adapter request
+     * @param context - the background context for the Adapter
      * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
      */
-    unsubscribeMessage?: (params: TypeFromDefinition<T['Parameters']>) => unknown
+    unsubscribeMessage?: (
+      params: TypeFromDefinition<T['Parameters']>,
+      context: EndpointContext<T>,
+    ) => unknown
   }
 }
 
@@ -157,7 +165,7 @@ export class WebSocketTransport<
       // Called when any message is received by the open connection
       message: async (event: WebSocket.MessageEvent) => {
         const parsed = this.deserializeMessage(event.data)
-        logger.trace(`Got ws message: ${event.data}`)
+        censorLogs(() => logger.trace(`Got ws message: ${event.data}`))
         const providerDataReceived = Date.now()
         const results = this.config.handlers.message(parsed, context)?.map((r) => {
           const result = r as TimestampedProviderResult<T>
@@ -184,8 +192,10 @@ export class WebSocketTransport<
 
       // Called when an error is thrown by the connection
       error: async (event: WebSocket.ErrorEvent) => {
-        logger.debug(
-          `Error occurred in web socket connection. Error: ${event.error} ; Message: ${event.message}`,
+        censorLogs(() =>
+          logger.debug(
+            `Error occurred in web socket connection. Error: ${event.error} ; Message: ${event.message}`,
+          ),
         )
         // Record connection error count
         metrics.get('wsConnectionErrors').labels(connectionErrorLabels(event.message)).inc()
@@ -203,10 +213,13 @@ export class WebSocketTransport<
         // Using URL in label since connection_key is removed from v3
         metrics.get('wsConnectionActive').dec()
 
-        // Also, register that the connection was closed and the reason why
+        // Also, register that the connection was closed and the reason why.
+        // We need to filter out query params from the URL to avoid having
+        // the cardinality of the metric go out of control.
+        const filteredUrl = this.currentUrl.split('?')[0]
         metrics.get('wsConnectionClosures').inc({
           code: event.code,
-          url: this.currentUrl,
+          url: filteredUrl,
         })
       },
     }
@@ -297,6 +310,7 @@ export class WebSocketTransport<
     const connectionUnresponsive =
       timeSinceLastActivity > 0 &&
       timeSinceLastActivity > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
+
     let connectionClosed = this.connectionClosed()
     logger.trace(`WS conn staleness info: 
       now: ${now} |
@@ -312,7 +326,7 @@ export class WebSocketTransport<
       const reason = urlChanged
         ? `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`
         : `Last message was received ${timeSinceLastMessage} ago, exceeding the threshold of ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}ms, closing connection...`
-      logger.info(reason)
+      censorLogs(() => logger.info(reason))
 
       // Check if connection was opened very recently; if so, wait a bit before continuing.
       // This is so if we just opened the connection and are waiting to receive some messages,
@@ -323,14 +337,16 @@ export class WebSocketTransport<
         )
         await sleep(1000 - timeSinceConnectionOpened)
       }
-      this.wsConnection?.close()
+      this.wsConnection?.close(1000)
       connectionClosed = true
 
       if (subscriptions.desired.length) {
-        logger.trace(
-          `Connection will be reopened and will subscribe to new and resubscribe to existing: ${JSON.stringify(
-            subscriptions.desired,
-          )}`,
+        censorLogs(() =>
+          logger.trace(
+            `Connection will be reopened and will subscribe to new and resubscribe to existing: ${JSON.stringify(
+              subscriptions.desired,
+            )}`,
+          ),
         )
       }
     }
@@ -367,11 +383,17 @@ export class WebSocketTransport<
         const { subscribeMessage, unsubscribeMessage } = builders
         await this.sendMessages(
           context,
-          subscribeMessage ? subscriptions.new.map(subscribeMessage) : subscriptions.new,
-          unsubscribeMessage ? subscriptions.stale.map(unsubscribeMessage) : subscriptions.stale,
+          subscribeMessage
+            ? subscriptions.new.map((sub) => subscribeMessage(sub, context))
+            : subscriptions.new,
+          unsubscribeMessage
+            ? subscriptions.stale.map((sub) => unsubscribeMessage(sub, context))
+            : subscriptions.stale,
         )
       } else {
-        await this.sendMessages(context, subscriptions.new, subscriptions.stale)
+        logger.trace(
+          "This ws transport has no builders configured, so we're not sending any messages",
+        )
       }
     }
 
