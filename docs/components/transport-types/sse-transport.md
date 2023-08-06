@@ -2,7 +2,7 @@
 
 The `SseTransport` is used to fetch data from a Provider using the SSE (Server-Sent Events) protocol. In order to use it you need to provide a `prepareSSEConnectionConfig` method for connection, `prepareSubscriptionRequest` and `prepareUnsubscriptionRequest` methods for sending data to the Provider, and an `eventListeners` array for handling and storing the responses. Optionally you can provide `prepareKeepAliveRequest` method to send a request to the Provider to keep the connection alive.
 
-Example usage of SseTransport
+Example usage of SseTransport:
 
 ```typescript
 export const sseTransport = new SseTransport<EndpointTypes>({
@@ -161,7 +161,7 @@ The `SseTransport` accepts one type param that describes the request and respons
 const sseTransport = new SseTransport<EndpointTypes>({
 ```
 
-Example structure of `EndpointTypes`
+Example structure of `EndpointTypes`:
 
 ```typescript
 export type EndpointTypes = {

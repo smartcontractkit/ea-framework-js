@@ -251,7 +251,7 @@ export  const wsTransport = new WebsocketReverseMappingTransport<EndpointTypes, 
 const wsTransport = new WebSocketTransport<EndpointTypes>({
 ```
 
-Example structure of `EndpointTypes`
+Example structure of `EndpointTypes`:
 
 ```typescript
 export type EndpointTypes = {
