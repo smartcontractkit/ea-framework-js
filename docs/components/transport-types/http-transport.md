@@ -155,7 +155,7 @@ parseResponse: (params, response, config) => {
 const transport = new HttpTransport<EndpointTypes>({
 ```
 
-Example structure of `EndpointTypes`
+Example structure of `EndpointTypes`:
 
 ```typescript
 export type EndpointTypes = {
