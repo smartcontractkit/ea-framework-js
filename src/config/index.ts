@@ -370,6 +370,12 @@ export const BaseSettingsDefinition = {
     default: 0,
     validate: validator.integer({ min: 0, max: 120000 }),
   },
+  DEBUG_ENDPOINTS: {
+    type: 'boolean',
+    description:
+      'Whether to enable debug enpoints (/debug/*) for this adapter. Enabling them might consume more resources.',
+    default: false,
+  },
 } as const satisfies SettingsDefinitionMap
 
 export const buildAdapterSettings = <
@@ -580,6 +586,16 @@ export type SettingsDefinitionFromConfig<T> = T extends AdapterConfig<infer Defi
   ? Definition
   : never
 
+export type SettingDefinitionDetails = {
+  type: string
+  description: string
+  required: boolean
+  sensitive: boolean
+  default: unknown
+  customSetting: boolean
+  envDefaultOverride: unknown
+}
+
 /**
  * This class will hold the processed config type, and the basic settings.
  * The idea is that you can no longer use a straight object, but have to build a config,
@@ -663,6 +679,25 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
         ),
       }))
     CensorList.set(censorList)
+  }
+
+  getSettingDebugDetails(settingName: string): SettingDefinitionDetails {
+    const settingDefinition =
+      this.settingsDefinition[settingName] ||
+      BaseSettingsDefinition[settingName as keyof BaseSettingsDefinitionType]
+
+    const details = {
+      type: settingDefinition.type,
+      description: settingDefinition.description,
+      required: settingDefinition.required || false,
+      default: settingDefinition.default,
+      sensitive: (settingDefinition as { sensitive: boolean }).sensitive,
+      customSetting: !!this.settingsDefinition[settingName],
+      envDefaultOverride:
+        this.options?.envDefaultOverrides?.[settingName as keyof BaseAdapterSettings],
+    }
+
+    return details
   }
 }
 

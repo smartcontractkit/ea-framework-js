@@ -5,6 +5,7 @@ import { ExecutionError } from 'redlock'
 import { Adapter, AdapterDependencies } from './adapter'
 import { callBackgroundExecutes } from './background-executor'
 import { AdapterSettings, SettingsDefinitionMap } from './config'
+import registerDebugEndpoints from './debug/router'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
 import {
   AdapterRequest,
@@ -202,6 +203,12 @@ async function buildRestApi(adapter: Adapter) {
   app.get(join(adapter.config.settings.BASE_URL, 'health'), (req, res) => {
     res.status(200).send({ message: 'OK', version: VERSION })
   })
+
+  // If specified, serve debug endpoints to assist in issue triaging
+  if (adapter.config.settings.DEBUG_ENDPOINTS === true) {
+    registerDebugEndpoints(app, adapter)
+    logger.info('Serving debug endpoints')
+  }
 
   // Use global error handling
   app.setErrorHandler(errorCatchingMiddleware)
