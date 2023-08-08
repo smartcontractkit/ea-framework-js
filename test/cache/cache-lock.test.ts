@@ -62,7 +62,7 @@ test.serial(
     })
 
     const redisClient = new RedisMock() as unknown as Redis
-    const cache = new RedisCache(redisClient) // Fake redis
+    const cache = new RedisCache(redisClient, 10000) // Fake redis
     const dependencies: Partial<AdapterDependencies> = {
       cache,
       redisClient,
@@ -131,7 +131,7 @@ test.serial(
     })
 
     const redisClient = new RedisMock() as unknown as Redis
-    const cache = new RedisCache(redisClient) // Fake redis
+    const cache = new RedisCache(redisClient, 10000) // Fake redis
     const dependencies: Partial<AdapterDependencies> = {
       cache,
       redisClient,
@@ -195,7 +195,7 @@ test.serial(
     })
 
     const redisClient = new RedisMock() as unknown as Redis
-    let cache: RedisCache | MockCache = new RedisCache(redisClient) // Fake redis
+    let cache: RedisCache | MockCache = new RedisCache(redisClient, 10000) // Fake redis
 
     const dependencies: Partial<AdapterDependencies> = {
       cache,
@@ -270,7 +270,7 @@ test.serial(
     })
 
     const redisClient = new RedisMock() as unknown as Redis
-    const cache = new RedisCache(redisClient) // Fake redis
+    const cache = new RedisCache(redisClient, 10000) // Fake redis
     const dependencies: Partial<AdapterDependencies> = {
       cache,
       redisClient,
@@ -342,7 +342,7 @@ test.serial(
 
     const redisMock = new RedisMock()
     const redisClient = redisMock as unknown as Redis
-    const cache = new RedisCache(redisClient) // Fake redis
+    const cache = new RedisCache(redisClient, 10000) // Fake redis
     const dependencies: Partial<AdapterDependencies> = {
       cache,
       redisClient,

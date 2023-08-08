@@ -38,7 +38,7 @@ test.beforeEach(async (t) => {
     ],
   })
 
-  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const cache = new RedisCache(new RedisMock() as unknown as Redis, 10000) // Fake redis
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }
@@ -71,7 +71,7 @@ test.serial('redis client is initialized with options', async (t) => {
     ],
   })
 
-  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const cache = new RedisCache(new RedisMock() as unknown as Redis, 10000) // Fake redis
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }
@@ -106,7 +106,7 @@ test.serial('redis client is initialized with url', async (t) => {
     ],
   })
 
-  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const cache = new RedisCache(new RedisMock() as unknown as Redis, 10000) // Fake redis
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }
@@ -151,11 +151,19 @@ test.serial('Test cache factory failure (redis)', async (t) => {
   }
 })
 
+test.serial('Test getting value from redis when it does not exist in local cache', async (t) => {
+  const cache = new RedisCache(new RedisMock() as unknown as Redis, 10000)
+  await cache.set('k1', 'v1', 1000)
+  await cache['localCache'].delete('k1')
+  const value = await cache.get('k1')
+  t.is(value, 'v1')
+})
+
 test.serial('Test cache key collision across adapters', async (t) => {
   const adapterA = buildDiffResultAdapter('TESTA')
   const adapterB = buildDiffResultAdapter('TESTB')
 
-  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const cache = new RedisCache(new RedisMock() as unknown as Redis, 10000) // Fake redis
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }

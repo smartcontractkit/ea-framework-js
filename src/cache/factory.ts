@@ -17,7 +17,7 @@ export class CacheFactory {
         if (!redisClient) {
           throw new Error('Redis client undefined. Cannot create Redis cache')
         }
-        return new RedisCache(redisClient)
+        return new RedisCache(redisClient, maxSizeForLocalCache)
       }
     }
   }
