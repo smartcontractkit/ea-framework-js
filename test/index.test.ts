@@ -179,7 +179,7 @@ test('Adapter writer mode api disabled', async (t) => {
     ],
   })
 
-  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const cache = new RedisCache(new RedisMock() as unknown as Redis, 10000) // Fake redis
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }
@@ -210,7 +210,7 @@ test('Initialize adapter twice (error)', async (t) => {
     ],
   })
 
-  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const cache = new RedisCache(new RedisMock() as unknown as Redis, 10000) // Fake redis
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }

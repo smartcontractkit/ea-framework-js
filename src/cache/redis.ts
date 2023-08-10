@@ -3,7 +3,7 @@ import Redis, { Result } from 'ioredis'
 import Redlock from 'redlock'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { AdapterResponse, censorLogs, makeLogger, sleep } from '../util'
-import { Cache, CacheEntry } from './index'
+import { Cache, CacheEntry, LocalCache } from './index'
 import { CacheTypes, cacheMetricsLabel, cacheSet } from './metrics'
 
 declare module 'ioredis' {
@@ -22,8 +22,11 @@ const logger = makeLogger('RedisCache')
  */
 export class RedisCache<T = unknown> implements Cache<T> {
   type = CacheTypes.Redis
+  private localCache: LocalCache
 
-  constructor(private client: Redis) {
+  constructor(private client: Redis, localCacheCapacity: number) {
+    // Local cache is used for fast reads. Every SET to redis also sets the value to local cache.
+    this.localCache = new LocalCache(localCacheCapacity)
     this.defineCommands()
   }
 
@@ -49,6 +52,14 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
   async get(key: string): Promise<Readonly<T> | undefined> {
     censorLogs(() => logger.trace(`Getting key ${key}`))
+    // Try to find the entry in the local cache first
+    const localCacheValue = await this.localCache.get(key)
+    if (localCacheValue) {
+      return localCacheValue as T
+    }
+    // If the entry doesn't exist in the local cache, search it in redis.
+    // This is needed since there is a case when EA restarts with cached values in redis.
+    // Those cached values are not in local cache after restart, so we search in redis.
     const value = await this.client.get(key)
 
     // Record get command sent to Redis
@@ -67,6 +78,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
   async delete(key: string): Promise<void> {
     censorLogs(() => logger.trace(`Deleting key ${key}`))
     await this.client.del(key)
+    this.localCache.delete(key)
 
     // Record delete command sent to Redis
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'delete')
@@ -75,6 +87,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
   async set(key: string, value: Readonly<T>, ttl: number): Promise<void> {
     censorLogs(() => logger.trace(`Setting key ${key}`))
     await this.client.setExternalAdapterResponse(key, JSON.stringify(value), ttl)
+    this.localCache.set(key, value, ttl)
 
     // Record set command sent to Redis
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'setExternalAdapterResponse')
@@ -87,6 +100,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
     for (const entry of entries) {
       chain = chain.setExternalAdapterResponse(entry.key, JSON.stringify(entry.value), ttl)
+      this.localCache.set(entry.key, entry.value, ttl)
     }
 
     await chain.exec()
