@@ -77,7 +77,6 @@ jobs:
             | awk -F: '{ print $2 }' \
             | sed 's/[", ]//g')  
           echo "VERSION_TAG=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
-      - run: yarn generate-ref-tables
       - name: Create commit
         id: create-commit
         if: inputs.dry-run != 'true' && ${{ steps.tick-version.outputs.VERSION_TAG != '' }}
