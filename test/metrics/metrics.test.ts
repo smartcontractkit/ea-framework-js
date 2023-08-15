@@ -168,7 +168,7 @@ test.serial('test basic metrics', async (t) => {
   // Test http request payload size
   metrics.assert(t, {
     name: 'request_payload_size_sum',
-    expectedValue: 34
+    expectedValue: 34,
   })
   // Test data provider requests metrics
   metrics.assert(t, {

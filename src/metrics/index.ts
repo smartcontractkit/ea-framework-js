@@ -220,7 +220,7 @@ export const metrics = new Metrics(() => ({
   requestPayloadSize: new client.Histogram({
     name: 'request_payload_size',
     help: 'A histogram bucket of the distribution of incoming request payload size',
-    buckets: [100, 500, 1000, 2000, 5000]
+    buckets: [100, 500, 1000, 2000, 5000],
   }),
   bgExecuteSubscriptionSetCount: new client.Gauge({
     name: 'bg_execute_subscription_set_count',

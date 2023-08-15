@@ -155,14 +155,20 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
     super(params)
   }
 
-  override async handleRequest(req: AdapterRequest<EmptyInputParameters>, replySent: Promise<unknown>): Promise<Readonly<AdapterResponse>> {
-    const endpoint = this.endpoints.find(e => e.name === req.requestContext.endpointName)
+  override async handleRequest(
+    req: AdapterRequest<EmptyInputParameters>,
+    replySent: Promise<unknown>,
+  ): Promise<Readonly<AdapterResponse>> {
+    const endpoint = this.endpoints.find((e) => e.name === req.requestContext.endpointName)
 
     if (endpoint instanceof PoRBalanceEndpoint) {
-      const data = req.requestContext.data as {addresses: {address: string}[]}
+      const data = req.requestContext.data as { addresses: { address: string }[] }
       if (data && data.addresses && Array.isArray(data.addresses)) {
         const feedId = req.requestContext?.meta?.metrics?.feedId || 'N/A'
-        metrics.get('porBalanceAddressLength').labels({feed_id: feedId}).inc(data.addresses.length)
+        metrics
+          .get('porBalanceAddressLength')
+          .labels({ feed_id: feedId })
+          .inc(data.addresses.length)
       }
     }
     return super.handleRequest(req, replySent)
