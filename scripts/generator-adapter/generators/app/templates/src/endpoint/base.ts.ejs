@@ -12,12 +12,7 @@ export const inputParameters = new InputParameters({
     type: 'string',
     description: 'The symbol of the currency to convert to',
   },
-}, [
-  {
-    base: 'ETH',
-    quote: 'BTC'
-  }
-])
+})
 <% if (includeComments) { %>// Endpoints contain a type parameter that allows specifying relevant types of an endpoint, for example, request payload type, Adapter response type and Adapter configuration (environment variables) type<% } %>
 export type BaseEndpointTypes = {
   Parameters: typeof inputParameters.definition
