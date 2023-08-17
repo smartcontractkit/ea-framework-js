@@ -3,7 +3,9 @@ import { AdapterEndpoint } from './endpoint'
 import { AdapterConfig, SettingsDefinitionMap } from '../config'
 import { Adapter } from './basic'
 import { AdapterParams } from './types'
-import { InputParametersDefinition } from '../validation/input-params'
+import { EmptyInputParameters, InputParametersDefinition } from '../validation/input-params'
+import { AdapterRequest, AdapterResponse } from '../util'
+import { metrics } from '../metrics'
 
 export type PoRAddress = Record<string, unknown> & {
   network: string
@@ -151,5 +153,24 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
     }
 
     super(params)
+  }
+
+  override async handleRequest(
+    req: AdapterRequest<EmptyInputParameters>,
+    replySent: Promise<unknown>,
+  ): Promise<Readonly<AdapterResponse>> {
+    const endpoint = this.endpoints.find((e) => e.name === req.requestContext.endpointName)
+
+    if (endpoint instanceof PoRBalanceEndpoint) {
+      const data = req.requestContext.data as { addresses: { address: string }[] }
+      if (data && data.addresses && Array.isArray(data.addresses)) {
+        const feedId = req.requestContext?.meta?.metrics?.feedId || 'N/A'
+        metrics
+          .get('porBalanceAddressLength')
+          .labels({ feed_id: feedId })
+          .set(data.addresses.length)
+      }
+    }
+    return super.handleRequest(req, replySent)
   }
 }
