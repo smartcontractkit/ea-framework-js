@@ -378,7 +378,7 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
 
   params: ProcessedParam[]
 
-  constructor(public definition: T) {
+  constructor(public definition: T, public examples?: TypeFromDefinition<T>[]) {
     this.params = Object.entries(this.definition).map(
       ([name, param]) => new ProcessedParam(name, param),
     )
