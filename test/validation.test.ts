@@ -790,32 +790,39 @@ test.serial('examples in input parameters', async (t) => {
       type: 'string',
       description: 'stuff',
       required: true,
-    }
+    },
   })
 
   t.is(inputParameters.examples, undefined)
 
-  const inputParametersWithExamples = new InputParameters({
-    base: {
-      type: 'string',
-      array: true,
-      description: 'stuff',
-      required: true,
+  const inputParametersWithExamples = new InputParameters(
+    {
+      base: {
+        type: 'string',
+        array: true,
+        description: 'stuff',
+        required: true,
+      },
+      quote: {
+        type: 'number',
+        description: 'stuff',
+        required: true,
+      },
     },
-    quote: {
-      type: 'number',
-      description: 'stuff',
-      required: true,
-    }
-  }, [{
-    base: ['1', '2', '3'],
-    quote: 2
-  }])
+    [
+      {
+        base: ['1', '2', '3'],
+        quote: 2,
+      },
+    ],
+  )
 
-  t.deepEqual(inputParametersWithExamples.examples, [{
-    base: ['1', '2', '3'],
-    quote: 2
-  }])
+  t.deepEqual(inputParametersWithExamples.examples, [
+    {
+      base: ['1', '2', '3'],
+      quote: 2,
+    },
+  ])
 })
 
 test.serial('limit size of input parameters', async (t) => {
