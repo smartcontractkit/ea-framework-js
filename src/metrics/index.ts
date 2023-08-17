@@ -343,7 +343,7 @@ export const metrics = new Metrics(() => ({
     help: 'The number of data provider credits the adapter is consuming',
     labelNames: ['participant_id', 'feed_id'] as const,
   }),
-  porBalanceAddressLength: new client.Counter({
+  porBalanceAddressLength: new client.Gauge({
     name: 'por_balance_address_length',
     help: 'The number of addresses in PoR request input parameters',
     labelNames: ['feed_id'] as const,

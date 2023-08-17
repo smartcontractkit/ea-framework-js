@@ -168,7 +168,7 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
         metrics
           .get('porBalanceAddressLength')
           .labels({ feed_id: feedId })
-          .inc(data.addresses.length)
+          .set(data.addresses.length)
       }
     }
     return super.handleRequest(req, replySent)
