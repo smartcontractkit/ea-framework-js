@@ -42,7 +42,7 @@ test.before(async (t) => {
     ],
   })
 
-  const cache = new RedisCache(new RedisMock() as unknown as Redis) // Fake redis
+  const cache = new RedisCache(new RedisMock() as unknown as Redis, 10000) // Fake redis
   const dependencies: Partial<AdapterDependencies> = {
     cache,
   }

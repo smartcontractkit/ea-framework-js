@@ -76,6 +76,9 @@ export const buildMetricsMiddleware = (
   // Record response time of request through entire EA
   metrics.get('httpRequestDurationSeconds').observe(res.getResponseTime() / 1000)
   censorLogs(() => logger.debug(`Response time for ${feedId}: ${res.getResponseTime()}ms`))
+
+  const requestSize = Buffer.byteLength(JSON.stringify(req.body))
+  metrics.get('requestPayloadSize').observe(requestSize)
   done()
 }
 
@@ -214,6 +217,11 @@ export const metrics = new Metrics(() => ({
     name: 'requester_queue_overflow',
     help: 'Total times the requester queue replaced the oldest item to avoid an overflow',
   }),
+  requestPayloadSize: new client.Histogram({
+    name: 'request_payload_size',
+    help: 'A histogram bucket of the distribution of incoming request payload size',
+    buckets: [100, 500, 1000, 2000, 5000],
+  }),
   bgExecuteSubscriptionSetCount: new client.Gauge({
     name: 'bg_execute_subscription_set_count',
     help: 'The number of active subscriptions in background execute',
@@ -334,5 +342,10 @@ export const metrics = new Metrics(() => ({
     name: 'rate_limit_credits_spent_total',
     help: 'The number of data provider credits the adapter is consuming',
     labelNames: ['participant_id', 'feed_id'] as const,
+  }),
+  porBalanceAddressLength: new client.Gauge({
+    name: 'por_balance_address_length',
+    help: 'The number of addresses in PoR request input parameters',
+    labelNames: ['feed_id'] as const,
   }),
 }))
