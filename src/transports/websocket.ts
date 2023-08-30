@@ -42,7 +42,10 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
   ) => Promise<string> | string
 
   /** Optional parameters used when establishing the WebSocket connection */
-  options?: (context: EndpointContext<T>) => Promise<ClientOptions> | ClientOptions
+  options?: (
+    context: EndpointContext<T>,
+    desiredSubs: TypeFromDefinition<T['Parameters']>[],
+  ) => Promise<ClientOptions> | ClientOptions
 
   /** Map of handlers for different WS lifecycle events */
   handlers: {
@@ -354,7 +357,8 @@ export class WebSocketTransport<
     // Check if we need to open a new connection
     if (connectionClosed && subscriptions.desired.length) {
       logger.debug('No established connection and new subscriptions available, connecting to WS')
-      const options = this.config.options && (await this.config.options(context))
+      const options =
+        this.config.options && (await this.config.options(context, subscriptions.desired))
       this.currentUrl = urlFromConfig
       // Need to write this now, otherwise there could be messages sent with values before the open handler finishes
       this.providerDataStreamEstablished = Date.now()
