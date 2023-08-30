@@ -1,4 +1,4 @@
-<% if (includeComments) { %>// Input parameters define the structure of the request expected by the endpoint.<% } %>
+<% if (includeComments) { %>// Input parameters define the structure of the request expected by the endpoint. The second parameter defines example input data that will be used in EA readme<% } %>
 export const inputParameters = new InputParameters({
   base: {
     aliases: ['from', 'coin', 'symbol', 'market'],
@@ -12,7 +12,12 @@ export const inputParameters = new InputParameters({
     type: 'string',
     description: 'The symbol of the currency to convert to',
   },
-})
+}, [
+    {
+      base: 'BTC',
+      quote: 'USD'
+    }
+])
 <% if (includeComments) { %>// Endpoints contain a type parameter that allows specifying relevant types of an endpoint, for example, request payload type, Adapter response type and Adapter configuration (environment variables) type<% } %>
 export type BaseEndpointTypes = {
   Parameters: typeof inputParameters.definition
