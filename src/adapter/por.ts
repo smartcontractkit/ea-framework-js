@@ -129,7 +129,13 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
     if (!params.config) {
       params.config = new AdapterConfig(
         {},
-        { envDefaultOverrides: { BACKGROUND_EXECUTE_TIMEOUT: 180_000, API_TIMEOUT: 60_000 } },
+        {
+          envDefaultOverrides: {
+            BACKGROUND_EXECUTE_TIMEOUT: 180_000,
+            API_TIMEOUT: 60_000,
+            CACHE_MAX_AGE: 360_000,
+          },
+        },
       ) as AdapterConfig<T>
     } else {
       params.config.options = {
@@ -139,6 +145,7 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
           BACKGROUND_EXECUTE_TIMEOUT:
             params.config.options?.envDefaultOverrides?.BACKGROUND_EXECUTE_TIMEOUT ?? 180_000,
           API_TIMEOUT: params.config.options?.envDefaultOverrides?.API_TIMEOUT ?? 60_000,
+          CACHE_MAX_AGE: params.config.options?.envDefaultOverrides?.CACHE_MAX_AGE ?? 360_000,
         },
       }
     }
