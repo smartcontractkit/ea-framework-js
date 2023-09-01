@@ -62,4 +62,3 @@ export class LwbaEndpoint<T extends LwbaEndpointGenerics> extends AdapterEndpoin
     super(params)
   }
 }
-
