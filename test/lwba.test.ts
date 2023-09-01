@@ -1,7 +1,12 @@
 import { NopTransport, TestAdapter } from '../src/util/testing-utils'
 import untypedTest, { TestFn } from 'ava'
 import { InputParameters } from '../src/validation'
-import { DEFAULT_LWBA_ALIASES, LwbaEndpoint, LwbaEndpointGenerics, lwbaEndpointInputParametersDefinition } from '../src/adapter'
+import {
+  DEFAULT_LWBA_ALIASES,
+  LwbaEndpoint,
+  LwbaEndpointGenerics,
+  lwbaEndpointInputParametersDefinition,
+} from '../src/adapter'
 
 type TestContext = {
   testAdapter: TestAdapter
