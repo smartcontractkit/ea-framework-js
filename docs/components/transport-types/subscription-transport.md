@@ -1,14 +1,14 @@
 # Subscription Transport
 
-The `SubscriptionTransport` is an **abstract transport** (class) that serves as the foundation for implementing subscription-based transports. It handles incoming requests, adds them to a subscription set, and provides those entries to a background handler method. This class is intended to be extended by specific transport implementations. 
+The `SubscriptionTransport` is an **abstract transport** (class) that serves as the foundation for implementing subscription-based transports. It handles incoming requests, adds them to a subscription set, and provides those entries to a background handler method. This class is intended to be extended by specific transport implementations.
 
 All incoming requests to the adapter for an endpoint that uses subscription-based transport are stored in a cached set (`SubscriptionSet`).
 Periodically, the background execute loop of the adapter will read the entire subscription set and call the `backgroundHandler` method of the transport.
 
-`SubscriptionTransport` has two abstract methods that should be implemented by subclasses. 
+`SubscriptionTransport` has two abstract methods that should be implemented by subclasses.
+
 1. `backgroundHandler` is called on each background execution iteration. It receives endpoint context as first argument and an array of all the entries in the subscription set as second argument. Sub-transport logic should be defined in this method.
 2. `getSubscriptionTtlFromConfig` receives adapter settings and should return time-to-live (TTL) value for subscription set.
-
 
 ## Example implementation of SubscriptionTransport
 
@@ -19,7 +19,7 @@ export class AddressTransport extends SubscriptionTransport<AddressTransportType
   // JsonRpcProvider provider instance to be used for contract calls in this example
   provider!: ethers.providers.JsonRpcProvider
 
-  // Initialize the transport with necessary dependencies, adapter settings, endpoint name, and a transport name. 
+  // Initialize the transport with necessary dependencies, adapter settings, endpoint name, and a transport name.
   // You can initialize additional properties here as well, like in this case `this.provider`
   async initialize(
     dependencies: TransportDependencies<AddressTransportTypes>,
@@ -29,7 +29,7 @@ export class AddressTransport extends SubscriptionTransport<AddressTransportType
   ): Promise<void> {
     // when initializing additional properties don't forget to call super.initialize()
     await super.initialize(dependencies, adapterSettings, endpointName, transportName)
-  
+
     this.provider = new ethers.providers.JsonRpcProvider(
       adapterSettings.RPC_URL,
       adapterSettings.CHAIN_ID,
@@ -47,7 +47,7 @@ export class AddressTransport extends SubscriptionTransport<AddressTransportType
     await sleep(context.adapterSettings.BACKGROUND_EXECUTE_MS)
   }
 
-  // helper method that takes params in subscription set, cocnstructs and saves a response object into a cache. 
+  // helper method that takes params in subscription set, cocnstructs and saves a response object into a cache.
   private async handleRequest(param: RequestParams) {
     let response: AdapterResponse<BaseEndpointTypes['Response']>
     try {
@@ -72,7 +72,7 @@ export class AddressTransport extends SubscriptionTransport<AddressTransportType
   private async _handleRequest(
     param: RequestParams,
   ): Promise<AdapterResponse<AddressTransportTypes['Response']>> {
-    const {  contractAddress } = param
+    const { contractAddress } = param
     const contract = new ethers.Contract(contractAddress, ABI, this.provider)
 
     const providerDataRequestedUnixMs = Date.now()
@@ -99,6 +99,4 @@ export class AddressTransport extends SubscriptionTransport<AddressTransportType
 }
 ```
 
-
 Another example of `SubscriptionTransport` is built-in [HTTP Transport](./http-transport.md).
-
