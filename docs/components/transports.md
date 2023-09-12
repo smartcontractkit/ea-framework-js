@@ -15,7 +15,6 @@ The v3 framework provides transports to fetch data from a Provider using the com
 - [SSE Transport](./transport-types/sse-transport.md)
 - [Custom Transport](./transport-types/custom-transport.md)
 
-
 ### Abstract Transports
 
 If you find that the built-in features of a transport do not meet your endpoint's requirements, you can define a custom transport extending one of the abstract transports or existing basic ones to include the custom functionality yourself.
