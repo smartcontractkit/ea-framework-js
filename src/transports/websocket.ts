@@ -469,7 +469,9 @@ export class WebsocketReverseMappingTransport<
   }
 }
 
-export class UrlSubscriptionWebsocketTransport<T extends WebsocketTransportGenerics> extends WebSocketTransport<T> {
+export class UrlSubscriptionWebsocketTransport<
+  T extends WebsocketTransportGenerics,
+> extends WebSocketTransport<T> {
   constructor(config: WebSocketTransportConfig<T>) {
     super(config)
     this.isUrlSubscriptionWebsocket = true
