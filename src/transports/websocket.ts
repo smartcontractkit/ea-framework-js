@@ -129,6 +129,7 @@ export class WebSocketTransport<
   currentUrl = ''
   lastMessageReceivedAt = 0
   connectionOpenedAt = 0
+  isUrlSubscriptionWebsocket = false
 
   constructor(private config: WebSocketTransportConfig<T>) {
     super()
@@ -329,7 +330,8 @@ export class WebSocketTransport<
       const reason = urlChanged
         ? `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`
         : `Last message was received ${timeSinceLastMessage} ago, exceeding the threshold of ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}ms, closing connection...`
-      censorLogs(() => logger.info(reason))
+      const logfn = urlChanged && this.isUrlSubscriptionWebsocket ? logger.debug : logger.info
+      censorLogs(() => logfn(reason))
 
       // Check if connection was opened very recently; if so, wait a bit before continuing.
       // This is so if we just opened the connection and are waiting to receive some messages,
@@ -464,5 +466,12 @@ export class WebsocketReverseMappingTransport<
    */
   getReverseMapping(value: K): TypeFromDefinition<T['Parameters']> | undefined {
     return this.requestMapping.get(value)
+  }
+}
+
+export class UrlSubscriptionWebsocketTransport<T extends WebsocketTransportGenerics> extends WebSocketTransport<T> {
+  constructor(config: WebSocketTransportConfig<T>) {
+    super(config)
+    this.isUrlSubscriptionWebsocket = true
   }
 }
