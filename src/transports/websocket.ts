@@ -129,7 +129,6 @@ export class WebSocketTransport<
   currentUrl = ''
   lastMessageReceivedAt = 0
   connectionOpenedAt = 0
-  isUrlSubscriptionWebsocket = false
 
   constructor(private config: WebSocketTransportConfig<T>) {
     super()
