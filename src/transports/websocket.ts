@@ -326,10 +326,19 @@ export class WebSocketTransport<
 
     // Check if we should close the current connection
     if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
-      const reason = urlChanged
-        ? `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`
-        : `Last message was received ${timeSinceLastMessage} ago, exceeding the threshold of ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}ms, closing connection...`
-      censorLogs(() => logger.info(reason))
+      if (urlChanged) {
+        censorLogs(() =>
+          logger.debug(
+            `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`,
+          ),
+        )
+      } else {
+        censorLogs(() =>
+          logger.info(
+            `Last message was received ${timeSinceLastMessage} ago, exceeding the threshold of ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}ms, closing connection...`,
+          ),
+        )
+      }
 
       // Check if connection was opened very recently; if so, wait a bit before continuing.
       // This is so if we just opened the connection and are waiting to receive some messages,
