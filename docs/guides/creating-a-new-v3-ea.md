@@ -7,7 +7,7 @@ This guide carries stylistic biases, mainly in the context of the collection of 
 ## Creating A New Adapter
 
 The framework provides an interactive EA generator script to help create new adapters.
-To create a new adapter in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js) run `yarn generate-v3-adapter`. It will ask several questions regarding adapter and endpoints and will generate the file structure with all the boilerplate code.
+To create a new adapter in the [External Adapters Monorepo](https://github.com/smartcontractkit/external-adapters-js) run `yarn new`. It will ask several questions regarding adapter and endpoints and will generate the file structure with all the boilerplate code.
 
 ## Steps to create a new Adapter manually
 

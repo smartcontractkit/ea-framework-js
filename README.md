@@ -40,6 +40,8 @@ yarn # Install yarn dependencies
     - [HTTP](./docs/components/transport-types/http-transport.md)
     - [WebSocket](./docs/components/transport-types/websocket-transport.md)
     - [SSE](./docs/components/transport-types/sse-transport.md)
+    - [Subscription](./docs/components/transport-types/subscription-transport.md)
+    - [Streaming](./docs/components/transport-types/streaming-transport.md)
     - [Custom](./docs/components/transport-types/custom-transport.md)
 - Guides
   - [Porting a v2 EA to v3](./docs/guides/porting-a-v2-ea-to-v3.md)
