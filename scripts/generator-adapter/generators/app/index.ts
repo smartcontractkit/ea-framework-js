@@ -129,11 +129,7 @@ module.exports = class extends Generator<{rootPath: string}> {
       this.props
     )
 
-    // Copy config
-    this.fs.copy(
-      this.templatePath('src/config/index.ts'),
-      this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/config/index.ts`),
-    )
+    // Copy overrides
     this.fs.copyTpl(
       this.templatePath('src/config/overrides.json'),
       this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/config/overrides.json`),
@@ -192,25 +188,32 @@ module.exports = class extends Generator<{rootPath: string}> {
       { endpoints: Object.values(this.props.endpoints) },
     )
 
-
-    // Create test files
     const httpEndpoints = Object.values(this.props.endpoints).filter((e: GeneratorEndpointContext) => e.inputTransports.some(t => t.type === 'http'))
     const wsEndpoints = Object.values(this.props.endpoints).filter((e: GeneratorEndpointContext) => e.inputTransports.some(t => t.type === 'ws'))
-    const customEndpoints = Object.values(this.props.endpoints).filter((e: GeneratorEndpointContext) => e.inputTransports.some(t => t.type === 'custom'))
+    const customFgEndpoints = Object.values(this.props.endpoints).filter((e: GeneratorEndpointContext) => e.inputTransports.some(t => t.type === 'customfg'))
+    const customBgEndpoints = Object.values(this.props.endpoints).filter((e: GeneratorEndpointContext) => e.inputTransports.some(t => t.type === 'custombg'))
 
+    // Copy config
+    this.fs.copyTpl(
+      this.templatePath('src/config/index.ts.ejs'),
+      this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/config/index.ts`),
+      {setBgExecuteMsEnv: customBgEndpoints.length}
+    )
+
+    // Create test files
     // Create adapter.test.ts if there is at least one endpoint with httpTransport
     if (httpEndpoints.length) {
       this.fs.copyTpl(
         this.templatePath(`test/adapter.test.ts.ejs`),
         this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/adapter.test.ts`),
-        { endpoints: httpEndpoints, transportName: 'rest' },
+        { endpoints: httpEndpoints, transportName: 'rest', setBgExecuteMsEnv: false },
       )
     }
 
     // Create adapter.test.ts or adapter-ws.test.ts if there is at least one endpoint with wsTransport
     if (wsEndpoints.length) {
       let fileName = 'adapter.test.ts'
-      if (httpEndpoints.length || customEndpoints.length) {
+      if (httpEndpoints.length || customFgEndpoints.length || customBgEndpoints.length) {
         fileName = 'adapter-ws.test.ts'
       }
       this.fs.copyTpl(
@@ -224,15 +227,26 @@ module.exports = class extends Generator<{rootPath: string}> {
     // Custom transport integration tests use the same template as http, but in separate file. This is not ideal
     // since the setup is the same (usually) and we could have just another test describe block, but at least this is
     // consistent behavior as each transport-specific test is in its own file.
-    if (customEndpoints.length) {
+    if (customFgEndpoints.length) {
       let fileName = 'adapter.test.ts'
       if (httpEndpoints.length || wsEndpoints.length) {
-        fileName = 'adapter-custom.test.ts'
+        fileName = 'adapter-custom-fg.test.ts'
       }
       this.fs.copyTpl(
         this.templatePath(`test/adapter.test.ts.ejs`),
         this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/${fileName}`),
-        { endpoints: customEndpoints, transportName: 'custom' },
+        { endpoints: customFgEndpoints, transportName: 'customfg', setBgExecuteMsEnv: false },
+      )
+    }
+    if (customBgEndpoints.length) {
+      let fileName = 'adapter.test.ts'
+      if (httpEndpoints.length || wsEndpoints.length || customFgEndpoints.length) {
+        fileName = 'adapter-custom-bg.test.ts'
+      }
+      this.fs.copyTpl(
+        this.templatePath(`test/adapter.test.ts.ejs`),
+        this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/${fileName}`),
+        { endpoints: customBgEndpoints, transportName: 'custombg', setBgExecuteMsEnv: true },
       )
     }
 
@@ -242,7 +256,7 @@ module.exports = class extends Generator<{rootPath: string}> {
       this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/fixtures.ts`),
       {
         includeWsFixtures: wsEndpoints.length > 0,
-        includeHttpFixtures: httpEndpoints.length > 0 || customEndpoints.length > 0,
+        includeHttpFixtures: httpEndpoints.length > 0 || customBgEndpoints.length > 0 || customFgEndpoints.length > 0,
       },
     )
 
@@ -383,7 +397,10 @@ module.exports = class extends Generator<{rootPath: string}> {
   private async _promptTransports(inputEndpointName: string): Promise<InputTransport[]> {
     if (this.promptDisabled) {
       return [
-        {type: 'http',  name: 'httpTransport'}, { type: 'ws', name: 'wsTransport' }, {type: 'custom', name: 'customTransport',}
+        {type: 'http',  name: 'httpTransport'},
+        { type: 'ws', name: 'wsTransport' },
+        {type: 'customfg' , name: 'customTransport'},
+        {type: 'custombg', name: 'customSubscriptionTransport'}
       ]
     }
     const { inputTransports } = await this.prompt<{ inputTransports: InputTransport[] }>({
@@ -407,9 +424,16 @@ module.exports = class extends Generator<{rootPath: string}> {
           },
         },
         {
-          name: 'Custom',
+          name: 'Custom (subscription based)',
           value: {
-            type: 'custom',
+            type: 'custombg',
+            name: 'customSubscriptionTransport',
+          },
+        },
+        {
+          name: 'Custom (simple)',
+          value: {
+            type: 'customfg',
             name: 'customTransport',
           },
 
