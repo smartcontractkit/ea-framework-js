@@ -9,7 +9,7 @@ export const adapter = new Adapter({
 <% } -%><%= ' ' %> defaultEndpoint: <%= defaultEndpoint.normalizedEndpointName %>.name,
 <% if (includeComments) { -%>
   // Adapter name
-<% } -%><%= ' ' %> name: '<%= adapterName.toUpperCase() %>',
+<% } -%><%= ' ' %> name: '<%= adapterName.toUpperCase().replace('-', '_') %>',
 <% if (includeComments) { -%>
   // Adapter configuration (environment variables)
 <% } -%><%= ' ' %> config,
