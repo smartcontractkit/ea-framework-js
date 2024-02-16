@@ -131,7 +131,7 @@ export class RedisCache<T = unknown> implements Cache<T> {
     this.localCache.setTTL(key, ttl)
 
     // Record set command sent to Redis
-    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'updateTTL')
+    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'setTTL')
   }
 
   async lock(
