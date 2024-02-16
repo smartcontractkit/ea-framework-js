@@ -1,8 +1,9 @@
+import FakeTimers from '@sinonjs/fake-timers'
 import Redis from 'ioredis'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { CacheFactory, RedisCache } from '../../src/cache'
 import { AdapterConfig } from '../../src/config'
-import { NopTransport, RedisMock, TestAdapter } from '../../src/util/testing-utils'
+import { NopTransport, RedisMock, runAllUntilTime, TestAdapter } from '../../src/util/testing-utils'
 import {
   BasicCacheSetterTransport,
   buildDiffResultAdapter,
@@ -188,4 +189,22 @@ test.serial('Test cache key collision across adapters', async (t) => {
   t.is(cacheResponseA.statusCode, 200)
   t.is(cacheResponseB.statusCode, 200)
   t.not(cacheResponseA.json().result, cacheResponseB.json().result)
+})
+
+test.serial('Test setting ttl for a cached value', async (t) => {
+  const cache = new RedisCache(new RedisMock() as unknown as Redis, 10000)
+  const cacheKey = 'k'
+  const cacheValue = 'v'
+  const clock = FakeTimers.install()
+
+  await cache.set(cacheKey, cacheValue, 10000)
+  await cache.setTTL(cacheKey, 20000)
+  await runAllUntilTime(clock, 15000)
+  let value = await cache.get(cacheKey)
+  t.is(value, cacheValue)
+  // Advance the clock an additional 6000 ms so that cache expires
+  await runAllUntilTime(clock, 6000)
+  value = await cache.get(cacheKey)
+  t.is(value, undefined)
+  clock.uninstall()
 })

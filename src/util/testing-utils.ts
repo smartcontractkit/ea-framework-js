@@ -159,6 +159,10 @@ export class RedisMock {
     }
   }
 
+  pexpire() {
+    return
+  }
+
   // For cache lock tests - naive implementation as the necessary error will
   // already have been thrown and the test will end the process
   quit() {

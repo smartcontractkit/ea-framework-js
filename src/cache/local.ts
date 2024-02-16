@@ -108,6 +108,23 @@ export class LocalCache<T = unknown> implements Cache<T> {
     }
   }
 
+  async setTTL(key: string, ttl: number):  Promise<void> {
+    censorLogs(() => logger.trace(`Updating key ${key} with a new ttl ${ttl}`))
+    if (this.cache.has(key)) {
+      const node = this.cache.get(key) as LinkedListNode<LocalCacheEntry<T>>
+      const isCacheExpired = node.data.expirationTimestamp <= Date.now()
+      if (isCacheExpired) {
+        return this.delete(key)
+      }
+      node.data = {
+        ...node.data,
+        expirationTimestamp: Date.now() + ttl,
+      }
+      // When ttl is updated, we move the node to the end of the list as we keep recently updated entries there
+      this.moveToTail(node)
+    }
+  }
+
   private evictIfNeeded() {
     if (this.list.size >= this.capacity) {
       logger.warn(`Cache list reached maximum capacity, evicting least recently updated entry`)

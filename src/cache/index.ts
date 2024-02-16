@@ -62,6 +62,15 @@ export interface Cache<T = unknown> {
   delete: (key: string) => Promise<void>
 
   /**
+   * Updates the TTL value for an entry
+   *
+   * @param key - the key of the entry to be updated
+   * @param ttl - a new time in milliseconds until the entry expires
+   * @returns an empty Promise that resolves when the entry has been updated
+   */
+  setTTL: (key: string, ttl: number) => Promise<void>
+
+  /**
    * Sets a lock on the Cache.
    *
    * @param key - the key used to identify the lock, composed of the cache prefix (if set) and adapter name
