@@ -108,7 +108,7 @@ export class LocalCache<T = unknown> implements Cache<T> {
     }
   }
 
-  async setTTL(key: string, ttl: number):  Promise<void> {
+  async setTTL(key: string, ttl: number): Promise<void> {
     censorLogs(() => logger.trace(`Updating key ${key} with a new ttl ${ttl}`))
     if (this.cache.has(key)) {
       const node = this.cache.get(key) as LinkedListNode<LocalCacheEntry<T>>
