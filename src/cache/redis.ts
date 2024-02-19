@@ -125,6 +125,15 @@ export class RedisCache<T = unknown> implements Cache<T> {
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'exec')
   }
 
+  async setTTL(key: string, ttl: number): Promise<void> {
+    censorLogs(() => logger.trace(`Updating key ${key} with a new ttl ${ttl}`))
+    await this.client.pexpire(key, ttl)
+    this.localCache.setTTL(key, ttl)
+
+    // Record set command sent to Redis
+    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'setTTL')
+  }
+
   async lock(
     key: string,
     cacheLockDuration: number,

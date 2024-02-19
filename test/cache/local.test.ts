@@ -114,3 +114,22 @@ test.serial('error responses are not overwriting successful cache entries', asyn
   const value4 = await cache.get(cacheKey)
   t.is(value4, errorResponse2)
 })
+
+test.serial('Test setting ttl for a cached value', async (t) => {
+  const cache = CacheFactory.buildCache({
+    cacheType: 'local',
+    maxSizeForLocalCache: 10000,
+  }) as LocalCache<PartialAdapterResponse>
+  const cacheKey = 'KEY'
+  const response = { result: 1, data: { result: 1 } }
+
+  await cache.set(cacheKey, response, 10000)
+  await cache.setTTL(cacheKey, 20000)
+  await runAllUntilTime(t.context.clock, 15000)
+  let value = await cache.get(cacheKey)
+  t.is(value, response)
+  // Advance the clock an additional 6000 ms so that cache expires
+  await runAllUntilTime(t.context.clock, 6000)
+  value = await cache.get(cacheKey)
+  t.is(value, undefined)
+})
