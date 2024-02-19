@@ -62,7 +62,7 @@ yarn test
 
 ### Automatic
 
-The normal flow for publishing a release is through a series o GitHub actions that are triggered when a PR is closed by merging with the base branch. Full details about our workflows can be found in [./.github/WORKFLOW-README.MD]. A summary of our publish workflow follows:
+The normal flow for publishing a release is through a series o GitHub actions that are triggered when a PR is closed by merging with the base branch. Full details about our workflows can be found in [docs](./docs/github_workflows.md). A summary of our publish workflow follows:
 
 1. Close a PR containing your changes
 2. If the PR was merged and if it contains a version label instruction (patch, minor, major, none), a new PR will be created that contains the result of running `npm version LABEL` on main with the original PR author assigned as a reviewer.

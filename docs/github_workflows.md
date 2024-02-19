@@ -106,7 +106,7 @@ This job is responsible for creating a new pull request with a version bump comm
 
 ### [publish](../.github/workflows/publish.yaml)
 
-The publish workflow is used to publish an NPM package when changes (version-bump pull requests) are pushed to the main branch and the package.json file is updated.
+The publish workflow is used to publish an NPM package when changes (version-bump pull requests) are pushed to the main branch and the package.json file is updated. **Requires an engineer to approve the use of production credentials.**
 The workflow ensures that the current package version is different from the previously published version before initiating the publishing process.
 
 #### Trigger Events
