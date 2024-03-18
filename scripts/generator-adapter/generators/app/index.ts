@@ -264,8 +264,8 @@ module.exports = class extends Generator<{rootPath: string}> {
     const pkgJson = {
       devDependencies: {
         '@types/jest': '27.5.2',
-        '@types/node': '16.11.51',
-        nock: '13.2.9',
+        '@types/node': '16.11.68',
+        nock: '13.5.4',
         typescript: '5.0.4',
       },
       dependencies: {
@@ -278,7 +278,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     // If EA has websocket transports add additional packages for tests.
     if (wsEndpoints.length) {
       pkgJson.devDependencies['@sinonjs/fake-timers'] = '9.1.2'
-      pkgJson.devDependencies['@types/sinonjs__fake-timers'] = '8.1.2'
+      pkgJson.devDependencies['@types/sinonjs__fake-timers'] = '8.1.5'
     }
 
     // If the generator is in standalone mode, add additional packages and a script for running the tests with jest
