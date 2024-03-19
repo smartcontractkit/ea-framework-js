@@ -196,7 +196,7 @@ export class WebSocketTransport<
       // Called when an error is thrown by the connection
       error: async (event: WebSocket.ErrorEvent) => {
         censorLogs(() =>
-          logger.debug(
+          logger.warn(
             `Error occurred in web socket connection. Error: ${event.error} ; Message: ${event.message}`,
           ),
         )
