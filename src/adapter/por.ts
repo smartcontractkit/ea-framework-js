@@ -134,7 +134,9 @@ export type PoRProviderEndpointGenerics = TransportGenerics & {
  * A PoRProviderEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, the response type must be `PoRProviderResponse`.
  */
-export class PoRProviderEndpoint<T extends PoRProviderEndpointGenerics> extends AdapterEndpoint<T> {}
+export class PoRProviderEndpoint<
+  T extends PoRProviderEndpointGenerics,
+> extends AdapterEndpoint<T> {}
 
 /**
  * A PoRAdapter is a specific kind of Adapter that includes at least one PoRTotalBalanceEndpoint,
