@@ -7,6 +7,14 @@ import { EmptyInputParameters, InputParametersDefinition } from '../validation/i
 import { AdapterRequest, AdapterResponse } from '../util'
 import { metrics } from '../metrics'
 
+export type PoRProviderResponse = {
+  Result: number
+  Data: {
+    result: number
+    ripcord: boolean
+  }
+}
+
 export type PoRAddress = Record<string, unknown> & {
   network: string
   chainId: string
@@ -118,9 +126,21 @@ export class PoRTotalBalanceEndpoint<
   T extends PoRTotalBalanceEndpointGenerics,
 > extends AdapterEndpoint<T> {}
 
+export type PoRProviderEndpointGenerics = TransportGenerics & {
+  Response: PoRProviderResponse
+}
+
+/**
+ * A PoRProviderEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
+ * Data Feeds, the response type must be `PoRProviderResponse`.
+ */
+export class PoRProviderEndpoint<
+  T extends PoRProviderEndpointGenerics,
+> extends AdapterEndpoint<T> {}
+
 /**
  * A PoRAdapter is a specific kind of Adapter that includes at least one PoRTotalBalanceEndpoint,
- * PoRBalanceEndpoint or PoRAddressEndpoint.
+ * PoRBalanceEndpoint, PoRAddressEndpoint or PoRProviderEndpoint.
  */
 export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
   constructor(params: AdapterParams<T>) {
@@ -153,7 +173,8 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
       (e) =>
         e instanceof PoRBalanceEndpoint ||
         e instanceof PoRTotalBalanceEndpoint ||
-        e instanceof PoRAddressEndpoint,
+        e instanceof PoRAddressEndpoint ||
+        e instanceof PoRProviderEndpoint,
     )
     if (!porEndpoints.length) {
       throw new Error(`This PoRAdapter's list of endpoints does not contain a valid PoR endpoint`)
@@ -168,7 +189,7 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
   ): Promise<Readonly<AdapterResponse>> {
     const endpoint = this.endpoints.find((e) => e.name === req.requestContext.endpointName)
 
-    if (endpoint instanceof PoRBalanceEndpoint) {
+    if (endpoint instanceof PoRBalanceEndpoint || endpoint instanceof PoRTotalBalanceEndpoint) {
       const data = req.requestContext.data as { addresses: { address: string }[] }
       if (data && data.addresses && Array.isArray(data.addresses)) {
         const feedId = req.requestContext?.meta?.metrics?.feedId || 'N/A'
