@@ -5,8 +5,8 @@ import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { AdapterConfig, SettingsDefinitionFromConfig } from '../../src/config'
 import { AdapterRequest } from '../../src/util'
 import { TypeFromDefinition } from '../../src/validation/input-params'
-import { NopTransport, TestAdapter, assertEqualResponses } from '../../src/util/testing-utils'
-import { CacheTestTransportTypes } from './helper'
+import { NopTransport, TestAdapter, assertEqualResponses, runAllUntilTime } from '../../src/util/testing-utils'
+import { cacheTestInputParameters, CacheTestTransportTypes } from './helper'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
@@ -129,3 +129,62 @@ test.serial('writes error response when censoring fails', async (t) => {
     statusCode: 502,
   })
 })
+
+test.serial('updates the response cache ttl', async (t) => {
+  process.env['API_KEY'] = apiKey
+  let requestCount = 0
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters: cacheTestInputParameters,
+        transport: new (class extends NopTransport<CacheTestTransportTypes> {
+          override async foregroundExecute(
+            req: AdapterRequest<TypeFromDefinition<CacheTestTransportTypes['Parameters']>>,
+          ): Promise<void> {
+            // Simulating a signal that should update already cached entries
+            if (requestCount === 1) {
+              const entries = [{ base: 'BTC', factor: 10 }]
+              await this.responseCache.writeTTL(this.name, entries, 120_000)
+            }
+
+            if (requestCount === 0 ){
+              await this.responseCache.write(this.name, [
+                {
+                  params: req.requestContext.data,
+                  response: {
+                    data: null,
+                    result: price,
+                    timestamps: {
+                      providerDataRequestedUnixMs: 0,
+                      providerDataReceivedUnixMs: 0,
+                      providerIndicatedTimeUnixMs: undefined,
+                    },
+                  },
+                },
+              ])
+            }
+            requestCount++
+          }
+        })(),
+      }),
+    ],
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+  // First request sets the response in the cache
+  await testAdapter.request({ base: 'BTC', factor: 10 })
+  // On second request we refresh the cache TTL of a response with factor:10, and set it to 120_000
+  await testAdapter.request({base: 'BTC', factor: 11})
+  // Advancing the clock to make sure that the TTL was updated and we get the response
+  await runAllUntilTime(t.context.clock, 110000)
+  const response = await testAdapter.request({base: 'BTC', factor: 10})
+
+  t.is(response.json().statusCode, 200)
+  t.is(response.json().result, 1234)
+
+})
+
