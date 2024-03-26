@@ -11,7 +11,11 @@ import {
   makeLogger,
 } from '../util'
 import CensorList from '../util/censor/censor-list'
-import { InputParameters, InputParametersDefinition } from '../validation/input-params'
+import {
+  InputParameters,
+  InputParametersDefinition,
+  TypeFromDefinition,
+} from '../validation/input-params'
 import { validator } from '../validation/utils'
 import { Cache, calculateCacheKey, calculateFeedId } from './'
 import * as cacheMetrics from './metrics'
@@ -146,5 +150,30 @@ export class ResponseCache<
     }
 
     return
+  }
+
+  /**
+   * Sets a new TTL value for already cached responses in the adapter cache
+   *
+   * @param transportName - transport name
+   * @param params - set of parameters that uniquely relate to the response
+   * @param ttl - a new time in milliseconds until the response expires
+   */
+  async writeTTL(
+    transportName: string,
+    params: TypeFromDefinition<T['Parameters']>[],
+    ttl: number,
+  ): Promise<void> {
+    for (const param of params) {
+      const key = calculateCacheKey({
+        transportName: transportName,
+        data: param,
+        adapterName: this.adapterName,
+        endpointName: this.endpointName,
+        adapterSettings: this.adapterSettings,
+      })
+
+      this.cache.setTTL(key, ttl)
+    }
   }
 }
