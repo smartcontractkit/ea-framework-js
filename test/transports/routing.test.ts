@@ -2,7 +2,7 @@ import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { Server } from 'mock-socket'
-import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
+import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import {
   AdapterConfig,
   SettingsDefinitionFromConfig,
@@ -18,6 +18,8 @@ import {
 } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter, mockWebSocketProvider } from '../../src/util/testing-utils'
+import { AdapterRequest } from '../../src/util'
+import { TypeFromDefinition } from '../../src/validation/input-params'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter<SettingsDefinitionFromConfig<typeof adapterConfig>>
@@ -88,7 +90,7 @@ const inputParameters = new InputParameters({
 })
 
 class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
-  public backgroundExecuteCalls = 0
+  public registerRequestCalls = 0
 
   constructor() {
     super({
@@ -123,9 +125,12 @@ class MockWebSocketTransport extends WebSocketTransport<WebSocketTypes> {
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<WebSocketTypes>): Promise<void> {
-    this.backgroundExecuteCalls++
-    return super.backgroundExecute(context)
+  override async registerRequest(
+    req: AdapterRequest<TypeFromDefinition<WebSocketTypes['Parameters']>>,
+    _: WebSocketTypes['Settings'],
+  ): Promise<void> {
+    this.registerRequestCalls++
+    return super.registerRequest(req, _)
   }
 }
 
@@ -157,9 +162,11 @@ type HttpTypes = BaseEndpointTypes & {
 }
 
 class MockHttpTransport extends HttpTransport<HttpTypes> {
-  backgroundExecuteCalls = 0
+  // Since backgroundExecute always runs for all compatible transports, regardless of the requests,
+  // we check for registered requests
+  registerRequestCalls = 0
 
-  constructor(private callSuper = false) {
+  constructor() {
     super({
       prepareRequests: (params) => {
         return {
@@ -186,11 +193,12 @@ class MockHttpTransport extends HttpTransport<HttpTypes> {
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<HttpTypes>): Promise<void> {
-    this.backgroundExecuteCalls++
-    if (this.callSuper) {
-      super.backgroundExecute(context)
-    }
+  override async registerRequest(
+    req: AdapterRequest<TypeFromDefinition<HttpTypes['Parameters']>>,
+    _: HttpTypes['Settings'],
+  ): Promise<void> {
+    this.registerRequestCalls++
+    return super.registerRequest(req, _)
   }
 }
 
@@ -204,7 +212,7 @@ type SSETypes = BaseEndpointTypes & {
 }
 
 class MockSseTransport extends SseTransport<SSETypes> {
-  public backgroundExecuteCalls = 0
+  public registerRequestCalls = 0
 
   constructor() {
     super({
@@ -251,9 +259,12 @@ class MockSseTransport extends SseTransport<SSETypes> {
     })
   }
 
-  override async backgroundExecute(context: EndpointContext<SSETypes>): Promise<void> {
-    this.backgroundExecuteCalls++
-    return super.backgroundExecute(context)
+  override async registerRequest(
+    req: AdapterRequest<TypeFromDefinition<SSETypes['Parameters']>>,
+    _: SSETypes['Settings'],
+  ): Promise<void> {
+    this.registerRequestCalls++
+    return super.registerRequest(req, _)
   }
 }
 
@@ -299,6 +310,14 @@ test.beforeEach(async (t) => {
   }
 })
 
+test.afterEach(() => {
+  ;(transports.get('batch') as unknown as { registerRequestCalls: number }).registerRequestCalls = 0
+  ;(
+    transports.get('websocket') as unknown as { registerRequestCalls: number }
+  ).registerRequestCalls = 0
+  ;(transports.get('sse') as unknown as { registerRequestCalls: number }).registerRequestCalls = 0
+})
+
 test.serial('endpoint routing errors on invalid transport', async (t) => {
   t.is(
     Object.keys(transports).find((s) => s === 'INVALID'),
@@ -340,7 +359,7 @@ test.serial('endpoint routing can route to HttpTransport', async (t) => {
 
   t.is(error.statusCode, 504)
   const internalTransport = transports.get('batch') as unknown as MockHttpTransport
-  t.assert(internalTransport.backgroundExecuteCalls > 0)
+  t.assert(internalTransport.registerRequestCalls > 0)
 })
 
 test.serial('endpoint routing can route to WebSocket transport', async (t) => {
@@ -351,7 +370,7 @@ test.serial('endpoint routing can route to WebSocket transport', async (t) => {
   })
   t.is(error?.statusCode, 504)
   const internalTransport = transports.get('websocket') as unknown as MockWebSocketTransport
-  t.assert(internalTransport.backgroundExecuteCalls > 0)
+  t.assert(internalTransport.registerRequestCalls > 0)
 })
 
 test.serial('endpoint routing can route to SSE transport', async (t) => {
@@ -377,7 +396,7 @@ test.serial('endpoint routing can route to SSE transport', async (t) => {
   t.is(error.statusCode, 504)
 
   const internalTransport = transports.get('sse') as unknown as MockSseTransport
-  t.assert(internalTransport.backgroundExecuteCalls > 0)
+  t.assert(internalTransport.registerRequestCalls > 0)
 })
 
 test.serial('custom router is applied to get valid transport to route to', async (t) => {
@@ -439,7 +458,7 @@ test.serial('custom router is applied to get valid transport to route to', async
   t.is(error.statusCode, 504)
 
   const internalTransport = transports.get('batch') as unknown as MockHttpTransport
-  t.assert(internalTransport.backgroundExecuteCalls > 0)
+  t.assert(internalTransport.registerRequestCalls > 0)
 })
 
 test.serial('custom router returns invalid transport and request fails', async (t) => {
@@ -624,7 +643,7 @@ test.serial('missing transport in input params with default succeeds', async (t)
   t.is(error.statusCode, 504)
 
   const internalTransport = transports.get('batch') as unknown as MockHttpTransport
-  t.assert(internalTransport.backgroundExecuteCalls > 0)
+  t.assert(internalTransport.registerRequestCalls > 0)
 })
 
 test.serial('transport creation fails if transport names are not acceptable', async (t) => {
@@ -658,3 +677,144 @@ test.serial('transports with same name throws error', async (t) => {
     { message: 'Transport with name "websocket" is already registered in this map' },
   )
 })
+
+test.serial('transport override routes to correct Transport', async (t) => {
+  axiosMock
+    .onPost(`${restUrl}/price`, {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(200, {
+      prices: [
+        {
+          pair: `${from}/${to}`,
+          price,
+        },
+      ],
+    })
+
+  const error = await t.context.testAdapter.request({
+    from,
+    to,
+    transport: 'websocket',
+    overrides: {
+      test: {
+        __TRANSPORT__: 'batch',
+      },
+    },
+  })
+
+  t.is(error.statusCode, 504)
+  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
+  t.assert(internalTransport.registerRequestCalls > 0)
+})
+
+test.serial('invalid transport override is skipped', async (t) => {
+  axiosMock
+    .onPost(`${restUrl}/price`, {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(200, {
+      prices: [
+        {
+          pair: `${from}/${to}`,
+          price,
+        },
+      ],
+    })
+
+  const error = await t.context.testAdapter.request({
+    from,
+    to,
+    transport: 'websocket',
+    overrides: {
+      // Invalid adapter name
+      XXXX: {
+        __TRANSPORT__: 'batch',
+      },
+    },
+  })
+
+  t.is(error.statusCode, 504)
+  const internalTransport = transports.get('websocket') as unknown as MockHttpTransport
+  t.assert(internalTransport.registerRequestCalls > 0)
+})
+
+test.serial(
+  'transport and transport override are ignored when custom router returns a value',
+  async (t) => {
+    const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+      inputParameters,
+      name: 'price', // /price
+      transportRoutes: transports,
+      customRouter: () => 'batch',
+    })
+
+    const customConfig = new AdapterConfig(settings, {
+      envDefaultOverrides: {
+        LOG_LEVEL: 'debug',
+        METRICS_ENABLED: false,
+        CACHE_POLLING_SLEEP_MS: 10,
+        CACHE_POLLING_MAX_RETRIES: 0,
+      },
+    })
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'price',
+      config: customConfig,
+      endpoints: [endpoint],
+      rateLimiting: {
+        tiers: {
+          default: {
+            rateLimit1s: 5,
+          },
+        },
+      },
+    })
+
+    const testAdapter = await TestAdapter.start(adapter, t.context)
+
+    axiosMock
+      .onPost(`${restUrl}/price`, {
+        pairs: [
+          {
+            base: from,
+            quote: to,
+          },
+        ],
+      })
+      .reply(200, {
+        prices: [
+          {
+            pair: `${from}/${to}`,
+            price,
+          },
+        ],
+      })
+
+    const error = await testAdapter.request({
+      from,
+      to,
+      transport: 'sse',
+      overrides: {
+        test: {
+          __TRANSPORT__: 'websocket',
+        },
+      },
+    })
+    t.is(error.statusCode, 504)
+
+    const internalTransport = transports.get('batch') as unknown as MockHttpTransport
+    t.assert(internalTransport.registerRequestCalls > 0)
+  },
+)

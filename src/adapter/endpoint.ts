@@ -170,13 +170,19 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   }
 
   /**
-   * Default routing strategy. Will try and use the transport input parameter if present in the request body.
+   * Default routing strategy. Will try and use the transport override if present
+   * or transport input parameter in the request body.
    *
    * @param req - The current adapter request
-   * @returns the transport param if present
+   * @returns the transport param or override if present
    */
   private defaultRouter(req: AdapterRequest<TypeFromDefinition<T['Parameters']>>) {
     const rawRequestBody = req.body as unknown as { data: AdapterRequestData }
+    const requestOverrides = rawRequestBody.data?.overrides?.[this.adapterName.toLowerCase()]
+    // Transport override
+    if (requestOverrides?.['__TRANSPORT__']) {
+      return requestOverrides['__TRANSPORT__']
+    }
     return rawRequestBody.data?.transport
   }
 }
