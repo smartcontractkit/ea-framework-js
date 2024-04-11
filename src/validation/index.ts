@@ -125,7 +125,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
       req.requestContext.cacheKey = `${cachePrefix}${cacheKey}`
     } else {
-      const transportName = endpoint.getTransportNameForRequest(req, adapter.config.settings)
+      const transportName = req.requestContext.transportName
       req.requestContext.cacheKey = calculateCacheKey({
         data: req.requestContext.data,
         adapterName: adapter.name,
