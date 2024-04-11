@@ -33,7 +33,7 @@ export type AdapterRequestContext<T> = {
   /** Name of the endpoint this payload should be directed to */
   endpointName: string
 
-  /** Name of the endpoint this payload should be directed to */
+  /** Name of the transport this payload should be directed to */
   transportName: string
 
   /** Precalculated cache key used to get and set corresponding values from the cache and subscription sets */
@@ -101,11 +101,12 @@ export interface AdapterMetricsMeta {
 }
 
 /**
- * Map of overrides objects (symbol -\> symbol) per adapter name
+ * Map of overrides objects (symbol -\> symbol and request transport) per adapter name
  */
 export type Overrides = {
   [adapterName: string]: {
     [symbol: string]: string
+    transport: string
   }
 }
 
