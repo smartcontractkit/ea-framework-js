@@ -180,8 +180,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     const rawRequestBody = req.body as unknown as { data: AdapterRequestData }
     const requestOverrides = rawRequestBody.data?.overrides?.[this.adapterName.toLowerCase()]
     // Transport override
-    if (requestOverrides?.['__TRANSPORT__']) {
-      return requestOverrides['__TRANSPORT__']
+    if (requestOverrides?.['transport']) {
+      return requestOverrides['transport']
     }
     return rawRequestBody.data?.transport
   }

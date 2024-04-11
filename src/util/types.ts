@@ -106,7 +106,7 @@ export interface AdapterMetricsMeta {
 export type Overrides = {
   [adapterName: string]: {
     [symbol: string]: string
-    __TRANSPORT__: string
+    transport: string
   }
 }
 

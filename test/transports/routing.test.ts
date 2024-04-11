@@ -704,7 +704,7 @@ test.serial('transport override routes to correct Transport', async (t) => {
     transport: 'websocket',
     overrides: {
       test: {
-        __TRANSPORT__: 'batch',
+        transport: 'batch',
       },
     },
   })
@@ -740,7 +740,7 @@ test.serial('invalid transport override is skipped', async (t) => {
     overrides: {
       // Invalid adapter name
       XXXX: {
-        __TRANSPORT__: 'batch',
+        transport: 'batch',
       },
     },
   })
@@ -809,7 +809,7 @@ test.serial(
       transport: 'sse',
       overrides: {
         test: {
-          __TRANSPORT__: 'websocket',
+          transport: 'websocket',
         },
       },
     })
