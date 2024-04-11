@@ -311,11 +311,12 @@ test.beforeEach(async (t) => {
 })
 
 test.afterEach(() => {
-  ;(transports.get('batch') as unknown as { registerRequestCalls: number }).registerRequestCalls = 0
-  ;(
-    transports.get('websocket') as unknown as { registerRequestCalls: number }
-  ).registerRequestCalls = 0
-  ;(transports.get('sse') as unknown as { registerRequestCalls: number }).registerRequestCalls = 0
+  const batchTransport = transports.get('batch') as unknown as { registerRequestCalls: number }
+  const wsTransport = transports.get('websocket') as unknown as { registerRequestCalls: number }
+  const sseTransport = transports.get('sse') as unknown as { registerRequestCalls: number }
+  batchTransport.registerRequestCalls = 0
+  wsTransport.registerRequestCalls = 0
+  sseTransport.registerRequestCalls = 0
 })
 
 test.serial('endpoint routing errors on invalid transport', async (t) => {
