@@ -26,7 +26,7 @@ jobs:
     steps:
       - id: set-job-name
         run: echo "JOB_NAME=${{ github.job }}" >> $GITHUB_OUTPUT
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
       - id: validate
         name: Validate that version bump labels are on the PR
         uses: ./.github/actions/validate-version-labels
@@ -46,7 +46,7 @@ jobs:
     steps:
       - id: set-job-name
         run: echo "JOB_NAME=${{ github.job }}" >> $GITHUB_OUTPUT
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
         with:
           ref: ${{ github.base_ref || github.ref }} # Explicit ref required to push from PR because of github internals
       - uses: ./.github/actions/set-git-credentials
@@ -305,10 +305,10 @@ jobs:
       - createVersionBumpPR
     steps:
       - name: Post success or failure comment to PR
-        uses: actions/github-script@v6
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
-            // `needs` isn't loaded into `actions/github-script@v6`.context, so we have to read it from the outer context
+            // `needs` isn't loaded into `actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1`.context, so we have to read it from the outer context
             // Using toJSON will dump a string representation of the object verbatim, which effective generates code for the `needs` javascript variable below
             const needs = ${{ toJSON(needs) }}
 

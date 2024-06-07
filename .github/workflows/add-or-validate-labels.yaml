@@ -20,7 +20,7 @@ jobs:
     outputs:
       VERSION_INSTRUCTION: ${{ steps.validate.outputs.VERSION_INSTRUCTION }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
       - name: Validate that version bump labels are on the PR
         id: validate
         uses: ./.github/actions/validate-version-labels
@@ -49,7 +49,7 @@ jobs:
           echo "MESSAGE=$MESSAGE" >> $GITHUB_OUTPUT
 
       - name: Find previous comment
-        uses: peter-evans/find-comment@v2
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3.1.0
         id: fc
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -57,7 +57,7 @@ jobs:
           body-includes: NPM Publishing labels
 
       - name: Create or update comment
-        uses: peter-evans/create-or-update-comment@v2
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4.0.0
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}

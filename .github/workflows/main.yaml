@@ -13,7 +13,7 @@ jobs:
     concurrency: build-${{ github.ref}}
     if: ${{ !startsWith(github.head_ref, 'version-bump') }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
       - uses: ./.github/actions/setup
       - run: yarn build
   lint:
@@ -21,7 +21,7 @@ jobs:
     concurrency: lint-${{ github.ref }}
     if: ${{ !startsWith(github.head_ref, 'version-bump') }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
       - uses: ./.github/actions/setup
       - run: yarn lint
       - run: yarn prettier --check "**/*.{ts,md}"
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !startsWith(github.head_ref, 'version-bump') }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
       - uses: ./.github/actions/setup
       - run: |
           # Check for test.only() in test files
@@ -44,7 +44,7 @@ jobs:
             exit 1
           fi
       - run: yarn test
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         with:
           name: coverage-reports
           path: |
@@ -56,9 +56,9 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !startsWith(github.head_ref, 'version-bump') }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
       - uses: ./.github/actions/setup
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: coverage-reports
       - run: yarn code-coverage
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !startsWith(github.head_ref, 'version-bump') }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
       - uses: ./.github/actions/setup
       - name: Generate new adapter, build, run the tests
         run: |
