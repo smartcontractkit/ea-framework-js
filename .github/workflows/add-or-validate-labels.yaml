@@ -49,7 +49,7 @@ jobs:
           echo "MESSAGE=$MESSAGE" >> $GITHUB_OUTPUT
 
       - name: Find previous comment
-        uses: peter-evans/find-comment@v2
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3.1.0
         id: fc
         with:
           issue-number: ${{ github.event.pull_request.number }}
