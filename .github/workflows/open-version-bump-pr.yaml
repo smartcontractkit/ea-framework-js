@@ -89,7 +89,7 @@ jobs:
           git checkout -b $VERSION_BRANCH
           if ! gh api -X GET /repos/:owner/:repo/git/ref/heads/$VERSION_BRANCH >/dev/null 2>&1; then
             echo "creating new branch $VERSION_BRANCH"
-            gh api -X POST /repos/:owner/:repo/git/refs -f ref="refs/heads/main" -f sha="$GITHUB_SHA" -f "ref=refs/heads/$VERSION_BRANCH"
+            gh api -X POST /repos/:owner/:repo/git/refs -f "ref=refs/heads/$VERSION_BRANCH" -f sha="$GITHUB_SHA" 
           fi
 
           # get the content of package.json from $VERSION_BRANCH to get the current bump version
