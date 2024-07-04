@@ -25,7 +25,7 @@ import {
   makeLogger,
 } from '../util'
 import { Requester } from '../util/requester'
-import { AdapterTimeoutError } from '../validation/error'
+import { AdapterError, AdapterTimeoutError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import {
@@ -407,6 +407,14 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
 
       return response
     }
+  }
+
+  validateOutput(req: AdapterRequest<EmptyInputParameters>, output: Readonly<AdapterResponse>): AdapterError | undefined {
+    const endpoint = this.endpointsMap[req.requestContext.endpointName]
+    if (endpoint.customOutputValidation) {
+      return endpoint.customOutputValidation(output)
+    }
+    return undefined
   }
 
   /**

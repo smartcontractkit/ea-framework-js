@@ -234,6 +234,12 @@ async function buildRestApi(adapter: Adapter) {
           req as AdapterRequest<EmptyInputParameters>,
           reply as unknown as Promise<unknown>,
         )
+
+        adapter.validateOutput(
+          req as AdapterRequest<EmptyInputParameters>, 
+          response
+        )
+        
         return reply.code(response.statusCode || 200).send(response)
       },
     })

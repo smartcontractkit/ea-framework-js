@@ -1,4 +1,5 @@
 import { TransportGenerics } from '../transports'
+import { AdapterError } from '../validation/error'
 import { AdapterEndpoint } from './endpoint'
 import { AdapterEndpointParams, PriceEndpointInputParametersDefinition } from './index'
 
@@ -59,6 +60,25 @@ export class LwbaEndpoint<T extends LwbaEndpointGenerics> extends AdapterEndpoin
       }
     }
 
+    // All LWBA requests must have a mid, bid, and ask
+    // Response validation ensures that we meet the invariant: bid <= mid <= ask
+    params.customOutputValidation = (output) => {
+      const data = output.data as LwbaResponseDataFields['Data']
+      if (!data.mid || !data.bid || !data.ask) {
+        throw new AdapterError({
+          statusCode: 500,
+          message: `Invariant voilation. LWBA response must contain mid, bid and ask prices.`,
+        })
+      }
+      if (data.mid < data.bid || data.mid > data.ask) {
+        throw new AdapterError({
+          statusCode: 500,
+          message: `Invariant voilation. Mid price must be between bid and ask prices.`,
+        })
+      }
+
+      return undefined
+    }
     super(params)
   }
 }
