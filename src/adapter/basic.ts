@@ -409,7 +409,10 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     }
   }
 
-  validateOutput(req: AdapterRequest<EmptyInputParameters>, output: Readonly<AdapterResponse>): AdapterError | undefined {
+  validateOutput(
+    req: AdapterRequest<EmptyInputParameters>,
+    output: Readonly<AdapterResponse>,
+  ): AdapterError | undefined {
     const endpoint = this.endpointsMap[req.requestContext.endpointName]
     if (endpoint.customOutputValidation) {
       return endpoint.customOutputValidation(output)

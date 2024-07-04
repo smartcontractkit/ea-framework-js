@@ -127,9 +127,7 @@ export type CustomInputValidator<T extends EndpointGenerics> = (
   adapterSettings: T['Settings'],
 ) => AdapterError | undefined
 
-export type CustomOutputValidator = (
-  output: Readonly<AdapterResponse>,
-) => AdapterError | undefined
+export type CustomOutputValidator = (output: Readonly<AdapterResponse>) => AdapterError | undefined
 
 /**
  * Structure to describe a specific endpoint in an [[Adapter]]
