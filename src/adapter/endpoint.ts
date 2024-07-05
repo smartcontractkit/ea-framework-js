@@ -59,6 +59,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.rateLimiting = params.rateLimiting
     this.cacheKeyGenerator = params.cacheKeyGenerator
     this.customInputValidation = params.customInputValidation
+    this.customOutputValidation = params.customOutputValidation
     this.overrides = params.overrides
     this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
   }
