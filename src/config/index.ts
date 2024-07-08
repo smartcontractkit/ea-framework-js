@@ -317,10 +317,10 @@ export const BaseSettingsDefinition = {
     validate: validator.integer({ min: 1, max: 2000 }),
   },
   BACKGROUND_EXECUTE_BUFFER_INTERVAL_MS: {
-    description: "Minimum buffer time added between background execute loops for all transports",
+    description: 'Minimum buffer time added between background execute loops for all transports',
     type: 'number',
     default: 10,
-    validate: validator.integer({ min: 1, max: 1000 })
+    validate: validator.integer({ min: 1, max: 1000 }),
   },
   BACKGROUND_EXECUTE_MS_SSE: {
     description: "Time in milliseconds to sleep between SSE transports' background execute calls",
