@@ -92,10 +92,10 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
       // This background execute loop is no longer the one to determine the sleep between bg execute calls.
       // That is now instead responsibility of each transport, to allow for custom ones to implement their own timings.
       logger.trace(
-        `Finished background execute for endpoint "${endpoint.name}", calling it again in 10ms...`,
+        `Finished background execute for endpoint "${endpoint.name}", calling it again in ${adapter.config.settings.BACKGROUND_EXECUTE_BUFFER_INTERVAL_MS}ms...`,
       )
       metricsTimer()
-      timeoutsMap[endpoint.name] = setTimeout(handler, 10)
+      timeoutsMap[endpoint.name] = setTimeout(handler, adapter.config.settings.BACKGROUND_EXECUTE_BUFFER_INTERVAL_MS)
     }
 
     // Start recursive async calls

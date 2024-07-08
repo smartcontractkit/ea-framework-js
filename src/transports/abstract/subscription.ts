@@ -22,6 +22,9 @@ export abstract class SubscriptionTransport<const T extends TransportGenerics>
   subscriptionTtl!: number
   name!: string
 
+  retryCount!: number
+  retryTime!: number
+
   async initialize(
     dependencies: TransportDependencies<T>,
     adapterSettings: T['Settings'],
@@ -32,6 +35,8 @@ export abstract class SubscriptionTransport<const T extends TransportGenerics>
     this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName, name)
     this.subscriptionTtl = this.getSubscriptionTtlFromConfig(adapterSettings) // Will be implemented by subclasses
     this.name = name
+    this.retryCount = 0
+    this.retryTime = 0
   }
 
   async registerRequest(
@@ -54,6 +59,11 @@ export abstract class SubscriptionTransport<const T extends TransportGenerics>
 
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
     logger.debug('Starting background execute')
+
+    if (this.retryTime > Date.now()) {
+      return
+    }
+
     const entries = await this.subscriptionSet.getAll()
 
     // Keep track of active subscriptions for background execute
@@ -68,7 +78,16 @@ export abstract class SubscriptionTransport<const T extends TransportGenerics>
       })
       .set(entries.length)
 
-    await this.backgroundHandler(context, entries)
+    try {
+      await this.backgroundHandler(context, entries)
+      this.retryCount = 0
+    } catch (e) {
+      logger.error(`Error with subscriptions in the backgroundHandler: ${e}`)
+      const timeout = context.adapterSettings.SUBSCRIPTION_RETRY_BASE_MS * (context.adapterSettings.SUBSCRIPTION_RETRY_EXP_FACTOR ** this.retryCount)
+      this.retryTime = Date.now() + timeout
+      this.retryCount += 1
+      logger.info(`Waiting ${timeout}ms before backgroundHandler retry #${this.retryCount}`)
+    }
   }
 
   /**
