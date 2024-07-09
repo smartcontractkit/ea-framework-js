@@ -39,8 +39,7 @@ class LWBATestTransport implements Transport<LWBATestTypes> {
     private mockResponse: (
       req: AdapterRequest<TypeFromDefinition<LwbaEndpointInputParametersDefinition>>,
     ) => AdapterResponse<LWBATestTypes['Response']>,
-  ) {
-  }
+  ) {}
 
   async initialize(): Promise<void> {
     return
@@ -49,7 +48,6 @@ class LWBATestTransport implements Transport<LWBATestTypes> {
   async foregroundExecute(
     req: AdapterRequest<TypeFromDefinition<LwbaEndpointInputParametersDefinition>>,
   ): Promise<void | AdapterResponse<LWBATestTypes['Response']>> {
-
     return this.mockResponse(req)
   }
 }
@@ -90,7 +88,7 @@ export const buildAdapter = async (
         name: 'lwba_test',
         inputParameters: new InputParameters(lwbaEndpointInputParametersDefinition),
         transport: new LWBATestTransport(mockResponse),
-      })
+      }),
     ],
     includes,
   })
@@ -125,17 +123,14 @@ test('Successful response passes LWBA validation', async (t) => {
     },
   }
 
-  const testAdapter = await buildAdapter(
-    t.context,
-    (req) => {
-      t.deepEqual(req.requestContext.data, {
-        base: 'BTC',
-        quote: 'USD',
-      })
+  const testAdapter = await buildAdapter(t.context, (req) => {
+    t.deepEqual(req.requestContext.data, {
+      base: 'BTC',
+      quote: 'USD',
+    })
 
-      return mockResponse
-    },
-  )
+    return mockResponse
+  })
 
   const response = await testAdapter.request({
     base: 'BTC',
@@ -165,25 +160,23 @@ test('Invariant violation fails LWBA validation (bid <= mid <= ask)', async (t) 
     },
   }
 
-  const testAdapter = await buildAdapter(
-    t.context,
-    (req) => {
-      t.deepEqual(req.requestContext.data, {
-        base: 'BTC',
-        quote: 'USD',
-      })
+  const testAdapter = await buildAdapter(t.context, (req) => {
+    t.deepEqual(req.requestContext.data, {
+      base: 'BTC',
+      quote: 'USD',
+    })
 
-      return mockResponse
-    },
-  )
+    return mockResponse
+  })
 
   const expectedError = JSON.stringify({
-    "status": "errored",
-    "statusCode": 500,
-    "error": {
-      "name": "AdapterLWBAError",
-      "message": "Invariant violation. Mid price must be between bid and ask prices. Got: (bid: 123.1, mid: 123.4, ask: 123.3)"
-    }
+    status: 'errored',
+    statusCode: 500,
+    error: {
+      name: 'AdapterLWBAError',
+      message:
+        'Invariant violation. Mid price must be between bid and ask prices. Got: (bid: 123.1, mid: 123.4, ask: 123.3)',
+    },
   })
 
   const response = await testAdapter.request({
@@ -195,7 +188,6 @@ test('Invariant violation fails LWBA validation (bid <= mid <= ask)', async (t) 
   t.is(response.statusCode, 500)
   t.is(JSON.stringify(response.json()), expectedError)
 })
-
 
 test('Invariant violation fails LWBA validation (bid, mid or ask not found)', async (t) => {
   const mockResponse: AdapterResponse<LWBATestTypes['Response']> = {
@@ -213,25 +205,23 @@ test('Invariant violation fails LWBA validation (bid, mid or ask not found)', as
     },
   }
 
-  const testAdapter = await buildAdapter(
-    t.context,
-    (req) => {
-      t.deepEqual(req.requestContext.data, {
-        base: 'BTC',
-        quote: 'USD',
-      })
+  const testAdapter = await buildAdapter(t.context, (req) => {
+    t.deepEqual(req.requestContext.data, {
+      base: 'BTC',
+      quote: 'USD',
+    })
 
-      return mockResponse
-    },
-  )
+    return mockResponse
+  })
 
   const expectedError = JSON.stringify({
-    "status": "errored",
-    "statusCode": 500,
-    "error": {
-      "name": "AdapterLWBAError",
-      "message": "Invariant violation. LWBA response must contain mid, bid and ask prices. Got: (bid: null, mid: 123.4, ask: 123.3)"
-    }
+    status: 'errored',
+    statusCode: 500,
+    error: {
+      name: 'AdapterLWBAError',
+      message:
+        'Invariant violation. LWBA response must contain mid, bid and ask prices. Got: (bid: null, mid: 123.4, ask: 123.3)',
+    },
   })
 
   const response = await testAdapter.request({
