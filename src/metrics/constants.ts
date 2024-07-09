@@ -12,6 +12,7 @@ export enum HttpRequestType {
   // RES_EMPTY_ERROR = 'responseEmptyError',
   // RES_INVALID_ERROR = 'responseInvalidError',
   CUSTOM_ERROR = 'customError',
+  LWBA_ERROR = 'lwbaError'
 }
 
 /**
