@@ -102,18 +102,12 @@ export class AdapterTimeoutError extends AdapterError {
   }
 }
 export class AdapterDataProviderError extends AdapterError {
-  constructor(
-    input: Partial<AdapterError>,
-    public timestamps: ResponseTimestamps,
-  ) {
+  constructor(input: Partial<AdapterError>, public timestamps: ResponseTimestamps) {
     super({ ...input, metricsLabel: HttpRequestType.DP_ERROR })
   }
 }
 export class AdapterConnectionError extends AdapterError {
-  constructor(
-    input: Partial<AdapterError>,
-    public timestamps: ResponseTimestamps,
-  ) {
+  constructor(input: Partial<AdapterError>, public timestamps: ResponseTimestamps) {
     super({ ...input, metricsLabel: HttpRequestType.CONNECTION_ERROR })
   }
 }

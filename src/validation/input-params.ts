@@ -30,12 +30,12 @@ type ParameterType = PrimitiveParameterTypeString | InputParametersDefinition
 type TypeFromTypeString<T extends ParameterType> = T extends 'string'
   ? string
   : T extends 'number'
-    ? number
-    : T extends 'boolean'
-      ? boolean
-      : T extends InputParametersDefinition
-        ? TypeFromDefinition<T>
-        : never
+  ? number
+  : T extends 'boolean'
+  ? boolean
+  : T extends InputParametersDefinition
+  ? TypeFromDefinition<T>
+  : never
 
 /**
  * All posible types for specifying options for an InputParameter
@@ -220,10 +220,10 @@ export type TypeFromDefinition<T extends InputParametersDefinition> = unknown ex
 type TypeFromDefinitionIsDefined<T extends InputParameter> = T['required'] extends true
   ? true
   : T['array'] extends true
-    ? true
-    : IsUnknown<T['default']> extends false
-      ? true
-      : false
+  ? true
+  : IsUnknown<T['default']> extends false
+  ? true
+  : false
 
 /**
  * Util type to represent the absence of input parameters for an adapter endpoint.
@@ -261,10 +261,7 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
   /** Definition for the type of this parameter */
   type: PrimitiveParameterTypeString | InputParameters<InputParametersDefinition>
 
-  constructor(
-    public name: string,
-    public definition: T,
-  ) {
+  constructor(public name: string, public definition: T) {
     this.aliases = [this.name, ...(this.definition.aliases || [])]
     this.type =
       typeof definition.type === 'object' ? new InputParameters(definition.type) : definition.type
@@ -381,10 +378,7 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
 
   params: ProcessedParam[]
 
-  constructor(
-    public definition: T,
-    public examples?: TypeFromDefinition<T>[],
-  ) {
+  constructor(public definition: T, public examples?: TypeFromDefinition<T>[]) {
     this.params = Object.entries(this.definition).map(
       ([name, param]) => new ProcessedParam(name, param),
     )
