@@ -420,6 +420,16 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     return undefined
   }
 
+  async handleRequestWithValidation(
+    req: AdapterRequest<EmptyInputParameters>,
+    replySent: Promise<unknown>,
+  ): Promise<Readonly<AdapterResponse>> {
+    const response = await this.handleRequest(req, replySent)
+    if (!response.errorMessage) {
+      this.validateOutput(req as AdapterRequest<EmptyInputParameters>, response)
+    }
+    return response
+  }
   /**
    * Function to serve as middleware to pass along the AdapterRequest to the appropriate Transport (acc. to the endpoint in the req.)
    *

@@ -47,10 +47,10 @@ export const DEFAULT_LWBA_ALIASES = ['crypto-lwba', 'crypto_lwba', 'cryptolwba']
 
 export const validateLwbaResponse = (bid?: number, mid?: number, ask?: number): string => {
   if (!mid || !bid || !ask) {
-    return `Invariant violation. LWBA response must contain mid, bid and ask prices. Got: (mid: ${mid}, bid: ${bid}, ask: ${ask})`
+    return `Invariant violation. LWBA response must contain mid, bid and ask prices. Got: (bid: ${bid}, mid: ${mid}, ask: ${ask})`
   }
   if (mid < bid || mid > ask) {
-    return `Invariant violation. Mid price must be between bid and ask prices. Got: (mid: ${mid}, bid: ${bid}, ask: ${ask})`
+    return `Invariant violation. Mid price must be between bid and ask prices. Got: (bid: ${bid}, mid: ${mid}, ask: ${ask})`
   }
   return ''
 }

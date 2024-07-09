@@ -230,14 +230,11 @@ async function buildRestApi(adapter: Adapter) {
       url: adapter.config.settings.BASE_URL,
       method: 'POST',
       handler: async (req, reply) => {
-        const response = await adapter.handleRequest(
+        const response = await adapter.handleRequestWithValidation(
           req as AdapterRequest<EmptyInputParameters>,
           reply as unknown as Promise<unknown>,
         )
 
-        if (!response.errorMessage) {
-          adapter.validateOutput(req as AdapterRequest<EmptyInputParameters>, response)
-        }
         return reply.code(response.statusCode || 200).send(response)
       },
     })
