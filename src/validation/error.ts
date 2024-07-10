@@ -116,3 +116,13 @@ export class AdapterCustomError extends AdapterError {
     super({ ...input, metricsLabel: HttpRequestType.CUSTOM_ERROR })
   }
 }
+
+export class AdapterLWBAError extends AdapterError {
+  constructor(input: Partial<AdapterError>) {
+    super({
+      ...input,
+      name: 'AdapterLWBAError',
+      metricsLabel: HttpRequestType.LWBA_ERROR,
+    })
+  }
+}

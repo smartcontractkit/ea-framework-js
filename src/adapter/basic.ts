@@ -25,7 +25,7 @@ import {
   makeLogger,
 } from '../util'
 import { Requester } from '../util/requester'
-import { AdapterTimeoutError } from '../validation/error'
+import { AdapterError, AdapterTimeoutError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import {
@@ -409,6 +409,27 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
     }
   }
 
+  validateOutput(
+    req: AdapterRequest<EmptyInputParameters>,
+    output: Readonly<AdapterResponse>,
+  ): AdapterError | undefined {
+    const endpoint = this.endpointsMap[req.requestContext.endpointName]
+    if (endpoint.customOutputValidation) {
+      return endpoint.customOutputValidation(output)
+    }
+    return undefined
+  }
+
+  async handleRequestWithValidation(
+    req: AdapterRequest<EmptyInputParameters>,
+    replySent: Promise<unknown>,
+  ): Promise<Readonly<AdapterResponse>> {
+    const response = await this.handleRequest(req, replySent)
+    if (!response.errorMessage) {
+      this.validateOutput(req as AdapterRequest<EmptyInputParameters>, response)
+    }
+    return response
+  }
   /**
    * Function to serve as middleware to pass along the AdapterRequest to the appropriate Transport (acc. to the endpoint in the req.)
    *

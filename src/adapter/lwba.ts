@@ -1,4 +1,5 @@
 import { TransportGenerics } from '../transports'
+import { AdapterLWBAError } from '../validation/error'
 import { AdapterEndpoint } from './endpoint'
 import { AdapterEndpointParams, PriceEndpointInputParametersDefinition } from './index'
 
@@ -44,6 +45,16 @@ export type LwbaEndpointGenerics = TransportGenerics & {
 
 export const DEFAULT_LWBA_ALIASES = ['crypto-lwba', 'crypto_lwba', 'cryptolwba']
 
+export const validateLwbaResponse = (bid?: number, mid?: number, ask?: number): string => {
+  if (!mid || !bid || !ask) {
+    return `Invariant violation. LWBA response must contain mid, bid and ask prices. Got: (bid: ${bid}, mid: ${mid}, ask: ${ask})`
+  }
+  if (mid < bid || mid > ask) {
+    return `Invariant violation. Mid price must be between bid and ask prices. Got: (bid: ${bid}, mid: ${mid}, ask: ${ask})`
+  }
+  return ''
+}
+
 /**
  * An LwbaEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * LWBA (lightweight bid/ask) Data Feeds, its InputParameters must extend the basic ones (base/quote).
@@ -59,6 +70,18 @@ export class LwbaEndpoint<T extends LwbaEndpointGenerics> extends AdapterEndpoin
       }
     }
 
+    // All LWBA requests must have a mid, bid, and ask
+    // Response validation ensures that we meet the invariant: bid <= mid <= ask
+    params.customOutputValidation = (output) => {
+      const data = output.data as LwbaResponseDataFields['Data']
+      const error = validateLwbaResponse(data.bid, data.mid, data.ask)
+
+      if (error) {
+        throw new AdapterLWBAError({ statusCode: 500, message: error })
+      }
+
+      return undefined
+    }
     super(params)
   }
 }
