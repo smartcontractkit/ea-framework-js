@@ -10,6 +10,7 @@ import {
   AdapterEndpointInterface,
   AdapterEndpointParams,
   CustomInputValidator,
+  CustomOutputValidator,
   EndpointGenerics,
   EndpointRateLimitingConfig,
   RequestTransform,
@@ -30,6 +31,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   rateLimiting?: EndpointRateLimitingConfig | undefined
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
+  customOutputValidation?: CustomOutputValidator | undefined
   requestTransforms: RequestTransform<T>[]
   overrides?: Record<string, string> | undefined
   customRouter?: (
@@ -57,6 +59,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.rateLimiting = params.rateLimiting
     this.cacheKeyGenerator = params.cacheKeyGenerator
     this.customInputValidation = params.customInputValidation
+    this.customOutputValidation = params.customOutputValidation
     this.overrides = params.overrides
     this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
   }

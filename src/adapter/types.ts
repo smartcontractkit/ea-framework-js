@@ -4,7 +4,7 @@ import { Cache } from '../cache'
 import { AdapterConfig, BaseAdapterSettings, SettingsDefinitionMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics, TransportRoutes } from '../transports'
-import { AdapterRequest, LoggerFactory, SubscriptionSetFactory } from '../util'
+import { AdapterRequest, AdapterResponse, LoggerFactory, SubscriptionSetFactory } from '../util'
 import { Requester } from '../util/requester'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
@@ -127,6 +127,8 @@ export type CustomInputValidator<T extends EndpointGenerics> = (
   adapterSettings: T['Settings'],
 ) => AdapterError | undefined
 
+export type CustomOutputValidator = (output: Readonly<AdapterResponse>) => AdapterError | undefined
+
 /**
  * Structure to describe a specific endpoint in an [[Adapter]]
  */
@@ -148,6 +150,9 @@ export interface BaseAdapterEndpointParams<T extends EndpointGenerics> {
 
   /** Custom input validation. Void function that should throw AdapterInputError on validation errors */
   customInputValidation?: CustomInputValidator<T>
+
+  /** Custom output validation. Void function that should throw AdapterError on validation errors */
+  customOutputValidation?: CustomOutputValidator
 
   /** Transforms that will apply to the request before submitting it through the adapter request flow */
   requestTransforms?: RequestTransform<T>[]
