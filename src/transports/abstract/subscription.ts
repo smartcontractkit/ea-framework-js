@@ -14,9 +14,7 @@ const logger = makeLogger('SubscriptionTransport')
  *
  * @typeParam T - all types related to the [[Transport]]
  */
-export abstract class SubscriptionTransport<const T extends TransportGenerics>
-  implements Transport<T>
-{
+export abstract class SubscriptionTransport<T extends TransportGenerics> implements Transport<T> {
   responseCache!: ResponseCache<T>
   subscriptionSet!: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
   subscriptionTtl!: number
@@ -81,8 +79,12 @@ export abstract class SubscriptionTransport<const T extends TransportGenerics>
     try {
       await this.backgroundHandler(context, entries)
       this.retryCount = 0
-    } catch (e) {
-      logger.error(`Error with subscriptions in the backgroundHandler: ${e}`)
+    } catch (error) {
+      censorLogs(() => logger.error(error, (error as Error).stack))
+      metrics
+        .get('bgHandlerErrors')
+        .labels({ adapter_endpoint: context.endpointName, transport: this.name })
+        .inc()
       const timeout = Math.min(
         context.adapterSettings.SUBSCRIPTION_RETRY_MIN_MS *
           context.adapterSettings.SUBSCRIPTION_RETRY_EXP_FACTOR ** this.retryCount,
