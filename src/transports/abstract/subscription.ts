@@ -20,9 +20,6 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   subscriptionTtl!: number
   name!: string
 
-  retryCount!: number
-  retryTime!: number
-
   async initialize(
     dependencies: TransportDependencies<T>,
     adapterSettings: T['Settings'],
@@ -33,8 +30,6 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName, name)
     this.subscriptionTtl = this.getSubscriptionTtlFromConfig(adapterSettings) // Will be implemented by subclasses
     this.name = name
-    this.retryCount = 0
-    this.retryTime = 0
   }
 
   async registerRequest(
@@ -58,10 +53,6 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
     logger.debug('Starting background execute')
 
-    if (this.retryTime > Date.now()) {
-      return
-    }
-
     const entries = await this.subscriptionSet.getAll()
 
     // Keep track of active subscriptions for background execute
@@ -76,24 +67,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
       })
       .set(entries.length)
 
-    try {
-      await this.backgroundHandler(context, entries)
-      this.retryCount = 0
-    } catch (error) {
-      censorLogs(() => logger.error(error, (error as Error).stack))
-      metrics
-        .get('bgHandlerErrors')
-        .labels({ adapter_endpoint: context.endpointName, transport: this.name })
-        .inc()
-      const timeout = Math.min(
-        context.adapterSettings.SUBSCRIPTION_RETRY_MIN_MS *
-          context.adapterSettings.SUBSCRIPTION_RETRY_EXP_FACTOR ** this.retryCount,
-        context.adapterSettings.SUBSCRIPTION_RETRY_MAX_MS,
-      )
-      this.retryTime = Date.now() + timeout
-      this.retryCount += 1
-      logger.info(`Waiting ${timeout}ms before backgroundHandler retry #${this.retryCount}`)
-    }
+    await this.backgroundHandler(context, entries)
   }
 
   /**

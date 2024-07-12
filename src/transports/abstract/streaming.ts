@@ -3,6 +3,7 @@ import { EndpointContext } from '../../adapter'
 import { censorLogs, makeLogger } from '../../util'
 import { TypeFromDefinition } from '../../validation/input-params'
 import { SubscriptionTransport } from './subscription'
+import { metrics } from '../../metrics'
 
 const logger = makeLogger('StreamingTransport')
 
@@ -37,10 +38,17 @@ export abstract class StreamingTransport<
   // This only tracks when the connection was established, not when the subscription was requested
   providerDataStreamEstablished = 0
 
+  retryCount = 0
+  retryTime = 0
+
   override async backgroundHandler(
     context: EndpointContext<T>,
     desiredSubs: TypeFromDefinition<T['Parameters']>[],
   ): Promise<void> {
+    if (this.retryTime > Date.now()) {
+      return
+    }
+
     logger.debug('Generating delta (subscribes & unsubscribes)')
 
     const desiredSubsSet = new Set(desiredSubs.map((s) => JSON.stringify(s)))
@@ -62,7 +70,25 @@ export abstract class StreamingTransport<
       censorLogs(() => logger.trace(`Will unsubscribe to: ${JSON.stringify(subscriptions.stale)}`))
     }
 
-    await this.streamHandler(context, subscriptions)
+    try {
+      await this.streamHandler(context, subscriptions)
+      this.retryCount = 0
+    } catch (error) {
+      censorLogs(() => logger.error(error, (error as Error).stack))
+      metrics
+        .get('streamHandlerErrors')
+        .labels({ adapter_endpoint: context.endpointName, transport: this.name })
+        .inc()
+      const timeout = Math.min(
+        context.adapterSettings.STREAM_HANDLER_RETRY_MIN_MS *
+          context.adapterSettings.STREAM_HANDLER_RETRY_EXP_FACTOR ** this.retryCount,
+        context.adapterSettings.STREAM_HANDLER_RETRY_MAX_MS,
+      )
+      this.retryTime = Date.now() + timeout
+      this.retryCount += 1
+      logger.info(`Waiting ${timeout}ms before backgroundHandler retry #${this.retryCount}`)
+      return
+    }
 
     logger.debug('Setting local state to subscription set value')
     this.localSubscriptions = desiredSubs

@@ -242,11 +242,6 @@ export const metrics = new Metrics(() => ({
     help: 'A histogram bucket of the distribution of background execute durations',
     labelNames: ['adapter_endpoint', 'transport'] as const,
   }),
-  bgHandlerErrors: new client.Counter({
-    name: 'bg_handler_errors',
-    help: 'The number of background handler errors per endpoint x transport',
-    labelNames: ['adapter_endpoint', 'transport'] as const,
-  }),
   cacheDataGetCount: new client.Counter({
     name: 'cache_data_get_count',
     help: 'A counter that increments every time a value is fetched from the cache',
@@ -298,6 +293,11 @@ export const metrics = new Metrics(() => ({
     name: 'redis_commands_sent_count',
     help: 'The number of redis commands sent',
     labelNames: ['status', 'function_name'],
+  }),
+  streamHandlerErrors: new client.Counter({
+    name: 'stream_handler_errors',
+    help: 'The number of stream handler errors per endpoint x transport',
+    labelNames: ['adapter_endpoint', 'transport'] as const,
   }),
   cacheWarmerCount: new client.Gauge({
     name: 'cache_warmer_get_count',

@@ -102,23 +102,23 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: '',
   },
-  SUBSCRIPTION_RETRY_MAX_MS: {
+  STREAM_HANDLER_RETRY_MAX_MS: {
     type: 'number',
     description:
-      'The maximum time (ms) to wait before trying to subscribe again (takes precedent over SUBSCRIPTION_RETRY_MIN_MS',
+      'The maximum time (ms) to wait before running the stream handler (takes precedent over STREAM_HANDLER_RETRY_MIN_MS',
     default: 20 * 60 * 1000,
     validate: validator.integer({ min: 3_000, max: 24 * 60 * 60 * 1000 }),
   },
-  SUBSCRIPTION_RETRY_MIN_MS: {
+  STREAM_HANDLER_RETRY_MIN_MS: {
     type: 'number',
-    description: 'The minimum/base time (ms) to wait before trying to subscribe again',
+    description: 'The minimum/base time (ms) to wait before trying to run the stream handler',
     default: 100,
     validate: validator.integer({ min: 100, max: 10_000 }),
   },
-  SUBSCRIPTION_RETRY_EXP_FACTOR: {
+  STREAM_HANDLER_RETRY_EXP_FACTOR: {
     type: 'number',
     description:
-      'The factor for exponential back-off to wait before trying to subscribe again (1 = no change from SUBSCRIPTION_RETRY_MIN_MS)',
+      'The factor for exponential back-off to wait before running the stream handler (1 = no change from STREAM_HANDLER_RETRY_MIN_MS)',
     default: 3,
     validate: validator.integer({ min: 1, max: 10 }),
   },
