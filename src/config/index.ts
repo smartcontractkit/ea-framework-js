@@ -104,7 +104,8 @@ export const BaseSettingsDefinition = {
   },
   SUBSCRIPTION_RETRY_MAX_MS: {
     type: 'number',
-    description: 'The maximum time (ms) to wait before trying to subscribe again (takes precedent over SUBSCRIPTION_RETRY_MIN_MS',
+    description:
+      'The maximum time (ms) to wait before trying to subscribe again (takes precedent over SUBSCRIPTION_RETRY_MIN_MS',
     default: 20 * 60 * 1000,
     validate: validator.integer({ min: 3_000, max: 24 * 60 * 60 * 1000 }),
   },
@@ -116,7 +117,8 @@ export const BaseSettingsDefinition = {
   },
   SUBSCRIPTION_RETRY_EXP_FACTOR: {
     type: 'number',
-    description: 'The factor for exponential back-off to wait before trying to subscribe again (1 = no change from SUBSCRIPTION_RETRY_MIN_MS)',
+    description:
+      'The factor for exponential back-off to wait before trying to subscribe again (1 = no change from SUBSCRIPTION_RETRY_MIN_MS)',
     default: 3,
     validate: validator.integer({ min: 1, max: 10 }),
   },
