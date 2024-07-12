@@ -83,7 +83,10 @@ export abstract class SubscriptionTransport<const T extends TransportGenerics>
       this.retryCount = 0
     } catch (e) {
       logger.error(`Error with subscriptions in the backgroundHandler: ${e}`)
-      const timeout = context.adapterSettings.SUBSCRIPTION_RETRY_BASE_MS * (context.adapterSettings.SUBSCRIPTION_RETRY_EXP_FACTOR ** this.retryCount)
+      const timeout = Math.min(
+        context.adapterSettings.SUBSCRIPTION_RETRY_MIN_MS * (context.adapterSettings.SUBSCRIPTION_RETRY_EXP_FACTOR ** this.retryCount),
+        context.adapterSettings.SUBSCRIPTION_RETRY_MAX_MS
+      )
       this.retryTime = Date.now() + timeout
       this.retryCount += 1
       logger.info(`Waiting ${timeout}ms before backgroundHandler retry #${this.retryCount}`)
