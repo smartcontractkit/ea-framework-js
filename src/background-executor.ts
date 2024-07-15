@@ -95,7 +95,7 @@ export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromis
         `Finished background execute for endpoint "${endpoint.name}", calling it again in 10ms...`,
       )
       metricsTimer()
-      timeoutsMap[endpoint.name] = setTimeout(handler, 10)
+      timeoutsMap[endpoint.name] = setTimeout(handler, 10) // 10ms
     }
 
     // Start recursive async calls

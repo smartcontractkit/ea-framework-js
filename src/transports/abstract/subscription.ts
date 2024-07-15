@@ -14,9 +14,7 @@ const logger = makeLogger('SubscriptionTransport')
  *
  * @typeParam T - all types related to the [[Transport]]
  */
-export abstract class SubscriptionTransport<const T extends TransportGenerics>
-  implements Transport<T>
-{
+export abstract class SubscriptionTransport<T extends TransportGenerics> implements Transport<T> {
   responseCache!: ResponseCache<T>
   subscriptionSet!: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
   subscriptionTtl!: number
@@ -54,6 +52,7 @@ export abstract class SubscriptionTransport<const T extends TransportGenerics>
 
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
     logger.debug('Starting background execute')
+
     const entries = await this.subscriptionSet.getAll()
 
     // Keep track of active subscriptions for background execute

@@ -2,11 +2,6 @@ import CensorList, { CensorKeyValue } from '../util/censor/censor-list'
 import { Validator, validator } from '../validation/utils'
 
 export const BaseSettingsDefinition = {
-  // V2 compat
-  // ADAPTER_URL: {
-  //   description: 'The URL of another adapter from which data needs to be retrieved',
-  //   type: 'string',
-  // },
   API_TIMEOUT: {
     description:
       'The number of milliseconds a request can be pending before returning a timeout error for data provider request',
@@ -63,11 +58,6 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: '127.0.0.1',
   },
-  // CACHE_REDIS_MAX_QUEUED_ITEMS: {
-  //   description: 'Maximum length of the client internal command queue',
-  //   type: 'number',
-  //   default: 500,
-  // },
   CACHE_REDIS_MAX_RECONNECT_COOLDOWN: {
     description: 'Max cooldown (in ms) before attempting redis reconnection',
     type: 'number',
@@ -112,6 +102,26 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: '',
   },
+  STREAM_HANDLER_RETRY_MAX_MS: {
+    type: 'number',
+    description:
+      'The maximum time (ms) to wait before running the stream handler (takes precedent over STREAM_HANDLER_RETRY_MIN_MS',
+    default: 20 * 60 * 1000,
+    validate: validator.integer({ min: 3_000, max: 24 * 60 * 60 * 1000 }),
+  },
+  STREAM_HANDLER_RETRY_MIN_MS: {
+    type: 'number',
+    description: 'The minimum/base time (ms) to wait before trying to run the stream handler',
+    default: 100,
+    validate: validator.integer({ min: 100, max: 10_000 }),
+  },
+  STREAM_HANDLER_RETRY_EXP_FACTOR: {
+    type: 'number',
+    description:
+      'The factor for exponential back-off to wait before running the stream handler (1 = no change from STREAM_HANDLER_RETRY_MIN_MS)',
+    default: 3,
+    validate: validator.integer({ min: 1, max: 10 }),
+  },
   SUBSCRIPTION_SET_MAX_ITEMS: {
     type: 'number',
     description: 'The maximum number of subscriptions set',
@@ -123,20 +133,11 @@ export const BaseSettingsDefinition = {
     type: 'boolean',
     default: true,
   },
-  // DATA_PROVIDER_URL: {
-  //   description: 'Legacy variable that has the same functionality as ADAPTER_URL',
-  //   type: 'string',
-  // },
   DEBUG: {
     description: 'Toggles debug mode',
     type: 'boolean',
     default: false,
   },
-  // DEFAULT_WS_HEARTBEAT_INTERVAL: {
-  //   description: 'Interval between WS heartbeat pings (ms)',
-  //   type: 'number',
-  //   default: 30000,
-  // },
   EA_PORT: {
     description:
       'Port through which the EA will listen for REST requests (if mode is set to "reader" or "reader-writer")',
@@ -144,9 +145,6 @@ export const BaseSettingsDefinition = {
     default: 8080,
     validate: validator.port(),
   },
-  // ERROR_CAPACITY: {
-  //   type: 'number',
-  // },
   EXPERIMENTAL_METRICS_ENABLED: {
     description:
       'Flag to specify whether or not to collect metrics. Used as fallback for METRICS_ENABLED',
@@ -250,12 +248,6 @@ export const BaseSettingsDefinition = {
     default: 10_000,
     validate: validator.integer({ min: 500, max: 30_000 }),
   },
-  // WS_TIME_UNTIL_HANDLE_NEXT_MESSAGE_OVERRIDE: {
-  //   description: 'Time to wait until adapter should handle next WS message',
-  //   type: 'number',
-  // },
-
-  // V3
   CACHE_POLLING_MAX_RETRIES: {
     description:
       'Max amount of times to attempt to find EA response in the cache after the Transport has been set up',

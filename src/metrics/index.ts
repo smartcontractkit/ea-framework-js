@@ -294,6 +294,11 @@ export const metrics = new Metrics(() => ({
     help: 'The number of redis commands sent',
     labelNames: ['status', 'function_name'],
   }),
+  streamHandlerErrors: new client.Counter({
+    name: 'stream_handler_errors',
+    help: 'The number of stream handler errors per endpoint x transport',
+    labelNames: ['adapter_endpoint', 'transport'] as const,
+  }),
   cacheWarmerCount: new client.Gauge({
     name: 'cache_warmer_get_count',
     help: 'The number of cache warmers running',

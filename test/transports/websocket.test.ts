@@ -520,7 +520,7 @@ test.serial(
 
     const metrics = await testAdapter.getMetrics()
     metrics.assert(t, {
-      name: 'bg_execute_errors',
+      name: 'stream_handler_errors',
       labels: {
         adapter_endpoint: 'test',
         transport: 'default_single_transport',
@@ -776,7 +776,7 @@ test.serial('does not hang the background execution if the open handler hangs', 
 
   const metrics = await testAdapter.getMetrics()
   metrics.assert(t, {
-    name: 'bg_execute_errors',
+    name: 'stream_handler_errors',
     labels: {
       adapter_endpoint: 'test',
       transport: 'default_single_transport',
