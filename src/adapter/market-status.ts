@@ -7,11 +7,11 @@ import { AdapterEndpoint } from './endpoint'
  */
 export type MarketStatusEndpointInputParametersDefinition = InputParametersDefinition & {
   market: {
-    aliases: readonly [],
-    type: 'string',
-    description: 'The name of the market',
-    required: boolean,
-  },
+    aliases: readonly []
+    type: 'string'
+    description: 'The name of the market'
+    required: boolean
+  }
 }
 
 /**
@@ -51,4 +51,6 @@ export type MarketStatusEndpointGenerics = TransportGenerics & {
  * A MarketStatusEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its InputParameters must extend the basic ones (base).
  */
-export class MarketStatusEndpoint<T extends MarketStatusEndpointGenerics> extends AdapterEndpoint<T> {}
+export class MarketStatusEndpoint<
+  T extends MarketStatusEndpointGenerics,
+> extends AdapterEndpoint<T> {}
