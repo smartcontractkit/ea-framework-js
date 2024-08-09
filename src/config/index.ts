@@ -637,7 +637,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
 
     if (validationErrors.length > 0) {
       throw new Error(
-        `Validation failed for the following variables:\n ${validationErrors.join('\n')}`,
+        `Validation failed for the following variables:\n${validationErrors.join('\n')}`,
       )
     }
   }

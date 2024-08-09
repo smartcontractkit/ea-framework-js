@@ -268,7 +268,9 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
       if (e instanceof AdapterDataProviderError && e.cause instanceof AxiosError) {
         const err = e as AdapterDataProviderError
         const cause = err.cause as AxiosError
-        const errorMessage = `Provider request failed with status ${cause.status}: "${cause.response?.data}"`
+        const errorMessage = `Provider request failed with status ${cause.status}: ${JSON.stringify(
+          cause.response?.data,
+        )}`
         censorLogs(() => logger.info(errorMessage))
         return {
           results: requestConfig.params.map((entry) => ({
