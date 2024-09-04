@@ -51,7 +51,7 @@ export class CustomTransport implements Transport<CustomTransportTypes> {
   // request, process it,save it in the cache and return to user.
 <% } -%>
   async foregroundExecute(
-    req: AdapterRequest<typeof inputParameters.validated>
+    _: AdapterRequest<typeof inputParameters.validated>
   ): Promise<AdapterResponse<CustomTransportTypes['Response']>> {
 
     // Custom transport logic
@@ -68,16 +68,6 @@ export class CustomTransport implements Transport<CustomTransportTypes> {
         providerIndicatedTimeUnixMs: undefined,
       },
     }
-<% if (includeComments) { -%>
-    // Once the response object is ready, write it to the cache. Use the transport name, request payload and constructed response. Once cache is
-    // saved, return the response to the user.
-<% } -%>
-    await this.responseCache.write(this.name, [
-      {
-        params: req.requestContext.data,
-        response,
-      },
-    ])
 
     return response
   }
