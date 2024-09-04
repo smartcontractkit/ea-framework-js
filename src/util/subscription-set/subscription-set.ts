@@ -22,12 +22,14 @@ export class SubscriptionSetFactory {
   private redisClient?: Redis
   private adapterName?: string
   private capacity: AdapterSettings['SUBSCRIPTION_SET_MAX_ITEMS']
+  private cachePrefix: AdapterSettings['CACHE_PREFIX']
 
   constructor(adapterSettings: AdapterSettings, adapterName: string, redisClient?: Redis) {
     this.cacheType = adapterSettings.CACHE_TYPE
     this.redisClient = redisClient
     this.adapterName = adapterName
     this.capacity = adapterSettings.SUBSCRIPTION_SET_MAX_ITEMS
+    this.cachePrefix = adapterSettings.CACHE_PREFIX
   }
 
   buildSet<T>(endpointName: string, transportName: string): SubscriptionSet<T> {
@@ -39,7 +41,8 @@ export class SubscriptionSetFactory {
           throw new Error('Redis client undefined. Cannot create Redis subscription set')
         }
         // Identifier key used for the subscription set in redis
-        const subscriptionSetKey = `${this.adapterName}-${endpointName}-${transportName}-subscriptionSet`
+        const cachePrefix = this.cachePrefix ? `${this.cachePrefix}-` : ''
+        const subscriptionSetKey = `${cachePrefix}${this.adapterName}-${endpointName}-${transportName}-subscriptionSet`
         return new RedisSubscriptionSet<T>(this.redisClient, subscriptionSetKey)
       }
     }
