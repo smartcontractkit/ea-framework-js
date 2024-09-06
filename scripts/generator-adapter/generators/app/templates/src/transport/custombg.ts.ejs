@@ -2,11 +2,14 @@ import { TransportDependencies } from '@chainlink/external-adapter-framework/tra
 import { ResponseCache } from '@chainlink/external-adapter-framework/cache/response'
 import { Requester } from '@chainlink/external-adapter-framework/util/requester'
 import {
-  AdapterResponse, sleep
+  AdapterResponse, sleep, makeLogger
 } from '@chainlink/external-adapter-framework/util'
 import { SubscriptionTransport } from '@chainlink/external-adapter-framework/transports/abstract/subscription'
 import { EndpointContext } from '@chainlink/external-adapter-framework/adapter'
 import { BaseEndpointTypes, inputParameters } from '../endpoint/<%= inputEndpointName %>'
+import { AdapterError } from '@chainlink/external-adapter-framework/validation/error'
+
+const logger = makeLogger('CustomTransport')
 
 type RequestParams = typeof inputParameters.validated
 
@@ -63,8 +66,9 @@ export class CustomTransport extends SubscriptionTransport<CustomTransportTypes>
       response = await this._handleRequest(param)
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred'
+      logger.error(e, errorMessage)
       response = {
-        statusCode: 502,
+        statusCode: (e as AdapterError)?.statusCode || 502,
         errorMessage,
         timestamps: {
           providerDataRequestedUnixMs: 0,
