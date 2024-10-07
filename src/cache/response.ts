@@ -17,7 +17,7 @@ import {
   TypeFromDefinition,
 } from '../validation/input-params'
 import { validator } from '../validation/utils'
-import { Cache, calculateCacheKey, calculateFeedId } from './'
+import { Cache, calculateCacheKey, calculateFeedId, calculateAdapterName } from './'
 import * as cacheMetrics from './metrics'
 
 const logger = makeLogger('ResponseCache')
@@ -99,7 +99,7 @@ export class ResponseCache<
         this.adapterSettings.EXPERIMENTAL_METRICS_ENABLED
       ) {
         response.meta = {
-          adapterName: this.adapterName,
+          adapterName: calculateAdapterName(this.adapterName, r.params),
           metrics: {
             feedId: calculateFeedId(
               {

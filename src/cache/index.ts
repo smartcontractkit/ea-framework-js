@@ -152,6 +152,27 @@ const calculateKey = <T extends EndpointGenerics>({
   return `${endpointName}-${transportName}-${paramsKey}`
 }
 
+export const calculateAdapterName = (
+  adapterName: string,
+  data: Record<string, unknown>,
+): string => {
+  if (Object.keys(data).length === 0) {
+    logger.trace('Cannot generate Adapter Name without data, using default')
+    return adapterName
+  }
+
+  if (data && typeof data !== 'object') {
+    logger.trace('Cannot generate Adapter Name without valid data, using default')
+    return adapterName
+  }
+
+  if (data['adapterNameOverride'] && typeof data['adapterNameOverride'] === 'string') {
+    return data['adapterNameOverride'].toUpperCase()
+  } else {
+    return adapterName
+  }
+}
+
 export const calculateFeedId = <T extends EndpointGenerics>(
   {
     adapterSettings,
