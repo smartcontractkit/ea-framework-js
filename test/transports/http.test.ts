@@ -55,6 +55,7 @@ test.beforeEach((t) => {
 })
 
 test.afterEach(async (t) => {
+  t.context.clock.reset()
   t.context.clock.uninstall()
   await t.context.testAdapter?.api.close()
 })
@@ -523,8 +524,7 @@ test.serial('DP request fails, EA returns 502 cached error', async (t) => {
       to,
     },
     expectedResponse: {
-      errorMessage:
-        'Provider request failed with status undefined: "There was an unexpected issue"',
+      errorMessage: 'Provider request failed with status 500: "There was an unexpected issue"',
       statusCode: 502,
     },
   })
