@@ -264,9 +264,9 @@ module.exports = class extends Generator<{rootPath: string}> {
     const pkgJson = {
       devDependencies: {
         '@types/jest': '27.5.2',
-        '@types/node': '16.11.68',
+        '@types/node': '16.18.115',
         nock: '13.5.4',
-        typescript: '5.0.4',
+        typescript: '5.5.4',
       },
       dependencies: {
         '@chainlink/external-adapter-framework': this.props.frameworkVersion,
