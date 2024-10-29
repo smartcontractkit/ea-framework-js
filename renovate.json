@@ -1,0 +1,10 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "preview:dockerCompose",
+    "preview:dockerVersions",
+    "schedule:weekends"
+  ],
+  "prConcurrentLimit": 5
+}
