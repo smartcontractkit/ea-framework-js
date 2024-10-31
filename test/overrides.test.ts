@@ -28,6 +28,10 @@ const inputParameters = new InputParameters({
     description: 'quote',
     required: true,
   },
+  adapterNameOverride: {
+    type: 'string',
+    description: 'adapterNameOverride',
+  },
 })
 
 type TestTransportGenerics = TransportGenerics & {
@@ -175,6 +179,27 @@ test('adapter overrides that resolve field to overridable symbol are not overrid
 
   t.deepEqual(response.json().data, {
     base: 'overriden_1', // Want to check that it's not been overriden twice, which would be 'twice'
+    quote: 'USD',
+  })
+})
+
+test('adapter with overrideAdapterName uses overrideAdapterName', async (t) => {
+  const response = await t.context.testAdapter.request({
+    base: 'OVER2',
+    quote: 'USD',
+    adapterNameOverride: 'overridetest',
+    overrides: {
+      overridetest: {
+        OVER2: 'valid',
+      },
+      test: {
+        OVER2: 'invalid',
+      },
+    },
+  })
+
+  t.deepEqual(response.json().data, {
+    base: 'valid',
     quote: 'USD',
   })
 })
