@@ -110,6 +110,11 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     }
   }
 
+  getRequestOverrides(data: Record<string, string>, overrides?: Overrides) {
+    const overrideAdapterName = data['adapterNameOverride']
+    return overrides?.[overrideAdapterName] || overrides?.[this.adapterName.toLowerCase()]
+  }
+
   /**
    * Default request transform that takes requests and manipulates base params
    *
@@ -118,9 +123,9 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @returns the modified (or new) request
    */
   symbolOverrider(req: AdapterRequest<TypeFromDefinition<T['Parameters']>>) {
-    const rawRequestBody = req.body as { data?: { overrides?: Overrides } }
-    const requestOverrides = rawRequestBody.data?.overrides?.[this.adapterName.toLowerCase()]
     const data = req.requestContext.data as Record<string, string>
+    const rawRequestBody = req.body as { data?: { overrides?: Overrides } }
+    const requestOverrides = this.getRequestOverrides(data, rawRequestBody.data?.overrides)
     const base = data['base']
     if (requestOverrides?.[base]) {
       // Perform overrides specified in the request payload

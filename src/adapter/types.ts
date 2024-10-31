@@ -148,7 +148,10 @@ export interface BaseAdapterEndpointParams<T extends EndpointGenerics> {
   /** Custom function that generates cache keys */
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
 
-  /** Custom input validation. Void function that should throw AdapterInputError on validation errors */
+  /**
+   * Custom input validation. Void function that should throw AdapterInputError on validation errors.
+   * Can be used to pre-transform requests before all the requestTransforms happens
+   */
   customInputValidation?: CustomInputValidator<T>
 
   /** Custom output validation. Void function that should throw AdapterError on validation errors */
