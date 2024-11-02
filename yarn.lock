@@ -404,7 +404,7 @@
     execa "^5.0.0"
     rxjs "^6.4.0"
 
-"@types/yeoman-generator@*":
+"@types/yeoman-generator@*", "@types/yeoman-generator@5.2.14":
   version "5.2.14"
   resolved "https://registry.yarnpkg.com/@types/yeoman-generator/-/yeoman-generator-5.2.14.tgz#31bc71dfaf2a11885a41924779a5e8abd2d1612f"
   integrity sha512-eIYBqQyURXiAaoU6jvJqMI+tNSG4s7EXtcHucLCgb8EV2vqz4x1WPr91MT0MiWHV8+9dDRrMkc1VZ6LduexuyA==
@@ -414,18 +414,6 @@
     "@types/inquirer" "^8"
     "@types/mem-fs-editor" "*"
     "@types/node" "*"
-    "@types/yeoman-environment" "*"
-    rxjs "^6.4.0"
-
-"@types/yeoman-generator@5.2.11":
-  version "5.2.11"
-  resolved "https://registry.yarnpkg.com/@types/yeoman-generator/-/yeoman-generator-5.2.11.tgz#fa6bdab74b44d27f07e309c8ae387b62edbc6bc1"
-  integrity sha512-Eu56V69QPODdnHhdHil2xzw8SvR6cJdgkQBmGkyYDNz6dTErr3wCCUv+Uvw5jPATZjyB+b2CNyZbidI79KBcdw==
-  dependencies:
-    "@types/debug" "*"
-    "@types/ejs" "*"
-    "@types/inquirer" "^8"
-    "@types/mem-fs-editor" "*"
     "@types/yeoman-environment" "*"
     rxjs "^6.4.0"
 
