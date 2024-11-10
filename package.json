@@ -9,7 +9,7 @@
     "eventsource": "2.0.2",
     "fastify": "4.28.1",
     "ioredis": "5.4.1",
-    "mock-socket": "9.1.5",
+    "mock-socket": "9.3.1",
     "pino": "8.6.1",
     "pino-pretty": "9.1.0",
     "prom-client": "13.2.0",
