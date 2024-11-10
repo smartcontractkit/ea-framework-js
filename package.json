@@ -15,7 +15,7 @@
     "prom-client": "13.2.0",
     "redlock": "5.0.0-beta.2",
     "ws": "8.17.1",
-    "yeoman-generator": "3.1.1"
+    "yeoman-generator": "3.2.0"
   },
   "scripts": {
     "build": "mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc && yarn build-generator",
