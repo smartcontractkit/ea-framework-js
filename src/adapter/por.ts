@@ -22,7 +22,8 @@ export type PoRAddress = Record<string, unknown> & {
 }
 
 export type PoRTokenAddress = Record<string, unknown> & {
-  network: string
+  network?: string
+  chainId?: string
   contractAddress: string
   wallets: string[]
   balanceOfSignature?: string
