@@ -21,10 +21,25 @@ export type PoRAddress = Record<string, unknown> & {
   address: string
 }
 
+export type PoRTokenAddress = Record<string, unknown> & {
+  network: string
+  contractAddress: string
+  wallets: string[]
+  balanceOfSignature?: string
+  decimalsSignature?: string
+}
+
 export type PoRAddressResponse = {
   Result: null
   Data: {
     result: PoRAddress[]
+  }
+}
+
+export type PoRTokenAddressResponse = {
+  Result: null
+  Data: {
+    result: PoRTokenAddress[]
   }
 }
 
@@ -35,11 +50,19 @@ export type PoRAddressEndpointGenerics = TransportGenerics & {
   Response: PoRAddressResponse
 }
 
+export type PoRTokenAddressEndpointGenerics = TransportGenerics & {
+  Response: PoRTokenAddressResponse
+}
+
 /**
  * A PoRAddressEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its response type must be `PoRAddressResponse`
  */
 export class PoRAddressEndpoint<T extends PoRAddressEndpointGenerics> extends AdapterEndpoint<T> {}
+
+export class PoRTokenAddressEndpoint<
+  T extends PoRTokenAddressEndpointGenerics,
+> extends AdapterEndpoint<T> {}
 
 export type PoRBalance = Record<string, unknown> & {
   balance: string
@@ -140,7 +163,7 @@ export class PoRProviderEndpoint<
 
 /**
  * A PoRAdapter is a specific kind of Adapter that includes at least one PoRTotalBalanceEndpoint,
- * PoRBalanceEndpoint, PoRAddressEndpoint or PoRProviderEndpoint.
+ * PoRBalanceEndpoint, PoRAddressEndpoint, PoRTokenAddressEndpoint or PoRProviderEndpoint.
  */
 export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
   constructor(params: AdapterParams<T>) {
@@ -174,6 +197,7 @@ export class PoRAdapter<T extends SettingsDefinitionMap> extends Adapter<T> {
         e instanceof PoRBalanceEndpoint ||
         e instanceof PoRTotalBalanceEndpoint ||
         e instanceof PoRAddressEndpoint ||
+        e instanceof PoRTokenAddressEndpoint ||
         e instanceof PoRProviderEndpoint,
     )
     if (!porEndpoints.length) {
