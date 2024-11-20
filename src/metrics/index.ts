@@ -74,8 +74,8 @@ export const buildMetricsMiddleware = (
   metrics.get('httpRequestsTotal').labels(labels).inc()
 
   // Record response time of request through entire EA
-  metrics.get('httpRequestDurationSeconds').observe(res.getResponseTime() / 1000)
-  censorLogs(() => logger.debug(`Response time for ${feedId}: ${res.getResponseTime()}ms`))
+  metrics.get('httpRequestDurationSeconds').observe(res.elapsedTime / 1000)
+  censorLogs(() => logger.debug(`Response time for ${feedId}: ${res.elapsedTime}ms`))
 
   const requestSize = Buffer.byteLength(JSON.stringify(req.body))
   metrics.get('requestPayloadSize').observe(requestSize)
