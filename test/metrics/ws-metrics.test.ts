@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
@@ -133,7 +134,7 @@ test.before(async (t) => {
     socket.on('message', parseMessage)
   })
 
-  t.context.clock = FakeTimers.install()
+  t.context.clock = installTimers()
   t.context.testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
   t.context.server = mockWsServer
 })

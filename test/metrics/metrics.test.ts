@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import axios from 'axios'
 import MockAdapter from 'axios-mock-adapter'
@@ -100,7 +101,7 @@ const to = 'USD'
 const price = 1234
 
 test.before(async (t) => {
-  t.context.clock = FakeTimers.install()
+  t.context.clock = installTimers()
   process.env['METRICS_ENABLED'] = 'true'
   const config = new AdapterConfig(
     {},

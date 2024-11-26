@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
@@ -123,12 +124,12 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
   return adapter
 }
 
-test.beforeEach((t) => {
-  t.context.clock = FakeTimers.install()
+test.before((t) => {
+  t.context.clock = installTimers()
 })
 
 test.afterEach((t) => {
-  t.context.clock.uninstall()
+  t.context.clock.reset()
 })
 
 test.serial('connects to websocket, subscribes, gets message, unsubscribes', async (t) => {

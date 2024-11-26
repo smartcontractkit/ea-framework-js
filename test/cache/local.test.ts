@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
 import { Cache, CacheFactory, LocalCache } from '../../src/cache'
@@ -13,8 +14,11 @@ const test = untypedTest as TestFn<{
   cache: Cache
 }>
 
+test.before(async (t) => {
+  t.context.clock = installTimers()
+})
+
 test.beforeEach(async (t) => {
-  t.context.clock = FakeTimers.install()
   const config = new AdapterConfig(
     {},
     {
@@ -51,7 +55,7 @@ test.beforeEach(async (t) => {
 })
 
 test.afterEach((t) => {
-  t.context.clock.uninstall()
+  t.context.clock.reset()
 })
 
 test.serial('Test cache factory success (redis)', async (t) => {

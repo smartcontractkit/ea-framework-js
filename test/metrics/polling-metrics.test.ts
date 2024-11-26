@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { TestAdapter } from '../../src/util/testing-utils'
 import { buildHttpAdapter } from './helper'
@@ -22,7 +23,7 @@ test.before(async (t) => {
   const adapter = buildHttpAdapter()
 
   // Start the adapter
-  t.context.clock = FakeTimers.install()
+  t.context.clock = installTimers()
   t.context.testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 })
 
