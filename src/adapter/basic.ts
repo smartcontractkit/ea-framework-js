@@ -463,7 +463,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
         try {
           // `await` is required to catch the error, you'll get an unhandled promise rejection otherwise
           // Disable non-null assertion operator because we already checked for the existence of registerRequest
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+
           return await transport.registerRequest!(req, this.config.settings)
         } catch (err) {
           censorLogs(() => logger.error(`Error registering request: ${err}`))

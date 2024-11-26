@@ -49,6 +49,7 @@ const settings = {
   },
 } satisfies SettingsDefinitionMap
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const adapterConfig = new AdapterConfig(settings)
 
 const restUrl = 'http://test-url.com'

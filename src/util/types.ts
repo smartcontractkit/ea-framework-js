@@ -3,7 +3,6 @@ import { Adapter } from '../adapter'
 import { AdapterError } from '../validation/error'
 import { InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
 declare module 'fastify' {
-  // eslint-disable-next-line no-shadow
   export interface FastifyRequest {
     requestContext: AdapterRequestContext<unknown>
   }

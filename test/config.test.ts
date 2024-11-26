@@ -13,7 +13,7 @@ test.serial('Test config validator', async (t) => {
     config.initialize()
     config.validate()
     t.fail()
-  } catch (e: unknown) {
+  } catch (_) {
     t.pass()
   }
 })
@@ -33,7 +33,7 @@ test.serial('Test bad enum config', async (t) => {
     config.initialize()
     config.validate()
     t.fail()
-  } catch (e: unknown) {
+  } catch (_) {
     t.pass()
   }
 })
@@ -42,7 +42,7 @@ test.serial('Test bad env name', async (t) => {
   try {
     getEnv('$#%', {} as SettingDefinition)
     t.fail()
-  } catch (e: unknown) {
+  } catch (_) {
     t.pass()
   }
 })
@@ -74,7 +74,7 @@ test.serial('Test missing custom settings (required)', async (t) => {
     config.initialize()
     config.validate()
     t.fail()
-  } catch (e: unknown) {
+  } catch (_) {
     t.pass()
   }
 })
@@ -92,7 +92,7 @@ test.serial('Test custom settings (overlap base)', async (t) => {
     config.initialize()
     config.validate()
     t.fail()
-  } catch (e: unknown) {
+  } catch (_) {
     t.pass()
   }
 })
@@ -119,7 +119,7 @@ test.serial('Test validate function (out of bounds)', async (t) => {
   try {
     config.validate()
     t.fail()
-  } catch (e) {
+  } catch (_) {
     t.pass()
   }
 })
@@ -138,7 +138,7 @@ test.serial('Test validate function (decimal)', async (t) => {
   try {
     config.validate()
     t.fail()
-  } catch (e) {
+  } catch (_) {
     t.pass()
   }
 })
@@ -157,7 +157,7 @@ test.serial('Test validate function (scientific notation)', async (t) => {
   try {
     config.validate()
     t.pass()
-  } catch (e) {
+  } catch (_) {
     t.fail()
   }
 })

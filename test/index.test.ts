@@ -112,7 +112,7 @@ test('MTLS_ENABLED connection with incorrect params should error', async (t) => 
   })
   try {
     await start(adapter)
-  } catch (e: unknown) {
+  } catch (_) {
     t.pass()
   }
 })

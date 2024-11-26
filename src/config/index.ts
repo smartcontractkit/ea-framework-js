@@ -662,7 +662,6 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
         key: name,
         // Escaping potential special characters in values before creating regex
         value: new RegExp(
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           ((this.settings as Record<string, ValidSettingValue>)[name]! as string).replace(
             /[-[\]{}()*+?.,\\^$|#\s]/g,
             '\\$&',
