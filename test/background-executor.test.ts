@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from './helper'
 import untypedTest, { TestFn } from 'ava'
 import { start } from '../src'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../src/adapter'
@@ -41,7 +42,7 @@ test.serial('background executor calls transport function with background contex
 })
 
 test.serial('background executor ends recursive chain on server close', async (t) => {
-  const clock = FakeTimers.install()
+  const clock = installTimers()
   let timesCalled = 0
 
   const transport = new (class extends NopTransport {
@@ -124,7 +125,7 @@ test.serial('background executor error does not stop the loop', async (t) => {
 
 test.serial('background executor timeout does not stop the loop', async (t) => {
   eaMetrics.clear()
-  const clock = FakeTimers.install()
+  const clock = installTimers()
   const [promise, resolve] = deferredPromise<EndpointContext<NopTransportTypes>>()
   let iteration = 0
 

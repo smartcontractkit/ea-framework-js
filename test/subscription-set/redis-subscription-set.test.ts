@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
@@ -231,8 +232,8 @@ test.before(async (_) => {
   process.env['BACKGROUND_EXECUTE_MS_HTTP'] = '1000'
 })
 
-test.beforeEach((t) => {
-  t.context.clock = FakeTimers.install()
+test.before((t) => {
+  t.context.clock = installTimers()
 })
 
 test.afterEach((t) => {

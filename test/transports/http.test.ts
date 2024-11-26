@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
@@ -50,13 +51,12 @@ interface ProviderVolumeResponseBody {
   }>
 }
 
-test.beforeEach((t) => {
-  t.context.clock = FakeTimers.install()
+test.before((t) => {
+  t.context.clock = installTimers()
 })
 
 test.afterEach(async (t) => {
   t.context.clock.reset()
-  t.context.clock.uninstall()
   await t.context.testAdapter?.api.close()
 })
 

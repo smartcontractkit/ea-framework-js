@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosRequestConfig } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
@@ -151,7 +152,7 @@ const mockHTTP = () => {
 }
 
 test('connects to EventSource, subscribes, gets message, unsubscribes and handles misconfigured subscription', async (t) => {
-  t.context.clock = FakeTimers.install()
+  t.context.clock = installTimers()
 
   // Mocks SSE events which are handled by the mock EventListener dependency
   mockSSE()

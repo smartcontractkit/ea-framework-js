@@ -1,4 +1,5 @@
-import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { InstalledClock } from '@sinonjs/fake-timers'
+import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
@@ -19,12 +20,12 @@ const test = untypedTest as TestFn<{
   api: FastifyInstance | undefined
 }>
 
-test.beforeEach((t) => {
-  t.context.clock = FakeTimers.install()
+test.before((t) => {
+  t.context.clock = installTimers()
 })
 
 test.afterEach(async (t) => {
-  t.context.clock.uninstall()
+  t.context.clock.reset()
   await t.context.testAdapter?.api.close()
 })
 
