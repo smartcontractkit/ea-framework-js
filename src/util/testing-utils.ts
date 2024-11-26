@@ -180,7 +180,6 @@ class CommandChainMock {
     return this
   }
 
-  // eslint-disable-next-line max-params
   setExternalAdapterResponse(key: string, value: string, ttl: number) {
     this.promises.push(this.redisMock.setExternalAdapterResponse(key, value, ttl))
     return this
@@ -436,7 +435,6 @@ export class TestAdapter<T extends SettingsDefinitionMap = SettingsDefinitionMap
     // Advance clock so that the batch warmer executes once again and wait for the cache to be set
     // We disable the non-null assertion because we've already checked for existence in the line above
     await runAllUntil(this.clock, () => {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const cacheSize = this.mockCache!.cache.size
       return cacheSize >= (expectedSize || 1)
     })

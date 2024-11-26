@@ -58,7 +58,7 @@ test.serial('Test cache factory success (redis)', async (t) => {
   try {
     CacheFactory.buildCache({ cacheType: 'local', maxSizeForLocalCache: 10000 })
     t.pass()
-  } catch (e: unknown) {
+  } catch (_) {
     t.fail()
   }
 })

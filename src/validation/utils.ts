@@ -104,9 +104,10 @@ const url: () => Validator<string> = () => ({
   },
   fn: (value) => {
     try {
+      /* eslint-disable-next-line @typescript-eslint/no-unused-expressions */
       value && new URL(value)
     } catch (e) {
-      return `Value must be valid URL. Received ${value}`
+      return `Value must be valid URL. Received ${value}, error ${e}`
     }
     return
   },
@@ -157,7 +158,7 @@ const base64: () => Validator<string> = () => ({
       const encodedAgain = Buffer.from(decoded, 'utf-8').toString('base64')
       return value !== encodedAgain ? errorMessage : undefined
     } catch (err) {
-      return errorMessage
+      return `Value is not valid base64 string. ${err}`
     }
   },
 })

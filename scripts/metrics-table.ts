@@ -1,7 +1,7 @@
 import { metrics } from '../src/metrics/index'
 
 metrics.initialize()
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const metricDefs = metrics.getMetricsDefinition() as unknown as {
   [key: string]: {
     help: string

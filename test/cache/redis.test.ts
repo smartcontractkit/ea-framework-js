@@ -138,7 +138,7 @@ test.serial('Test cache factory success (redis)', async (t) => {
       new RedisMock() as unknown as Redis,
     )
     t.is(true, true)
-  } catch (e: unknown) {
+  } catch (_) {
     t.is(true, false)
   }
 })
@@ -147,7 +147,7 @@ test.serial('Test cache factory failure (redis)', async (t) => {
   try {
     CacheFactory.buildCache({ cacheType: 'redis', maxSizeForLocalCache: 10000 })
     t.fail()
-  } catch (e: unknown) {
+  } catch (_) {
     t.pass()
   }
 })

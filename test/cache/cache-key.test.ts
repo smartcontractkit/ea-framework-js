@@ -194,7 +194,7 @@ test.serial('throws error when cache data is not object', async (t) => {
       adapterSettings: {} as BaseAdapterSettings,
     })
     t.fail()
-  } catch (e: unknown) {
+  } catch (_) {
     t.pass()
   }
 })

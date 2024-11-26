@@ -35,7 +35,7 @@ test('subscription set factory (redis cache missing client)', async (t) => {
   try {
     factory.buildSet('test', 'test')
     t.fail()
-  } catch (e: unknown) {
+  } catch (_) {
     t.pass()
   }
 })

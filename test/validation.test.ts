@@ -667,7 +667,7 @@ test.serial('Test url validator', async (t) => {
   t.is(error, undefined)
   value = 'unknown_url'
   error = urlValidator.fn(value)
-  t.is(error, 'Value must be valid URL. Received unknown_url')
+  t.is(error, 'Value must be valid URL. Received unknown_url, error TypeError: Invalid URL')
 })
 
 test.serial('Test host validator', async (t) => {
@@ -702,7 +702,10 @@ test.serial('Test base64 validator', async (t) => {
   // @ts-expect-error - testing invalid input
   let value: string = -1
   let error = base64Validator.fn(value)
-  t.is(error, 'Value is not valid base64 string.')
+  t.is(
+    error,
+    'Value is not valid base64 string. TypeError [ERR_INVALID_ARG_TYPE]: The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received type number (-1)',
+  )
   // @ts-expect-error - testing invalid input
   value = undefined
   error = base64Validator.fn(value)
