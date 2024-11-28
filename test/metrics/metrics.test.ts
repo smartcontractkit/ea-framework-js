@@ -132,8 +132,10 @@ const feed_id = '{\\"from\\":\\"eth\\",\\"to\\":\\"usd\\"}'
 test.serial('test basic metrics', async (t) => {
   axiosMock
     .onGet(`${URL}/price`, {
-      base: from,
-      quote: to,
+      params: {
+        base: from,
+        quote: to,
+      },
     })
     .reply(200, {
       price,
@@ -236,8 +238,10 @@ test.serial('test basic metrics', async (t) => {
   // Test http requests total metrics (cache hit)
   axiosMock
     .onGet(`${URL}/price`, {
-      base: from,
-      quote: to,
+      params: {
+        base: from,
+        quote: to,
+      },
     })
     .reply(200, {
       price,
@@ -314,8 +318,10 @@ test('invalid metric name throws error', async (t) => {
 test.serial('validate response.meta has the correct properties', async (t) => {
   axiosMock
     .onGet(`${URL}${endpoint}`, {
-      base: from,
-      quote: to,
+      params: {
+        base: from,
+        quote: to,
+      },
     })
     .reply(200, {
       price,
@@ -333,8 +339,10 @@ test.serial('test cache overflow metric', async (t) => {
   for (let i = 0; i < 1100; i++) {
     axiosMock
       .onGet(`${URL}/price`, {
-        base: `${from}${i}`,
-        quote: to,
+        params: {
+          base: `${from}${i}`,
+          quote: to,
+        },
       })
       .reply(200, {
         price,
