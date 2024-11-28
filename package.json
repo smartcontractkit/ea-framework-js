@@ -18,7 +18,7 @@
     "yeoman-generator": "7.3.3",
     "@yeoman/types": "1.5.0",
     "mem-fs": "4.1.1",
-    "@yeoman/adapter": "1.6.0"
+    "@yeoman/adapter": "2.0.0"
   },
   "scripts": {
     "build": "mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc && yarn build-generator",
