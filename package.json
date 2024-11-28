@@ -67,11 +67,13 @@
     "files": [
       "test/**/*.test.ts"
     ],
-    "extensions": [
-      "ts"
-    ],
+    "extensions": {
+      "mjs": true,
+      "ts": "commonjs"
+    },
     "require": [
-      "ts-node/register"
+      "ts-node/register",
+      "./test/_force-exit.mjs"
     ],
     "workerThreads": false,
     "environmentVariables": {
