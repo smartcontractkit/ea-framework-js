@@ -5,7 +5,7 @@ import { config } from '../config'
 import overrides from '../config/overrides.json'
 import { <%= inputTransports[0].name %> } from '../transport/<%= inputEndpointName %>'
 
-<%- include ./base.ts.ejs %>
+<%- include ('base.ts.ejs') %>
 
 export const endpoint = new AdapterEndpoint({
 <% if (includeComments) { -%>

@@ -15,7 +15,10 @@
     "prom-client": "13.2.0",
     "redlock": "5.0.0-beta.2",
     "ws": "8.18.0",
-    "yeoman-generator": "3.2.0"
+    "yeoman-generator": "7.3.3",
+    "@yeoman/types": "1.5.0",
+    "mem-fs": "4.1.1",
+    "@yeoman/adapter": "1.6.0"
   },
   "scripts": {
     "build": "mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc && yarn build-generator",
@@ -39,7 +42,6 @@
     "@types/node": "22.10.1",
     "@types/sinonjs__fake-timers": "8.1.5",
     "@types/ws": "8.5.13",
-    "@types/yeoman-generator": "5.2.14",
     "@typescript-eslint/eslint-plugin": "8.16.0",
     "@typescript-eslint/parser": "8.16.0",
     "ava": "6.2.0",
