@@ -419,7 +419,7 @@ test('crypto price endpoint has common aliases', async (t) => {
         providerDataReceivedUnixMs: 0,
         providerIndicatedTimeUnixMs: undefined,
       },
-    } as AdapterResponse<PriceTestTypes['Response']>)
+    }) as AdapterResponse<PriceTestTypes['Response']>
 
   const data = {
     base: 'BTC',
@@ -461,7 +461,7 @@ test('price adapter throws if non-crypto endpoint reuses aliases', async (t) => 
         providerDataReceivedUnixMs: 0,
         providerIndicatedTimeUnixMs: undefined,
       },
-    } as AdapterResponse<PriceTestTypes['Response']>)
+    }) as AdapterResponse<PriceTestTypes['Response']>
 
   const adapter = new PriceAdapter({
     name: 'TEST',
@@ -499,7 +499,7 @@ test('can create a price adapter with only a single ', async (t) => {
         providerDataReceivedUnixMs: 0,
         providerIndicatedTimeUnixMs: undefined,
       },
-    } as AdapterResponse<PriceTestTypes['Response']>)
+    }) as AdapterResponse<PriceTestTypes['Response']>
 
   const adapter = new PriceAdapter({
     name: 'TEST',

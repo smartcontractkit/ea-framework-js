@@ -469,14 +469,14 @@ type SettingValueType = string | number | boolean
 type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
   ? string
   : C['type'] extends 'number'
-  ? number
-  : C['type'] extends 'boolean'
-  ? boolean
-  : C['type'] extends 'enum'
-  ? C['options'] extends readonly string[]
-    ? C['options'][number]
-    : never
-  : never
+    ? number
+    : C['type'] extends 'boolean'
+      ? boolean
+      : C['type'] extends 'enum'
+        ? C['options'] extends readonly string[]
+          ? C['options'][number]
+          : never
+        : never
 export type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
 export type SettingDefinition =
   | {
@@ -552,16 +552,16 @@ export type Settings<T extends SettingsDefinitionMap> = {
   }
     ? K
     : T[K]['required'] extends true
-    ? K
-    : never]: SettingType<T[K]>
+      ? K
+      : never]: SettingType<T[K]>
 } & {
   -readonly [K in keyof T as T[K] extends {
     default: SettingValueType
   }
     ? never
     : T[K]['required'] extends true
-    ? never
-    : K]?: SettingType<T[K]> | undefined
+      ? never
+      : K]?: SettingType<T[K]> | undefined
 }
 
 export type BaseAdapterSettings = Settings<BaseSettingsDefinitionType>
@@ -574,9 +574,8 @@ export type CustomSettingsDefinition<T = SettingsDefinitionMap> = Record<keyof T
 export type EmptySettingsDefinitionMap = Record<string, never>
 export type SettingsDefinitionMap = Record<string, SettingDefinition>
 export type ValidationErrorMessage = string | undefined
-export type SettingsDefinitionFromConfig<T> = T extends AdapterConfig<infer Definition>
-  ? Definition
-  : never
+export type SettingsDefinitionFromConfig<T> =
+  T extends AdapterConfig<infer Definition> ? Definition : never
 
 export type SettingDefinitionDetails = {
   type: string

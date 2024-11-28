@@ -24,7 +24,10 @@ export class RedisCache<T = unknown> implements Cache<T> {
   type = CacheTypes.Redis
   private localCache: LocalCache
 
-  constructor(private client: Redis, localCacheCapacity: number) {
+  constructor(
+    private client: Redis,
+    localCacheCapacity: number,
+  ) {
     // Local cache is used for fast reads. Every SET to redis also sets the value to local cache.
     this.localCache = new LocalCache(localCacheCapacity)
     this.defineCommands()
