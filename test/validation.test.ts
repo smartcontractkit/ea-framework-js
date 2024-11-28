@@ -469,7 +469,7 @@ test.serial('omitted optional param returns 200', async (t) => {
 })
 
 test.serial('duplicate params in definition fails', async (t) => {
-  const error: AdapterInputError | undefined = t.throws(() => {
+  const error = t.throws(() => {
     new InputParameters({
       base: {
         type: 'string',
@@ -528,7 +528,7 @@ test.serial('non-required number allows default 0', async (t) => {
 })
 
 test.serial('missing dependency fails validation', async (t) => {
-  const error: AdapterInputError | undefined = t.throws(() => {
+  const error = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
       base: {
         type: 'string',
@@ -543,7 +543,7 @@ test.serial('missing dependency fails validation', async (t) => {
 })
 
 test.serial('missing exclusion fails validation', async (t) => {
-  const error: AdapterInputError | undefined = t.throws(() => {
+  const error = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
       base: {
         type: 'string',
@@ -558,7 +558,7 @@ test.serial('missing exclusion fails validation', async (t) => {
 })
 
 test.serial('dependency on required param fails validation', async (t) => {
-  const error: AdapterInputError | undefined = t.throws(() => {
+  const error = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
       base: {
         type: 'string',
@@ -581,7 +581,7 @@ test.serial('dependency on required param fails validation', async (t) => {
 })
 
 test.serial('exclusion of required param fails validation', async (t) => {
-  const error: AdapterInputError | undefined = t.throws(() => {
+  const error = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
       base: {
         type: 'string',
@@ -601,7 +601,7 @@ test.serial('exclusion of required param fails validation', async (t) => {
 })
 
 test.serial('aliases of different properties with common values fail validation', async (t) => {
-  const error: AdapterInputError | undefined = t.throws(() => {
+  const error = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
       base: {
         type: 'string',
@@ -623,7 +623,7 @@ test.serial('aliases of different properties with common values fail validation'
 })
 
 test.serial('throws on empty options array', async (t) => {
-  const error: AdapterInputError | undefined = t.throws(() => {
+  const error = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
       base: {
         type: 'string',
@@ -637,7 +637,7 @@ test.serial('throws on empty options array', async (t) => {
 })
 
 test.serial('throws on repeated options', async (t) => {
-  const error: AdapterInputError | undefined = t.throws(() => {
+  const error = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({
       base: {
         type: 'string',
