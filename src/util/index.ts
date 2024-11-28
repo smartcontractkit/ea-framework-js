@@ -166,10 +166,13 @@ export const groupArrayByKey = <T extends Record<string, string>, K extends keyo
   array: T[],
   key: K,
 ) => {
-  return array.reduce((groupedItems, item) => {
-    const keyValue = item[key]
-    groupedItems[keyValue] ??= []
-    groupedItems[keyValue].push(item)
-    return groupedItems
-  }, {} as Record<T[K], T[]>)
+  return array.reduce(
+    (groupedItems, item) => {
+      const keyValue = item[key]
+      groupedItems[keyValue] ??= []
+      groupedItems[keyValue].push(item)
+      return groupedItems
+    },
+    {} as Record<T[K], T[]>,
+  )
 }

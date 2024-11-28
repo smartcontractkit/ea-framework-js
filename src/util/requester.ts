@@ -100,7 +100,10 @@ export class Requester {
   private timeout: number
   private sleepBeforeRequeueingMs: number
 
-  constructor(private rateLimiter: RateLimiter, adapterSettings: AdapterSettings) {
+  constructor(
+    private rateLimiter: RateLimiter,
+    adapterSettings: AdapterSettings,
+  ) {
     this.maxRetries = adapterSettings.RETRY
     this.timeout = adapterSettings.API_TIMEOUT
     this.sleepBeforeRequeueingMs = adapterSettings.REQUESTER_SLEEP_BEFORE_REQUEUEING_MS
