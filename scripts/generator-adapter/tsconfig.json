@@ -2,11 +2,11 @@
   "compilerOptions": {
     "rootDir": "./../",
     "outDir": "../../dist/src",
-    "target": "es2020",
+    "target": "es2022",
     "downlevelIteration": true,
-    "esModuleInterop": false,
+    "esModuleInterop": true,
     "moduleResolution": "node",
-    "module": "CommonJS",
+    "module": "es2020",
     "resolveJsonModule": true
   },
   "files": [

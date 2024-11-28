@@ -1,4 +1,8 @@
 import * as Generator from 'yeoman-generator'
+import { exec } from 'child_process'
+
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 
 interface InputTransport {
   type: string
@@ -18,8 +22,7 @@ interface GeneratorEndpointContext {
   normalizedEndpointNameCap: string
 }
 
-
-module.exports = class extends Generator<{rootPath: string}> {
+export default class extends Generator.default {
   props: {
     // Current ea-framework version in package.json
     frameworkVersion: string
@@ -43,7 +46,7 @@ module.exports = class extends Generator<{rootPath: string}> {
   standalone = process.env.EXTERNAL_ADAPTER_GENERATOR_STANDALONE === 'true'
 
   constructor(args, opts) {
-    super(args, opts)
+    super(args, opts, { customInstallTask: true })
     this.argument('rootPath', {
       type: String,
       required: false,
@@ -85,7 +88,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     this.props = {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
-      frameworkVersion: (await import('../../../package.json')).version,
+      frameworkVersion: (await require('../../../package.json')).version,
       adapterName,
       endpoints,
       endpointNames,
@@ -117,7 +120,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     baseFiles.forEach(fileName => {
       this.fs.copyTpl(
         this.templatePath(fileName),
-        this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/${fileName}`),
+        this.destinationPath(`${this.args[0]}/${this.props.adapterName}/${fileName}`),
         {...this.props, standalone: this.standalone}
       )
     })
@@ -125,14 +128,14 @@ module.exports = class extends Generator<{rootPath: string}> {
     // copy main index.ts file
     this.fs.copyTpl(
       this.templatePath(`src/index.ts.ejs`),
-      this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/index.ts`),
+      this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/index.ts`),
       this.props
     )
 
     // Copy overrides
     this.fs.copyTpl(
       this.templatePath('src/config/overrides.json'),
-      this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/config/overrides.json`),
+      this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/config/overrides.json`),
       this.props,
     )
 
@@ -142,7 +145,7 @@ module.exports = class extends Generator<{rootPath: string}> {
         // Router endpoints
         this.fs.copyTpl(
           this.templatePath('src/endpoint/endpoint-router.ts.ejs'),
-          this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/endpoint/${inputEndpointName}.ts`),
+          this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/endpoint/${inputEndpointName}.ts`),
           {
             inputEndpointName,
             inputTransports,
@@ -155,7 +158,7 @@ module.exports = class extends Generator<{rootPath: string}> {
         inputTransports.forEach(transport => {
           this.fs.copyTpl(
             this.templatePath(`src/transport/${transport.type}.ts.ejs`),
-            this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/transport/${inputEndpointName}-${transport.type}.ts`),
+            this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/transport/${inputEndpointName}-${transport.type}.ts`),
             { inputEndpointName, includeComments: this.props.includeComments },
           )
         })
@@ -163,7 +166,7 @@ module.exports = class extends Generator<{rootPath: string}> {
         // Single transport endpoints
         this.fs.copyTpl(
           this.templatePath('src/endpoint/endpoint.ts.ejs'),
-          this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/endpoint/${inputEndpointName}.ts`),
+          this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/endpoint/${inputEndpointName}.ts`),
           {
             inputEndpointName,
             inputTransports,
@@ -175,7 +178,7 @@ module.exports = class extends Generator<{rootPath: string}> {
 
         this.fs.copyTpl(
           this.templatePath(`src/transport/${inputTransports[0].type}.ts.ejs`),
-          this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/transport/${inputEndpointName}.ts`),
+          this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/transport/${inputEndpointName}.ts`),
           { inputEndpointName, includeComments: this.props.includeComments },
         )
       }
@@ -184,7 +187,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     // Create endpoint barrel file
     this.fs.copyTpl(
       this.templatePath(`src/endpoint/index.ts.ejs`),
-      this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/endpoint/index.ts`),
+      this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/endpoint/index.ts`),
       { endpoints: Object.values(this.props.endpoints) },
     )
 
@@ -196,7 +199,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     // Copy config
     this.fs.copyTpl(
       this.templatePath('src/config/index.ts.ejs'),
-      this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/src/config/index.ts`),
+      this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/config/index.ts`),
       {setBgExecuteMsEnv: customBgEndpoints.length}
     )
 
@@ -205,7 +208,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     if (httpEndpoints.length) {
       this.fs.copyTpl(
         this.templatePath(`test/adapter.test.ts.ejs`),
-        this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/adapter.test.ts`),
+        this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/adapter.test.ts`),
         { endpoints: httpEndpoints, transportName: 'rest', setBgExecuteMsEnv: false },
       )
     }
@@ -218,7 +221,7 @@ module.exports = class extends Generator<{rootPath: string}> {
       }
       this.fs.copyTpl(
         this.templatePath(`test/adapter-ws.test.ts.ejs`),
-        this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/${fileName}`),
+        this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/${fileName}`),
         { endpoints: wsEndpoints },
       )
     }
@@ -234,7 +237,7 @@ module.exports = class extends Generator<{rootPath: string}> {
       }
       this.fs.copyTpl(
         this.templatePath(`test/adapter.test.ts.ejs`),
-        this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/${fileName}`),
+        this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/${fileName}`),
         { endpoints: customFgEndpoints, transportName: 'customfg', setBgExecuteMsEnv: false },
       )
     }
@@ -245,7 +248,7 @@ module.exports = class extends Generator<{rootPath: string}> {
       }
       this.fs.copyTpl(
         this.templatePath(`test/adapter.test.ts.ejs`),
-        this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/${fileName}`),
+        this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/${fileName}`),
         { endpoints: customBgEndpoints, transportName: 'custombg', setBgExecuteMsEnv: true },
       )
     }
@@ -253,7 +256,7 @@ module.exports = class extends Generator<{rootPath: string}> {
     // Copy test fixtures
     this.fs.copyTpl(
       this.templatePath(`test/fixtures.ts.ejs`),
-      this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/test/integration/fixtures.ts`),
+      this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/fixtures.ts`),
       {
         includeWsFixtures: wsEndpoints.length > 0,
         includeHttpFixtures: httpEndpoints.length > 0 || customBgEndpoints.length > 0 || customFgEndpoints.length > 0,
@@ -290,17 +293,17 @@ module.exports = class extends Generator<{rootPath: string}> {
       pkgJson.scripts['test'] = 'EA_PORT=0 METRICS_ENABLED=false jest --updateSnapshot'
     }
 
-    this.fs.extendJSON(this.destinationPath(`${this.options.rootPath}/${this.props.adapterName}/package.json`), pkgJson)
+    this.fs.extendJSON(this.destinationPath(`${this.args[0]}/${this.props.adapterName}/package.json`), pkgJson)
   }
 
   // install stage is used to run npm or yarn install scripts
-  install() {
-    this.yarnInstall([], {cwd: `${this.options.rootPath}/${this.props.adapterName}`})
+  async install() {
+    await exec(`yarn install --cwd ${this.args[0]}/${this.props.adapterName}`);
   }
 
   // end is the last stage. can be used for messages or cleanup
   end() {
-    this.log(`🚀 Adapter '${this.props.adapterName}' was successfully created. 📍${this.options.rootPath}/${this.props.adapterName}`)
+    this.log(`🚀 Adapter '${this.props.adapterName}' was successfully created. 📍${this.args[0]}/${this.props.adapterName}`)
   }
 
   private async _promptAdapterName(): Promise<string> {
