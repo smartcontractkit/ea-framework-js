@@ -14,15 +14,12 @@
     "pino-pretty": "13.0.0",
     "prom-client": "15.1.3",
     "redlock": "5.0.0-beta.2",
-    "ws": "8.18.0",
-    "yeoman-generator": "7.3.3",
-    "@yeoman/types": "1.5.0",
-    "mem-fs": "4.1.1",
-    "@yeoman/adapter": "2.0.0"
+    "ws": "8.18.0"
   },
   "scripts": {
-    "build": "mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc && yarn build-generator",
-    "build-generator": "mkdir -p ./dist/src/generator-adapter/generators/app/templates && cp -R scripts/generator-adapter/generators/app/templates dist/src/generator-adapter/generators/app && cp scripts/generator-adapter/package.json dist/src/generator-adapter && tsc --project scripts/generator-adapter/tsconfig.json && tsc scripts/adapter-generator.ts --outDir dist/src",
+    "build": "rm -rf dist/src && mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc && yarn pre-build-generator",
+    "pre-build-generator": "cd scripts/generator-adapter && yarn && cd .. && cd .. && yarn build-generator",
+    "build-generator": "mkdir -p ./dist/src/generator-adapter/generators/app/templates && cp -R scripts/generator-adapter/generators/app/templates dist/src/generator-adapter/generators/app && cp scripts/generator-adapter/package.json dist/src/generator-adapter && cp -R scripts/generator-adapter/node_modules dist/src/generator-adapter && tsc --project scripts/generator-adapter/tsconfig.json && tsc scripts/adapter-generator.ts --outDir dist/src",
     "generate-docs": "typedoc src/**/*.ts",
     "generate-ref-tables": "ts-node scripts/metrics-table.ts > docs/reference-tables/metrics.md && ts-node scripts/ea-settings-table.ts > docs/reference-tables/ea-settings.md && yarn prettier --write docs/reference-tables",
     "lint-fix": "eslint --max-warnings=0 --fix . && prettier --write ./src/**/*.ts ./test/**/*.ts ./*.{json,yaml}",
