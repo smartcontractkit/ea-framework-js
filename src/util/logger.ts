@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import pino from 'pino'
+import pretty from 'pino-pretty'
 import { BaseSettingsDefinition } from '../config'
 import { EmptyInputParameters } from '../validation/input-params'
 import CensorList, { CensorKeyValue } from './censor/censor-list'
@@ -13,48 +14,47 @@ export type Store = {
   correlationId: string
 }
 
-const debugTransport = {
-  target: 'pino-pretty',
-  options: {
-    levelFirst: true,
-    levelLabel: 'level',
-    ignore: 'layer,pid,hostname,correlationId,color',
-    messageFormat: `\x1b[0m[{correlationId}] {color}[{layer}]\x1b[0m {msg}`,
-    translateTime: 'yyyy-mm-dd HH:MM:ss.l',
-  },
-}
+const stream = pretty({
+  levelFirst: true,
+  levelLabel: 'level',
+  ignore: 'layer,pid,hostname,correlationId,color',
+  messageFormat: `\x1b[0m[{correlationId}] {color}[{layer}]\x1b[0m {msg}`,
+  translateTime: 'yyyy-mm-dd HH:MM:ss.l',
+})
 
 // Base logger, shouldn't be used because we want layers to be specified
-const baseLogger = pino({
-  level: process.env['LOG_LEVEL']?.toLowerCase() || BaseSettingsDefinition.LOG_LEVEL.default,
-  formatters: {
-    level(label) {
-      return { level: label }
+const baseLogger = pino(
+  {
+    level: process.env['LOG_LEVEL']?.toLowerCase() || BaseSettingsDefinition.LOG_LEVEL.default,
+    formatters: {
+      level(label) {
+        return { level: label }
+      },
     },
-  },
-  hooks: {
-    logMethod(inputArgs, method) {
-      // Censor each argument of logger
-      const censorList = CensorList.getAll()
-      return method.apply(
-        this,
-        inputArgs.map((arg) => censor(arg, censorList)) as [string, ...unknown[]],
-      )
+    hooks: {
+      logMethod(inputArgs, method) {
+        // Censor each argument of logger
+        const censorList = CensorList.getAll()
+        return method.apply(
+          this,
+          inputArgs.map((arg) => censor(arg, censorList)) as [string, ...unknown[]],
+        )
+      },
     },
-  },
-  mixin() {
-    if (process.env['CORRELATION_ID_ENABLED'] !== 'false') {
-      const store = asyncLocalStorage.getStore() as Store
-      if (store) {
-        return {
-          correlationId: store.correlationId,
+    mixin() {
+      if (process.env['CORRELATION_ID_ENABLED'] !== 'false') {
+        const store = asyncLocalStorage.getStore() as Store
+        if (store) {
+          return {
+            correlationId: store.correlationId,
+          }
         }
       }
-    }
-    return {}
+      return {}
+    },
   },
-  transport: process.env['DEBUG'] === 'true' ? debugTransport : undefined,
-})
+  process.env['DEBUG'] === 'true' ? stream : undefined,
+)
 
 export const COLORS = [
   '\u001b[31;1m',
