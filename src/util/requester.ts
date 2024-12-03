@@ -241,6 +241,7 @@ export class Requester {
 
     try {
       censorLogs(() => logger.trace(`Sending request (Key: ${key}) to data provider`))
+      censorLogs(() => logger.trace(config))
       const response = await axios.request(config)
       censorLogs(() => logger.trace(`Request (Key: ${key}) was successful `))
       resolve({
