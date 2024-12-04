@@ -44,7 +44,7 @@
     "ava": "6.2.0",
     "axios-mock-adapter": "2.1.0",
     "c8": "10.1.2",
-    "eslint": "9.15.0",
+    "eslint": "9.16.0",
     "eslint-config-prettier": "9.1.0",
     "eslint-plugin-tsdoc": "0.4.0",
     "mocksse": "1.0.4",
