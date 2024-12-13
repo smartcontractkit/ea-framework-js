@@ -31,10 +31,6 @@ const baseLogger = pino(
         return { level: label }
       },
     },
-    timestamp: () => {
-      const now = new Date()
-      return `,"time":${now.getTime()},"isoTime":"${now.toISOString()}"`
-    },
     hooks: {
       logMethod(inputArgs, method) {
         // Censor each argument of logger
