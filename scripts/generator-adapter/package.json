@@ -11,7 +11,7 @@
     "extnerl-adapter-generator"
   ],
   "devDependencies": {
-    "yeoman-generator": "7.3.3",
+    "yeoman-generator": "7.4.0",
     "@yeoman/types": "1.5.0",
     "mem-fs": "4.1.1",
     "@yeoman/adapter": "2.0.0",
