@@ -84,10 +84,10 @@ jobs:
       - name: Generate new adapter, build, run the tests
         run: |
           yarn build
-          path_to_generator="$GITHUB_WORKSPACE/dist/src/generator-adapter"
-          npm install -g yo@4.3.1
+          path_to_generator="$GITHUB_WORKSPACE/dist/src/generator-adapter/generators/app/index.js"
+          npm install -g yo@5.0.0
           # The command bellow will generate new EA with default name 'example-adapter' in specified directory 'examples'
-          DEBUG=* yo "$path_to_generator" examples --ignore-version-check
+          DEBUG=* yo "$path_to_generator" examples
           cd examples/example-adapter
           yarn build
           yarn test
