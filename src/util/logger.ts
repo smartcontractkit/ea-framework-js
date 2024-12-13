@@ -33,7 +33,7 @@ const baseLogger = pino(
     },
     timestamp: () => {
       const now = new Date()
-      return `,"time":${now.getTime()},"isoTime":"${now.toISOString()}"` 
+      return `,"time":${now.getTime()},"isoTime":"${now.toISOString()}"`
     },
     hooks: {
       logMethod(inputArgs, method) {
