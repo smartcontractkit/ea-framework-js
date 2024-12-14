@@ -1022,10 +1022,10 @@ mem-fs-editor@^11.0.1:
     textextensions "^6.11.0"
     vinyl "^3.0.0"
 
-mem-fs@4.1.1:
-  version "4.1.1"
-  resolved "https://registry.yarnpkg.com/mem-fs/-/mem-fs-4.1.1.tgz#2b5dfe2b8a3728b34560c041539dbcc6f05273d8"
-  integrity sha512-GwrbYV4U8h1iTfj3Yac2xxSMw1HGVbf3GcTKriFLf1hUmgoUwVPsfcp8ZQLYr6kiAHNXA9ozxrY5JuA23SjGFA==
+mem-fs@4.1.2:
+  version "4.1.2"
+  resolved "https://registry.yarnpkg.com/mem-fs/-/mem-fs-4.1.2.tgz#9c09d1344d88968e940b0e3366048ed8973bb78a"
+  integrity sha512-CMwusHK+Kz0tu1qjgbd0rwcJxzgg76jlkPpqK+pDTv8Hth8JyM7JlgxNWaAFRKe969HATPTz/sp8T63QflyI+w==
   dependencies:
     "@types/node" ">=18"
     "@types/vinyl" "^2.0.8"
