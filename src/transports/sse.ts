@@ -1,5 +1,5 @@
 import { AxiosRequestConfig } from 'axios'
-import EventSource from 'eventsource'
+import { EventSource } from 'eventsource'
 import { EndpointContext } from '../adapter'
 import { calculateHttpRequestKey } from '../cache'
 import { makeLogger, sleep } from '../util'
@@ -13,7 +13,7 @@ const logger = makeLogger('SSETransport')
 
 export interface SSEConfig {
   url: string
-  eventSourceInitDict?: EventSource.EventSourceInitDict
+  headers?: Record<string, string>
 }
 
 /**
@@ -103,7 +103,13 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
       logger.debug('No established connection and new subscriptions available, connecting to SSE')
       const sseConfig = this.config.prepareSSEConnectionConfig(subscriptions.new, context)
       this.providerDataStreamEstablished = Date.now()
-      this.sseConnection = new this.EventSource(sseConfig.url, sseConfig.eventSourceInitDict)
+      this.sseConnection = new this.EventSource(sseConfig.url, {
+        fetch: (input, init) =>
+          fetch(input, {
+            ...init,
+            headers: { ...init?.headers, ...sseConfig.headers },
+          }),
+      })
 
       const eventHandlerGenerator = (listener: (typeof this.config.eventListeners)[0]) => {
         return (e: MessageEvent) => {

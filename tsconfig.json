@@ -20,7 +20,8 @@
     "noImplicitThis": true,
     "noPropertyAccessFromIndexSignature": true,
     "noUnusedLocals": true,
-    "strict": true
+    "strict": true,
+    "skipLibCheck": true
   },
   "exclude": ["src/**/test/**/*"],
   "include": ["./src/**/*"]
