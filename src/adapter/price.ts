@@ -152,7 +152,9 @@ export class PriceAdapter<
       }
 
       for (const endpoint of priceEndpoints) {
-        endpoint.requestTransforms?.push(requestTransform)
+        if (endpoint.name != 'crypto'){
+          endpoint.requestTransforms?.push(requestTransform)
+        }
       }
     }
   }
