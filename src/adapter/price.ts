@@ -152,7 +152,7 @@ export class PriceAdapter<
       }
 
       for (const endpoint of priceEndpoints) {
-        if (endpoint.name != 'crypto'){
+        if (!['crypto', 'crypto-lwba'].includes(endpoint.name)){
           endpoint.requestTransforms?.push(requestTransform)
         }
       }
