@@ -244,6 +244,7 @@ export class WebSocketTransport<
     )
 
     // Attempt to establish the connection
+    metrics.get('wsConnectionAttempt').inc()
     try {
       await timeoutPromise(
         'WS Open Handler',

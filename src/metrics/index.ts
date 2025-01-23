@@ -304,6 +304,10 @@ export const metrics = new Metrics(() => ({
     help: 'The number of cache warmers running',
     labelNames: ['isBatched'] as const,
   }),
+  wsConnectionAttempt: new client.Counter({
+    name: 'ws_connection_attempt',
+    help: 'The number of open connection attempts',
+  }),
   wsConnectionActive: new client.Gauge({
     name: 'ws_connection_active',
     help: 'The number of active connections',
