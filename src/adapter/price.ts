@@ -141,12 +141,6 @@ export class PriceAdapter<
         }
         const includesDetails = this.includesMap?.[requestData.base]?.[requestData.quote]
 
-        if (includesDetails?.endpoints?.length === 0) {
-          throw new Error(
-            `No endpoints supported in includes.json for ${requestData.base}/${requestData.quote}.`,
-          )
-        }
-
         if (
           includesDetails?.endpoints === undefined ||
           includesDetails?.endpoints?.includes(req.requestContext.endpointName)
