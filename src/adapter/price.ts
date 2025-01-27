@@ -147,7 +147,10 @@ export class PriceAdapter<
           )
         }
 
-        if (includesDetails?.endpoints === undefined || includesDetails?.endpoints?.includes(req.requestContext.endpointName)) {
+        if (
+          includesDetails?.endpoints === undefined ||
+          includesDetails?.endpoints?.includes(req.requestContext.endpointName)
+        ) {
           if (includesDetails) {
             requestData.base = includesDetails.from || requestData.base
             requestData.quote = includesDetails.to || requestData.quote
