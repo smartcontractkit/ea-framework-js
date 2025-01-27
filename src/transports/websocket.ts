@@ -157,7 +157,7 @@ export class WebSocketTransport<
     return {
       // Called when the WS connection is opened
       open: async (event: WebSocket.Event) => {
-        logger.debug(`Opened websocket connection. (event type ${event.type})`)
+        logger.info(`Opened websocket connection. (event type ${event.type})`)
         if (this.config.handlers.open) {
           await this.config.handlers.open(connection, context)
           logger.debug('Successfully executed connection opened handler')

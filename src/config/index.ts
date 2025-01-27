@@ -246,7 +246,7 @@ export const BaseSettingsDefinition = {
       'The maximum amount of time in milliseconds to wait for the websocket connection to open (including custom open handler)',
     type: 'number',
     default: 10_000,
-    validate: validator.integer({ min: 500, max: 30_000 }),
+    validate: validator.integer({ min: 500, max: 180000 }),
   },
   CACHE_POLLING_MAX_RETRIES: {
     description:
