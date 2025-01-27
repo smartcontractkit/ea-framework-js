@@ -141,12 +141,16 @@ export class PriceAdapter<
         }
         const includesDetails = this.includesMap?.[requestData.base]?.[requestData.quote]
 
-        if (includesDetails?.endpoints.length === 0){
-          throw new Error(`No endpoints supported in includes.json for ${requestData.base}/${requestData.quote}.`)
+        if (includesDetails?.endpoints.length === 0) {
+          throw new Error(
+            `No endpoints supported in includes.json for ${requestData.base}/${requestData.quote}.`,
+          )
         }
 
-        if (!includesDetails?.endpoints.includes(req.requestContext.endpointName)){
-          throw new Error(`Endpoint ${req.requestContext.endpointName} not supported for ${requestData.base}/${requestData.quote} in includes.json`)
+        if (!includesDetails?.endpoints.includes(req.requestContext.endpointName)) {
+          throw new Error(
+            `Endpoint ${req.requestContext.endpointName} not supported for ${requestData.base}/${requestData.quote} in includes.json`,
+          )
         }
 
         if (includesDetails) {
@@ -161,7 +165,7 @@ export class PriceAdapter<
       }
 
       for (const endpoint of priceEndpoints) {
-          endpoint.requestTransforms?.push(requestTransform)
+        endpoint.requestTransforms?.push(requestTransform)
       }
     }
   }
