@@ -59,6 +59,7 @@ type IncludeDetails = {
   from: string
   to: string
   inverse: boolean
+  endpoints: string[]
 }
 type IncludePair = {
   from: string
@@ -140,6 +141,14 @@ export class PriceAdapter<
         }
         const includesDetails = this.includesMap?.[requestData.base]?.[requestData.quote]
 
+        if (includesDetails?.endpoints.length == 0){
+          throw new Error(`No endpoints supported in includes.json for ${requestData.base}/${requestData.quote}.`)
+        }
+
+        if (!includesDetails?.endpoints.includes(req.requestContext.endpointName)){
+          throw new Error(`Endpoint ${req.requestContext.endpointName} not supported for ${requestData.base}/${requestData.quote} in includes.json`)
+        }
+
         if (includesDetails) {
           requestData.base = includesDetails.from || requestData.base
           requestData.quote = includesDetails.to || requestData.quote
@@ -152,9 +161,7 @@ export class PriceAdapter<
       }
 
       for (const endpoint of priceEndpoints) {
-        if (!['crypto', 'crypto-lwba'].includes(endpoint.name)){
           endpoint.requestTransforms?.push(requestTransform)
-        }
       }
     }
   }
