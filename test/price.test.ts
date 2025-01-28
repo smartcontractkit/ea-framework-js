@@ -668,3 +668,111 @@ test('can create a crypto price endpoint with non-required base and quote and ex
 
   t.truthy(adapter)
 })
+
+test('does not process request if endpoint not supported in includes', async (t) => {
+  const includes = [
+    {
+      from: 'ETH',
+      to: 'USD',
+      includes: [
+        {
+          from: 'USD',
+          to: 'ETH',
+          inverse: true,
+          endpoints: ['forex'],
+        },
+      ],
+    },
+  ]
+
+  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
+    result: 1234,
+    data: {
+      result: 1234,
+    },
+    statusCode: 200,
+    timestamps: {
+      providerDataRequestedUnixMs: 0,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
+    },
+  }
+
+  const data = {
+    base: 'ETH',
+    quote: 'USD',
+  }
+
+  const testAdapter = await buildAdapter(
+    t.context,
+    (req) => {
+      t.deepEqual(req.requestContext.data, data)
+
+      return mockResponse
+    },
+    includes,
+  )
+
+  const response = await testAdapter.request({
+    ...data,
+    endpoint: 'test',
+  })
+  t.is(response.statusCode, 500)
+  t.is(response.body, 'Endpoint test not supported for ETH/USD in includes.json')
+})
+
+test('processes request if endpoint supported in includes', async (t) => {
+  const includes = [
+    {
+      from: 'ETH',
+      to: 'BTC',
+      includes: [
+        {
+          from: 'BTC',
+          to: 'ETH',
+          inverse: true,
+          endpoints: ['test'],
+        },
+      ],
+    },
+  ]
+
+  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
+    result: 1 / 1234,
+    data: {
+      result: 1 / 1234,
+    },
+    statusCode: 200,
+    timestamps: {
+      providerDataRequestedUnixMs: 0,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
+    },
+  }
+
+  const data = {
+    base: 'ETH',
+    quote: 'BTC',
+  }
+
+  const testAdapter = await buildAdapter(
+    t.context,
+    (req) => {
+      t.deepEqual(req.requestContext.data, {
+        base: 'BTC',
+        quote: 'ETH',
+      })
+
+      return mockResponse
+    },
+    includes,
+  )
+
+  const response = await testAdapter.request({
+    ...data,
+    endpoint: 'test',
+  })
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, 1234)
+  t.is(response.json().data.result, 1234)
+})
