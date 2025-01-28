@@ -679,7 +679,7 @@ test('does not process request if endpoint not supported in includes', async (t)
           from: 'USD',
           to: 'ETH',
           inverse: true,
-          endpoints: ["forex"]
+          endpoints: ['forex'],
         },
       ],
     },
@@ -718,7 +718,7 @@ test('does not process request if endpoint not supported in includes', async (t)
     endpoint: 'test',
   })
   t.is(response.statusCode, 500)
-  t.is(response.body, "Endpoint test not supported for ETH/USD in includes.json")
+  t.is(response.body, 'Endpoint test not supported for ETH/USD in includes.json')
 })
 
 test('processes request if endpoint supported in includes', async (t) => {
@@ -731,7 +731,7 @@ test('processes request if endpoint supported in includes', async (t) => {
           from: 'BTC',
           to: 'ETH',
           inverse: true,
-          endpoints: ['test']
+          endpoints: ['test'],
         },
       ],
     },
