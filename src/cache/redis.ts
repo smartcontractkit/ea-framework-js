@@ -108,22 +108,6 @@ export class RedisCache<T = unknown> implements Cache<T> {
 
     await chain.exec()
 
-    // Loop again, but this time to record these in metrics
-    const now = Date.now()
-    for (const entry of entries) {
-      // Only record metrics if feed Id is present, otherwise assuming value is not adapter response to record
-      const response = entry.value as unknown as AdapterResponse
-      const feedId = response.meta?.metrics?.feedId
-      if (feedId) {
-        const providerTime = response.timestamps?.providerIndicatedTimeUnixMs
-        const timeDelta = providerTime ? now - providerTime : undefined
-
-        // Record cache set count, max age, and staleness (set to 0 for cache set)
-        const label = cacheMetricsLabel(entry.key, feedId, CacheTypes.Redis)
-        cacheSet(label, ttl, timeDelta)
-      }
-    }
-
     // Record exec command sent to Redis
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'exec')
   }
