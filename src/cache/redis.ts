@@ -2,9 +2,9 @@ import EventEmitter from 'events'
 import Redis, { Result } from 'ioredis'
 import Redlock from 'redlock'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
-import { AdapterResponse, censorLogs, makeLogger, sleep } from '../util'
+import { censorLogs, makeLogger, sleep } from '../util'
 import { Cache, CacheEntry, LocalCache } from './index'
-import { CacheTypes, cacheMetricsLabel, cacheSet } from './metrics'
+import { CacheTypes } from './metrics'
 
 declare module 'ioredis' {
   interface RedisCommander<Context> {
