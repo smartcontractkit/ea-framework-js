@@ -60,6 +60,26 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
     open?: (wsConnection: WebSocket, context: EndpointContext<T>) => Promise<void> | void
 
     /**
+     * Handles when the websocket connection dispatches an error event
+     * Optional to let the adapter handle the error in its own way if it decides to
+     *
+     * @param error - the WebSocket error event
+     * @param context - the background context for the Adapter
+     * @returns an empty Promise, or void
+     */
+    error?: (errorEvent: WebSocket.ErrorEvent, context: EndpointContext<T>) => Promise<void> | void
+
+    /**
+     * Handles when the websocket has an error
+     * Optional to let the adapter handle the error in its own way if it decides to
+     *
+     * @param closeEvent - the WebSocket close event
+     * @param context - the background context for the Adapter
+     * @returns an empty Promise, or void
+     */
+    close?: (closeEvent: WebSocket.CloseEvent, context: EndpointContext<T>) => Promise<void> | void
+
+    /**
      * Handles when the WS receives a message
      *
      * @param message - the message received by the WS
@@ -202,10 +222,14 @@ export class WebSocketTransport<
         )
         // Record connection error count
         metrics.get('wsConnectionErrors').labels(connectionErrorLabels(event.message)).inc()
+        if (this.config.handlers.error) {
+          await this.config.handlers.error(event, context)
+          logger.debug('Successfully executed connection error handler')
+        }
       },
 
       // Called when the WS connection closes for any reason
-      close: (event: WebSocket.CloseEvent) => {
+      close: async (event: WebSocket.CloseEvent) => {
         // If the connection closed with 1000, it's a usual closure
         const level = event.code === 1000 ? 'debug' : 'info'
         logger[level](
@@ -224,6 +248,10 @@ export class WebSocketTransport<
           code: event.code,
           url: filteredUrl,
         })
+        if (this.config.handlers.close) {
+          await this.config.handlers.close(event, context)
+          logger.debug('Successfully executed connection close handler')
+        }
       },
     }
   }
