@@ -7,11 +7,11 @@ import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import {
   WebSocketClassProvider,
-  WebSocketTransport,
   WebsocketReverseMappingTransport,
+  WebSocketTransport,
 } from '../../src/transports'
 import { SingleNumberResultResponse, sleep } from '../../src/util'
-import { TestAdapter, mockWebSocketProvider, runAllUntilTime } from '../../src/util/testing-utils'
+import { mockWebSocketProvider, runAllUntilTime, TestAdapter } from '../../src/util/testing-utils'
 import { InputParameters } from '../../src/validation'
 
 export const test = untypedTest as TestFn<{
@@ -790,6 +790,209 @@ test.serial('does not hang the background execution if the open handler hangs', 
   mockWsServer.close()
   await t.context.clock.runAllAsync()
 })
+
+test.serial('if defined the close handler is called when the websocket is closed', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  process.env['METRICS_ENABLED'] = 'false'
+  let handlerCalled = false
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', () => {
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
+    })
+    socket.close()
+  })
+
+  const transport = new WebSocketTransport<WebSocketTypes>({
+    url: () => ENDPOINT_URL,
+    handlers: {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      close: (event) => {
+        handlerCalled = true
+      },
+      message(message) {
+        const [curBase, curQuote] = message.pair.split('/')
+        return [
+          {
+            params: { base: curBase, quote: curQuote },
+            response: {
+              data: {
+                result: message.value,
+              },
+              result: message.value,
+            },
+          },
+        ]
+      },
+    },
+    builders: {
+      subscribeMessage: (params) => ({
+        request: 'subscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+      unsubscribeMessage: (params) => ({
+        request: 'unsubscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+    },
+  })
+
+  const webSocketEndpoint = new AdapterEndpoint({
+    name: 'TEST',
+    transport: transport,
+    inputParameters,
+  })
+
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
+        WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+      },
+    },
+  )
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [webSocketEndpoint],
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  await testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runAllAsync()
+
+  t.true(handlerCalled)
+})
+
+test.serial(
+  'if defined the error handler is called when the websocket emits an error',
+  async (t) => {
+    const base = 'ETH'
+    const quote = 'DOGE'
+    process.env['METRICS_ENABLED'] = 'false'
+    let handlerCalled = false
+
+    // Mock WS
+    mockWebSocketProvider(WebSocketClassProvider)
+    const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+    mockWsServer.on('connection', (socket) => {
+      socket.on('message', () => {
+        socket.send(
+          JSON.stringify({
+            pair: `${base}/${quote}`,
+            value: price,
+          }),
+        )
+      })
+      // Simulate error event after connection
+      setTimeout(() => {
+        const errorEvent = new Event('error')
+        socket.dispatchEvent(errorEvent)
+      }, 100)
+    })
+
+    const transport = new WebSocketTransport<WebSocketTypes>({
+      url: () => ENDPOINT_URL,
+      handlers: {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        error: (event) => {
+          handlerCalled = true
+        },
+        message(message) {
+          const [curBase, curQuote] = message.pair.split('/')
+          return [
+            {
+              params: { base: curBase, quote: curQuote },
+              response: {
+                data: {
+                  result: message.value,
+                },
+                result: message.value,
+              },
+            },
+          ]
+        },
+      },
+      builders: {
+        subscribeMessage: (params) => ({
+          request: 'subscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
+        unsubscribeMessage: (params) => ({
+          request: 'unsubscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
+      },
+    })
+
+    const webSocketEndpoint = new AdapterEndpoint({
+      name: 'TEST',
+      transport: transport,
+      inputParameters,
+    })
+
+    const config = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          BACKGROUND_EXECUTE_MS_WS,
+          WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+        },
+      },
+    )
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config,
+      endpoints: [webSocketEndpoint],
+    })
+
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base, quote },
+      expectedResponse: {
+        data: {
+          result: price,
+        },
+        result: price,
+        statusCode: 200,
+      },
+    })
+
+    await testAdapter.api.close()
+    mockWsServer.close()
+    await t.context.clock.runAllAsync()
+
+    t.true(handlerCalled)
+  },
+)
 
 const createReverseMappingAdapter = (
   envDefaultOverrides?: Record<string, string | number | symbol>,
