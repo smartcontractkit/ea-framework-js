@@ -60,6 +60,26 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
     open?: (wsConnection: WebSocket, context: EndpointContext<T>) => Promise<void> | void
 
     /**
+     * Handles when the websocket connection dispatches an error event
+     * Optional to let the adapter handle the event in its own way if it decides to
+     *
+     * @param errorEvent - the WebSocket error event
+     * @param context - the background context for the Adapter
+     * @returns void
+     */
+    error?: (errorEvent: WebSocket.ErrorEvent, context: EndpointContext<T>) => void
+
+    /**
+     * Handles when the websocket connection dispatches a close event
+     * Optional to let the adapter handle the event in its own way if it decides to
+     *
+     * @param closeEvent - the WebSocket close event
+     * @param context - the background context for the Adapter
+     * @returns void
+     */
+    close?: (closeEvent: WebSocket.CloseEvent, context: EndpointContext<T>) => void
+
+    /**
      * Handles when the WS receives a message
      *
      * @param message - the message received by the WS
@@ -202,6 +222,10 @@ export class WebSocketTransport<
         )
         // Record connection error count
         metrics.get('wsConnectionErrors').labels(connectionErrorLabels(event.message)).inc()
+        if (this.config.handlers.error) {
+          this.config.handlers.error(event, context)
+          logger.debug('Successfully executed connection error handler')
+        }
       },
 
       // Called when the WS connection closes for any reason
@@ -224,6 +248,10 @@ export class WebSocketTransport<
           code: event.code,
           url: filteredUrl,
         })
+        if (this.config.handlers.close) {
+          this.config.handlers.close(event, context)
+          logger.debug('Successfully executed connection close handler')
+        }
       },
     }
   }
@@ -244,6 +272,7 @@ export class WebSocketTransport<
     )
 
     // Attempt to establish the connection
+    metrics.get('wsConnectionAttempt').inc()
     try {
       await timeoutPromise(
         'WS Open Handler',
