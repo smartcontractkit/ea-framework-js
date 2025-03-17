@@ -644,6 +644,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
   /**
    * Creates a list of key/value pairs that need to be censored in the logs
    * using the sensitive flag in the adapter config
+   * RPC_URL are potentially sensitive given it may contain API keys in path
    */
   buildCensorList() {
     const censorList: CensorKeyValue[] = Object.entries(
@@ -654,7 +655,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
         ([name, setting]) =>
           setting &&
           setting.type === 'string' &&
-          setting.sensitive &&
+          (setting.sensitive || name.endsWith('RPC_URL')) &&
           (this.settings as Record<string, ValidSettingValue>)[name],
       )
       .map(([name]) => ({
