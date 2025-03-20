@@ -25,11 +25,11 @@ interface GeneratorEndpointContext {
 const execAsPromise = async (command: string): Promise<string> => {
   return new Promise(async (resolve, reject) => {
     exec(command, (error, stdout, stderr) => {
-      if (error.code === 0) {
+      if (error) {
+        reject(error);
+      } else {
         resolve(stdout);
-        return;
       }
-      reject(error);
     });
   });
 };
