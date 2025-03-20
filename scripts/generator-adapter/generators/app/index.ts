@@ -22,6 +22,18 @@ interface GeneratorEndpointContext {
   normalizedEndpointNameCap: string
 }
 
+const execAsPromise = async (command: string): Promise<string> => {
+  return new Promise(async (resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error.code === 0) {
+        resolve(stdout);
+        return;
+      }
+      reject(error);
+    });
+  });
+};
+
 export default class extends Generator.default {
   props: {
     // Current ea-framework version in package.json
@@ -298,7 +310,7 @@ export default class extends Generator.default {
 
   // install stage is used to run npm or yarn install scripts
   async install() {
-    await exec(`yarn install --cwd ${this.args[0]}/${this.props.adapterName}`);
+    await execAsPromise(`yarn install --cwd ${this.args[0]}/${this.props.adapterName}`);
   }
 
   // end is the last stage. can be used for messages or cleanup
