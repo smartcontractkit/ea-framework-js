@@ -203,3 +203,21 @@ test('adapter with overrideAdapterName uses overrideAdapterName', async (t) => {
     quote: 'USD',
   })
 })
+
+test('adapter with overrideAdapterName uses original name if no override specified for overrideAdapterName', async (t) => {
+  const response = await t.context.testAdapter.request({
+    base: 'OVER2',
+    quote: 'USD',
+    adapterNameOverride: 'overridetest',
+    overrides: {
+      test: {
+        OVER2: 'overridden',
+      },
+    },
+  })
+
+  t.deepEqual(response.json().data, {
+    base: 'overridden',
+    quote: 'USD',
+  })
+})
