@@ -259,3 +259,20 @@ test('adapter name in overrides can have hyphen', async (t) => {
     quote: 'USD',
   })
 })
+
+test('adapter name in overrides can use upper case', async (t) => {
+  const response = await t.context.testAdapter.request({
+    base: 'OVER2',
+    quote: 'USD',
+    overrides: {
+      TEST_ADAPTER: {
+        OVER2: 'qweqwe',
+      },
+    },
+  })
+
+  t.deepEqual(response.json().data, {
+    base: 'qweqwe',
+    quote: 'USD',
+  })
+})
