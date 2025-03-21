@@ -1,7 +1,14 @@
 import { ResponseCache } from '../cache/response'
 import { AdapterSettings } from '../config'
 import { TransportRoutes } from '../transports'
-import { AdapterRequest, AdapterRequestData, Overrides, makeLogger } from '../util'
+import {
+  AdapterRequest,
+  AdapterRequestData,
+  Overrides,
+  makeLogger,
+  getCanonicalAdapterName,
+  canonicalizeAdapterNameKeys,
+} from '../util'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -111,8 +118,10 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   }
 
   getRequestOverrides(data: Record<string, string>, overrides?: Overrides) {
-    const overrideAdapterName = data['adapterNameOverride']
-    return overrides?.[overrideAdapterName] || overrides?.[this.adapterName.toLowerCase()]
+    const overrideAdapterName = getCanonicalAdapterName(data['adapterNameOverride'])
+    const adapterName = getCanonicalAdapterName(this.adapterName)
+    const canonicalOverrides: Overrides | undefined = canonicalizeAdapterNameKeys(overrides)
+    return canonicalOverrides?.[overrideAdapterName] || canonicalOverrides?.[adapterName]
   }
 
   /**
@@ -185,8 +194,11 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
    * @returns the transport param or override if present
    */
   private defaultRouter(req: AdapterRequest<TypeFromDefinition<T['Parameters']>>) {
+    // DefaultRouter is called before customInputValidation, so we don't have
+    // the validation data on the requestContext yet.
+    const data: Record<string, string> = {}
     const rawRequestBody = req.body as unknown as { data: AdapterRequestData }
-    const requestOverrides = rawRequestBody.data?.overrides?.[this.adapterName.toLowerCase()]
+    const requestOverrides = this.getRequestOverrides(data, rawRequestBody.data?.overrides)
     // Transport override
     if (requestOverrides?.['transport']) {
       return requestOverrides['transport']

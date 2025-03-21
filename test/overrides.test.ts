@@ -68,7 +68,7 @@ class OverrideTestTransport implements Transport<TestTransportGenerics> {
 
 test.beforeEach(async (t) => {
   const adapter = new Adapter({
-    name: 'TEST',
+    name: 'TEST_ADAPTER',
     defaultEndpoint: 'test-endpoint',
     endpoints: [
       new AdapterEndpoint({
@@ -103,7 +103,7 @@ test('request overrides are respected', async (t) => {
     base: 'OVER2',
     quote: 'USD',
     overrides: {
-      test: {
+      test_adapter: {
         OVER2: 'qweqwe',
       },
     },
@@ -137,7 +137,7 @@ test('request overrides take precedence over adapter hardcoded ones', async (t) 
     base: 'OVER1',
     quote: 'USD',
     overrides: {
-      test: {
+      test_adapter: {
         OVER1: 'priority',
       },
     },
@@ -154,7 +154,7 @@ test('request overrides that resolve field to overridable symbol are not overrid
     base: 'OVER2',
     quote: 'USD',
     overrides: {
-      test: {
+      test_adapter: {
         OVER2: 'OVER1',
       },
     },
@@ -204,13 +204,34 @@ test('adapter with overrideAdapterName uses overrideAdapterName', async (t) => {
   })
 })
 
+test('adapterNameOverride can use hyphen', async (t) => {
+  const response = await t.context.testAdapter.request({
+    base: 'OVER2',
+    quote: 'USD',
+    adapterNameOverride: 'override-test',
+    overrides: {
+      override_test: {
+        OVER2: 'valid',
+      },
+      test: {
+        OVER2: 'invalid',
+      },
+    },
+  })
+
+  t.deepEqual(response.json().data, {
+    base: 'valid',
+    quote: 'USD',
+  })
+})
+
 test('adapter with overrideAdapterName uses original name if no override specified for overrideAdapterName', async (t) => {
   const response = await t.context.testAdapter.request({
     base: 'OVER2',
     quote: 'USD',
     adapterNameOverride: 'overridetest',
     overrides: {
-      test: {
+      test_adapter: {
         OVER2: 'overridden',
       },
     },
@@ -218,6 +239,40 @@ test('adapter with overrideAdapterName uses original name if no override specifi
 
   t.deepEqual(response.json().data, {
     base: 'overridden',
+    quote: 'USD',
+  })
+})
+
+test('adapter name in overrides can have hyphen', async (t) => {
+  const response = await t.context.testAdapter.request({
+    base: 'OVER2',
+    quote: 'USD',
+    overrides: {
+      'test-adapter': {
+        OVER2: 'qweqwe',
+      },
+    },
+  })
+
+  t.deepEqual(response.json().data, {
+    base: 'qweqwe',
+    quote: 'USD',
+  })
+})
+
+test('adapter name in overrides can use upper case', async (t) => {
+  const response = await t.context.testAdapter.request({
+    base: 'OVER2',
+    quote: 'USD',
+    overrides: {
+      TEST_ADAPTER: {
+        OVER2: 'qweqwe',
+      },
+    },
+  })
+
+  t.deepEqual(response.json().data, {
+    base: 'qweqwe',
     quote: 'USD',
   })
 })
