@@ -291,7 +291,7 @@ test.beforeEach(async (t) => {
   })
 
   const sampleAdapter = new Adapter({
-    name: 'TEST',
+    name: 'TEST_ADAPTER',
     defaultEndpoint: 'price',
     config: customConfig,
     endpoints: [sampleEndpoint],
@@ -704,7 +704,42 @@ test.serial('transport override routes to correct Transport', async (t) => {
     to,
     transport: 'websocket',
     overrides: {
-      test: {
+      test_adapter: {
+        transport: 'batch',
+      },
+    },
+  })
+
+  t.is(error.statusCode, 504)
+  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
+  t.assert(internalTransport.registerRequestCalls > 0)
+})
+
+test.serial('transport override adapter name can use hyphen', async (t) => {
+  axiosMock
+    .onPost(`${restUrl}/price`, {
+      pairs: [
+        {
+          base: from,
+          quote: to,
+        },
+      ],
+    })
+    .reply(200, {
+      prices: [
+        {
+          pair: `${from}/${to}`,
+          price,
+        },
+      ],
+    })
+
+  const error = await t.context.testAdapter.request({
+    from,
+    to,
+    transport: 'websocket',
+    overrides: {
+      'test-adapter': {
         transport: 'batch',
       },
     },

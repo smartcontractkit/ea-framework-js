@@ -176,3 +176,34 @@ export const groupArrayByKey = <T extends Record<string, string>, K extends keyo
     {} as Record<T[K], T[]>,
   )
 }
+
+/**
+ * Returns adapter name in lower case and with hyphens replaced by underscores.
+ * Types are declared such that the output type is defined iff the input type
+ * is defined.
+ * @param  name - The name to canonicalize
+ * @returns The canonical name
+ */
+export function getCanonicalAdapterName(name: string): string
+export function getCanonicalAdapterName(name: undefined): undefined
+export function getCanonicalAdapterName(name: string | undefined): string | undefined {
+  return name?.toLowerCase().replace(/-/g, '_')
+}
+
+type StringKeys<T> = { [key: string]: T }
+
+/**
+ * Returns the record with adapter names as keys after canonicalizing the keys.
+ * @param  obj - The record with adapter names as keys
+ * @returns The record with canonicalized adapter names as keys
+ */
+export const canonicalizeAdapterNameKeys = <T>(
+  obj: StringKeys<T> | undefined,
+): StringKeys<T> | undefined => {
+  if (obj === undefined) {
+    return undefined
+  }
+  return Object.fromEntries(
+    Object.entries(obj).map(([key, value]) => [getCanonicalAdapterName(key), value]),
+  )
+}
