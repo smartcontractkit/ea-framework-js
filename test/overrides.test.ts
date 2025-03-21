@@ -248,7 +248,7 @@ test('adapter name in overrides can have hyphen', async (t) => {
     base: 'OVER2',
     quote: 'USD',
     overrides: {
-      "test-adapter": {
+      'test-adapter': {
         OVER2: 'qweqwe',
       },
     },

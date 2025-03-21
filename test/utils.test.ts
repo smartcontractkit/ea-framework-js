@@ -1,4 +1,9 @@
-import { groupArrayByKey, splitArrayIntoChunks, getCanonicalAdapterName, canonicalizeAdapterNameKeys } from '../src/util'
+import {
+  groupArrayByKey,
+  splitArrayIntoChunks,
+  getCanonicalAdapterName,
+  canonicalizeAdapterNameKeys,
+} from '../src/util'
 import test from 'ava'
 
 test('Test splitArrayIntoChunks function', async (t) => {
@@ -49,17 +54,20 @@ test('Test getCanonicalAdapterName', async (t) => {
 
 test('Test canonicalizeAdapterNameKeys', async (t) => {
   t.deepEqual(canonicalizeAdapterNameKeys(undefined), undefined)
-  t.deepEqual(canonicalizeAdapterNameKeys({
-    'test': 1,
-    'TEST2': 2,
-    'TEST-adapter': 3,
-    'TEST_ADAPTER2': 4,
-    'A-B-C-D-e-f': 5,
-  }), {
-    test: 1,
-    test2: 2,
-    test_adapter: 3,
-    test_adapter2: 4,
-    a_b_c_d_e_f: 5,
-  })
+  t.deepEqual(
+    canonicalizeAdapterNameKeys({
+      test: 1,
+      TEST2: 2,
+      'TEST-adapter': 3,
+      TEST_ADAPTER2: 4,
+      'A-B-C-D-e-f': 5,
+    }),
+    {
+      test: 1,
+      test2: 2,
+      test_adapter: 3,
+      test_adapter2: 4,
+      a_b_c_d_e_f: 5,
+    },
+  )
 })
