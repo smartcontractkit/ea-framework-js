@@ -53,7 +53,7 @@
     "ts-node": "10.9.2",
     "ts-node-dev": "2.0.0",
     "typedoc": "0.28.1",
-    "typescript": "5.8.2"
+    "typescript": "5.8.3"
   },
   "prettier": {
     "semi": false,
