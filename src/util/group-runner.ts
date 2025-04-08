@@ -36,7 +36,7 @@ export class GroupRunner {
   // Calls the given callback eventually but makes sure any previous group of
   // groupSize size has settled before calling and subsequent callbacks.
   run<T>(callback: Callback<T>): Promise<T> {
-    return new Promise(async (resolve) => {
+    return new Promise((resolve) => {
       // This creates an implicit queue which guarantees that there are no
       // concurrent calls into startRunning. This is necessary to avoid having
       // currentGroup being cleared concurrently.
