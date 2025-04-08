@@ -8,7 +8,7 @@ type Resolve<T> = (arg: T | Promise<T>) => void
 //
 // const fetchBalances(addresses: string[]): Promise<number[]> {
 //    // addresses can contain thousands of addresses
-//    const groupRunner = new GroupRunner<number[]>(10)
+//    const groupRunner = new GroupRunner(10)
 //    const getBalance = groupRunner.wrapFunction(fetchBalance)
 //    const balancePromises: Promise<number>[] = []
 //    for (const address of addresses) {
