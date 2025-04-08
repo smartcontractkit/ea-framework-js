@@ -59,7 +59,7 @@ export class GroupRunner {
     resolve(promise)
   }
 
-  wrapFunction<Args extends any[], Return>(
+  wrapFunction<Args extends unknown[], Return>(
     func: (...args: Args) => Promise<Return>,
   ): (...args: Args) => Promise<Return> {
     return (...args: Args) => {

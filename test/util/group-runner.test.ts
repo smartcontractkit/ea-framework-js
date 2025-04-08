@@ -214,7 +214,7 @@ test('wrap function', async (t) => {
     tasks.push(createTask())
   }
 
-  const f = runner.wrapFunction((i) => tasks[i].callback())
+  const f = runner.wrapFunction((i: number) => tasks[i].callback())
 
   const promise0 = f(0)
   const promise1 = f(1)
