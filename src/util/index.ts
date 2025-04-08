@@ -115,7 +115,7 @@ export const timeoutPromise = <T>(
   ]).finally(() => clearTimeout(timer))
 }
 
-type DeferredResolve<T> = (value: T) => void
+type DeferredResolve<T> = (value: T | PromiseLike<T>) => void
 type DeferredReject = (reason?: unknown) => void
 
 /**

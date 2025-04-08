@@ -1,4 +1,5 @@
 import untypedTest, { TestFn } from 'ava'
+import { installTimers } from './helper'
 import { Adapter, AdapterEndpoint, CustomInputValidator, EndpointGenerics } from '../src/adapter'
 import { BaseAdapterSettings } from '../src/config'
 import { AdapterRequest, AdapterResponse } from '../src/util'
@@ -681,6 +682,12 @@ test.serial('Test host validator', async (t) => {
 })
 
 test.serial('Test response timestamp validator', async (t) => {
+  // Use a fake clock to avoid a race condition between getting the error and
+  // the clock progressing to the next millisecond.
+  const now = Date.now()
+  const clock = installTimers()
+  clock.setSystemTime(now)
+
   const timestampValidator = validator.responseTimestamp()
   let value = new Date().getTime()
   let error = timestampValidator.fn(value)
@@ -695,6 +702,8 @@ test.serial('Test response timestamp validator', async (t) => {
   value = 0
   error = timestampValidator.fn(value)
   t.is(error, 'Minimum allowed value is 1514764861000. Received 0')
+
+  clock.uninstall()
 })
 
 test.serial('Test base64 validator', async (t) => {
