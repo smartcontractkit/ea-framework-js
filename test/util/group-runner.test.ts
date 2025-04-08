@@ -5,12 +5,12 @@ import test from 'ava'
 type Task<T> = {
   promise: Promise<T>
   resolve: (arg: T) => void
-  reject: (arg: any) => void
+  reject: (arg: unknown) => void
   getCallCount: () => number
   callback: () => Promise<T>
 }
 
-const createTask = <T>(n: number = -1): Task<T> => {
+const createTask = <T>(): Task<T> => {
   const [promise, resolve, reject] = deferredPromise<T>()
   let callCount = 0
   return {
@@ -104,7 +104,7 @@ test('multiple groups', async (t) => {
 
   const tasks: Task<void>[] = []
   for (let i = 0; i < 5; i++) {
-    tasks.push(createTask(i))
+    tasks.push(createTask())
     runner.run(tasks[i].callback)
   }
 
@@ -125,7 +125,7 @@ test('multiple groups', async (t) => {
 
   // 5 more tasks for a total of 10:
   for (let i = 5; i < 10; i++) {
-    tasks.push(createTask(i))
+    tasks.push(createTask())
     runner.run(tasks[i].callback)
   }
 
@@ -160,7 +160,7 @@ test('multiple return values', async (t) => {
   const tasks: Task<number>[] = []
   const promises: Promise<number>[] = []
   for (let i = 0; i < 10; i++) {
-    tasks.push(createTask(i))
+    tasks.push(createTask())
     promises.push(runner.run(tasks[i].callback))
   }
 
@@ -184,10 +184,10 @@ test('rejecting promises', async (t) => {
   }
 
   runner.run(tasks[0].callback).catch(() => {
-    /* ignore */
+    /* Ignore */
   })
   runner.run(tasks[1].callback).catch(() => {
-    /* ignore */
+    /* Ignore */
   })
   runner.run(tasks[2].callback)
 
