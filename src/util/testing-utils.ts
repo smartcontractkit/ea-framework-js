@@ -508,4 +508,71 @@ export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): 
   // Need to disable typing, the mock-socket impl does not implement the ws interface fully
   provider.set(MockWebSocket as any) // eslint-disable-line @typescript-eslint/no-explicit-any
 }
+
+// Wraps an object such that accessing properties that do not exist will throw
+// an error instead of returning undefined.
+//
+// This is useful during unit test creation, as it makes it clear which
+// properties are missing rather than giving an error later on that undefined
+// doesn't have some other property.
+//
+// Once a test is passing, you can remove the wrapping and the test will still
+// pass. But it might be useful to keep it for when the code under test is
+// changed later on.
+//
+// Example usage:
+//
+// In code under test:
+//
+//   function doThing(obj) {
+//     const baz = obj.foo.baz
+//     ...
+//   }
+//
+// In test code:
+//
+//   const obj = makeStub('obj', { foo: { bar: 1 } })
+//   doThing(obj)
+//
+// Throws (and logs, in case the error is caught by the code under test):
+// Error: Property 'obj.foo.baz' does not exist
+export function makeStub<T>(name: string, obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+  return new Proxy(obj, {
+    get: (target, prop) => {
+      const propName = `${name}.${String(prop)}`
+      if (!(prop in target) && !isStubPropAllowedUndefined(prop)) {
+        const message = `Property '${propName}' does not exist`
+        // eslint-disable-next-line no-console
+        console.error(message)
+        throw new Error(message)
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return makeStub(propName, (target as any)[prop])
+    },
+  }) as T
+}
+
+// Properties checked by jest which don't need to be defined:
+export const allowedUndefinedStubProps = [
+  '$$typeof',
+  'nodeType',
+  'tagName',
+  'hasAttribute',
+  '@@__IMMUTABLE_ITERABLE__@@',
+  '@@__IMMUTABLE_RECORD__@@',
+  'toJSON',
+  'asymmetricMatch',
+  'then',
+]
+
+const isStubPropAllowedUndefined = (prop: string | symbol) => {
+  if (typeof prop === 'symbol') {
+    return true
+  }
+  return allowedUndefinedStubProps.includes(prop as string)
+}
+
 /* c8 ignore stop */ // eslint-disable-line
