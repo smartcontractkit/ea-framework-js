@@ -33,8 +33,8 @@ test('accessing an absent field should throw an error', async (t) => {
 
   t.throws(
     () => {
-      // @ts-ignore
-      stub.count
+      // @ts-expect-error intended
+      t.is(stub.count, undefined)
     },
     {
       message: "Property 'stub.count' does not exist",
@@ -52,8 +52,8 @@ test('accessing a nested absent field should throw an error', async (t) => {
 
   t.throws(
     () => {
-      // @ts-ignore
-      stub.nested.name
+      // @ts-expect-error intended
+      t.is(stub.nested.name, undefined)
     },
     {
       message: "Property 'stub.nested.name' does not exist",
@@ -67,9 +67,9 @@ test('fields used by jest are allowed to be undefined', async (t) => {
     count: 5,
   })
 
-  // @ts-ignore
+  // @ts-expect-error intended
   t.is(stub.nodeType, undefined)
-  // @ts-ignore
+  // @ts-expect-error intended
   t.is(stub.tagName, undefined)
 })
 
@@ -79,7 +79,7 @@ test('Symbol props are allowed to be undefined', async (t) => {
     count: 5,
   })
 
-  // @ts-ignore
+  // @ts-expect-error intended
   t.is(stub[Symbol('my symbol')], undefined)
 })
 
@@ -93,8 +93,8 @@ test('allowedUndefinedStubProps can be extended and restored', async (t) => {
 
   t.throws(
     () => {
-      // @ts-ignore
-      stub[customProp]
+      // @ts-expect-error intended
+      t.is(stub[customProp], undefined)
     },
     {
       message: "Property 'stub.myCustomProp' does not exist",
@@ -103,15 +103,15 @@ test('allowedUndefinedStubProps can be extended and restored', async (t) => {
 
   allowedUndefinedStubProps.push('myCustomProp')
 
-  // @ts-ignore
+  // @ts-expect-error intended
   t.is(stub[customProp], undefined)
 
   allowedUndefinedStubProps.pop()
 
   t.throws(
     () => {
-      // @ts-ignore
-      stub[customProp]
+      // @ts-expect-error intended
+      t.is(stub[customProp], undefined)
     },
     {
       message: "Property 'stub.myCustomProp' does not exist",
