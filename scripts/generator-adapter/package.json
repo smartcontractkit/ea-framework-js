@@ -14,7 +14,7 @@
     "yeoman-generator": "7.5.1",
     "@yeoman/types": "1.6.0",
     "mem-fs": "4.1.2",
-    "@yeoman/adapter": "2.0.0",
+    "@yeoman/adapter": "2.1.1",
     "@types/node": "22.14.1"
   }
 }

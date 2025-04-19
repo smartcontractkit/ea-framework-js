@@ -351,10 +351,10 @@
     "@types/expect" "^1.20.4"
     "@types/node" "*"
 
-"@yeoman/adapter@2.0.0":
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/@yeoman/adapter/-/adapter-2.0.0.tgz#f64890a22a615a756e1109ea2081d98e7a99f06b"
-  integrity sha512-eeLe2lRfnxXo2ryyuOt3kUAOLfn/X9LhftFKxEC53bdHZtWYiK0MBP7UKvpydZFwalEjGuMZRLhHfD0BmkIWGA==
+"@yeoman/adapter@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@yeoman/adapter/-/adapter-2.1.1.tgz#d08020959743ae8bf7eeeb2aa9a9ed2b16fc20a5"
+  integrity sha512-GJqZ/e+IkgAIaUUqBNngR2Y53eVCiJeMrqx8cLATDauEB6/SdEUIGeyRjaWuXdg+kAJHreFtNdBUDmfHO1lc0w==
   dependencies:
     "@inquirer/core" "^10.0.0"
     chalk "^5.2.0"
