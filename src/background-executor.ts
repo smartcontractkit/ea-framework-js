@@ -1,110 +1,140 @@
-import { Adapter, AdapterEndpoint, EndpointContext, EndpointGenerics } from './adapter'
-import { metrics } from './metrics'
-import { Transport, TransportGenerics } from './transports'
-import { asyncLocalStorage, censorLogs, makeLogger, timeoutPromise } from './util'
+import {
+  Adapter,
+  AdapterEndpoint,
+  EndpointContext,
+  EndpointGenerics,
+} from '../src/adapter'
+import { metrics } from '../src/metrics'
+import { Transport, TransportGenerics } from '../src/transports'
+import {
+  asyncLocalStorage,
+  censorLogs,
+  makeLogger,
+  timeoutPromise,
+} from '../src/util'
 
 const logger = makeLogger('BackgroundExecutor')
 
 /**
- * Very simple background loop that will call the [[Transport.backgroundExecute]] functions in all Transports.
- * It gets the time in ms to wait as the return value from those functions, and sleeps until next execution.
+ * Creates and maintains one background-execute loop for every
+ * `(endpoint × transport)` pair that implements `backgroundExecute`.
  *
- * @param adapter - an initialized External Adapter
- * @param server - the http server to attach an on close listener to
+ * • If the transport returns a number, that value becomes the delay (ms)
+ *   before the next run; otherwise the loop falls back to **10 ms** so
+ *   legacy unit-tests still observe four executions.  
+ * • All loops survive errors and time-outs.  
+ * • Timers are cleared—allowing the process to exit—once the HTTP
+ *   server’s shutdown promise resolves.
  */
-export async function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Promise<void>) {
-  // Set up variable to check later on to see if we need to stop this background "thread"
-  // If no server is provided, the listener won't be set and serverClosed will always be false
-  let serverClosed = false
+export function callBackgroundExecutes(
+  adapter: Adapter,
+  apiShutdownPromise?: Promise<void>,
+): void {
+  let shuttingDown = false
 
-  const timeoutsMap: {
-    [endpointName: string]: NodeJS.Timeout
-  } = {}
+  /** Live timers, keyed by `"endpoint:transport"`. */
+  const timers = new Map<string, NodeJS.Timeout>()
 
-  apiShutdownPromise?.then(() => {
-    serverClosed = true
-    for (const endpointName in timeoutsMap) {
-      logger.debug(`Clearing timeout for endpoint "${endpointName}"`)
-      timeoutsMap[endpointName].unref()
-      clearTimeout(timeoutsMap[endpointName])
-    }
-  })
+  /* ------------------------------------------------------------------ */
+  /* Graceful shutdown: invoked only when the HTTP server closes cleanly */
+  /* ------------------------------------------------------------------ */
+  const stopAll = (): void => {
+    if (shuttingDown) {return}
+    shuttingDown = true
 
-  // Checks if an individual transport has a backgroundExecute function, and executes it if it does
-  const callBackgroundExecute = (
+    for (const t of timers.values()) {clearTimeout(t)}
+    timers.clear()
+  }
+
+  if (apiShutdownPromise) {
+    apiShutdownPromise
+      .then(stopAll)
+      .catch((err) =>
+        logger.error(err, 'apiShutdownPromise rejected – skipping cleanup'),
+      )
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Spawn one loop per (endpoint × transport)                           */
+  /* ------------------------------------------------------------------ */
+  const spawnLoop = (
     endpoint: AdapterEndpoint<EndpointGenerics>,
     transport: Transport<TransportGenerics>,
-    transportName?: string,
-  ) => {
+    routeName: string,
+  ): void => {
     const backgroundExecute = transport.backgroundExecute?.bind(transport)
     if (!backgroundExecute) {
-      logger.debug(`Endpoint "${endpoint.name}" has no background execute, skipping...`)
+      logger.debug(
+        `Endpoint "${endpoint.name}" transport "${routeName}" has no backgroundExecute – skipping`,
+      )
       return
     }
 
-    const context: EndpointContext<EndpointGenerics> = {
+    const key = `${endpoint.name}:${routeName}`
+
+    /* Cache metric handles once – prom-client recommends this. */
+    const labels = {
+      adapter_endpoint: endpoint.name,
+      transport: routeName,
+    } as const
+    const mTotal = metrics.get('bgExecuteTotal').labels(labels)
+    const mErr   = metrics.get('bgExecuteErrors').labels(labels)
+    const mDur   = metrics.get('bgExecuteDurationSeconds').labels(labels)
+
+    const ctx: EndpointContext<EndpointGenerics> = {
       endpointName: endpoint.name,
       inputParameters: endpoint.inputParameters,
       adapterSettings: adapter.config.settings,
     }
 
-    const handler = async () => {
-      if (serverClosed) {
-        logger.info('Server closed, stopping recursive backgroundExecute handler chain')
-        return
-      }
+    let delayMs = 10 // Legacy default
 
-      // Count number of background executions per endpoint
-      metrics
-        .get('bgExecuteTotal')
-        .labels({ adapter_endpoint: endpoint.name, transport: transportName })
-        .inc()
+    /** Schedule the next run (fresh timer every time). */
+    const scheduleNext = (): void => {
+      if (shuttingDown) {return}
+      const next = setTimeout(handler, delayMs)
+      next.unref?.() // Harmless under Jest; valuable in prod
+      timers.set(key, next)
+    }
 
-      // Time the duration of the background execute process excluding sleep time
-      const metricsTimer = metrics
-        .get('bgExecuteDurationSeconds')
-        .labels({ adapter_endpoint: endpoint.name, transport: transportName })
-        .startTimer()
+    const handler = async (): Promise<void> => {
+      if (shuttingDown) {return}
 
-      logger.debug(`Calling background execute for endpoint "${endpoint.name}"`)
+      mTotal.inc()
+      const stopTimer = mDur.startTimer()
 
       try {
-        await timeoutPromise(
+        const maybeDelay = await timeoutPromise(
           'Background Execute',
           asyncLocalStorage.run(
             {
-              correlationId: `Endpoint: ${endpoint.name} - Transport: ${transport.constructor.name}`,
+              correlationId: `endpoint=${endpoint.name},transport=${routeName}`,
             },
-            () => {
-              return backgroundExecute(context)
-            },
+            () => backgroundExecute(ctx),
           ),
           adapter.config.settings.BACKGROUND_EXECUTE_TIMEOUT,
         )
-      } catch (error) {
-        censorLogs(() => logger.error(error, (error as Error).stack))
-        metrics
-          .get('bgExecuteErrors')
-          .labels({ adapter_endpoint: endpoint.name, transport: transportName })
-          .inc()
+
+        if (typeof maybeDelay === 'number' && maybeDelay >= 0) {
+          delayMs = maybeDelay
+        }
+      } catch (err) {
+        mErr.inc()
+        censorLogs(() => logger.error(err))
+      } finally {
+        stopTimer()
       }
 
-      // This background execute loop is no longer the one to determine the sleep between bg execute calls.
-      // That is now instead responsibility of each transport, to allow for custom ones to implement their own timings.
-      logger.trace(
-        `Finished background execute for endpoint "${endpoint.name}", calling it again in 10ms...`,
-      )
-      metricsTimer()
-      timeoutsMap[endpoint.name] = setTimeout(handler, 10) // 10ms
+      scheduleNext()
     }
 
-    // Start recursive async calls
-    handler()
+    /* Kick off immediately – required for backwards compatibility. */
+    void handler()
   }
 
-  for (const endpoint of adapter.endpoints) {
-    for (const [transportName, transport] of endpoint.transportRoutes.entries()) {
-      callBackgroundExecute(endpoint, transport, transportName)
+  for (const ep of adapter.endpoints) {
+    for (const [name, tr] of ep.transportRoutes.entries()) {
+      spawnLoop(ep, tr, name)
     }
   }
 }
