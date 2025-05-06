@@ -3,15 +3,15 @@ import {
   AdapterEndpoint,
   EndpointContext,
   EndpointGenerics,
-} from '../src/adapter'
-import { metrics } from '../src/metrics'
-import { Transport, TransportGenerics } from '../src/transports'
+} from './adapter'
+import { metrics } from './metrics'
+import { Transport, TransportGenerics } from './transports'
 import {
   asyncLocalStorage,
   censorLogs,
   makeLogger,
   timeoutPromise,
-} from '../src/util'
+} from './util'
 
 const logger = makeLogger('BackgroundExecutor')
 
@@ -24,7 +24,7 @@ const logger = makeLogger('BackgroundExecutor')
  *   legacy unit-tests still observe four executions.  
  * • All loops survive errors and time-outs.  
  * • Timers are cleared—allowing the process to exit—once the HTTP
- *   server’s shutdown promise resolves.
+ *   server's shutdown promise resolves.
  */
 export function callBackgroundExecutes(
   adapter: Adapter,
