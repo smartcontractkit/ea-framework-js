@@ -13,6 +13,7 @@ import {
   censorLogs,
   loggingContextMiddleware,
   makeLogger,
+  serializeResponse,
 } from './util'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
 import { EmptyInputParameters } from './validation/input-params'
@@ -235,7 +236,19 @@ async function buildRestApi(adapter: Adapter) {
           reply as unknown as Promise<unknown>,
         )
 
-        return reply.code(response.statusCode || 200).send(response)
+        // Set status code
+        reply.code(response.statusCode || 200)
+        
+        // Use optimized serialization if enabled
+        if (adapter.config.settings.FAST_SERIALIZATION_ENABLED) {
+          return reply
+            .type('application/json')
+            .serializer((payload) => serializeResponse(payload))
+            .send(response)
+        } else {
+          // Use default serialization
+          return reply.send(response)
+        }
       },
     })
 

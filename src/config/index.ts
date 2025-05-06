@@ -376,6 +376,12 @@ export const BaseSettingsDefinition = {
     default: 128,
     validate: validator.integer({ min: 1, max: 1000 }),
   },
+  FAST_SERIALIZATION_ENABLED: {
+    description:
+      'Enable optimized JSON serialization for adapter responses. Improves performance but can be disabled for troubleshooting.',
+    type: 'boolean',
+    default: true,
+  },
 } as const satisfies SettingsDefinitionMap
 
 export const buildAdapterSettings = <
