@@ -162,7 +162,7 @@ test.serial('cache key is truncated if over max size', async (t) => {
       .map((s, i) => `----------${i}`)
       .join('|'),
   })
-  t.is(response.json().result.length, 4 + 1 + 4 + 1 + 24 + 1 + 28) // Adapter Name + separator + Endpoint Name + separator + Transport Name + Hash
+  t.is(response.json().result.length, 4 + 1 + 4 + 1 + 24 + 1 + 16) // Adapter Name + separator + Endpoint Name + separator + Transport Name + Hash
 })
 
 test.serial('custom cache key', async (t) => {

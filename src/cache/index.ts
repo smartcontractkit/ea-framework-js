@@ -1,8 +1,9 @@
-import crypto from 'crypto'
 import { EventEmitter } from 'events'
 import { EndpointContext, EndpointGenerics } from '../adapter'
 import { AdapterResponse, censorLogs, makeLogger, sleep } from '../util'
 import { CacheTypes as CacheType } from './metrics'
+import farmhash from 'farmhash'
+
 
 export * from './factory'
 export * from './local'
@@ -217,11 +218,11 @@ const calculateParamsKey = (data: unknown, maxSize: number): string => {
     logger.debug(
       `Generated cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be hashed`,
     )
-    const shasum = crypto.createHash('sha1')
-    shasum.update(cacheKey)
-    return shasum.digest('base64')
+    const digest = farmhash.fingerprint64(cacheKey)
+    const hex   = digest.toString(16).padStart(16, '0')  // 16-char hex string :contentReference[oaicite:2]{index=2}
+    
+    return hex
   }
-
   return cacheKey
 }
 
