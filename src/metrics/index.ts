@@ -357,4 +357,10 @@ export const metrics = new Metrics(() => ({
     help: 'The number of addresses in PoR request input parameters',
     labelNames: ['feed_id'] as const,
   }),
+  eaResponseSerializationDurationSeconds: new client.Histogram({
+    name: 'ea_response_serialization_duration_seconds',
+    help: 'Time taken to serialize the adapter response in seconds',
+    labelNames: ['mode'], // 'fast' or 'standard'
+    buckets: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1],
+  }),
 }))

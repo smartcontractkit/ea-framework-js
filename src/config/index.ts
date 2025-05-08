@@ -368,6 +368,20 @@ export const BaseSettingsDefinition = {
       'Whether to enable debug enpoints (/debug/*) for this adapter. Enabling them might consume more resources.',
     default: false,
   },
+  MAX_PARALLEL_HTTP_SOCKETS: {
+    description:
+      'Maximum number of keep-alive sockets per origin that the internal HTTP/HTTPS agent can open. ' +
+      'Lower values reduce memory; higher values allow more in-flight requests.',
+    type: 'number',
+    default: 128,
+    validate: validator.integer({ min: 1, max: 1000 }),
+  },
+  FAST_SERIALIZATION_ENABLED: {
+    description:
+      'Enable optimized JSON serialization for adapter responses. Improves performance but can be disabled for troubleshooting.',
+    type: 'boolean',
+    default: true,
+  },
 } as const satisfies SettingsDefinitionMap
 
 export const buildAdapterSettings = <

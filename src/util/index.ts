@@ -1,6 +1,7 @@
 export * from './logger'
 export * from './subscription-set/subscription-set'
 export * from './types'
+export * from './fast-serialize'
 
 /**
  * Sleeps for the provided number of milliseconds
