@@ -8,6 +8,5 @@ runs:
         node-version: 22.14
         registry-url: https://registry.npmjs.org
         always-auth: true
-        cache: yarn
     - run: yarn install --frozen-lockfile
       shell: bash
