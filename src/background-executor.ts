@@ -19,10 +19,10 @@ const logger = makeLogger('BackgroundExecutor')
 export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Promise<void>): void {
   let shuttingDown = false
 
-  // live timers, keyed by `"endpoint:transport"`.
+  // Live timers, keyed by `"endpoint:transport"`.
   const timers = new Map<string, NodeJS.Timeout>()
-  
-  // graceful shutdown: invoked only when the HTTP server closes cleanly
+
+  // Graceful shutdown: invoked only when the HTTP server closes cleanly
   const stopAll = (): void => {
     if (shuttingDown) {
       return
@@ -41,7 +41,7 @@ export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Pr
       .catch((err) => logger.error(err, 'apiShutdownPromise rejected – skipping cleanup'))
   }
 
-  // spawn one loop per (endpoint × transport)
+  // Spawn one loop per (endpoint × transport)
   const spawnLoop = (
     endpoint: AdapterEndpoint<EndpointGenerics>,
     transport: Transport<TransportGenerics>,
@@ -57,7 +57,7 @@ export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Pr
 
     const key = `${endpoint.name}:${routeName}`
 
-    // cache metric handles once – prom-client recommends this
+    // Cache metric handles once – prom-client recommends this
     const labels = {
       adapter_endpoint: endpoint.name,
       transport: routeName,
@@ -74,7 +74,7 @@ export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Pr
 
     let delayMs = 10 // Legacy default
 
-    // schedule the next run (fresh timer every time)
+    // Schedule the next run (fresh timer every time)
     const scheduleNext = (): void => {
       if (shuttingDown) {
         return
@@ -117,7 +117,7 @@ export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Pr
       scheduleNext()
     }
 
-    // kick off immediately – required for backwards compatibility
+    // Kick off immediately – required for backwards compatibility
     void handler()
   }
 

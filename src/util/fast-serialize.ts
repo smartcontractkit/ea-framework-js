@@ -37,7 +37,7 @@ export function serializeResponse<T extends ResponseGenerics>(
       'data' in response &&
       'result' in response
     ) {
-      result = serializeSuccessResponse(response as AdapterResponse<T>)
+      result = serializeSuccessResponse(response)
     }
     // Error response fast path
     else if (
@@ -45,7 +45,7 @@ export function serializeResponse<T extends ResponseGenerics>(
       response.statusCode >= 400 &&
       'errorMessage' in response
     ) {
-      result = serializeErrorResponse(response as AdapterResponse<T>)
+      result = serializeErrorResponse(response)
     }
     // Handle batch responses
     else if (
@@ -67,7 +67,7 @@ export function serializeResponse<T extends ResponseGenerics>(
       mode = 'standard'
       result = JSON.stringify(response)
     }
-  } catch (e) {
+  } catch (_e) {
     // If any error occurs, fall back to standard serialization
     mode = 'standard'
     result = JSON.stringify(response)
@@ -86,7 +86,16 @@ export function serializeResponse<T extends ResponseGenerics>(
 function serializeSuccessResponse<T extends ResponseGenerics>(
   response: AdapterResponse<T>,
 ): string {
-  const { statusCode, data, result, timestamps, meta } = response as any
+  // Use unknown as an intermediate step before assertion to avoid type errors
+  const responseObj = response as unknown as {
+    statusCode: number
+    data?: unknown
+    result?: unknown
+    timestamps?: Record<string, number>
+    meta?: Record<string, unknown>
+  }
+
+  const { statusCode, data, result, timestamps, meta } = responseObj
 
   let json = '{'
 
@@ -103,7 +112,7 @@ function serializeSuccessResponse<T extends ResponseGenerics>(
     } else if (typeof data === 'object') {
       json += JSON.stringify(data)
     } else {
-      json += data
+      json += String(data)
     }
   }
 
@@ -118,7 +127,7 @@ function serializeSuccessResponse<T extends ResponseGenerics>(
       // Handle object types properly
       json += JSON.stringify(result)
     } else {
-      json += result
+      json += String(result)
     }
   }
 
@@ -143,7 +152,14 @@ function serializeSuccessResponse<T extends ResponseGenerics>(
  * Specialized serializer for error responses
  */
 function serializeErrorResponse<T extends ResponseGenerics>(response: AdapterResponse<T>): string {
-  const { statusCode, errorMessage, timestamps } = response as any
+  // Use unknown as an intermediate step before assertion to avoid type errors
+  const responseObj = response as unknown as {
+    statusCode: number
+    errorMessage: string | Record<string, unknown>
+    timestamps?: Record<string, number>
+  }
+
+  const { statusCode, errorMessage, timestamps } = responseObj
 
   let json = '{'
 
@@ -182,7 +198,7 @@ function escapeString(str: string): string {
     // If this function is ONLY called when errorMessage is a string, this check might be less critical
     // but good for robustness if the function could be used more generally.
     // Given its use context, `str` will likely always be a defined string.
-    return ''; // Or adjust based on desired behavior for null/undefined
+    return '' // Or adjust based on desired behavior for null/undefined
   }
-  return JSON.stringify(str).slice(1, -1);
+  return JSON.stringify(str).slice(1, -1)
 }
