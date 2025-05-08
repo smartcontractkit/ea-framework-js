@@ -238,7 +238,7 @@ async function buildRestApi(adapter: Adapter) {
 
         // Set status code
         reply.code(response.statusCode || 200)
-        
+
         // Use optimized serialization if enabled
         if (adapter.config.settings.FAST_SERIALIZATION_ENABLED) {
           return reply

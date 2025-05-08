@@ -91,11 +91,8 @@ export class Requester {
   ) {
     this.maxRetries = adapterSettings.RETRY
     this.timeout = adapterSettings.API_TIMEOUT
-    this.sleepBeforeRequeueingMs =
-      adapterSettings.REQUESTER_SLEEP_BEFORE_REQUEUEING_MS
-    this.queue = new UniqueLinkedList<QueuedRequest>(
-      adapterSettings.MAX_HTTP_REQUEST_QUEUE_LENGTH,
-    )
+    this.sleepBeforeRequeueingMs = adapterSettings.REQUESTER_SLEEP_BEFORE_REQUEUEING_MS
+    this.queue = new UniqueLinkedList<QueuedRequest>(adapterSettings.MAX_HTTP_REQUEST_QUEUE_LENGTH)
 
     const maxSockets =
       (adapterSettings as unknown as { MAX_PARALLEL_HTTP_SOCKETS?: number })
@@ -112,9 +109,7 @@ export class Requester {
   ): Promise<RequesterResult<T>> {
     const existing = this.map[key]
     if (existing) {
-      censorLogs(() =>
-        logger.trace(`Request already queued, returning promise (Key: ${key})`),
-      )
+      censorLogs(() => logger.trace(`Request already queued, returning promise (Key: ${key})`))
       return existing.promise as Promise<RequesterResult<T>>
     }
 
@@ -127,13 +122,11 @@ export class Requester {
 
     // Create promise whose handlers we store in the queued object
     await new Promise((unblock) => {
-      queuedRequest.promise = new Promise<RequesterResult<T>>(
-        (resolve, reject) => {
-          queuedRequest.resolve = resolve
-          queuedRequest.reject = reject
-          unblock(0)
-        },
-      )
+      queuedRequest.promise = new Promise<RequesterResult<T>>((resolve, reject) => {
+        queuedRequest.resolve = resolve
+        queuedRequest.reject = reject
+        unblock(0)
+      })
     })
 
     this.queueRequest(queuedRequest)
@@ -183,9 +176,7 @@ export class Requester {
     }
 
     censorLogs(() =>
-      logger.trace(
-        `Processing request (Key: ${next.key}, Retry #: ${next.retries})`,
-      ),
+      logger.trace(`Processing request (Key: ${next.key}, Retry #: ${next.retries})`),
     )
 
     await this.rateLimiter.waitForRateLimit(next.cost)
@@ -197,8 +188,7 @@ export class Requester {
   private async executeRequest(req: QueuedRequest) {
     const { key, config, resolve, reject, retries } = req
     const requestedAt = Date.now()
-    const responseTimer =
-      metrics.get('dataProviderRequestDurationSeconds').startTimer()
+    const responseTimer = metrics.get('dataProviderRequestDurationSeconds').startTimer()
 
     config.timeout = config.timeout || this.timeout
 
@@ -236,14 +226,11 @@ export class Requester {
 
       metrics
         .get('dataProviderRequests')
-        .labels(
-          dataProviderMetricsLabel(err.response?.status || 0, config.method),
-        )
+        .labels(dataProviderMetricsLabel(err.response?.status || 0, config.method))
         .inc()
 
       if (retries >= this.maxRetries) {
-        const ErrorClass =
-          err.response?.status ? AdapterDataProviderError : AdapterConnectionError
+        const ErrorClass = err.response?.status ? AdapterDataProviderError : AdapterConnectionError
 
         reject(
           new ErrorClass(
@@ -265,11 +252,8 @@ export class Requester {
         )
         delete this.map[key]
       } else {
-        const delay =
-          this.sleepBeforeRequeueingMs || (2 ** retries + Math.random()) * 1000
-        logger.info(
-          `${this.maxRetries - retries} retries remaining, sleeping ${delay}ms`,
-        )
+        const delay = this.sleepBeforeRequeueingMs || (2 ** retries + Math.random()) * 1000
+        logger.info(`${this.maxRetries - retries} retries remaining, sleeping ${delay}ms`)
         await sleep(delay)
         req.retries++
         this.queueRequest(req)

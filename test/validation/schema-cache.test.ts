@@ -7,9 +7,9 @@ test('getValidator caches compiled object schemas', (t) => {
     type: 'object',
     properties: {
       foo: { type: 'string' },
-      bar: { type: 'number' }
+      bar: { type: 'number' },
     },
-    required: ['foo']
+    required: ['foo'],
   }
 
   // Get the validator for the same schema twice
@@ -50,7 +50,7 @@ test('getValidator validates against the provided schema', (t) => {
   const numberSchema = {
     type: 'number',
     minimum: 10,
-    maximum: 100
+    maximum: 100,
   }
 
   const validator = getValidator(numberSchema)
@@ -76,43 +76,49 @@ test('getValidator handles complex schemas', (t) => {
         type: 'object',
         properties: {
           street: { type: 'string' },
-          city: { type: 'string' }
+          city: { type: 'string' },
         },
-        required: ['street', 'city']
+        required: ['street', 'city'],
       },
       tags: {
         type: 'array',
-        items: { type: 'string' }
-      }
+        items: { type: 'string' },
+      },
     },
-    required: ['name', 'age']
+    required: ['name', 'age'],
   }
 
   const validator = getValidator(complexSchema)
 
   // Valid object
-  t.true(validator({
-    name: 'John',
-    age: 30,
-    address: {
-      street: '123 Main St',
-      city: 'Anytown'
-    },
-    tags: ['developer', 'researcher']
-  }))
+  t.true(
+    validator({
+      name: 'John',
+      age: 30,
+      address: {
+        street: '123 Main St',
+        city: 'Anytown',
+      },
+      tags: ['developer', 'researcher'],
+    }),
+  )
 
   // Invalid objects
-  t.false(validator({
-    name: 'John'
-    // Missing age
-  }))
+  t.false(
+    validator({
+      name: 'John',
+      // Missing age
+    }),
+  )
 
-  t.false(validator({
-    name: 'John',
-    age: 30,
-    address: {
-      street: '123 Main St'
-      // Missing city
-    }
-  }))
-}) 
+  t.false(
+    validator({
+      name: 'John',
+      age: 30,
+      address: {
+        street: '123 Main St',
+        // Missing city
+      },
+    }),
+  )
+})

@@ -11,12 +11,12 @@ test.before(() => {
 // Helper function to measure serialization performance
 const measurePerformance = <T extends ResponseGenerics>(
   obj: AdapterResponse<T>,
-  iterations: number = 10000
+  iterations: number = 10000,
 ): { fastTime: number; standardTime: number; speedup: number } => {
   // Warm up
   serializeResponse(obj)
   JSON.stringify(obj)
-  
+
   // Measure fast serialization
   const fastStart = performance.now()
   for (let i = 0; i < iterations; i++) {
@@ -24,7 +24,7 @@ const measurePerformance = <T extends ResponseGenerics>(
   }
   const fastEnd = performance.now()
   const fastTime = fastEnd - fastStart
-  
+
   // Measure standard serialization
   const standardStart = performance.now()
   for (let i = 0; i < iterations; i++) {
@@ -32,10 +32,10 @@ const measurePerformance = <T extends ResponseGenerics>(
   }
   const standardEnd = performance.now()
   const standardTime = standardEnd - standardStart
-  
+
   // Calculate speedup
   const speedup = standardTime / fastTime
-  
+
   return { fastTime, standardTime, speedup }
 }
 
@@ -47,14 +47,14 @@ test('serializes standard success response correctly', (t) => {
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: 1714570799000
-    }
+      providerIndicatedTimeUnixMs: 1714570799000,
+    },
   }
-  
+
   // Test serialization correctness
   const serialized = serializeResponse(response)
   const standardSerialized = JSON.stringify(response)
-  
+
   // Parse both serialized versions and compare
   t.deepEqual(JSON.parse(serialized), JSON.parse(standardSerialized))
 })
@@ -66,14 +66,14 @@ test('serializes error response correctly', (t) => {
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: undefined
-    }
+      providerIndicatedTimeUnixMs: undefined,
+    },
   }
-  
+
   // Test serialization correctness
   const serialized = serializeResponse(response)
   const standardSerialized = JSON.stringify(response)
-  
+
   // Parse both serialized versions and compare
   t.deepEqual(JSON.parse(serialized), JSON.parse(standardSerialized))
 })
@@ -88,31 +88,31 @@ test('serializes batch response correctly', (t) => {
           timestamps: {
             providerDataRequestedUnixMs: 1714570800000,
             providerDataReceivedUnixMs: 1714570801000,
-            providerIndicatedTimeUnixMs: 1714570799000
-          }
+            providerIndicatedTimeUnixMs: 1714570799000,
+          },
         },
         {
           result: '678.90',
           timestamps: {
             providerDataRequestedUnixMs: 1714570800000,
             providerDataReceivedUnixMs: 1714570801000,
-            providerIndicatedTimeUnixMs: 1714570799000
-          }
-        }
-      ]
+            providerIndicatedTimeUnixMs: 1714570799000,
+          },
+        },
+      ],
     },
     result: '123.45',
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: 1714570799000
-    }
+      providerIndicatedTimeUnixMs: 1714570799000,
+    },
   }
-  
+
   // Test serialization correctness
   const serialized = serializeResponse(response)
   const standardSerialized = JSON.stringify(response)
-  
+
   // Parse both serialized versions and compare
   t.deepEqual(JSON.parse(serialized), JSON.parse(standardSerialized))
 })
@@ -129,29 +129,29 @@ test('handles complex nested objects', (t) => {
           name: 'Bitcoin',
           metadata: {
             blockchain: 'Bitcoin',
-            created: '2009-01-03'
-          }
-        }
-      }
+            created: '2009-01-03',
+          },
+        },
+      },
     },
     result: '123.45',
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: 1714570799000
+      providerIndicatedTimeUnixMs: 1714570799000,
     },
     meta: {
       adapterName: 'test-adapter',
       metrics: {
-        feedId: 'BTC-USD'
-      }
-    }
+        feedId: 'BTC-USD',
+      },
+    },
   }
-  
+
   // Test serialization correctness
   const serialized = serializeResponse(response)
   const standardSerialized = JSON.stringify(response)
-  
+
   // Parse both serialized versions and compare
   t.deepEqual(JSON.parse(serialized), JSON.parse(standardSerialized))
 })
@@ -164,14 +164,14 @@ test('handles special characters in strings', (t) => {
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: 1714570799000
-    }
+      providerIndicatedTimeUnixMs: 1714570799000,
+    },
   }
-  
+
   // Test serialization correctness
   const serialized = serializeResponse(response)
   const standardSerialized = JSON.stringify(response)
-  
+
   // Parse both serialized versions and compare
   t.deepEqual(JSON.parse(serialized), JSON.parse(standardSerialized))
 })
@@ -180,25 +180,25 @@ test('handles date objects correctly', (t) => {
   const now = new Date()
   const response: AdapterResponse = {
     statusCode: 200,
-    data: { 
+    data: {
       date: now,
       nestedDates: {
         created: now,
-        updated: now
-      }
+        updated: now,
+      },
     },
     result: '123.45',
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: 1714570799000
-    }
+      providerIndicatedTimeUnixMs: 1714570799000,
+    },
   }
-  
+
   // Test serialization correctness
   const serialized = serializeResponse(response)
   const standardSerialized = JSON.stringify(response)
-  
+
   // Both serializers should handle dates the same way
   t.deepEqual(JSON.parse(serialized), JSON.parse(standardSerialized))
 })
@@ -211,14 +211,14 @@ test('handles object in result field correctly', (t) => {
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: 1714570799000
-    }
+      providerIndicatedTimeUnixMs: 1714570799000,
+    },
   }
-  
+
   // Test serialization correctness
   const serialized = serializeResponse(response)
   const standardSerialized = JSON.stringify(response)
-  
+
   // Parse both serialized versions and compare
   t.deepEqual(JSON.parse(serialized), JSON.parse(standardSerialized))
 })
@@ -231,13 +231,13 @@ test('handles error objects correctly', (t) => {
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: 1714570799000
-    }
+      providerIndicatedTimeUnixMs: 1714570799000,
+    },
   }
-  
-  // Test serialization 
+
+  // Test serialization
   const serialized = serializeResponse(response)
-  
+
   // Parse the result to verify it's valid JSON and contains error details
   const parsed = JSON.parse(serialized)
   t.is(parsed.statusCode, 400)
@@ -253,10 +253,10 @@ test('performance benchmarks', (t) => {
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: 1714570799000
-    }
+      providerIndicatedTimeUnixMs: 1714570799000,
+    },
   }
-  
+
   // Complex response
   const complexResponse: AdapterResponse = {
     statusCode: 200,
@@ -264,43 +264,45 @@ test('performance benchmarks', (t) => {
       result: '123.45',
       details: {
         source: 'provider-1',
-        assets: Array(20).fill(0).map((_, i) => ({
-          symbol: `ASSET-${i}`,
-          price: 100 + i,
-          metadata: {
-            created: new Date().toISOString(),
-            tags: ['tag1', 'tag2', 'tag3']
-          }
-        }))
-      }
+        assets: Array(20)
+          .fill(0)
+          .map((_, i) => ({
+            symbol: `ASSET-${i}`,
+            price: 100 + i,
+            metadata: {
+              created: new Date().toISOString(),
+              tags: ['tag1', 'tag2', 'tag3'],
+            },
+          })),
+      },
     },
     result: '123.45',
     timestamps: {
       providerDataRequestedUnixMs: 1714570800000,
       providerDataReceivedUnixMs: 1714570801000,
-      providerIndicatedTimeUnixMs: 1714570799000
+      providerIndicatedTimeUnixMs: 1714570799000,
     },
     meta: {
       adapterName: 'test-adapter',
       metrics: {
-        feedId: 'BTC-USD'
-      }
-    }
+        feedId: 'BTC-USD',
+      },
+    },
   }
-  
+
   // Run performance tests with fewer iterations in test environment
   const simplePerf = measurePerformance(simpleResponse, 1000)
   const complexPerf = measurePerformance(complexResponse, 1000)
-  
+
   // In test environments, metrics overhead might make performance appear worse
   // Just make sure the implementation produces valid JSON
   console.log(`Simple response speedup: ${simplePerf.speedup.toFixed(2)}x`)
   console.log(`Complex response speedup: ${complexPerf.speedup.toFixed(2)}x`)
-  
+
   // Validate correctness instead of raw performance in test environment
   const simpleSerialized = serializeResponse(simpleResponse)
   const complexSerialized = serializeResponse(complexResponse)
-  
+
   t.deepEqual(JSON.parse(simpleSerialized), simpleResponse)
   t.deepEqual(JSON.parse(complexSerialized), complexResponse)
-}) 
+})

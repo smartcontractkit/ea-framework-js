@@ -1,17 +1,7 @@
-import {
-  Adapter,
-  AdapterEndpoint,
-  EndpointContext,
-  EndpointGenerics,
-} from './adapter'
+import { Adapter, AdapterEndpoint, EndpointContext, EndpointGenerics } from './adapter'
 import { metrics } from './metrics'
 import { Transport, TransportGenerics } from './transports'
-import {
-  asyncLocalStorage,
-  censorLogs,
-  makeLogger,
-  timeoutPromise,
-} from './util'
+import { asyncLocalStorage, censorLogs, makeLogger, timeoutPromise } from './util'
 
 const logger = makeLogger('BackgroundExecutor')
 
@@ -21,15 +11,12 @@ const logger = makeLogger('BackgroundExecutor')
  *
  * • If the transport returns a number, that value becomes the delay (ms)
  *   before the next run; otherwise the loop falls back to **10 ms** so
- *   legacy unit-tests still observe four executions.  
- * • All loops survive errors and time-outs.  
+ *   legacy unit-tests still observe four executions.
+ * • All loops survive errors and time-outs.
  * • Timers are cleared—allowing the process to exit—once the HTTP
  *   server's shutdown promise resolves.
  */
-export function callBackgroundExecutes(
-  adapter: Adapter,
-  apiShutdownPromise?: Promise<void>,
-): void {
+export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Promise<void>): void {
   let shuttingDown = false
 
   /** Live timers, keyed by `"endpoint:transport"`. */
@@ -39,19 +26,21 @@ export function callBackgroundExecutes(
   /* Graceful shutdown: invoked only when the HTTP server closes cleanly */
   /* ------------------------------------------------------------------ */
   const stopAll = (): void => {
-    if (shuttingDown) {return}
+    if (shuttingDown) {
+      return
+    }
     shuttingDown = true
 
-    for (const t of timers.values()) {clearTimeout(t)}
+    for (const t of timers.values()) {
+      clearTimeout(t)
+    }
     timers.clear()
   }
 
   if (apiShutdownPromise) {
     apiShutdownPromise
       .then(stopAll)
-      .catch((err) =>
-        logger.error(err, 'apiShutdownPromise rejected – skipping cleanup'),
-      )
+      .catch((err) => logger.error(err, 'apiShutdownPromise rejected – skipping cleanup'))
   }
 
   /* ------------------------------------------------------------------ */
@@ -78,8 +67,8 @@ export function callBackgroundExecutes(
       transport: routeName,
     } as const
     const mTotal = metrics.get('bgExecuteTotal').labels(labels)
-    const mErr   = metrics.get('bgExecuteErrors').labels(labels)
-    const mDur   = metrics.get('bgExecuteDurationSeconds').labels(labels)
+    const mErr = metrics.get('bgExecuteErrors').labels(labels)
+    const mDur = metrics.get('bgExecuteDurationSeconds').labels(labels)
 
     const ctx: EndpointContext<EndpointGenerics> = {
       endpointName: endpoint.name,
@@ -91,14 +80,18 @@ export function callBackgroundExecutes(
 
     /** Schedule the next run (fresh timer every time). */
     const scheduleNext = (): void => {
-      if (shuttingDown) {return}
+      if (shuttingDown) {
+        return
+      }
       const next = setTimeout(handler, delayMs)
       next.unref?.() // Harmless under Jest; valuable in prod
       timers.set(key, next)
     }
 
     const handler = async (): Promise<void> => {
-      if (shuttingDown) {return}
+      if (shuttingDown) {
+        return
+      }
 
       mTotal.inc()
       const stopTimer = mDur.startTimer()
