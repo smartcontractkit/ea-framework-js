@@ -8,7 +8,6 @@ runs:
         node-version: 22.14
         registry-url: https://registry.npmjs.org
         always-auth: true
-        cache: yarn
     - name: Enable Corepack
       run: corepack enable
       shell: bash
