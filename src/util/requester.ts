@@ -77,6 +77,30 @@ interface RequesterResult<T> {
   }
 }
 
+/**
+ * Manages outbound HTTP requests with queueing, rate limiting, and connection reuse.
+ *
+ * Key features:
+ * - **Request Coalescing:** Ignores duplicate outbound requests based on a provided unique key,
+ *   returning the promise of the already-queued request. This is useful as request
+ *   configs often contain dynamic elements like timestamps or nonces.
+ * - **Queueing:** Adds requests to an internal queue (`UniqueLinkedList`) to manage flow.
+ *   If the queue reaches its configured maximum length, adding a new request will cause
+ *   the oldest request in the queue to be removed and its promise rejected with an
+ *   AdapterRateLimitError.
+ * - **Rate Limiting:** Enforces rate limits on a per-instance basis before dispatching
+ *   requests, complying with typical "N Readers - 1 Writer" EA scaling architectures.
+ *   Requests are dequeued sequentially to respect rate limits.
+ * - **Connection Reuse:** Utilizes persistent HTTP and HTTPS agents with keep-alive enabled
+ *   (via global Axios defaults) to reduce socket churn and improve latency for
+ *   concurrent outbound requests. While rate limiting is sequential, actual HTTP
+ *   operations can be in-flight concurrently up to `MAX_PARALLEL_HTTP_SOCKETS`.
+ *
+ * This implementation does not:
+ * - Prioritize any specific request over another within the queue (FIFO).
+ * - Directly manage rate limiting for architectures with multiple writer EA instances;
+ *   rate limiting scope is per-instance.
+ */
 export class Requester {
   private processing = false
   private queue: UniqueLinkedList<QueuedRequest>

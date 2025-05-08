@@ -19,12 +19,10 @@ const logger = makeLogger('BackgroundExecutor')
 export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Promise<void>): void {
   let shuttingDown = false
 
-  /** Live timers, keyed by `"endpoint:transport"`. */
+  // live timers, keyed by `"endpoint:transport"`.
   const timers = new Map<string, NodeJS.Timeout>()
-
-  /* ------------------------------------------------------------------ */
-  /* Graceful shutdown: invoked only when the HTTP server closes cleanly */
-  /* ------------------------------------------------------------------ */
+  
+  // graceful shutdown: invoked only when the HTTP server closes cleanly
   const stopAll = (): void => {
     if (shuttingDown) {
       return
@@ -43,9 +41,7 @@ export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Pr
       .catch((err) => logger.error(err, 'apiShutdownPromise rejected – skipping cleanup'))
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Spawn one loop per (endpoint × transport)                           */
-  /* ------------------------------------------------------------------ */
+  // spawn one loop per (endpoint × transport)
   const spawnLoop = (
     endpoint: AdapterEndpoint<EndpointGenerics>,
     transport: Transport<TransportGenerics>,
@@ -61,7 +57,7 @@ export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Pr
 
     const key = `${endpoint.name}:${routeName}`
 
-    /* Cache metric handles once – prom-client recommends this. */
+    // cache metric handles once – prom-client recommends this
     const labels = {
       adapter_endpoint: endpoint.name,
       transport: routeName,
@@ -78,7 +74,7 @@ export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Pr
 
     let delayMs = 10 // Legacy default
 
-    /** Schedule the next run (fresh timer every time). */
+    // schedule the next run (fresh timer every time)
     const scheduleNext = (): void => {
       if (shuttingDown) {
         return
@@ -121,7 +117,7 @@ export function callBackgroundExecutes(adapter: Adapter, apiShutdownPromise?: Pr
       scheduleNext()
     }
 
-    /* Kick off immediately – required for backwards compatibility. */
+    // kick off immediately – required for backwards compatibility
     void handler()
   }
 

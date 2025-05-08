@@ -8,5 +8,14 @@ runs:
         node-version: 22.14
         registry-url: https://registry.npmjs.org
         always-auth: true
+        cache: yarn
+    - name: Enable Corepack
+      run: corepack enable
+      shell: bash
+    - name: Check Yarn version and path after Corepack enable
+      run: |
+        which yarn
+        yarn --version
+      shell: bash
     - run: yarn install --frozen-lockfile
       shell: bash
