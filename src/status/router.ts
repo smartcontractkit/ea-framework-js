@@ -54,7 +54,7 @@ export interface StatusResponse {
 export default function registerStatusEndpoint(app: FastifyInstance, adapter: Adapter) {
   // Status endpoint that returns comprehensive adapter information
   app.get(join(adapter.config.settings.BASE_URL, '/status'), async () => {
-    const metricsEndpoint = adapter.config.settings.METRICS_USE_BASE_URL 
+    const metricsEndpoint = adapter.config.settings.METRICS_USE_BASE_URL
       ? join(adapter.config.settings.BASE_URL, 'metrics')
       : '/metrics'
 
@@ -64,7 +64,7 @@ export default function registerStatusEndpoint(app: FastifyInstance, adapter: Ad
         version: process.env['npm_package_version'] || 'unknown',
         uptimeSeconds: process.uptime(),
       },
-      endpoints: adapter.endpoints.map(endpoint => ({
+      endpoints: adapter.endpoints.map((endpoint) => ({
         name: endpoint.name,
         aliases: endpoint.aliases || [],
         transports: endpoint.transportRoutes.routeNames(),
@@ -75,13 +75,15 @@ export default function registerStatusEndpoint(app: FastifyInstance, adapter: Ad
         nodeVersion: process.version,
         platform: process.platform,
         architecture: process.arch,
-        hostname: hostname()
+        hostname: hostname(),
       },
       metrics: {
         enabled: adapter.config.settings.METRICS_ENABLED,
-        port: adapter.config.settings.METRICS_ENABLED ? adapter.config.settings.METRICS_PORT : undefined,
-        endpoint: adapter.config.settings.METRICS_ENABLED ? metricsEndpoint : undefined
-      }
+        port: adapter.config.settings.METRICS_ENABLED
+          ? adapter.config.settings.METRICS_PORT
+          : undefined,
+        endpoint: adapter.config.settings.METRICS_ENABLED ? metricsEndpoint : undefined,
+      },
     }
 
     return statusResponse

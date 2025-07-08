@@ -8,7 +8,7 @@ import { NopTransport } from '../src/util/testing-utils'
 
 test.serial('status endpoint returns expected values', async (t) => {
   process.env['API_KEY'] = '12312341234'
-  
+
   const config = new AdapterConfig({
     API_KEY: {
       description: 'Api key',
@@ -34,8 +34,7 @@ test.serial('status endpoint returns expected values', async (t) => {
       }),
       new AdapterEndpoint({
         name: 'another',
-        transportRoutes: new TransportRoutes()
-          .register('websocket', new NopTransport()),
+        transportRoutes: new TransportRoutes().register('websocket', new NopTransport()),
         defaultTransport: 'websocket',
       }),
     ],
@@ -44,18 +43,18 @@ test.serial('status endpoint returns expected values', async (t) => {
 
   const { api } = await start(adapter)
   const statusResponse = await api?.inject({ path: '/status' })
-  
+
   if (!statusResponse?.body) {
     t.fail()
     return
   }
-  
+
   const parsedResponse = statusResponse?.json() as StatusResponse
 
   // Debug: Print response except for configs
   const debugResponse = { ...parsedResponse }
   delete (debugResponse as Partial<StatusResponse>).configuration
-  
+
   // Test adapter information
   t.is(parsedResponse.adapter.name, 'TEST')
   t.is(parsedResponse.adapter.version, '2.6.0')
@@ -106,8 +105,7 @@ test.serial('status endpoint redacts sensitive configuration values', async (t) 
     endpoints: [
       new AdapterEndpoint({
         name: 'test',
-        transportRoutes: new TransportRoutes()
-          .register('http', new NopTransport()),
+        transportRoutes: new TransportRoutes().register('http', new NopTransport()),
         defaultTransport: 'http',
       }),
     ],
@@ -116,16 +114,16 @@ test.serial('status endpoint redacts sensitive configuration values', async (t) 
 
   const { api } = await start(adapter)
   const statusResponse = await api?.inject({ path: '/status' })
-  
+
   if (!statusResponse?.body) {
     t.fail()
     return
   }
-  
+
   const parsedResponse = statusResponse?.json() as StatusResponse
 
   // Test that sensitive API_KEY setting is redacted
-  const apiKeySetting = parsedResponse.configuration.find(s => s.name === 'API_KEY')
+  const apiKeySetting = parsedResponse.configuration.find((s) => s.name === 'API_KEY')
   t.truthy(apiKeySetting)
   t.is(apiKeySetting?.value, '[API_KEY REDACTED]')
   t.is(apiKeySetting?.type, 'string')

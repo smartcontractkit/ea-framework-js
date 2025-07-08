@@ -14,7 +14,7 @@ export const buildSettingsList = (adapter: Adapter): DebugPageSetting[] => {
   const settings = adapter.config.settings
   const censoredValues = CensorList.getAll()
   const censoredSettings: Array<SettingDefinitionDetails & { name: string; value: unknown }> = []
-  
+
   for (const [key, value] of Object.entries(settings)) {
     const definitionDetails = adapter.config.getSettingDebugDetails(key)
     censoredSettings.push({
@@ -23,6 +23,6 @@ export const buildSettingsList = (adapter: Adapter): DebugPageSetting[] => {
       value: censor(value, censoredValues),
     })
   }
-  
+
   return censoredSettings.sort((a, b) => a.name.localeCompare(b.name))
-} 
+}
