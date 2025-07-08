@@ -90,6 +90,7 @@ export const BaseSettingsDefinition = {
       'The URL of the Redis server. Format: [redis[s]:]//[[user][:password@]][host][:port][/db-number][?db=db-number[&password=bar[&option=value]]]',
     type: 'string',
     validate: validator.url(),
+    sensitive: true,
   },
   CACHE_TYPE: {
     description: 'The type of cache to use throughout the EA',
@@ -302,6 +303,7 @@ export const BaseSettingsDefinition = {
     description: 'Base64 Private Key of TSL/SSL certificate',
     type: 'string',
     validate: validator.base64(),
+    sensitive: true,
   },
   TLS_PUBLIC_KEY: {
     description: 'Base64 Public Key of TSL/SSL certificate',
@@ -312,10 +314,12 @@ export const BaseSettingsDefinition = {
     description: 'Password to be used to generate an encryption key',
     type: 'string',
     default: '',
+    sensitive: true,
   },
   TLS_CA: {
     description: 'CA certificate to use for authenticating client certificates',
     type: 'string',
+    sensitive: true,
   },
   MAX_HTTP_REQUEST_QUEUE_LENGTH: {
     description:

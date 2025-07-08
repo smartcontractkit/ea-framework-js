@@ -16,6 +16,7 @@ import {
 } from './util'
 import { errorCatchingMiddleware, validatorMiddleware } from './validation'
 import { EmptyInputParameters } from './validation/input-params'
+import registerStatusEndpoint from './status/router'
 
 export { FastifyInstance as ServerInstance }
 
@@ -209,6 +210,9 @@ async function buildRestApi(adapter: Adapter) {
     registerDebugEndpoints(app, adapter)
     logger.info('Serving debug endpoints')
   }
+
+  // Register status endpoint
+  registerStatusEndpoint(app, adapter)
 
   // Use global error handling
   app.setErrorHandler(errorCatchingMiddleware)

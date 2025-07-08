@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify'
 import { join } from 'path'
 import { Adapter } from '../adapter'
-import settingsPage, { buildDebugSettingsList } from './settings-page'
+import settingsPage from './settings-page'
+import { buildSettingsList } from '../util/settings'
 
 /**
  * This function registers the debug endpoints for the adapter.
@@ -13,7 +14,7 @@ import settingsPage, { buildDebugSettingsList } from './settings-page'
 export default function registerDebugEndpoints(app: FastifyInstance, adapter: Adapter) {
   // Debug endpoint to return the current settings in raw JSON (censoring sensitive values)
   app.get(join(adapter.config.settings.BASE_URL, '/debug/settings/raw'), async () => {
-    const censoredSettings = buildDebugSettingsList(adapter)
+    const censoredSettings = buildSettingsList(adapter)
     return JSON.stringify(
       censoredSettings.sort((a, b) => a.name.localeCompare(b.name)),
       null,
@@ -23,7 +24,7 @@ export default function registerDebugEndpoints(app: FastifyInstance, adapter: Ad
 
   // Helpful UI to visualize current settings
   app.get(join(adapter.config.settings.BASE_URL, '/debug/settings'), (req, reply) => {
-    const censoredSettings = buildDebugSettingsList(adapter)
+    const censoredSettings = buildSettingsList(adapter)
     const censoredSettingsPage = settingsPage(censoredSettings)
     reply.headers({ 'content-type': 'text/html' }).send(censoredSettingsPage)
   })
