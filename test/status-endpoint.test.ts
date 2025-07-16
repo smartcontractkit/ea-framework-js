@@ -51,10 +51,6 @@ test.serial('status endpoint returns expected values', async (t) => {
 
   const parsedResponse = statusResponse?.json() as StatusResponse
 
-  // Debug: Print response except for configs
-  const debugResponse = { ...parsedResponse }
-  delete (debugResponse as Partial<StatusResponse>).configuration
-
   // Test adapter information
   t.is(parsedResponse.adapter.name, 'TEST')
   t.is(parsedResponse.adapter.version, '2.6.0')
@@ -89,7 +85,9 @@ test.serial('status endpoint returns expected values', async (t) => {
 })
 
 test.serial('status endpoint redacts sensitive configuration values', async (t) => {
+  // Set up sensitive environment variables that the framework uses
   process.env['API_KEY'] = '12312341234'
+  process.env['CACHE_REDIS_PASSWORD'] = 'super-secret-redis-password'
 
   const config = new AdapterConfig({
     API_KEY: {
@@ -122,13 +120,20 @@ test.serial('status endpoint redacts sensitive configuration values', async (t) 
 
   const parsedResponse = statusResponse?.json() as StatusResponse
 
-  // Test that sensitive API_KEY setting is redacted
+  // Test that our custom API_KEY setting is redacted
   const apiKeySetting = parsedResponse.configuration.find((s) => s.name === 'API_KEY')
   t.truthy(apiKeySetting)
   t.is(apiKeySetting?.value, '[API_KEY REDACTED]')
   t.is(apiKeySetting?.type, 'string')
   t.is(apiKeySetting?.required, true)
   t.is(apiKeySetting?.customSetting, true)
+
+  // Test that our custom CACHE_REDIS_PASSWORD setting is redacted
+  const redisPasswordSetting = parsedResponse.configuration.find(
+    (s) => s.name === 'CACHE_REDIS_PASSWORD',
+  )
+  t.truthy(redisPasswordSetting)
+  t.is(redisPasswordSetting?.value, '[CACHE_REDIS_PASSWORD REDACTED]')
 
   await api?.close()
 })
