@@ -15,7 +15,7 @@ export interface StatusResponse {
     aliases: string[]
     transports: string[]
   }[]
-  defaultEndpoint?: string
+  defaultEndpoint: string
   configuration: {
     name: string
     value: unknown
@@ -69,7 +69,7 @@ export default function registerStatusEndpoint(app: FastifyInstance, adapter: Ad
         aliases: endpoint.aliases || [],
         transports: endpoint.transportRoutes.routeNames(),
       })),
-      defaultEndpoint: adapter.defaultEndpoint,
+      defaultEndpoint: adapter.defaultEndpoint || '',
       configuration: buildSettingsList(adapter),
       runtime: {
         nodeVersion: process.version,

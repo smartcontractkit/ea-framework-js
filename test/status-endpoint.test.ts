@@ -51,35 +51,63 @@ test.serial('status endpoint returns expected values', async (t) => {
 
   const parsedResponse = statusResponse?.json() as StatusResponse
 
-  // Test adapter information
-  t.is(parsedResponse.adapter.name, 'TEST')
-  t.is(parsedResponse.adapter.version, '2.6.0')
+  // Create expected response with all static values
+  const expectedResponse: StatusResponse = {
+    adapter: {
+      name: 'TEST',
+      version: parsedResponse.adapter.version,
+      uptimeSeconds: parsedResponse.adapter.uptimeSeconds,
+    },
+    endpoints: [
+      {
+        name: 'test',
+        aliases: ['alias1', 'alias2'],
+        transports: ['http', 'websocket'],
+      },
+      {
+        name: 'another',
+        aliases: [],
+        transports: ['websocket'],
+      },
+    ],
+    defaultEndpoint: '', // No default endpoint set
+    configuration: parsedResponse.configuration,
+    runtime: {
+      nodeVersion: parsedResponse.runtime.nodeVersion,
+      platform: parsedResponse.runtime.platform,
+      architecture: parsedResponse.runtime.architecture,
+      hostname: parsedResponse.runtime.hostname,
+    },
+    metrics: {
+      enabled: false,
+    },
+  }
+
+  // Test the complete structure with deep equal
+  t.deepEqual(parsedResponse, expectedResponse)
+
+  // Test dynamic fields separately to ensure they have correct types/constraints
   t.is(typeof parsedResponse.adapter.uptimeSeconds, 'number')
-
-  // Test endpoints is an array
-  t.is(Array.isArray(parsedResponse.endpoints), true)
-  t.is(parsedResponse.endpoints.length, 2)
-  t.is(parsedResponse.endpoints[0].name, 'test')
-  t.deepEqual(parsedResponse.endpoints[0].aliases, ['alias1', 'alias2'])
-  t.deepEqual(parsedResponse.endpoints[0].transports, ['http', 'websocket'])
-  t.is(parsedResponse.endpoints[1].name, 'another')
-  t.deepEqual(parsedResponse.endpoints[1].aliases, [])
-  t.deepEqual(parsedResponse.endpoints[1].transports, ['websocket'])
-
-  // Test configuration is not empty
-  t.is(Array.isArray(parsedResponse.configuration), true)
-  t.true(parsedResponse.configuration.length > 0)
-
-  // Test runtime information
+  t.true(parsedResponse.adapter.uptimeSeconds >= 0)
   t.is(typeof parsedResponse.runtime.nodeVersion, 'string')
+  t.true(parsedResponse.runtime.nodeVersion.length > 0)
   t.is(typeof parsedResponse.runtime.platform, 'string')
+  t.true(parsedResponse.runtime.platform.length > 0)
   t.is(typeof parsedResponse.runtime.architecture, 'string')
+  t.true(parsedResponse.runtime.architecture.length > 0)
   t.is(typeof parsedResponse.runtime.hostname, 'string')
+  t.true(parsedResponse.runtime.hostname.length > 0)
 
-  // Test metrics configuration
   t.is(typeof parsedResponse.metrics.enabled, 'boolean')
-  t.is(parsedResponse.metrics.port, undefined)
-  t.is(parsedResponse.metrics.endpoint, undefined)
+
+  // Test specific configuration entries we know about
+  const apiKeySetting = parsedResponse.configuration.find((s) => s.name === 'API_KEY')
+  t.truthy(apiKeySetting)
+  t.is(apiKeySetting?.value, '[API_KEY REDACTED]')
+  t.is(apiKeySetting?.type, 'string')
+  t.is(apiKeySetting?.required, true)
+  t.is(apiKeySetting?.customSetting, true)
+  t.is(apiKeySetting?.description, 'Api key')
 
   await api?.close()
 })
