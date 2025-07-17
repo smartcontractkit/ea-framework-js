@@ -1,5 +1,11 @@
 import test from 'ava'
-import { AdapterConfig, getEnv, SettingDefinition, SettingsDefinitionMap } from '../src/config'
+import {
+  AdapterConfig,
+  BaseSettingsDefinition,
+  getEnv,
+  SettingDefinition,
+  SettingsDefinitionMap,
+} from '../src/config'
 import { validator } from '../src/validation/utils'
 
 test.afterEach(async () => {
@@ -160,4 +166,24 @@ test.serial('Test validate function (scientific notation)', async (t) => {
   } catch (_) {
     t.fail()
   }
+})
+
+test('sensitive configuration constants are properly flagged', (t) => {
+  // Extract all settings that are marked as sensitive
+  const actualSensitiveSettings = Object.entries(BaseSettingsDefinition)
+    .filter(([_, setting]) => (setting as { sensitive?: boolean }).sensitive === true)
+    .map(([name]) => name)
+    .sort()
+
+  // Expected list of settings that should be marked as sensitive
+  const expectedSensitiveSettings = [
+    'CACHE_REDIS_PASSWORD',
+    'CACHE_REDIS_URL',
+    'TLS_CA',
+    'TLS_PASSPHRASE',
+    'TLS_PRIVATE_KEY',
+  ].sort()
+
+  // Deep equal comparison
+  t.deepEqual(actualSensitiveSettings, expectedSensitiveSettings)
 })

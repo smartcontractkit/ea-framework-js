@@ -1,4 +1,4 @@
-import type EventSource from 'eventsource'
+import type { EventSource } from 'eventsource'
 import Redis from 'ioredis'
 import { Cache } from '../cache'
 import { AdapterConfig, BaseAdapterSettings, SettingsDefinitionMap } from '../config'

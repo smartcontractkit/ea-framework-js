@@ -1,5 +1,5 @@
 import { AxiosRequestConfig } from 'axios'
-import EventSource from 'eventsource'
+import { EventSource, EventSourceInit } from 'eventsource'
 import { EndpointContext } from '../adapter'
 import { calculateHttpRequestKey } from '../cache'
 import { makeLogger, sleep } from '../util'
@@ -13,7 +13,7 @@ const logger = makeLogger('SSETransport')
 
 export interface SSEConfig {
   url: string
-  eventSourceInitDict?: EventSource.EventSourceInitDict
+  eventSourceInitDict?: EventSourceInit
 }
 
 /**

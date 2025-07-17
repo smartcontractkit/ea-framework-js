@@ -2,7 +2,7 @@ import test from 'ava'
 import { start } from '../src'
 import { Adapter } from '../src/adapter'
 import { AdapterConfig } from '../src/config'
-import { DebugPageSetting } from '../src/debug/settings-page'
+import { DebugPageSetting } from '../src/util/settings'
 
 test.serial('debug endpoints return 404 if env var is omitted', async (t) => {
   process.env['DEBUG_ENDPOINTS'] = undefined

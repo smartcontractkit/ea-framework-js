@@ -278,10 +278,10 @@ export default class extends Generator.default {
     // Add dependencies to existing package.json
     const pkgJson = {
       devDependencies: {
-        '@types/jest': '27.5.2',
-        '@types/node': '16.18.119',
-        nock: '13.5.5',
-        typescript: '5.6.3',
+        '@types/jest': '^29.5.14',
+        '@types/node': '22.14.1',
+        nock: '13.5.6',
+        typescript: '5.8.3',
       },
       dependencies: {
         '@chainlink/external-adapter-framework': this.props.frameworkVersion,
@@ -310,7 +310,12 @@ export default class extends Generator.default {
 
   // install stage is used to run npm or yarn install scripts
   async install() {
-    await execAsPromise(`yarn install --cwd ${this.args[0]}/${this.props.adapterName}`);
+    try {
+      await execAsPromise(`yarn install --cwd ${this.args[0]}/${this.props.adapterName}`)
+    } catch (e) {
+      console.log(e)
+      await execAsPromise(`yarn --cwd ${this.args[0]}/${this.props.adapterName} install`)
+    }
   }
 
   // end is the last stage. can be used for messages or cleanup
