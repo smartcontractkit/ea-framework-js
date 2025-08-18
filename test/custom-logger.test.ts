@@ -30,7 +30,7 @@ test('custom logger instance is properly injected', async (t) => {
         },
       }
     },
-  }
+  } as unknown as LoggerFactory
 
   const adapter = new Adapter({
     name: 'TEST',
