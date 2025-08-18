@@ -41,7 +41,7 @@ const baseLogger = pino(
         const censorList = CensorList.getAll()
         return method.apply(
           this,
-          inputArgs.map((arg) => censor(arg, censorList)) as [string, ...unknown[]],
+          inputArgs.map((arg) => censor(arg, censorList)) as Parameters<pino.LogFn>,
         )
       },
     },
