@@ -20,7 +20,7 @@ jobs:
     outputs:
       VERSION_INSTRUCTION: ${{ steps.validate.outputs.VERSION_INSTRUCTION }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Validate that version bump labels are on the PR
         id: validate
         uses: ./.github/actions/validate-version-labels
