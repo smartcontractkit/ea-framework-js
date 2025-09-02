@@ -10,7 +10,8 @@ import { connectionErrorLabels, recordWsMessageMetrics } from './metrics'
 
 // Aliasing type for use at adapter level
 export { WebSocket, RawData as WebSocketRawData }
-
+// Explicit initial grace (1s) after open for web socket; after that, rely on "time since last message"
+const INITIAL_WS_GRACE_MS = 1000
 const logger = makeLogger('WebSocketTransport')
 
 type WebSocketClass = new (
@@ -159,7 +160,11 @@ export class WebSocketTransport<
   }
 
   connectionClosed(): boolean {
-    return !this.wsConnection || this.wsConnection.readyState === WebSocket.CLOSED
+    return (
+      !this.wsConnection ||
+      this.wsConnection.readyState === WebSocket.CLOSED ||
+      this.wsConnection.readyState === WebSocket.CLOSING
+    )
   }
 
   serializeMessage(payload: unknown): string {
@@ -187,6 +192,7 @@ export class WebSocketTransport<
 
       // Called when any message is received by the open connection
       message: async (event: WebSocket.MessageEvent) => {
+        this.lastMessageReceivedAt = Date.now()
         const parsed = this.deserializeMessage(event.data)
         censorLogs(() => logger.trace(`Got ws message: ${event.data}`))
         const providerDataReceived = Date.now()
@@ -202,8 +208,6 @@ export class WebSocketTransport<
         })
         logger.trace(`Writing ${results?.length ?? 0} responses to cache`)
         if (Array.isArray(results) && results.length > 0) {
-          // Updating the last message received time here, to only care about messages we use
-          this.lastMessageReceivedAt = Date.now()
           await this.responseCache.write(this.name, results)
         }
 
@@ -338,20 +342,14 @@ export class WebSocketTransport<
     const now = Date.now()
     const timeSinceLastMessage = Math.max(0, now - this.lastMessageReceivedAt)
     const timeSinceConnectionOpened = Math.max(0, now - this.connectionOpenedAt)
-    const timeSinceLastActivity = Math.min(timeSinceLastMessage, timeSinceConnectionOpened)
     const connectionUnresponsive =
-      timeSinceLastActivity > 0 &&
-      timeSinceLastActivity > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
+      timeSinceConnectionOpened >= INITIAL_WS_GRACE_MS &&
+      timeSinceLastMessage > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
 
     let connectionClosed = this.connectionClosed()
-    logger.trace(`WS conn staleness info: 
-      now: ${now} |
-      timeSinceLastMessage: ${timeSinceLastMessage} |
-      timeSinceConnectionOpened: ${timeSinceConnectionOpened} |
-      timeSinceLastActivity: ${timeSinceLastActivity} |
-      subscriptionUnresponsiveTtl: ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL} |
-      connectionUnresponsive: ${connectionUnresponsive} |
-      `)
+    logger.trace(
+      `WS conn staleness info: now: ${now} | timeSinceLastMessage: ${timeSinceLastMessage} | timeSinceConnectionOpened: ${timeSinceConnectionOpened} | subscriptionUnresponsiveTtl: ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL} | connectionUnresponsive: ${connectionUnresponsive} |`,
+    )
 
     // Check if we should close the current connection
     if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
@@ -372,13 +370,18 @@ export class WebSocketTransport<
       // Check if connection was opened very recently; if so, wait a bit before continuing.
       // This is so if we just opened the connection and are waiting to receive some messages,
       // we don't close is immediately after and miss the chance to receive them
-      if (timeSinceConnectionOpened < 1000) {
+      if (timeSinceConnectionOpened < INITIAL_WS_GRACE_MS) {
         logger.info(
           `Connection was opened only ${timeSinceConnectionOpened}ms ago, waiting for that to get to 1s before continuing...`,
         )
-        await sleep(1000 - timeSinceConnectionOpened)
+        await sleep(INITIAL_WS_GRACE_MS - timeSinceConnectionOpened)
       }
-      this.wsConnection?.close(1000)
+      if (this.wsConnection && this.wsConnection.readyState !== WebSocket.CLOSED) {
+        const old = this.wsConnection
+        // Prevent any further sends/reads via this reference
+        this.wsConnection = undefined
+        await waitForGracefulClose(old, 1500)
+      }
       connectionClosed = true
 
       if (subscriptions.desired.length) {
@@ -502,5 +505,42 @@ export class WebsocketReverseMappingTransport<
    */
   getReverseMapping(value: K): TypeFromDefinition<T['Parameters']> | undefined {
     return this.requestMapping.get(value)
+  }
+}
+
+/**
+ * Waits for a WebSocket connection to close gracefully.
+ *
+ * @param ws - The WebSocket instance (from the `ws` package).
+ * @param gracefulMs - Max time in milliseconds to wait for a graceful close before terminating. Defaults to 1500 ms.
+ * @returns A promise that resolves when the socket has closed or been terminated.
+ */
+async function waitForGracefulClose(ws: WebSocket, gracefulMs = 1500): Promise<void> {
+  if (!ws || ws.readyState === WebSocket.CLOSED) {
+    return
+  }
+
+  const closed = new Promise<void>((resolve) => {
+    ws.once('close', resolve)
+  })
+
+  try {
+    ws.close(1000)
+  } catch (err) {
+    logger.debug(`ws.close threw: ${(err as Error).message}`)
+  }
+
+  try {
+    await Promise.race([closed, sleep(gracefulMs)])
+  } catch (err) {
+    logger.debug(`waiting for close failed: ${(err as Error).message}`)
+  }
+  const state: number = ws.readyState
+  if (state !== WebSocket.CLOSED) {
+    try {
+      ws.terminate()
+    } catch (err) {
+      logger.debug(`ws.terminate threw: ${(err as Error).message}`)
+    }
   }
 }
