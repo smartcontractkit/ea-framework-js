@@ -18,7 +18,7 @@ const logger = makeLogger('HttpTransport')
  * Helper struct type that will be used to pass types to the generic parameters of a Transport.
  * Extends the common TransportGenerics, adding Provider specific types for this Batch endpoint.
  */
-type HttpTransportGenerics = TransportGenerics & {
+export type HttpTransportGenerics = TransportGenerics & {
   /**
    * Type details for any provider specific interfaces.
    */
