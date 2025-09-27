@@ -1447,10 +1447,10 @@ fast-uri@^3.0.1:
   resolved "https://registry.npmjs.org/fast-uri/-/fast-uri-3.0.1.tgz"
   integrity sha512-MWipKbbYiYI0UC7cl8m/i/IWTqfC8YXsqjzybjddLsFjStroQzsHXkc73JutMvBiXmOvapk+axIl79ig5t55Bw==
 
-fastify@5.6.0:
-  version "5.6.0"
-  resolved "https://registry.yarnpkg.com/fastify/-/fastify-5.6.0.tgz#b94321583dd3ec617466341f7c307085af1b9475"
-  integrity sha512-9j2r9TnwNsfGiCKGYT0Voqy244qwcoYM9qvNi/i+F8sNNWDnqUEVuGYNc9GyjldhXmMlJmVPS6gI1LdvjYGRJw==
+fastify@5.6.1:
+  version "5.6.1"
+  resolved "https://registry.yarnpkg.com/fastify/-/fastify-5.6.1.tgz#551248a047758ed82741aea15ac4396875d73687"
+  integrity sha512-WjjlOciBF0K8pDUPZoGPhqhKrQJ02I8DKaDIfO51EL0kbSMwQFl85cRwhOvmSDWoukNOdTo27gLN549pLCcH7Q==
   dependencies:
     "@fastify/ajv-compiler" "^4.0.0"
     "@fastify/error" "^4.0.0"
