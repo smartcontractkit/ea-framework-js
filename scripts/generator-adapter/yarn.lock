@@ -369,10 +369,10 @@
   resolved "https://registry.yarnpkg.com/@yeoman/namespace/-/namespace-1.0.1.tgz#8034277c4a62bdf41e05e2d890bc674bc320eb99"
   integrity sha512-XGdYL0HCoPvrzW7T8bxD6RbCY/B8uvR2jpOzJc/yEwTueKHwoVhjSLjVXkokQAO0LNl8nQFLVZ1aKfr2eFWZeA==
 
-"@yeoman/types@1.7.1":
-  version "1.7.1"
-  resolved "https://registry.yarnpkg.com/@yeoman/types/-/types-1.7.1.tgz#b7ecc78db1b4b1511525e3df493cf9b087ef0098"
-  integrity sha512-GseLxUAssJObEgGhXMEb1JfhA4mHycSawdrif73kjms2eSvbpxloNiAJSTiGRThcrfAYl05stleUk4OssyK41g==
+"@yeoman/types@1.8.0":
+  version "1.8.0"
+  resolved "https://registry.yarnpkg.com/@yeoman/types/-/types-1.8.0.tgz#122ff50a1b966221f5652bcee7e91610e57dfd2c"
+  integrity sha512-R0QPjieF89hSuc+NNKFYnibV67eW3QSNV1akL33VFx1ld1qrobajGkp3sLe/6CTsPnH5xm+qr+hzwTCdPYMdKQ==
 
 ansi-escapes@^4.3.2:
   version "4.3.2"
