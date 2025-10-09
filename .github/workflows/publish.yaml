@@ -15,6 +15,8 @@ on:
 
 jobs:
   publish:
+    permissions:
+      id-token: write # Required for OIDC
     runs-on: ubuntu-latest
     environment: main
     outputs:
@@ -50,5 +52,3 @@ jobs:
             exit 1
           fi
         working-directory: dist/src
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_EA_FRAMEWORK_JS }}
