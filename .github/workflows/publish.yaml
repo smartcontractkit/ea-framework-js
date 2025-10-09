@@ -16,7 +16,7 @@ on:
 jobs:
   publish:
     permissions:
-      id-token: write  # Required for OIDC
+      id-token: write # Required for OIDC
     runs-on: ubuntu-latest
     environment: main
     outputs:
