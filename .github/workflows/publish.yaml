@@ -22,6 +22,8 @@ jobs:
     outputs:
       VERSION_TAG: ${{ steps.get-version-tag.outputs.VERSION_TAG }}
     steps:
+      - name: Install npm version needed for trusted publishing
+        run: npm install -g npm@11
       - uses: actions/checkout@v5
       - id: version-check
         run: |
