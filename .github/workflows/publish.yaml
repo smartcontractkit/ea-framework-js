@@ -22,6 +22,11 @@ jobs:
     outputs:
       VERSION_TAG: ${{ steps.get-version-tag.outputs.VERSION_TAG }}
     steps:
+      - name: Install Node version needed for trusted publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
       - name: Install npm version needed for trusted publishing
         run: npm install -g npm@11
       - uses: actions/checkout@v5
