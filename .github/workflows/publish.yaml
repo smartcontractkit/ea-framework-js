@@ -22,8 +22,6 @@ jobs:
     outputs:
       VERSION_TAG: ${{ steps.get-version-tag.outputs.VERSION_TAG }}
     steps:
-      - name: Install npm version needed for trusted publishing
-        run: npm install -g npm@11
       - uses: actions/checkout@v5
       - id: version-check
         run: |
@@ -41,6 +39,9 @@ jobs:
           fi
       - if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
         uses: ./.github/actions/setup
+      - name: Install npm version needed for trusted publishing
+        if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
+        run: npm install -g npm@11
       - if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
         run: yarn build
       - if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
