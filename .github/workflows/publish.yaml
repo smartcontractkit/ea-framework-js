@@ -40,6 +40,7 @@ jobs:
       - if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
         uses: ./.github/actions/setup
       - name: Install npm version needed for trusted publishing
+        if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
         run: npm install -g npm@11
       - if: steps.version-check.outputs.SHOULD_PUBLISH == 'true'
         run: yarn build
