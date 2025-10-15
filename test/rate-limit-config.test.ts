@@ -229,7 +229,8 @@ test('throws error if requireTierSelection is true and no tier is specified in s
   })
 
   await t.throwsAsync(async () => start(adapter), {
-    message: 'This adapter requires you to specify a rate limit tier via the RATE_LIMIT_API_TIER environment variable',
+    message:
+      'This adapter requires you to specify a rate limit tier via the RATE_LIMIT_API_TIER environment variable',
   })
 })
 
