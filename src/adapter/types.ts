@@ -64,6 +64,7 @@ export interface EndpointContext<T extends EndpointGenerics> {
 export interface AdapterRateLimitingConfig {
   /** Adapter rate limits, gotten from the specific tier requested */
   tiers: Record<string, AdapterRateLimitTier>
+  requireTierSelection?: boolean
 }
 
 /**
