@@ -94,6 +94,7 @@ export const lowestTierLimit = (limits?: AdapterRateLimitTier) => {
 export const getRateLimitingTier = (
   adapterSettings: AdapterSettings,
   tiers?: Record<string, AdapterRateLimitTier>,
+  requireTierSelection?: boolean,
 ): AdapterRateLimitTier | undefined => {
   if (
     adapterSettings.RATE_LIMIT_CAPACITY ||
@@ -124,6 +125,12 @@ export const getRateLimitingTier = (
   }
 
   if (!selectedTier) {
+    if (requireTierSelection) {
+      throw new Error(
+        `This adapter requires you to specify a rate limit tier via the RATE_LIMIT_API_TIER environment variable`,
+      )
+    }
+    // Default to the lowest tier if none is specified
     // Sort the tiers by most to least restrictive
     const sortedTiers = Object.entries(tiers).sort(
       ([_, t1], [__, t2]) => lowestTierLimit(t1) - lowestTierLimit(t2),

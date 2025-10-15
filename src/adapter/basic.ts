@@ -315,7 +315,7 @@ export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = Se
       )
     }
 
-    const rateLimitingTier = getRateLimitingTier(this.config.settings, this.rateLimiting?.tiers)
+    const rateLimitingTier = getRateLimitingTier(this.config.settings, this.rateLimiting?.tiers, this.rateLimiting?.requireTierSelection)
 
     if (rateLimitingTier) {
       for (const limit of Object.values(rateLimitingTier)) {

@@ -187,6 +187,52 @@ test('throws error if explicit allocation exceeds 100%', async (t) => {
   )
 })
 
+test('throws error if requireTierSelection is true and no tier is specified in settings', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        transport: new (class extends NopTransport {
+          override async initialize(dependencies: AdapterDependencies): Promise<void> {
+            t.true(dependencies.rateLimiter instanceof BurstRateLimiter)
+            t.is(
+              (dependencies.rateLimiter as unknown as Record<string, number>)['perSecondLimit'],
+              123,
+            )
+          }
+        })(),
+      }),
+    ],
+    config: new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          RATE_LIMITING_STRATEGY: 'burst',
+        },
+      },
+    ),
+    rateLimiting: {
+      tiers: {
+        asd: {
+          rateLimit1s: 5234,
+        },
+        free: {
+          rateLimit1s: 123,
+        },
+        pro: {
+          rateLimit1m: 1234 * 60,
+        },
+      },
+      requireTierSelection: true,
+    },
+  })
+
+  await t.throwsAsync(async () => start(adapter), {
+    message: 'This adapter requires you to specify a rate limit tier via the RATE_LIMIT_API_TIER environment variable',
+  })
+})
+
 test('uses most restrictive tier if none is specified in settings', async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
