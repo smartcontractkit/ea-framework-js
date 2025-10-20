@@ -3,7 +3,7 @@ description: 'Sets up the project, installs dependencies, caches results'
 runs:
   using: 'composite'
   steps:
-    - uses: actions/setup-node@v5
+    - uses: actions/setup-node@v6
       with:
         node-version: 22.19
         registry-url: https://registry.npmjs.org
