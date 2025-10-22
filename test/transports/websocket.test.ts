@@ -1100,3 +1100,209 @@ test.serial('can set reverse mapping and read from it', async (t) => {
     },
   })
 })
+
+test.serial('heartbeat keeps connection alive when no data messages are sent', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 10000
+  const HEARTBEAT_INTERVAL = 2000
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  let connectionCounter = 0
+  let pongCounter = 0
+
+  mockWsServer.on('connection', (socket) => {
+    connectionCounter++
+    
+    // Send initial message with data
+    socket.send(
+      JSON.stringify({
+        pair: `${base}/${quote}`,
+        value: price,
+      }),
+    )
+
+    // Listen for ping frames and respond with pong
+    socket.on('ping', () => {
+      pongCounter++
+      socket.pong()
+    })
+  })
+
+  const transport = new WebSocketTransport<WebSocketTypes>({
+    url: () => ENDPOINT_URL,
+    heartbeatIntervalMs: HEARTBEAT_INTERVAL,
+    handlers: {
+      message(message) {
+        if (!message.pair) {
+          return []
+        }
+        const [curBase, curQuote] = message.pair.split('/')
+        return [
+          {
+            params: { base: curBase, quote: curQuote },
+            response: {
+              data: {
+                result: message.value,
+              },
+              result: message.value,
+            },
+          },
+        ]
+      },
+    },
+    builders: {
+      subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
+    },
+  })
+
+  const webSocketEndpoint = new AdapterEndpoint({
+    name: 'TEST',
+    transport: transport,
+    inputParameters,
+  })
+
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
+        WS_SUBSCRIPTION_TTL: 30000,
+        WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+      },
+    },
+  )
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [webSocketEndpoint],
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  // Wait for multiple heartbeat intervals without the provider sending any data messages
+  // This should be longer than WS_SUBSCRIPTION_UNRESPONSIVE_TTL to verify the connection stays alive
+  await runAllUntilTime(t.context.clock, WS_SUBSCRIPTION_UNRESPONSIVE_TTL + HEARTBEAT_INTERVAL * 3)
+
+  // The connection should still be open (only opened once)
+  t.is(connectionCounter, 1, 'Connection should not have reconnected')
+  
+  // We should have received multiple pongs (at least 5 based on the time elapsed)
+  t.true(pongCounter >= 5, `Should have received at least 5 pongs, got ${pongCounter}`)
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
+test.serial('connection without heartbeat still reconnects when unresponsive', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 1000
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  let connectionCounter = 0
+
+  mockWsServer.on('connection', (socket) => {
+    connectionCounter++
+    
+    // Send initial message then go silent
+    socket.send(
+      JSON.stringify({
+        pair: `${base}/${quote}`,
+        value: price,
+      }),
+    )
+  })
+
+  const transport = new WebSocketTransport<WebSocketTypes>({
+    url: () => ENDPOINT_URL,
+    // No heartbeatIntervalMs configured - connection should timeout
+    handlers: {
+      message(message) {
+        if (!message.pair) {
+          return []
+        }
+        const [curBase, curQuote] = message.pair.split('/')
+        return [
+          {
+            params: { base: curBase, quote: curQuote },
+            response: {
+              data: {
+                result: message.value,
+              },
+              result: message.value,
+            },
+          },
+        ]
+      },
+    },
+    builders: {
+      subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
+    },
+  })
+
+  const webSocketEndpoint = new AdapterEndpoint({
+    name: 'TEST',
+    transport: transport,
+    inputParameters,
+  })
+
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
+        WS_SUBSCRIPTION_TTL: 30000,
+        WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+      },
+    },
+  )
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    config,
+    endpoints: [webSocketEndpoint],
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  // Wait past the unresponsive TTL - connection should be closed and reopened
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+
+  // The connection should have reconnected
+  t.is(connectionCounter, 2, 'Connection should have reconnected due to inactivity')
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
