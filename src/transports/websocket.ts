@@ -47,6 +47,13 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
     desiredSubs: TypeFromDefinition<T['Parameters']>[],
   ) => Promise<ClientOptions> | ClientOptions
 
+  /**
+   * Optional heartbeat configuration to keep the connection alive.
+   * When enabled, sends periodic ping frames and updates lastMessageReceivedAt on pong responses.
+   * This prevents the connection from being closed due to inactivity when no data messages are being sent.
+   */
+  heartbeatIntervalMs?: number
+
   /** Map of handlers for different WS lifecycle events */
   handlers: {
     /**
@@ -149,6 +156,7 @@ export class WebSocketTransport<
   currentUrl = ''
   lastMessageReceivedAt = 0
   connectionOpenedAt = 0
+  private heartbeatInterval?: ReturnType<typeof setInterval>
 
   constructor(private config: WebSocketTransportConfig<T>) {
     super()
@@ -167,6 +175,42 @@ export class WebSocketTransport<
   }
   deserializeMessage(data: WebSocket.Data): T['Provider']['WsMessage'] {
     return JSON.parse(data.toString()) as T['Provider']['WsMessage']
+  }
+
+  private startHeartbeat(connection: WebSocket): void {
+    // Only start heartbeat if configured
+    if (!this.config.heartbeatIntervalMs) {
+      return
+    }
+
+    // Clear any existing interval
+    this.stopHeartbeat()
+
+    logger.debug(
+      `Starting heartbeat with interval of ${this.config.heartbeatIntervalMs}ms`,
+    )
+
+    // Send periodic pings to keep the connection alive
+    this.heartbeatInterval = setInterval(() => {
+      if (connection.readyState === WebSocket.OPEN) {
+        connection.ping()
+        logger.trace('Sent heartbeat ping')
+      }
+    }, this.config.heartbeatIntervalMs)
+
+    // Update lastMessageReceivedAt when we receive a pong
+    connection.on('pong', () => {
+      this.lastMessageReceivedAt = Date.now()
+      logger.trace('Received heartbeat pong')
+    })
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval)
+      this.heartbeatInterval = undefined
+      logger.debug('Stopped heartbeat')
+    }
   }
 
   buildConnectionHandlers(
@@ -296,6 +340,9 @@ export class WebSocketTransport<
     connection.addEventListener('error', handlers.error)
     connection.addEventListener('close', handlers.close)
 
+    // Start heartbeat mechanism if configured
+    this.startHeartbeat(connection)
+
     return connection
   }
 
@@ -378,6 +425,10 @@ export class WebSocketTransport<
         )
         await sleep(1000 - timeSinceConnectionOpened)
       }
+
+      // Stop heartbeat before closing connection
+      this.stopHeartbeat()
+
       this.wsConnection?.close(1000)
       connectionClosed = true
 
