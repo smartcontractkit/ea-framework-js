@@ -5,7 +5,7 @@ runs:
   steps:
     - uses: actions/setup-node@v6
       with:
-        node-version: 22.19
+        node-version: 22.21
         registry-url: https://registry.npmjs.org
         always-auth: true
         cache: yarn
