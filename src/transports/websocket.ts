@@ -355,7 +355,9 @@ export class WebSocketTransport<
     // to determine minimum TTL of an open connection given no explicit connection errors.
     if (connectionUnresponsive) {
       this.streamHandlerInvocationsWithNoConnection += 1
-      logger.trace(`The connection is unresponsive, incremented streamHandlerIterationsWithNoConnection = ${this.streamHandlerInvocationsWithNoConnection}`)
+      logger.trace(
+        `The connection is unresponsive, incremented streamHandlerIterationsWithNoConnection = ${this.streamHandlerInvocationsWithNoConnection}`,
+      )
     }
 
     // We want to check if the URL we calculate is different from the one currently connected.
@@ -464,7 +466,7 @@ export class WebSocketTransport<
 
   async determineUrlChange(
     context: EndpointContext<T>,
-    subscriptions: SubscriptionDeltas<TypeFromDefinition<T["Parameters"]>>
+    subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
   ): Promise<{ urlChanged: boolean; url: string }> {
     const url = await this.config.url(context, subscriptions.desired)
     const urlChanged = this.currentUrl !== url
