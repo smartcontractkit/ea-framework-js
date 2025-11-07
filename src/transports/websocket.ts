@@ -373,17 +373,17 @@ export class WebSocketTransport<
     // This is because some providers handle subscriptions on the URLs and not through messages.
     // Subclasses may also implement alternate URL handling logic,
     // eg: toggling through multiple possible URLs in case of failure.
-    const url = await this.config.url(context, subscriptions.desired, {
+    const urlFromConfig = await this.config.url(context, subscriptions.desired, {
       streamHandlerInvocationsWithNoConnection: this.streamHandlerInvocationsWithNoConnection,
     })
-    const urlChanged = this.currentUrl !== url
+    const urlChanged = this.currentUrl !== urlFromConfig
 
     // Check if we should close the current connection
     if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
       if (urlChanged) {
         censorLogs(() =>
           logger.debug(
-            `Websocket url has changed from ${this.currentUrl} to ${url}, closing connection...`,
+            `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`,
           ),
         )
       } else {
@@ -422,7 +422,7 @@ export class WebSocketTransport<
       logger.debug('No established connection and new subscriptions available, connecting to WS')
       const options =
         this.config.options && (await this.config.options(context, subscriptions.desired))
-      this.currentUrl = url
+      this.currentUrl = urlFromConfig
       // Need to write this now, otherwise there could be messages sent with values before the open handler finishes
       this.providerDataStreamEstablished = Date.now()
 
@@ -433,7 +433,7 @@ export class WebSocketTransport<
       subscriptions.new = subscriptions.desired
 
       // Connect to the provider
-      this.wsConnection = await this.establishWsConnection(context, url, options)
+      this.wsConnection = await this.establishWsConnection(context, urlFromConfig, options)
 
       // Now that we successfully opened the connection, we can reset the variables
       connectionClosed = false
