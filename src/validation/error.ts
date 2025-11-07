@@ -20,7 +20,7 @@ export type AdapterErrorResponse = {
 export class AdapterError extends Error {
   status: string
   statusCode: number
-  cause: unknown
+  override cause: unknown
   url?: string
   errorResponse: unknown
   feedID?: string
