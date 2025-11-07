@@ -373,7 +373,10 @@ export class WebSocketTransport<
     // This is because some providers handle subscriptions on the URLs and not through messages.
     // Subclasses may also implement alternate URL handling logic,
     // eg: toggling through multiple possible URLs in case of failure.
-    const { urlChanged, url } = await this.determineUrlChange(context, subscriptions)
+    const url = await this.config.url(context, subscriptions.desired, {
+      streamHandlerInvocationsWithNoConnection: this.streamHandlerInvocationsWithNoConnection,
+    })
+    const urlChanged = this.currentUrl !== url
 
     // Check if we should close the current connection
     if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
@@ -471,17 +474,6 @@ export class WebSocketTransport<
     await sleep(context.adapterSettings.BACKGROUND_EXECUTE_MS_WS)
 
     return
-  }
-
-  async determineUrlChange(
-    context: EndpointContext<T>,
-    subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
-  ): Promise<{ urlChanged: boolean; url: string }> {
-    const url = await this.config.url(context, subscriptions.desired, {
-      streamHandlerInvocationsWithNoConnection: this.streamHandlerInvocationsWithNoConnection,
-    })
-    const urlChanged = this.currentUrl !== url
-    return { urlChanged, url }
   }
 
   private rejectionHandler<E>(
