@@ -32,6 +32,14 @@ export class WebSocketClassProvider {
 }
 
 /**
+ * Object used to pass partial websocket transport state into url config function.
+ */
+export interface WebSocketUrlConfigFunctionParameters {
+  /** Number of times streamHandler was called without a responsive connection */
+  streamHandlerInvocationsWithNoConnection: number
+}
+
+/**
  * Config object that is provided to the WebSocketTransport constructor.
  */
 export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> {
@@ -39,6 +47,7 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
   url: (
     context: EndpointContext<T>,
     desiredSubs: TypeFromDefinition<T['Parameters']>[],
+    urlConfigFunctionParameters: WebSocketUrlConfigFunctionParameters,
   ) => Promise<string> | string
 
   /** Optional parameters used when establishing the WebSocket connection */
@@ -468,7 +477,9 @@ export class WebSocketTransport<
     context: EndpointContext<T>,
     subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
   ): Promise<{ urlChanged: boolean; url: string }> {
-    const url = await this.config.url(context, subscriptions.desired)
+    const url = await this.config.url(context, subscriptions.desired, {
+      streamHandlerInvocationsWithNoConnection: this.streamHandlerInvocationsWithNoConnection,
+    })
     const urlChanged = this.currentUrl !== url
     return { urlChanged, url }
   }
