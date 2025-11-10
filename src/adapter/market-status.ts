@@ -1,18 +1,5 @@
 import { TransportGenerics } from '../transports'
-import { InputParametersDefinition } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
-
-/**
- * Type for the base input parameter config that any [[MarketStatusEndpoint]] must extend
- */
-export type MarketStatusEndpointInputParametersDefinition = InputParametersDefinition & {
-  market: {
-    aliases: readonly []
-    type: 'string'
-    description: 'The name of the market'
-    required: boolean
-  }
-}
 
 /**
  * Base input parameter config that any [[MarketStatusEndpoint]] must extend
@@ -24,7 +11,13 @@ export const marketStatusEndpointInputParametersDefinition = {
     description: 'The name of the market',
     required: true,
   },
-} as const satisfies MarketStatusEndpointInputParametersDefinition
+  type: {
+    type: 'string',
+    description: 'Type of the market status',
+    options: ['regular', '24/5'],
+    default: 'regular',
+  },
+} as const
 
 export enum MarketStatus {
   UNKNOWN = 0,
@@ -32,10 +25,22 @@ export enum MarketStatus {
   OPEN = 2,
 }
 
+export enum TwentyfourFiveMarketStatus {
+  UNKNOWN = 0,
+  PRE_MARKET = 1,
+  REGULAR = 2,
+  POST_MARKET = 3,
+  OVERNIGHT = 4,
+  WEEKEND = 5,
+}
+
+type AggregatedMarketStatus = MarketStatus | TwentyfourFiveMarketStatus
+
 export type MarketStatusResultResponse = {
-  Result: MarketStatus
+  Result: AggregatedMarketStatus
   Data: {
-    result: MarketStatus
+    result: AggregatedMarketStatus
+    statusString: string
   }
 }
 
@@ -43,7 +48,7 @@ export type MarketStatusResultResponse = {
  * Helper type structure that contains the different types passed to the generic parameters of a PriceEndpoint
  */
 export type MarketStatusEndpointGenerics = TransportGenerics & {
-  Parameters: MarketStatusEndpointInputParametersDefinition
+  Parameters: typeof marketStatusEndpointInputParametersDefinition
   Response: MarketStatusResultResponse
 }
 
