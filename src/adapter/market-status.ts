@@ -27,11 +27,11 @@ export enum MarketStatus {
 
 export enum TwentyfourFiveMarketStatus {
   UNKNOWN = 0,
-  PRE_MARKET = 11,
-  REGULAR = 12,
-  POST_MARKET = 13,
-  OVERNIGHT = 14,
-  WEEKEND = 15,
+  PRE_MARKET = 1,
+  REGULAR = 2,
+  POST_MARKET = 3,
+  OVERNIGHT = 4,
+  WEEKEND = 5,
 }
 
 type AggregatedMarketStatus = MarketStatus | TwentyfourFiveMarketStatus
