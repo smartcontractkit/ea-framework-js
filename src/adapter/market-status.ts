@@ -14,7 +14,7 @@ export const marketStatusEndpointInputParametersDefinition = {
   type: {
     type: 'string',
     description: 'Type of the market status',
-    options: ['regular', '245'],
+    options: ['regular', '24/5'],
     default: 'regular',
   },
 } as const
@@ -25,8 +25,7 @@ export enum MarketStatus {
   OPEN = 2,
 }
 
-// 24/5
-export enum TwoFourFiveMarketStatus {
+export enum TwentyfourFiveMarketStatus {
   UNKNOWN = 0,
   PRE_MARKET = 11,
   REGULAR = 12,
@@ -35,7 +34,7 @@ export enum TwoFourFiveMarketStatus {
   WEEKEND = 15,
 }
 
-type AggregatedMarketStatus = MarketStatus | TwoFourFiveMarketStatus
+type AggregatedMarketStatus = MarketStatus | TwentyfourFiveMarketStatus
 
 export type MarketStatusResultResponse = {
   Result: AggregatedMarketStatus
