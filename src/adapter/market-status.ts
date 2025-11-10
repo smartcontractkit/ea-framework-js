@@ -40,6 +40,7 @@ export type MarketStatusResultResponse = {
   Result: AggregatedMarketStatus
   Data: {
     result: AggregatedMarketStatus
+    statusString: string
   }
 }
 
