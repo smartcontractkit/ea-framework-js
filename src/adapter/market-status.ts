@@ -1,5 +1,7 @@
 import { TransportGenerics } from '../transports'
 import { AdapterEndpoint } from './endpoint'
+import { AdapterEndpointParams } from './types'
+import { validateWeekend } from '../validation/market-status'
 
 /**
  * Base input parameter config that any [[MarketStatusEndpoint]] must extend
@@ -16,6 +18,11 @@ export const marketStatusEndpointInputParametersDefinition = {
     description: 'Type of the market status',
     options: ['regular', '24/5'],
     default: 'regular',
+  },
+  weekend: {
+    type: 'string',
+    description:
+      'DHH-DHH:TZ, 520-020:America/New_York means Fri 20:00 to Sun 20:00 Eastern Time Zone',
   },
 } as const
 
@@ -58,4 +65,15 @@ export type MarketStatusEndpointGenerics = TransportGenerics & {
  */
 export class MarketStatusEndpoint<
   T extends MarketStatusEndpointGenerics,
-> extends AdapterEndpoint<T> {}
+> extends AdapterEndpoint<T> {
+  constructor(params: AdapterEndpointParams<T>) {
+    params.customInputValidation = (req, _adapterSettings) => {
+      const data = req.requestContext.data as Record<string, string>
+      if (data['type'] === '24/5') {
+        validateWeekend(data['weekend'])
+      }
+      return undefined
+    }
+    super(params)
+  }
+}
