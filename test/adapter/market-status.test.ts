@@ -12,7 +12,7 @@ import { Adapter } from '../../src/adapter/basic'
 import { Transport } from '../../src/transports'
 import { ResponseCache } from '../../src/cache/response'
 
-test('MarketStatusEndpoint - validates weekend when type is 24/5', async (t) => {
+test('MarketStatusEndpoint - validates weekend', async (t) => {
   class MarketStatusTestTransport implements Transport<MarketStatusEndpointGenerics> {
     name!: string
     responseCache!: ResponseCache<MarketStatusEndpointGenerics>
@@ -57,30 +57,39 @@ test('MarketStatusEndpoint - validates weekend when type is 24/5', async (t) => 
   const response1 = await testAdapter.request({
     market: 'BTC',
     type: 'regular',
-    weekend: '520-020',
     endpoint: 'test',
   })
-  t.is(response1.statusCode, 200, 'Should succeed with invalid weekend when type is regular')
+  t.is(response1.statusCode, 200, 'Should succeed with empty weekend when type is regular')
 
   const response2 = await testAdapter.request({
     market: 'BTC',
-    type: '24/5',
+    type: 'regular',
     weekend: '520-020',
     endpoint: 'test',
   })
-  t.is(response2.statusCode, 400, 'Should fail with invalid weekend format')
+  t.is(response2.statusCode, 400, 'Should fail with weekend when type is regular')
   t.true(
-    response2.json().error.message.includes('[Param: weekend] does not match format'),
-    'Error message should mention weekend format',
+    response2
+      .json()
+      .error.message.includes('[Param: weekend] must be empty when [Param: type] is regular'),
   )
 
   const response3 = await testAdapter.request({
     market: 'BTC',
     type: '24/5',
+    weekend: '520-020',
+    endpoint: 'test',
+  })
+  t.is(response3.statusCode, 400, 'Should fail with invalid weekend format when type is 24/5')
+  t.true(response3.json().error.message.includes('[Param: weekend] does not match format'))
+
+  const response4 = await testAdapter.request({
+    market: 'BTC',
+    type: '24/5',
     weekend: '520-020:America/New_York',
     endpoint: 'test',
   })
-  t.is(response3.statusCode, 200, 'Should succeed with valid weekend')
+  t.is(response4.statusCode, 200, 'Should succeed with valid weekend when type is 24/5')
 
   await testAdapter.api.close()
 })

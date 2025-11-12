@@ -1,7 +1,8 @@
 import { TransportGenerics } from '../transports'
 import { AdapterEndpoint } from './endpoint'
 import { AdapterEndpointParams } from './types'
-import { validateWeekend } from '../validation/market-status'
+import { parseWeekendString } from '../validation/market-status'
+import { AdapterInputError } from '../validation/error'
 
 /**
  * Base input parameter config that any [[MarketStatusEndpoint]] must extend
@@ -70,7 +71,13 @@ export class MarketStatusEndpoint<
     params.customInputValidation = (req, _adapterSettings) => {
       const data = req.requestContext.data as Record<string, string>
       if (data['type'] === '24/5') {
-        validateWeekend(data['weekend'])
+        parseWeekendString(data['weekend'])
+      }
+      if (data['type'] === 'regular' && data['weekend']) {
+        throw new AdapterInputError({
+          statusCode: 400,
+          message: '[Param: weekend] must be empty when [Param: type] is regular',
+        })
       }
       return undefined
     }
