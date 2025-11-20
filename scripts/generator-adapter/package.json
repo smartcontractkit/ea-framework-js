@@ -15,6 +15,6 @@
     "@yeoman/types": "1.8.0",
     "mem-fs": "4.1.2",
     "@yeoman/adapter": "3.1.0",
-    "@types/node": "24.10.0"
+    "@types/node": "24.10.1"
   }
 }
