@@ -12,9 +12,9 @@
   ],
   "devDependencies": {
     "yeoman-generator": "7.5.1",
-    "@yeoman/types": "1.8.0",
+    "@yeoman/types": "1.9.1",
     "mem-fs": "4.1.2",
-    "@yeoman/adapter": "3.1.0",
+    "@yeoman/adapter": "3.1.1",
     "@types/node": "24.10.1"
   }
 }
