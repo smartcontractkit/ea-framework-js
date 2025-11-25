@@ -45,7 +45,7 @@ export const BaseSettingsDefinition = {
     type: 'number',
     description: 'The maximum number of items that remain in the cache',
     default: 10000,
-    validate: validator.integer({ min: 1000, max: 10000 }),
+    validate: validator.integer({ min: 1000, max: 50000 }),
   },
   CACHE_REDIS_CONNECTION_TIMEOUT: {
     description: 'Connection timeout for redis client',
