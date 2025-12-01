@@ -40,9 +40,9 @@ const logger = makeLogger('Adapter')
 /**
  * Main class to represent an External Adapter
  */
-export class Adapter<CustomSettingsDefinition extends SettingsDefinitionMap = SettingsDefinitionMap>
-  implements Omit<AdapterParams<CustomSettingsDefinition>, 'bootstrap'>
-{
+export class Adapter<
+  CustomSettingsDefinition extends SettingsDefinitionMap = SettingsDefinitionMap,
+> implements Omit<AdapterParams<CustomSettingsDefinition>, 'bootstrap'> {
   // Adapter params
   name: Uppercase<string>
   defaultEndpoint?: string | undefined
