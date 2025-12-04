@@ -667,16 +667,10 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
         value: new RegExp(
           ((this.settings as Record<string, ValidSettingValue>)[name]! as string)
             // Escaping potential special characters in values before creating regex
-            .replace(
-              /[-[\]{}()*+?.,\\^$|#\s]/g,
-              '\\$&',
-            )
+            .replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
             // Escaping special case for new line characters. This is needed to properly match and censor private keys,
             // ssh keys, and other multi-line string values.
-            .replace(
-              /\n/g,
-              '\\n',
-            ),
+            .replace(/\n/g, '\\n'),
           'gi',
         ),
       }))

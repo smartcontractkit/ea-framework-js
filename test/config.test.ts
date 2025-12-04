@@ -7,8 +7,8 @@ import {
   SettingsDefinitionMap,
 } from '../src/config'
 import { validator } from '../src/validation/utils'
-import { Adapter } from "../src/adapter";
-import { buildSettingsList } from "../src/util/settings";
+import { Adapter } from '../src/adapter'
+import { buildSettingsList } from '../src/util/settings'
 
 test.afterEach(async () => {
   process.env = {}
@@ -192,7 +192,8 @@ test.serial('sensitive configuration constants are properly flagged', (t) => {
 
 test.serial('multiline sensitive configuration constants are properly redacted', async (t) => {
   // GIVEN
-  process.env['PRIVATE_KEY'] = '-----BEGIN PRIVATE KEY-----\nthis\nis a fake\nprivate key\nused for testing only==\n-----END PRIVATE KEY-----'
+  process.env['PRIVATE_KEY'] =
+    '-----BEGIN PRIVATE KEY-----\nthis\nis a fake\nprivate key\nused for testing only==\n-----END PRIVATE KEY-----'
   const customSettings: SettingsDefinitionMap = {
     PRIVATE_KEY: {
       description: 'Test custom env var',
@@ -204,8 +205,8 @@ test.serial('multiline sensitive configuration constants are properly redacted',
         },
         fn: (_?: string) => {
           return ''
-        }
-      }
+        },
+      },
     },
   }
   const config = new AdapterConfig(customSettings)
@@ -214,7 +215,7 @@ test.serial('multiline sensitive configuration constants are properly redacted',
   config.buildCensorList()
 
   const adapter = new Adapter({
-    name: "TEST_ADAPTER",
+    name: 'TEST_ADAPTER',
     endpoints: [],
     config: config,
   })
@@ -224,5 +225,5 @@ test.serial('multiline sensitive configuration constants are properly redacted',
   const settingEntries = settingsList.filter((entry) => entry.name === 'PRIVATE_KEY')
   t.assert(settingEntries.length === 1)
   const settingEntry = settingEntries[0]
-  t.assert(settingEntry.value === "[PRIVATE_KEY REDACTED]")
+  t.assert(settingEntry.value === '[PRIVATE_KEY REDACTED]')
 })
