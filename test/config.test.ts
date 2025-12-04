@@ -7,6 +7,8 @@ import {
   SettingsDefinitionMap,
 } from '../src/config'
 import { validator } from '../src/validation/utils'
+import { Adapter } from "../src/adapter";
+import { buildSettingsList } from "../src/util/settings";
 
 test.afterEach(async () => {
   process.env = {}
@@ -168,7 +170,7 @@ test.serial('Test validate function (scientific notation)', async (t) => {
   }
 })
 
-test('sensitive configuration constants are properly flagged', (t) => {
+test.serial('sensitive configuration constants are properly flagged', (t) => {
   // Extract all settings that are marked as sensitive
   const actualSensitiveSettings = Object.entries(BaseSettingsDefinition)
     .filter(([_, setting]) => (setting as { sensitive?: boolean }).sensitive === true)
@@ -186,4 +188,41 @@ test('sensitive configuration constants are properly flagged', (t) => {
 
   // Deep equal comparison
   t.deepEqual(actualSensitiveSettings, expectedSensitiveSettings)
+})
+
+test.serial('multiline sensitive configuration constants are properly redacted', async (t) => {
+  // GIVEN
+  process.env['PRIVATE_KEY'] = '-----BEGIN PRIVATE KEY-----\nthis\nis a fake\nprivate key\nused for testing only==\n-----END PRIVATE KEY-----'
+  const customSettings: SettingsDefinitionMap = {
+    PRIVATE_KEY: {
+      description: 'Test custom env var',
+      type: 'string',
+      sensitive: true,
+      validate: {
+        meta: {
+          details: 'placeholder validation',
+        },
+        fn: (value?: string) => {
+          return ''
+        }
+      }
+    },
+  }
+  const config = new AdapterConfig(customSettings)
+  config.initialize()
+  config.validate()
+  config.buildCensorList()
+
+  const adapter = new Adapter({
+    name: "TEST_ADAPTER",
+    endpoints: [],
+    config: config,
+  })
+
+  const settingsList = buildSettingsList(adapter)
+
+  const settingEntries = settingsList.filter((entry) => entry.name === 'PRIVATE_KEY')
+  t.assert(settingEntries.length === 1)
+  const settingEntry = settingEntries[0]
+  t.assert(settingEntry.value === "[PRIVATE_KEY REDACTED]")
 })
