@@ -202,7 +202,7 @@ test.serial('multiline sensitive configuration constants are properly redacted',
         meta: {
           details: 'placeholder validation',
         },
-        fn: (value?: string) => {
+        fn: (_?: string) => {
           return ''
         }
       }
