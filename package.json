@@ -50,7 +50,7 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-tsdoc": "0.5.0",
     "mocksse": "1.0.4",
-    "prettier": "3.7.3",
+    "prettier": "3.7.4",
     "ts-node": "10.9.2",
     "ts-node-dev": "2.0.0",
     "typedoc": "0.28.15",
