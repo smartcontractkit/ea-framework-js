@@ -109,6 +109,55 @@ In the example above, after the connection is established a custom authenticatio
 
 As shown in the first example, **builders** object contains two methods, **subscribeMessage** and **unsubscribeMessage**. These methods can be provided for the WS transport to use to send subscription/unsubscription messages to Data Provider. Both accept _params_ which is the current input parameters of the request and should return object or string as payload that will be sent to Data Provider. If the payload is object it will be automatically stringified to JSON.
 
+### Heartbeat messages
+
+Some WebSocket providers require periodic heartbeat messages to keep the connection alive. The `WebSocketTransport` supports sending heartbeat messages automatically at a configurable interval.
+
+To enable heartbeat functionality, provide a `heartbeat` handler in the `handlers` object. The heartbeat will automatically start when the connection is opened and stop when the connection is closed.
+
+The `heartbeat` handler receives the WebSocket connection and adapter context, allowing you to implement any heartbeat logic you need. You can use WebSocket protocol-level ping, send custom messages, or perform any other heartbeat-related operations.
+
+**Using WebSocket protocol-level ping:**
+
+```typescript
+handlers: {
+  heartbeat: (connection) => {
+    connection.ping()
+  },
+}
+```
+
+**Using custom heartbeat message:**
+
+```typescript
+handlers: {
+  heartbeat: (connection, context) => {
+    connection.send(JSON.stringify({
+      type: 'ping',
+      timestamp: Date.now(),
+    }))
+  },
+}
+```
+
+**Using ping with optional data:**
+
+```typescript
+handlers: {
+  heartbeat: (connection) => {
+    connection.ping('heartbeat-data')
+  },
+}
+```
+
+The heartbeat interval is controlled by the `WS_HEARTBEAT_INTERVAL_MS` adapter setting (default: 10000ms). The heartbeat will automatically stop if:
+
+- The connection is closed
+- The connection state is no longer `OPEN`
+- A new heartbeat is started (replaces the previous one)
+
+**Note:** The heartbeat only starts if the `heartbeat` handler is provided. If you don't need heartbeat functionality, simply omit the `heartbeat` handler.
+
 ### Retrieving and storing the response or errors
 
 As shown in the first example, the **handlers** object accepts a function called **message** which will be executed when Data Provider sends a message through the WS connection. It takes this message as its first argument and the adapter context as the second, and should build and return a list of response objects (_ProviderResult_) that will be stored in the response cache for the endpoint.

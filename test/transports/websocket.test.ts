@@ -2,7 +2,8 @@ import { InstalledClock } from '@sinonjs/fake-timers'
 import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
-import { Adapter, AdapterEndpoint } from '../../src/adapter'
+import WebSocket from 'ws'
+import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import {
@@ -57,7 +58,13 @@ type WebSocketTypes = {
 
 const BACKGROUND_EXECUTE_MS_WS = 5000
 
-const createAdapter = (envDefaultOverrides: Record<string, string | number | symbol>): Adapter => {
+const createAdapter = (
+  envDefaultOverrides: Record<string, string | number | symbol>,
+  heartbeatHandler?: (
+    connection: WebSocket,
+    context: EndpointContext<WebSocketTypes>,
+  ) => Promise<void> | void,
+): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => ENDPOINT_URL,
     options: () => {
@@ -88,6 +95,7 @@ const createAdapter = (envDefaultOverrides: Record<string, string | number | sym
           },
         ]
       },
+      heartbeat: heartbeatHandler,
     },
     builders: {
       subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
@@ -532,7 +540,7 @@ test.serial(
     process.env['METRICS_ENABLED'] = 'false'
     await testAdapter.api.close()
     mockWsServer.close()
-    await t.context.clock.runAllAsync()
+    await t.context.clock.runToLastAsync()
   },
 )
 
@@ -632,7 +640,7 @@ test.serial('does not crash the server when new connection errors', async (t) =>
   t.pass()
   await testAdapter.api.close()
   mockWsServer.close()
-  await t.context.clock.runAllAsync()
+  await t.context.clock.runToLastAsync()
 })
 
 test.serial('closed ws connection should have a 1000 status code', async (t) => {
@@ -788,7 +796,7 @@ test.serial('does not hang the background execution if the open handler hangs', 
   process.env['METRICS_ENABLED'] = 'false'
   await testAdapter.api.close()
   mockWsServer.close()
-  await t.context.clock.runAllAsync()
+  await t.context.clock.runToLastAsync()
 })
 
 test.serial('if defined the close handler is called when the websocket is closed', async (t) => {
@@ -884,7 +892,7 @@ test.serial('if defined the close handler is called when the websocket is closed
 
   await testAdapter.api.close()
   mockWsServer.close()
-  await t.context.clock.runAllAsync()
+  await t.context.clock.runToLastAsync()
 
   t.true(handlerCalled)
 })
@@ -988,7 +996,7 @@ test.serial(
 
     await testAdapter.api.close()
     mockWsServer.close()
-    await t.context.clock.runAllAsync()
+    await t.context.clock.runToLastAsync()
 
     t.true(handlerCalled)
   },
@@ -1099,4 +1107,168 @@ test.serial('can set reverse mapping and read from it', async (t) => {
       statusCode: 200,
     },
   })
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
+test.serial('sends heartbeat using ping at configured interval', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const HEARTBEAT_INTERVAL = 5000
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  let heartbeatCallCount = 0
+
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', () => {
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
+    })
+  })
+
+  const adapter = createAdapter(
+    {
+      WS_HEARTBEAT_INTERVAL_MS: HEARTBEAT_INTERVAL,
+    },
+    () => {
+      heartbeatCallCount++
+    },
+  )
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  await runAllUntilTime(t.context.clock, HEARTBEAT_INTERVAL)
+
+  t.true(heartbeatCallCount >= 1, `Expected at least 1 heartbeat call, got ${heartbeatCallCount}`)
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
+test.serial('stops heartbeat when connection closes', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const HEARTBEAT_INTERVAL = 5000
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  let heartbeatCallCount = 0
+
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', () => {
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
+    })
+  })
+
+  const adapter = createAdapter(
+    {
+      WS_HEARTBEAT_INTERVAL_MS: HEARTBEAT_INTERVAL,
+    },
+    () => {
+      heartbeatCallCount++
+    },
+  )
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  const heartbeatCountBeforeClose = heartbeatCallCount
+
+  testAdapter.api.close()
+  mockWsServer.close()
+
+  await runAllUntilTime(t.context.clock, HEARTBEAT_INTERVAL * 2)
+
+  t.is(heartbeatCallCount, heartbeatCountBeforeClose)
+
+  await t.context.clock.runToLastAsync()
+})
+
+test.serial('stops heartbeat when handler throws an error', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const HEARTBEAT_INTERVAL = 5000
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  let heartbeatCallCount = 0
+
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', () => {
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
+    })
+  })
+
+  const adapter = createAdapter(
+    {
+      WS_HEARTBEAT_INTERVAL_MS: HEARTBEAT_INTERVAL,
+    },
+    () => {
+      heartbeatCallCount++
+      if (heartbeatCallCount === 1) {
+        throw new Error('Heartbeat handler error')
+      }
+    },
+  )
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  await runAllUntilTime(t.context.clock, HEARTBEAT_INTERVAL * 2)
+
+  t.is(heartbeatCallCount, 1)
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
 })

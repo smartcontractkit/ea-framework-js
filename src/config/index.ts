@@ -249,6 +249,12 @@ export const BaseSettingsDefinition = {
     default: 10_000,
     validate: validator.integer({ min: 500, max: 30_000 }),
   },
+  WS_HEARTBEAT_INTERVAL_MS: {
+    description: 'The number of ms between each hearbeat message that EA sends to server',
+    type: 'number',
+    default: 10_000,
+    validate: validator.integer({ min: 5_000, max: 300_000 }),
+  },
   CACHE_POLLING_MAX_RETRIES: {
     description:
       'Max amount of times to attempt to find EA response in the cache after the Transport has been set up',
