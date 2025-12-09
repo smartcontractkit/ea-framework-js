@@ -202,11 +202,10 @@ export class WebSocketTransport<
 
         if (this.wsConnection && this.wsConnection.readyState === WebSocket.OPEN) {
           try {
-            logger.debug('Sending WebSocket heartbeat')
+            logger.debug('Calling heartbeat handler')
             await this.config.handlers.heartbeat?.(this.wsConnection, context)
           } catch (error) {
-            logger.warn({ error }, 'Heartbeat handler failed, stopping heartbeat')
-            this.stopHeartbeat()
+            logger.warn({ error }, 'Heartbeat handler failed, will be tried later.')
           }
         } else {
           this.stopHeartbeat()

@@ -250,7 +250,8 @@ export const BaseSettingsDefinition = {
     validate: validator.integer({ min: 500, max: 30_000 }),
   },
   WS_HEARTBEAT_INTERVAL_MS: {
-    description: 'The number of ms between each hearbeat message that EA sends to server',
+    description:
+      'The number of ms between each hearbeat message that EA sends to server, only works if heartbeat handler is provided',
     type: 'number',
     default: 10_000,
     validate: validator.integer({ min: 5_000, max: 300_000 }),

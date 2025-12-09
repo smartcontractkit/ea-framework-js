@@ -1156,9 +1156,11 @@ test.serial('sends heartbeat using ping at configured interval', async (t) => {
     },
   })
 
-  await runAllUntilTime(t.context.clock, HEARTBEAT_INTERVAL)
+  const heartBeatRounds = 2
 
-  t.true(heartbeatCallCount >= 1, `Expected at least 1 heartbeat call, got ${heartbeatCallCount}`)
+  await runAllUntilTime(t.context.clock, HEARTBEAT_INTERVAL * heartBeatRounds)
+
+  t.is(heartbeatCallCount, heartBeatRounds)
 
   testAdapter.api.close()
   mockWsServer.close()
@@ -1219,7 +1221,7 @@ test.serial('stops heartbeat when connection closes', async (t) => {
   await t.context.clock.runToLastAsync()
 })
 
-test.serial('stops heartbeat when handler throws an error', async (t) => {
+test.serial('does not heartbeat when handler throws an error', async (t) => {
   const base = 'ETH'
   const quote = 'DOGE'
   const HEARTBEAT_INTERVAL = 5000
@@ -1245,9 +1247,7 @@ test.serial('stops heartbeat when handler throws an error', async (t) => {
     },
     () => {
       heartbeatCallCount++
-      if (heartbeatCallCount === 1) {
-        throw new Error('Heartbeat handler error')
-      }
+      throw new Error('Heartbeat handler error')
     },
   )
 
@@ -1264,9 +1264,11 @@ test.serial('stops heartbeat when handler throws an error', async (t) => {
     },
   })
 
-  await runAllUntilTime(t.context.clock, HEARTBEAT_INTERVAL * 2)
+  const heartBeatRounds = 2
 
-  t.is(heartbeatCallCount, 1)
+  await runAllUntilTime(t.context.clock, HEARTBEAT_INTERVAL * heartBeatRounds)
+
+  t.is(heartbeatCallCount, heartBeatRounds)
 
   testAdapter.api.close()
   mockWsServer.close()
