@@ -64,9 +64,19 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
      * Note: any listeners set in this method will be cleared after its execution.
      *
      * @param wsConnection - the WebSocket with an established connection
+     * @param context - the background context for the Adapter
      * @returns an empty Promise, or void
      */
     open?: (wsConnection: WebSocket, context: EndpointContext<T>) => Promise<void> | void
+
+    /**
+     * Handles when client is ready to send a heartbeat to server
+     *
+     * @param wsConnection - the WebSocket with an established connection
+     * @param context - the background context for the Adapter
+     * @returns an empty Promise, or void
+     */
+    heartbeat?: (wsConnection: WebSocket, context: EndpointContext<T>) => Promise<void> | void
 
     /**
      * Handles when the websocket connection dispatches an error event
@@ -159,6 +169,7 @@ export class WebSocketTransport<
   lastMessageReceivedAt = 0
   connectionOpenedAt = 0
   streamHandlerInvocationsWithNoConnection = 0
+  heartbeatInterval?: NodeJS.Timeout
 
   constructor(private config: WebSocketTransportConfig<T>) {
     super()
@@ -179,6 +190,39 @@ export class WebSocketTransport<
     return JSON.parse(data.toString()) as T['Provider']['WsMessage']
   }
 
+  startHeartbeat(context: EndpointContext<T>): void {
+    if (this.config.handlers.heartbeat) {
+      this.stopHeartbeat()
+
+      const intervalId = setInterval(async () => {
+        if (this.heartbeatInterval !== intervalId) {
+          clearInterval(intervalId)
+          return
+        }
+
+        if (this.wsConnection && this.wsConnection.readyState === WebSocket.OPEN) {
+          try {
+            logger.debug('Calling heartbeat handler')
+            await this.config.handlers.heartbeat?.(this.wsConnection, context)
+          } catch (error) {
+            logger.warn({ error }, 'Heartbeat handler failed, will be tried later.')
+          }
+        } else {
+          this.stopHeartbeat()
+        }
+      }, context.adapterSettings.WS_HEARTBEAT_INTERVAL_MS)
+
+      this.heartbeatInterval = intervalId
+    }
+  }
+
+  stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval)
+      this.heartbeatInterval = undefined
+    }
+  }
+
   buildConnectionHandlers(
     context: EndpointContext<T>,
     connection: WebSocket,
@@ -192,6 +236,7 @@ export class WebSocketTransport<
           await this.config.handlers.open(connection, context)
           logger.debug('Successfully executed connection opened handler')
         }
+        this.startHeartbeat(context)
         connectionReadyResolve(event.target)
       },
 
@@ -262,6 +307,7 @@ export class WebSocketTransport<
           this.config.handlers.close(event, context)
           logger.debug('Successfully executed connection close handler')
         }
+        this.stopHeartbeat()
       },
     }
   }
