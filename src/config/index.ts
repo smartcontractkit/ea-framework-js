@@ -249,6 +249,13 @@ export const BaseSettingsDefinition = {
     default: 10_000,
     validate: validator.integer({ min: 500, max: 30_000 }),
   },
+  WS_HEARTBEAT_INTERVAL_MS: {
+    description:
+      'The number of ms between each hearbeat message that EA sends to server, only works if heartbeat handler is provided',
+    type: 'number',
+    default: 10_000,
+    validate: validator.integer({ min: 5_000, max: 300_000 }),
+  },
   CACHE_POLLING_MAX_RETRIES: {
     description:
       'Max amount of times to attempt to find EA response in the cache after the Transport has been set up',
@@ -664,12 +671,13 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
       )
       .map(([name]) => ({
         key: name,
-        // Escaping potential special characters in values before creating regex
         value: new RegExp(
-          ((this.settings as Record<string, ValidSettingValue>)[name]! as string).replace(
-            /[-[\]{}()*+?.,\\^$|#\s]/g,
-            '\\$&',
-          ),
+          ((this.settings as Record<string, ValidSettingValue>)[name]! as string)
+            // Escaping potential special characters in values before creating regex
+            .replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+            // Escaping special case for new line characters. This is needed to properly match and censor private keys,
+            // ssh keys, and other multi-line string values.
+            .replace(/\n/g, '\\n'),
           'gi',
         ),
       }))

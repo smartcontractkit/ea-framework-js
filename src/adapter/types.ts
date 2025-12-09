@@ -190,8 +190,7 @@ type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
  * The reason why this is its own type is because the endpoint can be defined with one transport or multiple.
  */
 export interface AdapterEndpointInterface<T extends EndpointGenerics>
-  extends BaseAdapterEndpointParams<T>,
-    MultiTransportAdapterEndpointParams<T> {}
+  extends BaseAdapterEndpointParams<T>, MultiTransportAdapterEndpointParams<T> {}
 
 /**
  * Type for the parameters that an adapter endpoint requires. See the comment in the [[AdapterEndpointInterface]] for more details.
