@@ -45,7 +45,7 @@ export const BaseSettingsDefinition = {
     type: 'number',
     description: 'The maximum number of items that remain in the cache',
     default: 10000,
-    validate: validator.integer({ min: 1000, max: 10000 }),
+    validate: validator.integer({ min: 1000, max: 50000 }),
   },
   CACHE_REDIS_CONNECTION_TIMEOUT: {
     description: 'Connection timeout for redis client',
@@ -671,12 +671,13 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
       )
       .map(([name]) => ({
         key: name,
-        // Escaping potential special characters in values before creating regex
         value: new RegExp(
-          ((this.settings as Record<string, ValidSettingValue>)[name]! as string).replace(
-            /[-[\]{}()*+?.,\\^$|#\s]/g,
-            '\\$&',
-          ),
+          ((this.settings as Record<string, ValidSettingValue>)[name]! as string)
+            // Escaping potential special characters in values before creating regex
+            .replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+            // Escaping special case for new line characters. This is needed to properly match and censor private keys,
+            // ssh keys, and other multi-line string values.
+            .replace(/\n/g, '\\n'),
           'gi',
         ),
       }))

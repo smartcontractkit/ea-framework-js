@@ -5,8 +5,8 @@
     "target": "es2022",
     "downlevelIteration": true,
     "esModuleInterop": true,
-    "moduleResolution": "node",
-    "module": "es2020",
+    "moduleResolution": "nodenext",
+    "module": "nodenext",
     "resolveJsonModule": true
   },
   "files": [
