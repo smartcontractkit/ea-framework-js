@@ -453,6 +453,8 @@ export class WebSocketTransport<
       connectionClosed = true
 
       if (subscriptions.desired.length) {
+        // Clear wsSubscriptionActive metrics for all active subscriptions
+        recordWsMessageMetrics(context, [], subscriptions.desired, false)
         censorLogs(() =>
           logger.trace(
             `Connection will be reopened and will subscribe to new and resubscribe to existing: ${JSON.stringify(

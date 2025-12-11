@@ -293,6 +293,13 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
   const base = 'ETH'
   const quote = 'DOGE'
   const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 1000
+  process.env['METRICS_ENABLED'] = 'true'
+  eaMetrics.clear()
+
+  const labels = {
+    feed_id: "{'base':'eth','quote':'doge'}",
+    subscription_key: "test-{'base':'eth','quote':'doge'}",
+  }
 
   // Mock WS
   mockWebSocketProvider(WebSocketClassProvider)
@@ -304,6 +311,12 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
     connectionCounter++
     socket.on('message', () => {
       messageCounter++
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
     })
   })
 
@@ -314,21 +327,40 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-  const error = await testAdapter.request({
-    base,
-    quote,
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
   })
-  t.is(error.statusCode, 504)
 
-  // The WS connection should not send any messages to the EA, so we advance the clock until
-  // we reach the point where the EA will consider it unhealthy and reconnect.
-  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 2 + 100)
+  let metrics = await testAdapter.getMetrics()
+  metrics.assert(t, { name: 'ws_subscription_active', labels, expectedValue: 1 })
+  metrics.assert(t, { name: 'ws_subscription_total', labels, expectedValue: 1 })
+
+  // Advance to next cycle where connection is unhealthy and reconnect
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS + 100)
 
   // The connection was opened twice
   t.is(connectionCounter, 2)
   // The subscribe message was sent twice as well, since when we reopened we resubscribed to everything
   t.is(messageCounter, 2)
 
+  // Only one active sub should be recorded
+  metrics = await testAdapter.getMetrics()
+  metrics.assert(t, { name: 'ws_subscription_active', labels, expectedValue: 1 })
+  metrics.assert(t, { name: 'ws_subscription_total', labels, expectedValue: 2 })
+  metrics.assert(t, {
+    name: 'ws_message_total',
+    labels: { ...labels, direction: 'sent' },
+    expectedValue: 2,
+  })
+
+  process.env['METRICS_ENABLED'] = 'false'
   testAdapter.api.close()
   mockWsServer.close()
   await t.context.clock.runToLastAsync()
@@ -432,6 +464,7 @@ test.serial(
     const base = 'ETH'
     const quote = 'DOGE'
     process.env['METRICS_ENABLED'] = 'true'
+    eaMetrics.clear()
 
     let execution = 0
 
