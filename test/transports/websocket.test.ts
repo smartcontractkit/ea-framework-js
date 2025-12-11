@@ -341,6 +341,11 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
   let metrics = await testAdapter.getMetrics()
   metrics.assert(t, { name: 'ws_subscription_active', labels, expectedValue: 1 })
   metrics.assert(t, { name: 'ws_subscription_total', labels, expectedValue: 1 })
+  metrics.assert(t, {
+    name: 'ws_message_total',
+    labels: { ...labels, direction: 'sent' },
+    expectedValue: 1,
+  })
 
   // Advance to next cycle where connection is unhealthy and reconnect
   await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS + 100)

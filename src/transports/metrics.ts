@@ -29,25 +29,32 @@ export const messageSubsLabels = <T extends TransportGenerics>(
   }
 }
 
-// Record WS message and subscription metrics
-// Recalculate cacheKey and feedId for metrics
-// since avoiding storing extra info in expiring sorted set
-export const recordWsMessageMetrics = <T extends TransportGenerics>(
+export const recordWsMessageSentMetrics = <T extends TransportGenerics>(
   context: EndpointContext<T>,
   subscribes: TypeFromDefinition<T['Parameters']>[],
   unsubscribes: TypeFromDefinition<T['Parameters']>[],
-  wsMessageTotal: boolean = true,
-): void => {
-  const recordMetrics = (params: TypeFromDefinition<T['Parameters']>, type: 'sub' | 'unsub') => {
+) => {
+  for (const params of [...subscribes, ...unsubscribes]) {
     const baseLabels = messageSubsLabels(context, params)
 
     // Record total number of ws messages sent
-    if (wsMessageTotal) {
-      metrics
-        .get('wsMessageTotal')
-        .labels({ ...baseLabels, direction: 'sent' })
-        .inc()
-    }
+    metrics
+      .get('wsMessageTotal')
+      .labels({ ...baseLabels, direction: 'sent' })
+      .inc()
+  }
+}
+
+// Record WS message and subscription metrics
+// Recalculate cacheKey and feedId for metrics
+// since avoiding storing extra info in expiring sorted set
+export const recordWsMessageSubMetrics = <T extends TransportGenerics>(
+  context: EndpointContext<T>,
+  subscribes: TypeFromDefinition<T['Parameters']>[],
+  unsubscribes: TypeFromDefinition<T['Parameters']>[],
+): void => {
+  const recordMetrics = (params: TypeFromDefinition<T['Parameters']>, type: 'sub' | 'unsub') => {
+    const baseLabels = messageSubsLabels(context, params)
 
     // Record total number of subscriptions made
     if (type === 'sub') {

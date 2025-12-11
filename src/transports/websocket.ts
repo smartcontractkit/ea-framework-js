@@ -6,7 +6,11 @@ import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } 
 import { TypeFromDefinition } from '../validation/input-params'
 import { TransportGenerics } from './'
 import { StreamingTransport, SubscriptionDeltas } from './abstract/streaming'
-import { connectionErrorLabels, recordWsMessageMetrics } from './metrics'
+import {
+  connectionErrorLabels,
+  recordWsMessageSentMetrics,
+  recordWsMessageSubMetrics,
+} from './metrics'
 
 // Aliasing type for use at adapter level
 export { WebSocket, RawData as WebSocketRawData }
@@ -453,8 +457,8 @@ export class WebSocketTransport<
       connectionClosed = true
 
       if (subscriptions.desired.length) {
-        // Clear wsSubscriptionActive metrics for all active subscriptions
-        recordWsMessageMetrics(context, [], subscriptions.desired, false)
+        // Clear subscription metrics for all active subscriptions
+        recordWsMessageSubMetrics(context, [], subscriptions.desired)
         censorLogs(() =>
           logger.trace(
             `Connection will be reopened and will subscribe to new and resubscribe to existing: ${JSON.stringify(
@@ -505,6 +509,7 @@ export class WebSocketTransport<
             ? subscriptions.stale.map((sub) => unsubscribeMessage(sub, context))
             : subscriptions.stale,
         )
+        recordWsMessageSentMetrics(context, subscriptions.new, subscriptions.stale)
       } else {
         logger.trace(
           "This ws transport has no builders configured, so we're not sending any messages",
@@ -512,8 +517,8 @@ export class WebSocketTransport<
       }
     }
 
-    // Record WS message and subscription metrics
-    recordWsMessageMetrics(context, subscriptions.new, subscriptions.stale)
+    // Record WS subscription metrics
+    recordWsMessageSubMetrics(context, subscriptions.new, subscriptions.stale)
 
     // The background execute loop no longer sleeps between executions, so we have to do it here
     logger.trace(
