@@ -16,6 +16,17 @@ export const adapter = new Adapter({
 <% if (includeComments) { -%>
   // List of supported endpoints
 <% } -%><%= ' ' %> endpoints: [<%= endpointNames %>],
+<% if (Object.values(endpoints).some(endpoint => endpoint.inputTransports.some(({ type }) => type === 'http'))) { -%>
+<% if (includeComments) { -%>
+  // Rate limit otherwise we send requests as fast as possible without delay
+<% } -%><%= ' ' %> rateLimiting: {
+    tiers: {
+      default: {
+        rateLimit1m: 6,
+      },
+    },
+  },
+<% } -%>
 })
 
 export const server = (): Promise<ServerInstance | undefined> => expose(adapter)
