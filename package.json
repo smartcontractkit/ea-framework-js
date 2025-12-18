@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/external-adapter-framework",
-  "version": "2.11.3",
+  "version": "2.11.4",
   "main": "dist/index.js",
   "license": "MIT",
   "repository": "git://github.com/smartcontractkit/ea-framework-js.git",
@@ -38,11 +38,11 @@
   },
   "devDependencies": {
     "@sinonjs/fake-timers": "15.0.0",
-    "@types/node": "24.10.1",
+    "@types/node": "24.10.4",
     "@types/sinonjs__fake-timers": "15.0.1",
     "@types/ws": "8.18.1",
-    "@typescript-eslint/eslint-plugin": "8.48.1",
-    "@typescript-eslint/parser": "8.48.1",
+    "@typescript-eslint/eslint-plugin": "8.49.0",
+    "@typescript-eslint/parser": "8.49.0",
     "ava": "6.4.1",
     "axios-mock-adapter": "2.1.0",
     "c8": "10.1.3",
