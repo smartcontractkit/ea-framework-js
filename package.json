@@ -37,7 +37,7 @@
     "create-external-adapter": "adapter-generator.js"
   },
   "devDependencies": {
-    "@sinonjs/fake-timers": "15.0.0",
+    "@sinonjs/fake-timers": "15.1.0",
     "@types/node": "24.10.4",
     "@types/sinonjs__fake-timers": "15.0.1",
     "@types/ws": "8.18.1",
