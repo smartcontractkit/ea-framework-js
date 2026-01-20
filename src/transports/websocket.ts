@@ -295,16 +295,6 @@ export class WebSocketTransport<
           `Closed websocket connection. Code: ${event.code} ; reason: ${event.reason?.toString()}`,
         )
 
-        // If abnormal closure, increment failover counter to trigger potential URL switch
-        // Code 1000 is normal closure, all other codes indicate abnormal disconnections
-        if (event.code !== 1000) {
-          this.streamHandlerInvocationsWithNoConnection += 1
-          logger.info(
-            `Abnormal closure detected (code ${event.code}), incremented failover counter to ${this.streamHandlerInvocationsWithNoConnection}`,
-          )
-          metrics.get('wsConnectionFailoverCount').labels({ transport_name: this.name }).set(this.streamHandlerInvocationsWithNoConnection)
-        }
-
         // Record active ws connections by decrementing count on close
         // Using URL in label since connection_key is removed from v3
         metrics.get('wsConnectionActive').dec()
