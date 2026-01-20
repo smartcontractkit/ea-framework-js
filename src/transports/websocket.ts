@@ -295,6 +295,16 @@ export class WebSocketTransport<
           `Closed websocket connection. Code: ${event.code} ; reason: ${event.reason?.toString()}`,
         )
 
+        // If abnormal closure, increment failover counter to trigger potential URL switch
+        // Code 1000 is normal closure, all other codes indicate abnormal disconnections
+        if (event.code !== 1000) {
+          this.streamHandlerInvocationsWithNoConnection += 1
+          logger.info(
+            `Abnormal closure detected (code ${event.code}), incremented failover counter to ${this.streamHandlerInvocationsWithNoConnection}`,
+          )
+          metrics.get('wsConnectionFailoverCount').labels({ transport_name: this.name }).set(this.streamHandlerInvocationsWithNoConnection)
+        }
+
         // Record active ws connections by decrementing count on close
         // Using URL in label since connection_key is removed from v3
         metrics.get('wsConnectionActive').dec()
@@ -414,9 +424,10 @@ export class WebSocketTransport<
     // to determine minimum TTL of an open connection given no explicit connection errors.
     if (connectionUnresponsive) {
       this.streamHandlerInvocationsWithNoConnection += 1
-      logger.trace(
-        `The connection is unresponsive, incremented streamHandlerIterationsWithNoConnection = ${this.streamHandlerInvocationsWithNoConnection}`,
+      logger.info(
+        `The connection is unresponsive (last message ${timeSinceLastMessage}ms ago), incremented failover counter to ${this.streamHandlerInvocationsWithNoConnection}`,
       )
+      metrics.get('wsConnectionFailoverCount').labels({ transport_name: this.name }).set(this.streamHandlerInvocationsWithNoConnection)
     }
 
     // We want to check if the URL we calculate is different from the one currently connected.
@@ -431,9 +442,10 @@ export class WebSocketTransport<
     // Check if we should close the current connection
     if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
       if (urlChanged) {
+        logger.info('Websocket URL has changed, closing connection to reconnect...')
         censorLogs(() =>
           logger.debug(
-            `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`,
+            `Websocket URL changed from ${this.currentUrl} to ${urlFromConfig}`,
           ),
         )
       } else {
