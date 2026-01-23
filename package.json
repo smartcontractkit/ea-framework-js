@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/external-adapter-framework",
-  "version": "2.11.4",
+  "version": "2.11.5",
   "main": "dist/index.js",
   "license": "MIT",
   "repository": "git://github.com/smartcontractkit/ea-framework-js.git",
