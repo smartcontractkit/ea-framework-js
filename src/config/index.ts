@@ -39,7 +39,7 @@ export const BaseSettingsDefinition = {
     description: 'Maximum amount of time (in ms) that a response will stay cached',
     type: 'number',
     default: 90000,
-    validate: validator.integer({ min: 1000, max: 20 * 60 * 1000 }), // Max 20 minutes
+    validate: validator.integer({ min: 1000, max: 60 * 60 * 1000 }), // Max 1 hour
   },
   CACHE_MAX_ITEMS: {
     type: 'number',
@@ -359,7 +359,7 @@ export const BaseSettingsDefinition = {
       'The maximum amount of time in milliseconds to wait for a background execute to finish',
     type: 'number',
     default: 90_000,
-    validate: validator.integer({ min: 1000, max: 180_000 }),
+    validate: validator.integer({ min: 1000, max: 10 * 60 * 1000 }), // Max 10 minutes
   },
   RATE_LIMITING_STRATEGY: {
     description: 'The rate limiting strategy to use for outbound requests',
