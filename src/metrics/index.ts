@@ -359,7 +359,7 @@ export const metrics = new Metrics(() => ({
   }),
   wsConnectionFailoverCount: new client.Gauge({
     name: 'ws_connection_failover_count',
-    help: 'The number of consecutive connection issues (unresponsive/no data, abnormal closures), used to trigger URL failover. Resets to 0 when data flows successfully.',
+    help: 'The number of consecutive unresponsive connection detections (no data for WS_SUBSCRIPTION_UNRESPONSIVE_TTL), used to trigger URL failover',
     labelNames: ['transport_name'] as const,
   }),
 }))
