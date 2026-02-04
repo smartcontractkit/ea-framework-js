@@ -357,4 +357,9 @@ export const metrics = new Metrics(() => ({
     help: 'The number of addresses in PoR request input parameters',
     labelNames: ['feed_id'] as const,
   }),
+  wsConnectionFailoverCount: new client.Gauge({
+    name: 'ws_connection_failover_count',
+    help: 'The number of consecutive unresponsive connection detections (no data for WS_SUBSCRIPTION_UNRESPONSIVE_TTL), used to trigger URL failover',
+    labelNames: ['transport_name'] as const,
+  }),
 }))
