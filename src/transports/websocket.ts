@@ -417,7 +417,10 @@ export class WebSocketTransport<
       logger.info(
         `The connection is unresponsive (last message ${timeSinceLastMessage}ms ago), incremented failover counter to ${this.streamHandlerInvocationsWithNoConnection}`,
       )
-      metrics.get('wsConnectionFailoverCount').labels({ transport_name: this.name }).set(this.streamHandlerInvocationsWithNoConnection)
+      metrics
+        .get('wsConnectionFailoverCount')
+        .labels({ transport_name: this.name })
+        .set(this.streamHandlerInvocationsWithNoConnection)
     }
 
     // We want to check if the URL we calculate is different from the one currently connected.
@@ -434,9 +437,7 @@ export class WebSocketTransport<
       if (urlChanged) {
         logger.info('Websocket URL has changed, closing connection to reconnect...')
         censorLogs(() =>
-          logger.debug(
-            `Websocket URL changed from ${this.currentUrl} to ${urlFromConfig}`,
-          ),
+          logger.debug(`Websocket URL changed from ${this.currentUrl} to ${urlFromConfig}`),
         )
       } else {
         censorLogs(() =>
