@@ -19,6 +19,7 @@ export const BaseSettingsDefinition = {
     description: 'Starting path for the EA handler endpoint',
     type: 'string',
     default: '/',
+    sensitive: false,
   },
   CACHE_LOCK_DURATION: {
     description: 'Time (in ms) used as a baseline for the acquisition and extension of cache locks',
@@ -57,6 +58,7 @@ export const BaseSettingsDefinition = {
     description: 'Hostname for the Redis instance to be used',
     type: 'string',
     default: '127.0.0.1',
+    sensitive: false,
   },
   CACHE_REDIS_MAX_RECONNECT_COOLDOWN: {
     description: 'Max cooldown (in ms) before attempting redis reconnection',
@@ -72,6 +74,7 @@ export const BaseSettingsDefinition = {
   CACHE_REDIS_PATH: {
     description: 'The UNIX socket string of the Redis server',
     type: 'string',
+    sensitive: false,
   },
   CACHE_REDIS_PORT: {
     description: 'Port for the Redis instance to be used',
@@ -102,6 +105,7 @@ export const BaseSettingsDefinition = {
     description: 'Specifies a prefix to use for cache keys',
     type: 'string',
     default: '',
+    sensitive: false,
   },
   STREAM_HANDLER_RETRY_MAX_MS: {
     type: 'number',
@@ -156,6 +160,7 @@ export const BaseSettingsDefinition = {
     description: 'Minimum level required for logs to be output',
     type: 'string',
     default: 'info',
+    sensitive: false,
   },
   CENSOR_SENSITIVE_LOGS: {
     description: 'Controls whether the logging of sensitive information is enabled or disabled',
@@ -187,6 +192,7 @@ export const BaseSettingsDefinition = {
     description:
       'Rate limiting tier to use from the available options for the adapter. If not present, the adapter will run using the first tier on the list.',
     type: 'string',
+    sensitive: false,
   },
   RATE_LIMIT_CAPACITY: {
     description: 'Used as rate limit capacity per minute and ignores tier settings if defined',
@@ -274,6 +280,7 @@ export const BaseSettingsDefinition = {
     description: 'Default key to be used when one cannot be determined from request parameters',
     type: 'string',
     default: 'DEFAULT_CACHE_KEY',
+    sensitive: false,
   },
   EA_HOST: {
     description:
@@ -281,6 +288,7 @@ export const BaseSettingsDefinition = {
     type: 'string',
     default: '::',
     validate: validator.host(),
+    sensitive: false,
   },
   EA_MODE: {
     description:
@@ -316,6 +324,7 @@ export const BaseSettingsDefinition = {
     description: 'Base64 Public Key of TSL/SSL certificate',
     type: 'string',
     validate: validator.base64(),
+    sensitive: false,
   },
   TLS_PASSPHRASE: {
     description: 'Password to be used to generate an encryption key',
@@ -666,7 +675,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
         ([name, setting]) =>
           setting &&
           setting.type === 'string' &&
-          (setting.sensitive || name.endsWith('RPC_URL')) &&
+          (setting.sensitive !== false || name.endsWith('RPC_URL')) &&
           (this.settings as Record<string, ValidSettingValue>)[name],
       )
       .map(([name]) => ({
