@@ -417,9 +417,12 @@ export class WebSocketTransport<
       logger.info(
         `The connection is unresponsive (last message ${timeSinceLastMessage}ms ago), incremented failover counter to ${this.streamHandlerInvocationsWithNoConnection}`,
       )
+      // Filter out query params from the URL to avoid leaking sensitive data
+      // and prevent metric cardinality explosion
+      const filteredUrl = this.currentUrl.split('?')[0]
       metrics
         .get('wsConnectionFailoverCount')
-        .labels({ transport_name: this.name })
+        .labels({ transport_name: this.name, url: filteredUrl })
         .set(this.streamHandlerInvocationsWithNoConnection)
     }
 
