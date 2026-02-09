@@ -414,9 +414,16 @@ export class WebSocketTransport<
     // to determine minimum TTL of an open connection given no explicit connection errors.
     if (connectionUnresponsive) {
       this.streamHandlerInvocationsWithNoConnection += 1
-      logger.trace(
-        `The connection is unresponsive, incremented streamHandlerIterationsWithNoConnection = ${this.streamHandlerInvocationsWithNoConnection}`,
+      logger.info(
+        `The connection is unresponsive (last message ${timeSinceLastMessage}ms ago), incremented failover counter to ${this.streamHandlerInvocationsWithNoConnection}`,
       )
+      // Filter out query params from the URL to avoid leaking sensitive data
+      // and prevent metric cardinality explosion
+      const filteredUrl = this.currentUrl.split('?')[0]
+      metrics
+        .get('wsConnectionFailoverCount')
+        .labels({ transport_name: this.name, url: filteredUrl })
+        .set(this.streamHandlerInvocationsWithNoConnection)
     }
 
     // We want to check if the URL we calculate is different from the one currently connected.
@@ -431,10 +438,9 @@ export class WebSocketTransport<
     // Check if we should close the current connection
     if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
       if (urlChanged) {
+        logger.info('Websocket URL has changed, closing connection to reconnect...')
         censorLogs(() =>
-          logger.debug(
-            `Websocket url has changed from ${this.currentUrl} to ${urlFromConfig}, closing connection...`,
-          ),
+          logger.debug(`Websocket URL changed from ${this.currentUrl} to ${urlFromConfig}`),
         )
       } else {
         censorLogs(() =>
