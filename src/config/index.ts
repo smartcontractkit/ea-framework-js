@@ -675,7 +675,10 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
         ([name, setting]) =>
           setting &&
           setting.type === 'string' &&
-          (setting.sensitive !== false || name.endsWith('RPC_URL')) &&
+          (setting.sensitive !== false ||
+            name.endsWith('RPC_URL') ||
+            name.endsWith('API_KEY') ||
+            name.startsWith('API_KEY')) &&
           (this.settings as Record<string, ValidSettingValue>)[name],
       )
       .map(([name]) => ({
