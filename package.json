@@ -9,7 +9,7 @@
     "axios": "1.13.5",
     "eventsource": "4.1.0",
     "fastify": "5.7.4",
-    "ioredis": "5.9.2",
+    "ioredis": "5.9.3",
     "mock-socket": "9.3.1",
     "pino": "10.3.0",
     "pino-pretty": "13.1.3",
