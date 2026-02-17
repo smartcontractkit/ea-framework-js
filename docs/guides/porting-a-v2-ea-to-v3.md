@@ -238,7 +238,7 @@ export const customSettings = {
     default: 'foo', // If applicable, a default value
     validate: (value?: string) => {}, // If applicable, a function to validate the env var value. Return an error message for a failed validation, or undefined if it passes.
     required: true, // If the env var should be required. Default = false
-    sensitive: true, // Set to true to censor this env var from logs. Default = false
+    sensitive: false, // Set to false if the env var is safe to show uncensored in logs or telemetry. Default = true
   },
 } as const
 ```
