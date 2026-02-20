@@ -190,6 +190,48 @@ test.serial('sensitive configuration constants are properly flagged', (t) => {
   t.deepEqual(actualSensitiveSettings, expectedSensitiveSettings)
 })
 
+test.serial('API_KEY prefix/suffix settings are always censored', (t) => {
+  process.env['API_KEY_PRIMARY'] = 'prefixed-key'
+  process.env['PRIMARY_API_KEY'] = 'suffixed-key'
+  process.env['NOT_SECRET'] = 'plain-value'
+  const customSettings: SettingsDefinitionMap = {
+    API_KEY_PRIMARY: {
+      description: 'API key that is explicitly marked as non-sensitive',
+      type: 'string',
+      sensitive: false,
+    },
+    PRIMARY_API_KEY: {
+      description: 'API key suffix that is explicitly marked as non-sensitive',
+      type: 'string',
+      sensitive: false,
+    },
+    NOT_SECRET: {
+      description: 'Plain text that should not be censored',
+      type: 'string',
+      sensitive: false,
+    },
+  }
+  const config = new AdapterConfig(customSettings)
+  config.initialize()
+  config.validate()
+  config.buildCensorList()
+
+  const adapter = new Adapter({
+    name: 'TEST_ADAPTER',
+    endpoints: [],
+    config: config,
+  })
+
+  const settingsList = buildSettingsList(adapter)
+  const apiKeyPrimary = settingsList.find((entry) => entry.name === 'API_KEY_PRIMARY')
+  const primaryApiKey = settingsList.find((entry) => entry.name === 'PRIMARY_API_KEY')
+  const notSecret = settingsList.find((entry) => entry.name === 'NOT_SECRET')
+
+  t.is(apiKeyPrimary?.value, '[API_KEY_PRIMARY REDACTED]')
+  t.is(primaryApiKey?.value, '[PRIMARY_API_KEY REDACTED]')
+  t.is(notSecret?.value, 'plain-value')
+})
+
 test.serial('multiline sensitive configuration constants are properly redacted', async (t) => {
   // GIVEN
   process.env['PRIVATE_KEY'] =
