@@ -379,6 +379,12 @@ export const BaseSettingsDefinition = {
       'Whether to enable debug enpoints (/debug/*) for this adapter. Enabling them might consume more resources.',
     default: false,
   },
+  ASSET_CASE_INSENSITIVE: {
+    type: 'boolean',
+    description:
+      'Whether to treat asset symbols as case insensitive when generating cache keys and handling requests.',
+    default: false,
+  },
 } as const satisfies SettingsDefinitionMap
 
 export const buildAdapterSettings = <
