@@ -141,6 +141,7 @@ test.serial('/debug/settings/raw endpoint returns expected values', async (t) =>
         'Rate limiting tier to use from the available options for the adapter. If not present, the adapter will run using the first tier on the list.',
       name: 'RATE_LIMIT_API_TIER',
       required: false,
+      sensitive: false,
       customSetting: false,
     },
   )
