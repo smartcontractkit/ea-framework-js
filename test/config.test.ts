@@ -196,12 +196,12 @@ test.serial('API_KEY prefix/suffix settings are always censored', (t) => {
   process.env['NOT_SECRET'] = 'plain-value'
   const customSettings: SettingsDefinitionMap = {
     API_KEY_PRIMARY: {
-      description: 'API key that is explicitly marked as non-sensitive',
+      description: 'API key that is mistakenly marked as insensitive',
       type: 'string',
       sensitive: false,
     },
     PRIMARY_API_KEY: {
-      description: 'API key suffix that is explicitly marked as non-sensitive',
+      description: 'API key suffix that is mistakenly marked as insensitive',
       type: 'string',
       sensitive: false,
     },
