@@ -14,12 +14,14 @@ export const config = new AdapterConfig(
         'An API endpoint for Data Provider',
       type: 'string',
       default: 'https://dataproviderapi.com',
+      sensitive: false,
     },
     WS_API_ENDPOINT: {
       description:
         'WS endpoint for Data Provider',
       type: 'string',
       default: 'ws://localhost:9090',
+      sensitive: false,
     },
 <% if (setBgExecuteMsEnv) { %>
     BACKGROUND_EXECUTE_MS: {
@@ -27,6 +29,7 @@ export const config = new AdapterConfig(
         'The amount of time the background execute should sleep before performing the next request',
       type: 'number',
       default: 10_000,
+      sensitive: false,
     },<% } %>
   },
 )

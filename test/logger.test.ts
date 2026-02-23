@@ -13,8 +13,19 @@ test.before(async () => {
       type: 'string',
       sensitive: true,
     },
+    AB_LAMBO_MODEL: {
+      description: 'Test harmless env var that is safe to log',
+      type: 'string',
+      sensitive: false,
+    },
+    API_PRIVATE_KEY: {
+      description: 'Test env var that a developer forgot to explicitly flag as sensitive',
+      type: 'string',
+    },
   } satisfies SettingsDefinitionMap
   process.env['API_KEY'] = 'mock-api-key'
+  process.env['AB_LAMBO_MODEL'] = 'revuelto'
+  process.env['API_PRIVATE_KEY'] = 'mock-private-key'
   const config = new AdapterConfig(customSettings)
   const adapter = new Adapter({
     name: 'TEST',
@@ -33,6 +44,11 @@ test('properly builds censor list', async (t) => {
   const censorList = CensorList.getAll()
   // eslint-disable-next-line prefer-regex-literals
   t.deepEqual(censorList[0], { key: 'API_KEY', value: RegExp('mock\\-api\\-key', 'gi') })
+  t.deepEqual(censorList[1], {
+    key: 'API_PRIVATE_KEY',
+    // eslint-disable-next-line prefer-regex-literals
+    value: RegExp('mock\\-private\\-key', 'gi'),
+  })
 })
 
 test('properly redacts API_KEY (string)', async (t) => {
@@ -63,6 +79,16 @@ test('properly handles undefined property', async (t) => {
 test('properly handles undefined', async (t) => {
   const redacted = censor(undefined, CensorList.getAll())
   t.deepEqual(redacted, undefined)
+})
+
+test('does not censor vars flagged as sensitive = false', async (t) => {
+  const redacted = censor({ abLamboModel: 'revuelto' }, CensorList.getAll())
+  t.deepEqual(redacted, { abLamboModel: 'revuelto' })
+})
+
+test('censor vars not explicitly flagged as sensitive', async (t) => {
+  const redacted = censor({ publicApiKey: 'mock-private-key' }, CensorList.getAll())
+  t.deepEqual(redacted, { publicApiKey: '[API_PRIVATE_KEY REDACTED]' })
 })
 
 test('properly redacts API_KEY (multiple nested values)', async (t) => {
