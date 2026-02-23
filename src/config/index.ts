@@ -667,6 +667,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
    * RPC_URL are potentially sensitive given it may contain API keys in path
    */
   buildCensorList() {
+    const alwaysCensored = ['RPC_URL', 'API_KEY']
     const censorList: CensorKeyValue[] = Object.entries(
       BaseSettingsDefinition as SettingsDefinitionMap,
     )
@@ -676,9 +677,7 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
           setting &&
           setting.type === 'string' &&
           (setting.sensitive !== false ||
-            name.endsWith('RPC_URL') ||
-            name.endsWith('API_KEY') ||
-            name.startsWith('API_KEY')) &&
+            alwaysCensored.some((pattern) => name.includes(pattern))) &&
           (this.settings as Record<string, ValidSettingValue>)[name],
       )
       .map(([name]) => ({
