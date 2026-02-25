@@ -1,4 +1,6 @@
 name: 'Pinned dependencies'
+permissions:
+  contents: read
 on:
   push:
   pull_request:

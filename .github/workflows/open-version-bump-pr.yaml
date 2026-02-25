@@ -1,5 +1,10 @@
 name: 'Open Version Bump PR'
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -36,6 +41,9 @@ jobs:
   createVersionBumpPR:
     if: (github.event.pull_request.merged == true || inputs.version-type != 'none' || inputs.dry-run == 'true') && needs.preflight.outputs.VERSION_INSTRUCTION != 'version-bump'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     needs: preflight # Will be skipped if preflight is skipped, which causes this to not run on closes w/o merge unless it's a manual run
     outputs:
       PR_NUMBER: ${{ steps.create-pr.outputs.pull-request-number }}

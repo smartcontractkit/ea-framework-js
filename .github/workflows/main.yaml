@@ -1,5 +1,7 @@
 # This is the entry point for CI. It will setup the application, then run lint, test, and eventually publish if not the main branch
 name: 'Main'
+permissions:
+  contents: read
 on:
   workflow_dispatch:
   pull_request:
@@ -53,6 +55,8 @@ jobs:
   code-coverage:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: ${{ !startsWith(github.head_ref, 'version-bump') }}
     steps:
       - uses: actions/checkout@v6

@@ -1,6 +1,11 @@
 # Adds labels to pull requests based on the branch name. Labels are required by the "publish" workflow to determine
 name: 'Validate PR labels'
 
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
 on:
   workflow_dispatch: # Lets you see what labels would be added, but doesn't actually add them because no PR triggered it
   pull_request:
