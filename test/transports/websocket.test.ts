@@ -1312,3 +1312,351 @@ test.serial('does not heartbeat when handler throws an error', async (t) => {
   mockWsServer.close()
   await t.context.clock.runToLastAsync()
 })
+
+// ---------------------------------------------------------------------------
+// Tests demonstrating the connectionOpenedAt reset bug (1005 reconnect loop)
+// ---------------------------------------------------------------------------
+
+// Separate URL to avoid mock-socket "already listening" conflicts with
+// preceding tests that may not fully close their mock servers.
+const ENDPOINT_URL_1005 = 'wss://test-ws-1005.com/asd'
+
+test.serial(
+  'failover counter does not increment during rapid external close loop (1005 bug)',
+  async (t) => {
+    const base = 'ETH'
+    const quote = 'DOGE'
+
+    // TTL must be GREATER than BACKGROUND_EXECUTE_MS_WS (5s) so the
+    // connectionOpenedAt reset keeps timeSinceConnectionOpened below the
+    // threshold on every cycle, preventing connectionUnresponsive from
+    // ever becoming true.
+    const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 10_000
+
+    mockWebSocketProvider(WebSocketClassProvider)
+    const mockWsServer = new Server(ENDPOINT_URL_1005, { mock: false })
+    let connectionCounter = 0
+    const failoverCounterValues: number[] = []
+
+    mockWsServer.on('connection', (socket) => {
+      connectionCounter++
+      // Simulate Tiingo dropping connection with 1005 shortly after open
+      setTimeout(() => {
+        socket.close({ code: 1005, reason: '', wasClean: false })
+      }, 100)
+    })
+
+    const transport = new WebSocketTransport<WebSocketTypes>({
+      url: (_context, _desiredSubs, urlConfigFunctionParameters) => {
+        failoverCounterValues.push(
+          urlConfigFunctionParameters.streamHandlerInvocationsWithNoConnection,
+        )
+        return ENDPOINT_URL_1005
+      },
+      handlers: {
+        message(message) {
+          if (!message.pair) return []
+          const [b, q] = message.pair.split('/')
+          return [
+            {
+              params: { base: b, quote: q },
+              response: {
+                data: { result: message.value },
+                result: message.value,
+                timestamps: { providerIndicatedTimeUnixMs: Date.now() },
+              },
+            },
+          ]
+        },
+      },
+      builders: {
+        subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
+        unsubscribeMessage: (params) => ({
+          request: 'unsubscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
+      },
+    })
+
+    const webSocketEndpoint = new AdapterEndpoint({
+      name: 'TEST',
+      transport,
+      inputParameters,
+    })
+
+    const config = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          BACKGROUND_EXECUTE_MS_WS,
+          WS_SUBSCRIPTION_TTL: 60_000,
+          WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+        },
+      },
+    )
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config,
+      endpoints: [webSocketEndpoint],
+    })
+
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+    const error = await testAdapter.request({ base, quote })
+    t.is(error.statusCode, 504)
+
+    // Advance clock through multiple reconnect cycles
+    await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 6)
+
+    // Multiple reconnections should have occurred
+    t.true(connectionCounter >= 3, `Expected at least 3 reconnects but got ${connectionCounter}`)
+
+    // The failover counter should remain at 0 the entire time.
+    // connectionOpenedAt resets on each reconnect, keeping
+    // timeSinceConnectionOpened (~5s) below WS_SUBSCRIPTION_UNRESPONSIVE_TTL
+    // (10s), so connectionUnresponsive is never true.
+    t.is(transport.streamHandlerInvocationsWithNoConnection, 0)
+    t.true(
+      failoverCounterValues.every((v) => v === 0),
+      `Every url() call should have received counter=0, got: [${failoverCounterValues}]`,
+    )
+
+    testAdapter.api.close()
+    mockWsServer.close()
+    await t.context.clock.runToLastAsync()
+  },
+)
+
+test.serial(
+  'failover counter increments for unresponsive-but-open connections (control test)',
+  async (t) => {
+    const base = 'ETH'
+    const quote = 'DOGE'
+    const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 10_000
+
+    mockWebSocketProvider(WebSocketClassProvider)
+    const mockWsServer = new Server(ENDPOINT_URL_1005, { mock: false })
+    let connectionCounter = 0
+    const failoverCounterValues: number[] = []
+
+    // Server accepts connections but never sends data -- connection stays open
+    mockWsServer.on('connection', (socket) => {
+      connectionCounter++
+      socket.on('message', () => {
+        // Accept subscribe messages but don't send any data back
+      })
+    })
+
+    const transport = new WebSocketTransport<WebSocketTypes>({
+      url: (_context, _desiredSubs, urlConfigFunctionParameters) => {
+        failoverCounterValues.push(
+          urlConfigFunctionParameters.streamHandlerInvocationsWithNoConnection,
+        )
+        return ENDPOINT_URL_1005
+      },
+      handlers: {
+        message(message) {
+          if (!message.pair) return []
+          const [b, q] = message.pair.split('/')
+          return [
+            {
+              params: { base: b, quote: q },
+              response: {
+                data: { result: message.value },
+                result: message.value,
+                timestamps: { providerIndicatedTimeUnixMs: Date.now() },
+              },
+            },
+          ]
+        },
+      },
+      builders: {
+        subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
+        unsubscribeMessage: (params) => ({
+          request: 'unsubscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
+      },
+    })
+
+    const webSocketEndpoint = new AdapterEndpoint({
+      name: 'TEST',
+      transport,
+      inputParameters,
+    })
+
+    const config = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          BACKGROUND_EXECUTE_MS_WS,
+          WS_SUBSCRIPTION_TTL: 60_000,
+          WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+        },
+      },
+    )
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config,
+      endpoints: [webSocketEndpoint],
+    })
+
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+    const error = await testAdapter.request({ base, quote })
+    t.is(error.statusCode, 504)
+
+    // Advance clock past WS_SUBSCRIPTION_UNRESPONSIVE_TTL so the open-but-
+    // silent connection is detected as unresponsive. Need 3+ cycles (15s+)
+    // because the check is strictly-greater-than (>) the TTL (10s).
+    await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 4 + 500)
+
+    // Connection was reopened after unresponsive detection
+    t.true(connectionCounter >= 2, `Expected at least 2 connections but got ${connectionCounter}`)
+
+    // The failover counter should have incremented (unlike the rapid-close bug)
+    t.true(
+      transport.streamHandlerInvocationsWithNoConnection > 0,
+      `Expected failover counter > 0, got ${transport.streamHandlerInvocationsWithNoConnection}`,
+    )
+    t.true(
+      failoverCounterValues.some((v) => v > 0),
+      `Expected at least one url() call with counter > 0, got: [${failoverCounterValues}]`,
+    )
+
+    testAdapter.api.close()
+    mockWsServer.close()
+    await t.context.clock.runToLastAsync()
+  },
+)
+
+test.serial(
+  'EA stalls during rapid reconnect loop and never recovers to serve prices',
+  async (t) => {
+    const base = 'ETH'
+    const quote = 'DOGE'
+    const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 10_000
+
+    mockWebSocketProvider(WebSocketClassProvider)
+    const mockWsServer = new Server(ENDPOINT_URL_1005, { mock: false })
+    let connectionCounter = 0
+    let dropConnections = false
+
+    mockWsServer.on('connection', (socket) => {
+      connectionCounter++
+      if (dropConnections) {
+        setTimeout(() => {
+          socket.close({ code: 1005, reason: '', wasClean: false })
+        }, 100)
+        return
+      }
+
+      // Normal operation: respond to subscribe messages with price data
+      socket.on('message', () => {
+        socket.send(
+          JSON.stringify({
+            pair: `${base}/${quote}`,
+            value: price,
+          }),
+        )
+      })
+    })
+
+    const transport = new WebSocketTransport<WebSocketTypes>({
+      url: () => ENDPOINT_URL_1005,
+      handlers: {
+        message(message) {
+          if (!message.pair) return []
+          const [b, q] = message.pair.split('/')
+          return [
+            {
+              params: { base: b, quote: q },
+              response: {
+                data: { result: message.value },
+                result: message.value,
+                timestamps: { providerIndicatedTimeUnixMs: Date.now() },
+              },
+            },
+          ]
+        },
+      },
+      builders: {
+        subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
+        unsubscribeMessage: (params) => ({
+          request: 'unsubscribe',
+          pair: `${params.base}/${params.quote}`,
+        }),
+      },
+    })
+
+    const webSocketEndpoint = new AdapterEndpoint({
+      name: 'TEST',
+      transport,
+      inputParameters,
+    })
+
+    const config = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          BACKGROUND_EXECUTE_MS_WS,
+          WS_SUBSCRIPTION_TTL: 120_000,
+          WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+          CACHE_MAX_AGE: 5_000,
+        },
+      },
+    )
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config,
+      endpoints: [webSocketEndpoint],
+    })
+
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+    // Phase 1: normal operation -- verify prices flow
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base, quote },
+      expectedResponse: {
+        data: { result: price },
+        result: price,
+        statusCode: 200,
+      },
+    })
+    t.is(connectionCounter, 1)
+
+    // Phase 2: switch to dropping connections with 1005
+    dropConnections = true
+    mockWsServer.clients().forEach((client) => {
+      client.close({ code: 1005, reason: '', wasClean: false })
+    })
+
+    // Advance clock past CACHE_MAX_AGE (5s) and through several reconnect
+    // cycles so the cached price expires and the reconnect loop is visible.
+    await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS * 8)
+
+    // Multiple reconnection attempts should have occurred
+    t.true(connectionCounter >= 3, `Expected at least 3 connections but got ${connectionCounter}`)
+
+    // The EA should now be stalled: cached price has expired, no new data
+    const staleResponse = await testAdapter.request({ base, quote })
+    t.is(
+      staleResponse.statusCode,
+      504,
+      'EA should return 504 because cache expired and no new prices are flowing',
+    )
+
+    // Failover counter should still be 0 -- EA is trapped on the same URL
+    t.is(transport.streamHandlerInvocationsWithNoConnection, 0)
+
+    testAdapter.api.close()
+    mockWsServer.close()
+    await t.context.clock.runToLastAsync()
+  },
+)
