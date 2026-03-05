@@ -289,20 +289,27 @@ export class WebSocketTransport<
 
       // Called when the WS connection closes for any reason
       close: (event: WebSocket.CloseEvent) => {
-        // If the connection closed with 1000, it's a usual closure
-        const level = event.code === 1000 ? 'debug' : 'info'
-        logger[level](
-          `Closed websocket connection. Code: ${event.code} ; reason: ${event.reason?.toString()}`,
-        )
-
-        // Record active ws connections by decrementing count on close
-        // Using URL in label since connection_key is removed from v3
-        metrics.get('wsConnectionActive').dec()
-
-        // Also, register that the connection was closed and the reason why.
-        // We need to filter out query params from the URL to avoid having
-        // the cardinality of the metric go out of control.
         const filteredUrl = this.currentUrl.split('?')[0]
+        const isAbnormal = event.code !== 1000
+
+        if (isAbnormal) {
+          this.streamHandlerInvocationsWithNoConnection += 1
+          logger.warn(
+            `WebSocket closed abnormally (code: ${event.code}, reason: ${event.reason?.toString() || 'none'}). ` +
+              `Failover counter incremented to ${this.streamHandlerInvocationsWithNoConnection}. ` +
+              `URL: ${filteredUrl}`,
+          )
+          metrics
+            .get('wsConnectionFailoverCount')
+            .labels({ transport_name: this.name, url: filteredUrl })
+            .set(this.streamHandlerInvocationsWithNoConnection)
+        } else {
+          logger.debug(
+            `WebSocket closed normally (code: ${event.code}). URL: ${filteredUrl}`,
+          )
+        }
+
+        metrics.get('wsConnectionActive').dec()
         metrics.get('wsConnectionClosures').inc({
           code: event.code,
           url: filteredUrl,
