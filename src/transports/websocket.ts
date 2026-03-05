@@ -304,9 +304,7 @@ export class WebSocketTransport<
             .labels({ transport_name: this.name, url: filteredUrl })
             .set(this.streamHandlerInvocationsWithNoConnection)
         } else {
-          logger.debug(
-            `WebSocket closed normally (code: ${event.code}). URL: ${filteredUrl}`,
-          )
+          logger.debug(`WebSocket closed normally (code: ${event.code}). URL: ${filteredUrl}`)
         }
 
         metrics.get('wsConnectionActive').dec()
