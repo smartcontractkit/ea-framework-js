@@ -376,10 +376,10 @@
   resolved "https://registry.yarnpkg.com/@yeoman/namespace/-/namespace-1.0.1.tgz#8034277c4a62bdf41e05e2d890bc674bc320eb99"
   integrity sha512-XGdYL0HCoPvrzW7T8bxD6RbCY/B8uvR2jpOzJc/yEwTueKHwoVhjSLjVXkokQAO0LNl8nQFLVZ1aKfr2eFWZeA==
 
-"@yeoman/types@1.9.1":
-  version "1.9.1"
-  resolved "https://registry.yarnpkg.com/@yeoman/types/-/types-1.9.1.tgz#7752af2c0e3a4cdbbc98840235a56cb36da25259"
-  integrity sha512-5BMdA/zMzLv/ahnL1ktaV46nSXorb4sU4kQPQKDhIcK8ERbx9TAbGAE+XAlCXKioNIiOrihYj6gW1d/GEfU9Zw==
+"@yeoman/types@1.10.3":
+  version "1.10.3"
+  resolved "https://registry.yarnpkg.com/@yeoman/types/-/types-1.10.3.tgz#52f3efc0db7440b0058dfbef98cfafec5632e7b1"
+  integrity sha512-7CusjSigCHm8EvLkkr/5dbPptCVBNyjnTf8etOlfHg9qkjIfulQrIYVB7MThnofh2d7QQz/G+XfTO4mv9pgleQ==
 
 ansi-regex@^6.0.1:
   version "6.1.0"
