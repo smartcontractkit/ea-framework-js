@@ -11,6 +11,75 @@ import { test } from './helper'
 process.env['EA_PORT'] = '0'
 
 test.serial(
+  'An adapter with CACHE_LOCK_ENABLED=false should skip lock acquisition even with duplicate names',
+  async (t) => {
+    const config = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          CACHE_TYPE: 'redis',
+          CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_ENABLED: false,
+          CACHE_LOCK_DEFERRAL_MS: 0,
+        },
+      },
+    )
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config,
+      endpoints: [
+        new AdapterEndpoint({
+          name: 'nowork',
+          transport: new NopTransport(),
+        }),
+      ],
+    })
+
+    const config2 = new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          CACHE_TYPE: 'redis',
+          CACHE_REDIS_PORT: 6000,
+          CACHE_LOCK_ENABLED: false,
+          CACHE_LOCK_DEFERRAL_MS: 0,
+        },
+      },
+    )
+    const adapter2 = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      config: config2,
+      endpoints: [
+        new AdapterEndpoint({
+          name: 'nowork',
+          transport: new NopTransport(),
+        }),
+      ],
+    })
+
+    const redisClient = new RedisMock() as unknown as Redis
+    const cache = new RedisCache(redisClient, 10000)
+    const dependencies: Partial<AdapterDependencies> = {
+      cache,
+      redisClient,
+    }
+
+    try {
+      await expose(adapter, dependencies)
+      await expose(adapter2, dependencies)
+
+      t.is(adapter.lockAcquiredPromise, undefined)
+      t.is(adapter2.lockAcquiredPromise, undefined)
+      t.pass()
+    } catch (error) {
+      t.fail(`No error should have been thrown with CACHE_LOCK_ENABLED=false: ${error}`)
+    }
+  },
+)
+
+test.serial(
   'An adapter with a duplicate name and no cache prefix should fail to acquire a lock',
   async (t) => {
     const config = new AdapterConfig(
@@ -19,6 +88,7 @@ test.serial(
         envDefaultOverrides: {
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
+          CACHE_PREFIX: 'PREFIX',
           CACHE_LOCK_DURATION: 2000,
           CACHE_LOCK_RETRIES: 2,
           CACHE_LOCK_DEFERRAL_MS: 0,
@@ -43,6 +113,7 @@ test.serial(
         envDefaultOverrides: {
           CACHE_TYPE: 'redis',
           CACHE_REDIS_PORT: 6000,
+          CACHE_PREFIX: 'PREFIX',
           CACHE_LOCK_DURATION: 2000,
           CACHE_LOCK_RETRIES: 2,
           CACHE_LOCK_DEFERRAL_MS: 0,
