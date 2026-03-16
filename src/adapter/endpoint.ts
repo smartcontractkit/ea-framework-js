@@ -68,7 +68,11 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.customInputValidation = params.customInputValidation
     this.customOutputValidation = params.customOutputValidation
     this.overrides = params.overrides
-    this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
+    this.requestTransforms = [
+      this.symbolOverrider.bind(this),
+      this.normalizeInputCase.bind(this),
+      ...(params.requestTransforms || []),
+    ]
   }
 
   /**
@@ -145,6 +149,27 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     }
 
     return req
+  }
+
+  /**
+   * Default request transform that normalizes base and quote input parameters to uppercase.
+   * Controlled by the NORMALIZE_CASE_INPUTS setting (default: true).
+   * This prevents subscription churn when the same asset is requested with different casings.
+   */
+  normalizeInputCase(
+    req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
+    settings: T['Settings'],
+  ): void {
+    if (!(settings as Record<string, unknown>)['NORMALIZE_CASE_INPUTS']) {
+      return
+    }
+    const data = req.requestContext.data as Record<string, unknown>
+    if (typeof data['base'] === 'string') {
+      data['base'] = data['base'].toUpperCase()
+    }
+    if (typeof data['quote'] === 'string') {
+      data['quote'] = data['quote'].toUpperCase()
+    }
   }
 
   getTransportNameForRequest(
