@@ -32,8 +32,23 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
   add(value: T, ttl: number, key: string) {
     let node = this.map.get(key)
     if (node) {
+      if (JSON.stringify(value) !== JSON.stringify(node.data.value)) {
+        logger.warn(
+          `Subscription set received a value for key "${key}" that differs from the stored value. ` +
+            `Keeping the original value to avoid unnecessary subscription churn. ` +
+            `This indicates requests are using inconsistent parameter casing - ` +
+            `stored: ${JSON.stringify(node.data.value)}, incoming: ${JSON.stringify(value)}`,
+        )
+      }
       node.data = {
-        value,
+        // Preserve the existing value rather than overwriting it. The key is the
+        // normalised cache key (e.g. lowercased), so two entries that share a key
+        // represent the same logical subscription. Overwriting the value with a
+        // differently-cased variant would cause the streaming transport's
+        // JSON.stringify-based diff to see a change, triggering an
+        // unnecessary unsubscribe + resubscribe cycle that can permanently kill
+        // the provider feed. Only the TTL needs refreshing here.
+        value: node.data.value,
         expirationTimestamp: Date.now() + ttl,
       }
       this.moveToTail(node)
