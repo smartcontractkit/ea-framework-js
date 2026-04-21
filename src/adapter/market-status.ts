@@ -25,6 +25,11 @@ export const marketStatusEndpointInputParametersDefinition = {
     description:
       'DHH-DHH:TZ, 520-020:America/New_York means Fri 20:00 to Sun 20:00 Eastern Time Zone',
   },
+  force245MarketStatus: {
+    type: 'boolean',
+    description: 'Return response in 24/5 market status',
+    default: false,
+  },
 } as const
 
 export enum MarketStatus {
