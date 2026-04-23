@@ -60,10 +60,14 @@ export const httpTransport = new HttpTransport<HttpTransportTypes>({
 <% } -%>
   parseResponse: (params, response) => {
 <% if (includeComments) { -%>
-    // In case error was received, it's a good practice to return meaningful information to user
+    // For each 'param' a new response object is created and returned as an array
 <% } -%>
-    if (!response.data) {
-      return params.map((param) => {
+    return params.map((param) => {
+<% if (includeComments) { -%>
+      // In case error was received, it's a good practice to return meaningful information to user
+<% } -%>
+      const baseSymbol = param.base.toUpperCase()
+      if (!response.data || !response.data[baseSymbol]) {
         return {
           params: param,
           response: {
@@ -71,14 +75,9 @@ export const httpTransport = new HttpTransport<HttpTransportTypes>({
             statusCode: 502,
           },
         }
-      })
-    }
+      }
 
-<% if (includeComments) { -%>
-    // For successful responses for each 'param' a new response object is created and returned as an array
-<% } -%>
-    return params.map((param) => {
-      const result = response.data[param.base.toUpperCase()].price
+      const result = response.data[baseSymbol].price
 <% if (includeComments) { -%>
       // Response objects, whether successful or errors, contain two properties, 'params' and 'response'. 'response' is what will be
       // stored in the cache and returned as adapter response and 'params' determines the identifier so that the next request with same 'params'
