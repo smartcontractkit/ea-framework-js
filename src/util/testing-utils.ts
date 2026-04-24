@@ -1,4 +1,4 @@
-import { InstalledClock } from '@sinonjs/fake-timers'
+import { Clock as InstalledClock } from '@sinonjs/fake-timers'
 import { ExecutionContext } from 'ava'
 import { FastifyInstance } from 'fastify'
 import { ReplyError } from 'ioredis'

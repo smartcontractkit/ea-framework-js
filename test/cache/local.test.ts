@@ -1,4 +1,4 @@
-import { InstalledClock } from '@sinonjs/fake-timers'
+import { Clock as InstalledClock } from '@sinonjs/fake-timers'
 import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterDependencies, AdapterEndpoint } from '../../src/adapter'
