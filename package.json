@@ -37,6 +37,8 @@
     "create-external-adapter": "adapter-generator.js"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "3.3.5",
+    "@eslint/js": "10.0.1",
     "@sinonjs/fake-timers": "15.3.2",
     "@types/node": "24.12.2",
     "@types/sinonjs__fake-timers": "15.0.1",
