@@ -37,6 +37,8 @@
     "create-external-adapter": "adapter-generator.js"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "3.3.5",
+    "@eslint/js": "10.0.1",
     "@sinonjs/fake-timers": "15.3.2",
     "@types/node": "24.12.2",
     "@types/sinonjs__fake-timers": "15.0.1",
@@ -46,7 +48,7 @@
     "ava": "7.0.0",
     "axios-mock-adapter": "2.1.0",
     "c8": "11.0.0",
-    "eslint": "9.39.4",
+    "eslint": "10.2.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-tsdoc": "0.5.2",
     "mocksse": "1.0.4",

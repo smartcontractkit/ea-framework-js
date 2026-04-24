@@ -217,7 +217,7 @@ export const loggingContextMiddleware = (
 // Obj is typed as "any" because it could be a variety of structures in the logger
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function censor(obj: any, censorList: CensorKeyValue[], throwOnError = false) {
-  let stringified: string | undefined = ''
+  let stringified: string | undefined
   try {
     // JSON.stringify(obj) will fail if obj contains a circular reference.
     // If it fails, we fall back to replacing it with "[Unknown]".

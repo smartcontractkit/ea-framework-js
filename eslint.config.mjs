@@ -22,6 +22,7 @@ export default [{
         "scripts/generator-adapter",
         "**/.yarn",
         "**/.vscode",
+        "**/srcdocs",
     ],
 }, ...compat.extends("eslint:recommended", "plugin:@typescript-eslint/recommended", "prettier"), {
     plugins: {
