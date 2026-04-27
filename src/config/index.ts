@@ -497,7 +497,9 @@ type ConcreteSettingType<C extends SettingDefinition> = C['type'] extends 'strin
           ? C['options'][number]
           : never
         : never
-type SettingType<C extends SettingDefinition> = C extends HasDefault | IsRequired ? ConcreteSettingType<C> : ConcreteSettingType<C> | undefined
+type SettingType<C extends SettingDefinition> = C extends HasDefault | IsRequired
+  ? ConcreteSettingType<C>
+  : ConcreteSettingType<C> | undefined
 
 export type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
 
