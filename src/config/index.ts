@@ -486,7 +486,7 @@ export const getEnv = (
 }
 
 type SettingValueType = string | number | boolean
-type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
+type ConcreteSettingType<C extends SettingDefinition> = C['type'] extends 'string'
   ? string
   : C['type'] extends 'number'
     ? number
@@ -497,6 +497,8 @@ type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
           ? C['options'][number]
           : never
         : never
+type SettingType<C extends SettingDefinition> = C extends HasDefault | IsRequired ? ConcreteSettingType<C> : ConcreteSettingType<C> | undefined
+
 export type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
 
 export type MaybeRequiredSettingDefinition =
@@ -545,7 +547,7 @@ type NonOptionalSettingKeys<T extends SettingsDefinitionMap> = Exclude<
 >
 
 export type Settings<T extends SettingsDefinitionMap> = {
-  -readonly [K in OptionalSettingKeys<T>]?: SettingType<T[K]> | undefined
+  -readonly [K in OptionalSettingKeys<T>]?: SettingType<T[K]>
 } & {
   -readonly [K in NonOptionalSettingKeys<T>]: SettingType<T[K]>
 }
