@@ -1,3 +1,4 @@
+import test from 'ava'
 import { SettingDefinition, Settings } from '../src/config'
 
 // This file has type declarations that test the types of the config system at
@@ -155,3 +156,7 @@ const _settingsType: ExpectEqual<
   ExpectedSettingsType
 > = true
 void _settingsType
+
+test('add one actual test so the test framework does not complain', (t) => {
+  t.pass()
+})
