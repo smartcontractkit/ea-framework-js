@@ -77,6 +77,10 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       req,
       adapter.config.settings,
     )
+    const fallbackTransportName = endpoint.getFallbackTransportNameForRequest(
+      req.requestContext.transportName,
+      adapter.config.settings,
+    )
 
     // Custom input validation defined in the EA
     const error =
@@ -108,6 +112,12 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {
+      if (fallbackTransportName) {
+        errorCatcherLogger.warn(
+          'Fallback transports ignored for endpoints with custom cache key generators',
+        )
+      }
+
       let cacheKey
       cacheKey = endpoint.cacheKeyGenerator(req.requestContext.data)
       if (cacheKey.length > adapter.config.settings.MAX_COMMON_KEY_SIZE) {
@@ -125,14 +135,26 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
       req.requestContext.cacheKey = `${cachePrefix}${cacheKey}`
     } else {
-      const transportName = req.requestContext.transportName
       req.requestContext.cacheKey = calculateCacheKey({
         data: req.requestContext.data,
         adapterName: adapter.name,
         endpointName: endpoint.name,
-        transportName,
+        transportName: req.requestContext.transportName,
         adapterSettings: adapter.config.settings,
       })
+
+      if (fallbackTransportName) {
+        req.requestContext.fallback = {
+          transportName: fallbackTransportName,
+          cacheKey: calculateCacheKey({
+            data: req.requestContext.data,
+            adapterName: adapter.name,
+            endpointName: endpoint.name,
+            transportName: fallbackTransportName,
+            adapterSettings: adapter.config.settings,
+          }),
+        }
+      }
     }
 
     done()

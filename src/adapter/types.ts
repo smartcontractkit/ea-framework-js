@@ -183,6 +183,9 @@ type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
 
   /** If no value is returned from the custom router or the default (transport param), which transport to use */
   defaultTransport?: string
+
+  /** Backup transport to use when the primary transport is unable to return data */
+  fallbackTransport?: string
 }
 
 /**

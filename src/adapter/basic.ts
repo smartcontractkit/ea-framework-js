@@ -15,6 +15,7 @@ import {
   highestRateLimitTiers,
 } from '../rate-limiting'
 import { RateLimiterFactory, RateLimitingStrategy } from '../rate-limiting/factory'
+import { Transport } from '../transports'
 import {
   AdapterRequest,
   AdapterResponse,
@@ -449,6 +450,14 @@ export class Adapter<
     const endpoint = this.endpointsMap[req.requestContext.endpointName]
     const transport = endpoint.transportRoutes.get(req.requestContext.transportName)
 
+    return this.handleSingleTransportRequest(req, replySent, transport)
+  }
+
+  private async handleSingleTransportRequest(
+    req: AdapterRequest<EmptyInputParameters>,
+    replySent: Promise<unknown>,
+    transport: Transport<EndpointGenerics>,
+  ): Promise<Readonly<AdapterResponse>> {
     // First try to find the response in our cache, keep it ready
     const cachedResponse = await this.findResponseInCache(req)
 

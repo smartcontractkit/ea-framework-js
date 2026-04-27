@@ -38,6 +38,12 @@ export type AdapterRequestContext<T> = {
   /** Precalculated cache key used to get and set corresponding values from the cache and subscription sets */
   cacheKey: string
 
+  /** Fallback transport context to use if the primary transport is unable to return data */
+  fallback?: {
+    transportName: string
+    cacheKey: string
+  }
+
   /** Normalized and validated data coming from the request body */
   data: T
 
