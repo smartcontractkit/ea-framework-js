@@ -6,7 +6,7 @@
   "repository": "git://github.com/smartcontractkit/ea-framework-js.git",
   "dependencies": {
     "ajv": "8.18.0",
-    "axios": "1.15.0",
+    "axios": "1.15.2",
     "eventsource": "4.1.0",
     "fastify": "5.8.5",
     "ioredis": "5.10.1",
