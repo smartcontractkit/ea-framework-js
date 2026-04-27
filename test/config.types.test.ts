@@ -1,5 +1,5 @@
 import test from 'ava'
-import { AdapterConfig, SettingDefinition, Settings } from '../src/config'
+import { AdapterConfig, Getter, SettingDefinition, Settings } from '../src/config'
 
 // This file has type declarations that test the types of the config system at
 // compile time.
@@ -133,6 +133,77 @@ const testSettingsDefinition = {
     options: ['option1', 'option2', 'option3'],
     default: 'option1',
   },
+  variableOptionalStringSetting: {
+    type: 'string',
+    description: 'optional string setting',
+    variablePlaceholder: 'variable',
+  },
+  variableRequiredStringSetting: {
+    type: 'string',
+    description: 'required string setting',
+    required: true,
+    variablePlaceholder: 'variable',
+  },
+  variableDefaultStringSetting: {
+    type: 'string',
+    description: 'string setting with default value',
+    default: 'default value',
+    variablePlaceholder: 'variable',
+  },
+  variableOptionalNumberSetting: {
+    type: 'number',
+    description: 'optional number setting',
+    variablePlaceholder: 'variable',
+  },
+  variableRequiredNumberSetting: {
+    type: 'number',
+    description: 'required number setting',
+    required: true,
+    variablePlaceholder: 'variable',
+  },
+  variableDefaultNumberSetting: {
+    type: 'number',
+    description: 'number setting with default value',
+    default: 42,
+    variablePlaceholder: 'variable',
+  },
+  variableOptionalBooleanSetting: {
+    type: 'boolean',
+    description: 'optional boolean setting',
+    variablePlaceholder: 'variable',
+  },
+  variableRequiredBooleanSetting: {
+    type: 'boolean',
+    description: 'required boolean setting',
+    required: true,
+    variablePlaceholder: 'variable',
+  },
+  variableDefaultBooleanSetting: {
+    type: 'boolean',
+    description: 'boolean setting with default value',
+    default: true,
+    variablePlaceholder: 'variable',
+  },
+  variableOptionalEnumSetting: {
+    type: 'enum',
+    description: 'optional enum setting',
+    options: ['option1', 'option2', 'option3'],
+    variablePlaceholder: 'variable',
+  },
+  variableRequiredEnumSetting: {
+    type: 'enum',
+    description: 'required enum setting',
+    required: true,
+    options: ['option1', 'option2', 'option3'],
+    variablePlaceholder: 'variable',
+  },
+  variableDefaultEnumSetting: {
+    type: 'enum',
+    description: 'enum setting with default value',
+    options: ['option1', 'option2', 'option3'],
+    default: 'option1',
+    variablePlaceholder: 'variable',
+  },
 } as const
 void testSettingsDefinition
 
@@ -149,6 +220,18 @@ type ExpectedSettingsType = {
   optionalEnumSetting?: 'option1' | 'option2' | 'option3'
   requiredEnumSetting: 'option1' | 'option2' | 'option3'
   defaultEnumSetting: 'option1' | 'option2' | 'option3'
+  variableOptionalStringSetting: Getter<string | undefined>
+  variableRequiredStringSetting: Getter<string>
+  variableDefaultStringSetting: Getter<string>
+  variableOptionalNumberSetting: Getter<number | undefined>
+  variableRequiredNumberSetting: Getter<number>
+  variableDefaultNumberSetting: Getter<number>
+  variableOptionalBooleanSetting: Getter<boolean | undefined>
+  variableRequiredBooleanSetting: Getter<boolean>
+  variableDefaultBooleanSetting: Getter<boolean>
+  variableOptionalEnumSetting: Getter<'option1' | 'option2' | 'option3' | undefined>
+  variableRequiredEnumSetting: Getter<'option1' | 'option2' | 'option3'>
+  variableDefaultEnumSetting: Getter<'option1' | 'option2' | 'option3'>
 }
 
 const _settingsType: ExpectEqual<
