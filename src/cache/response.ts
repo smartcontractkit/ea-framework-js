@@ -100,6 +100,7 @@ export class ResponseCache<
       ) {
         response.meta = {
           adapterName: calculateAdapterName(this.adapterName, r.params),
+          transportName,
           metrics: {
             feedId: calculateFeedId(
               {

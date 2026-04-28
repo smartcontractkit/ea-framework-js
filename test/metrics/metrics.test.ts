@@ -332,6 +332,7 @@ test.serial('validate response.meta has the correct properties', async (t) => {
   t.deepEqual(response.meta, {
     adapterName: 'TEST',
     metrics: { feedId: '{"from":"eth","to":"usd"}' },
+    transportName: 'default_single_transport',
   })
 })
 
