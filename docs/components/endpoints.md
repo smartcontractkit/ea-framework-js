@@ -62,6 +62,29 @@ export type BaseEndpointTypes = {
 
 Transport files extend BaseEndpointTypes and additionally provide DP specific information like DP request/response type or websocket message types are defined in corresponding transport files.
 
+## Multiple transports and fallback
+
+For endpoints registered with `transportRoutes`, routing still picks a **primary** transport using `customRouter`, the request `transport` field, or `defaultTransport`.
+
+Optional **fallback** transports are configured per primary route name with `fallbackTransport`, a map from primary transport name to fallback transport name (both must exist on `transportRoutes`). This is **off by default** until the adapter setting `TRANSPORT_FALLBACK_ENABLED` is set to `true` (see [EA settings](../reference-tables/ea-settings.md)).
+
+When enabled, the framework may start work on the fallback route in parallel with the primary, but the **response still prefers primary data**: the client waits for the primary cache / foreground / polling path to finish or time out before using a successful fallback result. Separate cache keys are used per transport so cached values do not collide.
+
+Fallback is not supported together with a custom `cacheKeyGenerator` on the same endpoint; use the default cache key behavior if you need fallback.
+
+```typescript
+new AdapterEndpoint({
+  name: 'price',
+  inputParameters,
+  transportRoutes: new TransportRoutes<BaseEndpointTypes>()
+    .register('rest', httpTransport)
+    .register('ws', wsTransport),
+  defaultTransport: 'rest',
+  // When primary is `rest`, allow falling back to `ws`
+  fallbackTransport: { rest: 'ws' },
+})
+```
+
 ## Cache Key Generator
 
 **Only use if absolutely necessary**
