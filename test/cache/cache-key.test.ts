@@ -225,61 +225,6 @@ test.serial('builds fallback cache key from fallback transport name', async (t) 
   )
 })
 
-test.serial('custom cache key generator throws on fallback transport', async (t) => {
-  const config = new AdapterConfig(
-    {},
-    {
-      envDefaultOverrides: {
-        TRANSPORT_FALLBACK_ENABLED: true,
-      },
-    },
-  )
-  const adapter = new Adapter({
-    name: 'TEST',
-    defaultEndpoint: 'test-custom-cache-key-fallback',
-    config,
-    endpoints: [
-      new AdapterEndpoint<NopTransportTypes>({
-        name: 'test-custom-cache-key-fallback',
-        cacheKeyGenerator: (_) => `test:custom_cache_key`,
-        transportRoutes: new TransportRoutes<NopTransportTypes>()
-          .register(
-            'primary',
-            new (class extends NopTransport {
-              override async foregroundExecute(
-                req: AdapterRequest<NopTransportTypes['Parameters']>,
-              ) {
-                return {
-                  data: null,
-                  statusCode: 200,
-                  result: (req.requestContext.fallback?.cacheKey ||
-                    req.requestContext.cacheKey) as unknown as null,
-                  timestamps: {
-                    providerDataRequestedUnixMs: 0,
-                    providerDataReceivedUnixMs: 0,
-                    providerIndicatedTimeUnixMs: undefined,
-                  },
-                }
-              }
-            })(),
-          )
-          .register('fallback', new NopTransport()),
-        defaultTransport: 'primary',
-        fallbackTransport: { primary: 'fallback' },
-      }),
-    ],
-  })
-  const testAdapter = await TestAdapter.start(adapter, t.context)
-
-  const response = await testAdapter.request({})
-
-  t.is(response.statusCode, 404)
-  t.is(
-    response.json().error.message,
-    'fallbackTransport not supported for endpoints with cacheKeyGenerator',
-  )
-})
-
 test.serial('custom cache key is truncated if over max size', async (t) => {
   const response = await t.context.testAdapter.request({
     endpoint: 'test-custom-cache-key-long',

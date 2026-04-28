@@ -738,6 +738,22 @@ test.serial('fallback transport must be registered', async (t) => {
   )
 })
 
+test.serial("fallback's primary transport must be registered", async (t) => {
+  t.throws(
+    () =>
+      new AdapterEndpoint<BaseEndpointTypes>({
+        inputParameters,
+        name: 'price',
+        transportRoutes: transports,
+        fallbackTransport: { invalid: 'WEBSOCKET' },
+      }),
+    {
+      message:
+        'No primary transport found for key "invalid", must be one of ["websocket","batch","sse"]',
+    },
+  )
+})
+
 test.serial('fallback transport cannot match primary transport', async (t) => {
   t.throws(
     () =>
@@ -749,6 +765,22 @@ test.serial('fallback transport cannot match primary transport', async (t) => {
       }),
     {
       message: 'Fallback transport "batch" cannot be the same as primary transport.',
+    },
+  )
+})
+
+test.serial('fallback transport not allowed with cacheKeyGenerator', async (t) => {
+  t.throws(
+    () =>
+      new AdapterEndpoint<BaseEndpointTypes>({
+        inputParameters,
+        name: 'price',
+        transportRoutes: transports,
+        fallbackTransport: { batch: 'WEBSOCKET' },
+        cacheKeyGenerator: () => 'cache',
+      }),
+    {
+      message: 'fallbackTransport not allowed for endpoints with cacheKeyGenerator',
     },
   )
 })

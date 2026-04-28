@@ -79,24 +79,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.overrides = params.overrides
     this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
 
-    // Validate fallback structure if it's defined
-    Object.entries(this.fallbackTransport || {}).forEach(([primary, fallback]) => {
-      if (primary === fallback) {
-        throw new AdapterError({
-          statusCode: 400,
-          message: `Fallback transport "${fallback}" cannot be the same as primary transport.`,
-        })
-      }
-
-      if (!this.transportRoutes.get(fallback)) {
-        throw new AdapterError({
-          statusCode: 400,
-          message: `No fallback transport found for key "${fallback}", must be one of ${JSON.stringify(
-            this.transportRoutes.routeNames(),
-          )}`,
-        })
-      }
-    })
+    this.validateFallbackTransport()
   }
 
   /**
@@ -248,5 +231,41 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       return requestOverrides['transport']
     }
     return rawRequestBody.data?.transport
+  }
+
+  private validateFallbackTransport() {
+    if (this.cacheKeyGenerator && this.fallbackTransport) {
+      throw new AdapterError({
+        message: 'fallbackTransport not allowed for endpoints with cacheKeyGenerator',
+        statusCode: 404,
+      })
+    }
+
+    Object.entries(this.fallbackTransport || {}).forEach(([primary, fallback]) => {
+      if (primary === fallback) {
+        throw new AdapterError({
+          statusCode: 400,
+          message: `Fallback transport "${fallback}" cannot be the same as primary transport.`,
+        })
+      }
+
+      if (!this.transportRoutes.get(primary)) {
+        throw new AdapterError({
+          statusCode: 400,
+          message: `No primary transport found for key "${primary}", must be one of ${JSON.stringify(
+            this.transportRoutes.routeNames(),
+          )}`,
+        })
+      }
+
+      if (!this.transportRoutes.get(fallback)) {
+        throw new AdapterError({
+          statusCode: 400,
+          message: `No fallback transport found for key "${fallback}", must be one of ${JSON.stringify(
+            this.transportRoutes.routeNames(),
+          )}`,
+        })
+      }
+    })
   }
 }

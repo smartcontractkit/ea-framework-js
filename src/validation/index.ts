@@ -106,20 +106,8 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       req.requestContext = { ...req.requestContext, meta: { metrics } }
     }
 
-    const fallbackTransportName = endpoint.getFallbackTransportNameForRequest(
-      req.requestContext.transportName,
-      adapter.config.settings,
-    )
-
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {
-      if (fallbackTransportName) {
-        throw new AdapterInputError({
-          message: 'fallbackTransport not supported for endpoints with cacheKeyGenerator',
-          statusCode: 404,
-        })
-      }
-
       let cacheKey
       cacheKey = endpoint.cacheKeyGenerator(req.requestContext.data)
       if (cacheKey.length > adapter.config.settings.MAX_COMMON_KEY_SIZE) {
@@ -149,6 +137,10 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
         transportName: req.requestContext.transportName,
       })
 
+      const fallbackTransportName = endpoint.getFallbackTransportNameForRequest(
+        req.requestContext.transportName,
+        adapter.config.settings,
+      )
       if (fallbackTransportName) {
         req.requestContext.fallback = {
           transportName: fallbackTransportName,
