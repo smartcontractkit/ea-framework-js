@@ -1,4 +1,5 @@
-import { SettingDefinition, Settings } from '../src/config'
+import test from 'ava'
+import { SettingsDefinitionMap, SettingDefinition, Settings } from '../src/config'
 
 // This file has type declarations that test the types of the config system at
 // compile time.
@@ -155,3 +156,62 @@ const _settingsType: ExpectEqual<
   ExpectedSettingsType
 > = true
 void _settingsType
+
+// Reproduces the bug from `packages/sources/liveart/src/config/index.ts`.
+// Annotating the variable with the default `SettingsDefinitionMap` (no
+// inferred generic) widens the settings map to `Record<string,
+// SettingDefinition>`. Any custom setting then resolves via an index
+// signature whose value type is the full `SettingType<SettingDefinition>`
+// union.
+//
+// Previously this collapsed to `undefined` (because `SettingType` was not
+// distributive over `SettingDefinition`), which silently allowed values
+// like `adapterSettings.API_BASE_URL` to be passed into stricter types
+// such as Axios's `baseURL: string | undefined`.
+const wideConfig: SettingsDefinitionMap = {
+  API_BASE_URL: {
+    type: 'string',
+    description: 'API base URL',
+    required: true,
+    default: 'https://example.com',
+  },
+}
+void wideConfig
+
+const _wideConfigAccess: ExpectEqual<
+  Settings<typeof wideConfig>['API_BASE_URL'],
+  string | number | boolean | undefined
+> = true
+void _wideConfigAccess
+
+// The tests below are not directly a test of the config types, but it
+// demonstrates an important principle used in SettingType.
+
+type MyType = { foo: number } | { foo: string }
+
+type TypeOfFoo<T extends { foo: unknown }> = T['foo'] extends string
+  ? string
+  : T['foo'] extends number
+    ? number
+    : never
+
+type DistributeTypeOfFoo<T extends { foo: unknown }> = T extends never ? never : TypeOfFoo<T>
+
+// If TypeOfFoo is applied directly to MyType, it will evaluate T['foo'] as
+// `string | number`, which does not satisfy either condition and results in
+// `never`.
+const _testTypeOfFooDirectly: ExpectEqual<TypeOfFoo<MyType>, never> = true
+void _testTypeOfFooDirectly
+
+// But if you do the same inside a seemingly useless conditional, it will apply
+// `TypeOfFoo` to each member of the union separately (first to
+// `{ foo: number }` and then to `{ foo: string }`), and then combine the
+// results together. So it will evaluate to `number` for the first member and
+// `string` for the second member, and the result will be `number | string`.
+// then unions the results together.
+const _testTypeOfFooDistributed: ExpectEqual<DistributeTypeOfFoo<MyType>, string | number> = true
+void _testTypeOfFooDistributed
+
+test('add one actual test so the test framework does not complain', (t) => {
+  t.pass()
+})

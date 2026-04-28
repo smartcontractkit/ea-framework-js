@@ -486,7 +486,7 @@ export const getEnv = (
 }
 
 type SettingValueType = string | number | boolean
-type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
+type SettingTypeWhenPresent<C extends SettingDefinition> = C['type'] extends 'string'
   ? string
   : C['type'] extends 'number'
     ? number
@@ -497,91 +497,54 @@ type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
           ? C['options'][number]
           : never
         : never
+type SettingType<C extends SettingDefinition> = C extends HasDefault | IsRequired
+  ? SettingTypeWhenPresent<C>
+  : SettingTypeWhenPresent<C> | undefined
+
 export type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
+
+export type SettingDefinitionBase = {
+  description: string
+  sensitive?: boolean
+  required?: boolean
+}
+
+export type NonEnumSettingDefinition<TypeString, Type> = SettingDefinitionBase & {
+  type: TypeString
+  default?: Type
+  validate?: Validator<Type>
+  options?: never
+}
+
+export type EnumSettingDefinition = SettingDefinitionBase & {
+  type: 'enum'
+  default?: string
+  validate?: Validator<string>
+  options: readonly string[]
+}
+
 export type SettingDefinition =
-  | {
-      type: 'string'
-      description: string
-      options?: never
-      default?: string
-      validate?: Validator<string>
-      required?: false
-      sensitive?: boolean
-    }
-  | {
-      type: 'string'
-      description: string
-      options?: never
-      default?: string
-      validate?: Validator<string>
-      required: true
-      sensitive?: boolean
-    }
-  | {
-      type: 'number'
-      description: string
-      options?: never
-      default?: number
-      validate?: Validator<number>
-      required?: false
-    }
-  | {
-      type: 'number'
-      description: string
-      options?: never
-      default?: number
-      validate?: Validator<number>
-      required: true
-    }
-  | {
-      type: 'boolean'
-      description: string
-      options?: never
-      default?: boolean
-      validate?: Validator<boolean>
-      required?: false
-    }
-  | {
-      type: 'boolean'
-      description: string
-      options?: never
-      default?: boolean
-      validate?: Validator<boolean>
-      required: true
-    }
-  | {
-      type: 'enum'
-      description: string
-      default?: string
-      options: readonly string[]
-      validate?: Validator<string>
-      required?: false
-    }
-  | {
-      type: 'enum'
-      description: string
-      default?: string
-      options: readonly string[]
-      validate?: Validator<string>
-      required: true
-    }
+  | NonEnumSettingDefinition<'string', string>
+  | NonEnumSettingDefinition<'number', number>
+  | NonEnumSettingDefinition<'boolean', boolean>
+  | EnumSettingDefinition
+
+type HasDefault = { default: SettingValueType }
+type IsRequired = { required: true }
+
+type OptionalSettingKeys<T extends SettingsDefinitionMap> = {
+  [K in keyof T]: T[K] extends HasDefault | IsRequired ? never : K
+}[keyof T]
+
+type NonOptionalSettingKeys<T extends SettingsDefinitionMap> = Exclude<
+  keyof T,
+  OptionalSettingKeys<T>
+>
 
 export type Settings<T extends SettingsDefinitionMap> = {
-  -readonly [K in keyof T as T[K] extends {
-    default: SettingValueType
-  }
-    ? K
-    : T[K]['required'] extends true
-      ? K
-      : never]: SettingType<T[K]>
+  -readonly [K in OptionalSettingKeys<T>]?: SettingType<T[K]>
 } & {
-  -readonly [K in keyof T as T[K] extends {
-    default: SettingValueType
-  }
-    ? never
-    : T[K]['required'] extends true
-      ? never
-      : K]?: SettingType<T[K]> | undefined
+  -readonly [K in NonOptionalSettingKeys<T>]: SettingType<T[K]>
 }
 
 export type BaseAdapterSettings = Settings<BaseSettingsDefinitionType>
