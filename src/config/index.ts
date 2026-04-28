@@ -486,7 +486,7 @@ export const getEnv = (
 }
 
 type SettingValueType = string | number | boolean
-type ConcreteSettingType<C extends SettingDefinition> = C['type'] extends 'string'
+type SettingTypeWhenPresent<C extends SettingDefinition> = C['type'] extends 'string'
   ? string
   : C['type'] extends 'number'
     ? number
@@ -498,36 +498,29 @@ type ConcreteSettingType<C extends SettingDefinition> = C['type'] extends 'strin
           : never
         : never
 type SettingType<C extends SettingDefinition> = C extends HasDefault | IsRequired
-  ? ConcreteSettingType<C>
-  : ConcreteSettingType<C> | undefined
+  ? SettingTypeWhenPresent<C>
+  : SettingTypeWhenPresent<C> | undefined
 
 export type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
-
-export type MaybeRequiredSettingDefinition =
-  | {
-      required?: false
-    }
-  | {
-      required: true
-    }
 
 export type SettingDefinitionBase = {
   description: string
   sensitive?: boolean
-} & MaybeRequiredSettingDefinition
+  required?: boolean
+}
 
 export type NonEnumSettingDefinition<TypeString, Type> = SettingDefinitionBase & {
   type: TypeString
-  options?: never
   default?: Type
   validate?: Validator<Type>
+  options?: never
 }
 
 export type EnumSettingDefinition = SettingDefinitionBase & {
   type: 'enum'
-  options: readonly string[]
   default?: string
   validate?: Validator<string>
+  options: readonly string[]
 }
 
 export type SettingDefinition =
