@@ -77,10 +77,6 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       req,
       adapter.config.settings,
     )
-    const fallbackTransportName = endpoint.getFallbackTransportNameForRequest(
-      req.requestContext.transportName,
-      adapter.config.settings,
-    )
 
     // Custom input validation defined in the EA
     const error =
@@ -110,12 +106,18 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       req.requestContext = { ...req.requestContext, meta: { metrics } }
     }
 
+    const fallbackTransportName = endpoint.getFallbackTransportNameForRequest(
+      req.requestContext.transportName,
+      adapter.config.settings,
+    )
+
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {
       if (fallbackTransportName) {
-        errorCatcherLogger.warn(
-          'Fallback transports ignored for endpoints with custom cache key generators',
-        )
+        throw new AdapterInputError({
+          message: 'fallbackTransport not supported for endpoints with cacheKeyGenerator',
+          statusCode: 404,
+        })
       }
 
       let cacheKey
@@ -135,23 +137,24 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
       req.requestContext.cacheKey = `${cachePrefix}${cacheKey}`
     } else {
-      req.requestContext.cacheKey = calculateCacheKey({
+      const commonCacheKeyParams = {
         data: req.requestContext.data,
         adapterName: adapter.name,
         endpointName: endpoint.name,
-        transportName: req.requestContext.transportName,
         adapterSettings: adapter.config.settings,
+      }
+
+      req.requestContext.cacheKey = calculateCacheKey({
+        ...commonCacheKeyParams,
+        transportName: req.requestContext.transportName,
       })
 
       if (fallbackTransportName) {
         req.requestContext.fallback = {
           transportName: fallbackTransportName,
           cacheKey: calculateCacheKey({
-            data: req.requestContext.data,
-            adapterName: adapter.name,
-            endpointName: endpoint.name,
+            ...commonCacheKeyParams,
             transportName: fallbackTransportName,
-            adapterSettings: adapter.config.settings,
           }),
         }
       }

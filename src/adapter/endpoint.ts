@@ -46,7 +46,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     settings: T['Settings'],
   ) => string
   defaultTransport?: string
-  fallbackTransport?: string
+  fallbackTransport?: Record<string, string>
 
   constructor(params: AdapterEndpointParams<T>) {
     this.name = params.name
@@ -56,7 +56,14 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       this.transportRoutes = params.transportRoutes
       this.customRouter = params.customRouter
       this.defaultTransport = params.defaultTransport
-      this.fallbackTransport = params.fallbackTransport?.toLowerCase()
+      this.fallbackTransport = params.fallbackTransport
+        ? Object.fromEntries(
+            Object.entries(params.fallbackTransport).map(([k, v]) => [
+              k.toLowerCase(),
+              v.toLowerCase(),
+            ]),
+          )
+        : undefined
     } else {
       this.transportRoutes = new TransportRoutes<T>().register(
         DEFAULT_TRANSPORT_NAME,
@@ -71,6 +78,25 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.customOutputValidation = params.customOutputValidation
     this.overrides = params.overrides
     this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
+
+    // Validate fallback structure if it's defined
+    Object.entries(this.fallbackTransport || {}).forEach(([primary, fallback]) => {
+      if (primary === fallback) {
+        throw new AdapterError({
+          statusCode: 400,
+          message: `Fallback transport "${fallback}" cannot be the same as primary transport.`,
+        })
+      }
+
+      if (!this.transportRoutes.get(fallback)) {
+        throw new AdapterError({
+          statusCode: 400,
+          message: `No fallback transport found for key "${fallback}", must be one of ${JSON.stringify(
+            this.transportRoutes.routeNames(),
+          )}`,
+        })
+      }
+    })
   }
 
   /**
@@ -194,26 +220,14 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       return
     }
 
-    const fallbackTransportName = this.fallbackTransport.toLowerCase()
+    const fallbackTransportName = this.fallbackTransport[primaryTransportName.toLowerCase()]
 
-    if (!this.transportRoutes.get(fallbackTransportName)) {
-      throw new AdapterError({
-        statusCode: 400,
-        message: `No fallback transport found for key "${fallbackTransportName}", must be one of ${JSON.stringify(
-          this.transportRoutes.routeNames(),
-        )}`,
-      })
+    if (fallbackTransportName) {
+      logger.debug(`Request can fall back to transport "${fallbackTransportName}"`)
+      return fallbackTransportName
+    } else {
+      logger.trace(`No fallback transport defined for "${primaryTransportName}"`)
     }
-
-    if (fallbackTransportName === primaryTransportName.toLowerCase()) {
-      throw new AdapterError({
-        statusCode: 400,
-        message: `Fallback transport "${fallbackTransportName}" cannot be the same as primary transport.`,
-      })
-    }
-
-    logger.debug(`Request can fall back to transport "${fallbackTransportName}"`)
-    return fallbackTransportName
   }
 
   /**

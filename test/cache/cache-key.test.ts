@@ -211,7 +211,7 @@ test.serial('builds fallback cache key from fallback transport name', async (t) 
           )
           .register('fallback', new NopTransport()),
         defaultTransport: 'primary',
-        fallbackTransport: 'fallback',
+        fallbackTransport: { primary: 'fallback' },
       }),
     ],
   })
@@ -225,7 +225,7 @@ test.serial('builds fallback cache key from fallback transport name', async (t) 
   )
 })
 
-test.serial('custom cache key generator ignores fallback transport', async (t) => {
+test.serial('custom cache key generator throws on fallback transport', async (t) => {
   const config = new AdapterConfig(
     {},
     {
@@ -265,7 +265,7 @@ test.serial('custom cache key generator ignores fallback transport', async (t) =
           )
           .register('fallback', new NopTransport()),
         defaultTransport: 'primary',
-        fallbackTransport: 'fallback',
+        fallbackTransport: { primary: 'fallback' },
       }),
     ],
   })
@@ -273,8 +273,11 @@ test.serial('custom cache key generator ignores fallback transport', async (t) =
 
   const response = await testAdapter.request({})
 
-  t.is(response.statusCode, 200)
-  t.is(response.json().result, 'test:custom_cache_key')
+  t.is(response.statusCode, 404)
+  t.is(
+    response.json().error.message,
+    'fallbackTransport not supported for endpoints with cacheKeyGenerator',
+  )
 })
 
 test.serial('custom cache key is truncated if over max size', async (t) => {

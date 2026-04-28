@@ -685,7 +685,19 @@ test.serial('fallback transport is ignored when disabled', (t) => {
     inputParameters,
     name: 'price',
     transportRoutes: transports,
-    fallbackTransport: 'invalid',
+    fallbackTransport: { batch: 'websocket' },
+  })
+  const config = new AdapterConfig(settings)
+  config.initialize()
+
+  t.is(endpoint.getFallbackTransportNameForRequest('batch', config.settings), undefined)
+})
+
+test.serial('fallback transport missing', (t) => {
+  const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
+    inputParameters,
+    name: 'price',
+    transportRoutes: transports,
   })
   const config = new AdapterConfig(settings)
   config.initialize()
@@ -698,7 +710,7 @@ test.serial('fallback transport is normalized when enabled', (t) => {
     inputParameters,
     name: 'price',
     transportRoutes: transports,
-    fallbackTransport: 'WEBSOCKET',
+    fallbackTransport: { BATCH: 'WEBSOCKET' },
   })
   const config = new AdapterConfig(settings, {
     envDefaultOverrides: {
@@ -710,43 +722,35 @@ test.serial('fallback transport is normalized when enabled', (t) => {
   t.is(endpoint.getFallbackTransportNameForRequest('batch', config.settings), 'websocket')
 })
 
-test.serial('fallback transport must be registered when enabled', (t) => {
-  const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
-    inputParameters,
-    name: 'price',
-    transportRoutes: transports,
-    fallbackTransport: 'invalid',
-  })
-  const config = new AdapterConfig(settings, {
-    envDefaultOverrides: {
-      TRANSPORT_FALLBACK_ENABLED: true,
+test.serial('fallback transport must be registered', async (t) => {
+  t.throws(
+    () =>
+      new AdapterEndpoint<BaseEndpointTypes>({
+        inputParameters,
+        name: 'price',
+        transportRoutes: transports,
+        fallbackTransport: { batch: 'invalid' },
+      }),
+    {
+      message:
+        'No fallback transport found for key "invalid", must be one of ["websocket","batch","sse"]',
     },
-  })
-  config.initialize()
-
-  t.throws(() => endpoint.getFallbackTransportNameForRequest('batch', config.settings), {
-    message:
-      'No fallback transport found for key "invalid", must be one of ["websocket","batch","sse"]',
-  })
+  )
 })
 
-test.serial('fallback transport cannot match primary transport', (t) => {
-  const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
-    inputParameters,
-    name: 'price',
-    transportRoutes: transports,
-    fallbackTransport: 'batch',
-  })
-  const config = new AdapterConfig(settings, {
-    envDefaultOverrides: {
-      TRANSPORT_FALLBACK_ENABLED: true,
+test.serial('fallback transport cannot match primary transport', async (t) => {
+  t.throws(
+    () =>
+      new AdapterEndpoint<BaseEndpointTypes>({
+        inputParameters,
+        name: 'price',
+        transportRoutes: transports,
+        fallbackTransport: { batch: 'batch' },
+      }),
+    {
+      message: 'Fallback transport "batch" cannot be the same as primary transport.',
     },
-  })
-  config.initialize()
-
-  t.throws(() => endpoint.getFallbackTransportNameForRequest('batch', config.settings), {
-    message: 'Fallback transport "batch" cannot be the same as primary transport.',
-  })
+  )
 })
 
 test.serial('transport override routes to correct Transport', async (t) => {

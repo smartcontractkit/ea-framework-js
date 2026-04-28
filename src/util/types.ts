@@ -39,6 +39,7 @@ export type AdapterRequestContext<T> = {
   cacheKey: string
 
   /** Fallback transport context to use if the primary transport is unable to return data */
+  // TODO: Implement using this
   fallback?: {
     transportName: string
     cacheKey: string
