@@ -450,7 +450,39 @@ export class Adapter<
     const endpoint = this.endpointsMap[req.requestContext.endpointName]
     const transport = endpoint.transportRoutes.get(req.requestContext.transportName)
 
-    return this.handleSingleTransportRequest(req, replySent, transport)
+    const { fallback } = req.requestContext
+    if (!fallback) {
+      return this.handleSingleTransportRequest(req, replySent, transport)
+    }
+
+    const fallbackReq = {
+      ...req,
+      requestContext: {
+        ...req.requestContext,
+        transportName: fallback.transportName,
+        cacheKey: fallback.cacheKey,
+      },
+    } as AdapterRequest<EmptyInputParameters>
+
+    const fallbackResponsePromise = this.handleSingleTransportRequest(
+      fallbackReq,
+      replySent,
+      endpoint.transportRoutes.get(fallback.transportName),
+    ).then(
+      (response) => ({ response }),
+      (error) => ({ error }),
+    )
+
+    try {
+      return await this.handleSingleTransportRequest(req, replySent, transport)
+    } catch (primaryError) {
+      const fallbackResult = await fallbackResponsePromise
+      if ('response' in fallbackResult) {
+        return fallbackResult.response
+      }
+
+      throw primaryError
+    }
   }
 
   private async handleSingleTransportRequest(
