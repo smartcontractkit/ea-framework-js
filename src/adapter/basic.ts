@@ -469,15 +469,17 @@ export class Adapter<
       replySent,
       endpoint.transportRoutes.get(fallback.transportName),
     )
+      .then((response) => ({ response }))
+      .catch((error) => ({ error }))
 
     try {
       return await this.handleSingleTransportRequest(req, replySent, transport)
     } catch (primaryError) {
-      try {
-        return await fallbackResponsePromise
-      } catch (_fallbackError) {
-        throw primaryError
+      const fallbackResponse = await fallbackResponsePromise
+      if ('response' in fallbackResponse) {
+        return fallbackResponse.response
       }
+      throw primaryError
     }
   }
 
