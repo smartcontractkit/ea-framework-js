@@ -21,6 +21,12 @@ export const BaseSettingsDefinition = {
     default: '/',
     sensitive: false,
   },
+  CACHE_LOCK_ENABLED: {
+    description:
+      'Flag to enable or disable the cache lock mechanism. When disabled, multiple adapter instances can write to the same cache keys concurrently.',
+    type: 'boolean',
+    default: true,
+  },
   CACHE_LOCK_DURATION: {
     description: 'Time (in ms) used as a baseline for the acquisition and extension of cache locks',
     type: 'number',
