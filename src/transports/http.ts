@@ -93,6 +93,9 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
     res: AxiosResponse<T['Provider']['ResponseBody']>,
     adapterSettings: T['Settings'],
   ) => ProviderResult<T>[]
+
+  // Optional custom sleep time for the background execute loop
+  backgroundSleepMs?: number
 }
 
 /**
@@ -189,6 +192,11 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     // We're not sleeping here on purpose. We sleep when there are no entries in the subscription set to avoid polling too
     // frequently, but if we have entries we want the background execute to be re-run ASAP so we can prepare the next batch
     // of requests, and the sleep to rate-limit will be performed by the rate-limiter in the Requester.
+    // Unless config.backgroundSleepMs is set
+    if (this.config.backgroundSleepMs) {
+      logger.trace(`Sleep ${this.config.backgroundSleepMs}ms - config.backgroundSleepMs`)
+      await sleep(this.config.backgroundSleepMs)
+    }
     return
   }
 

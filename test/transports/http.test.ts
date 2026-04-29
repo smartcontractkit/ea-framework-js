@@ -93,8 +93,12 @@ const BACKGROUND_EXECUTE_MS_HTTP = 1000
 class MockHttpTransport extends HttpTransport<HttpTransportTypes> {
   backgroundExecuteCalls = 0
 
-  constructor(private callSuper = false) {
+  constructor(
+    private callSuper = false,
+    backgroundSleepMs?: number,
+  ) {
     super({
+      backgroundSleepMs,
       prepareRequests: (params) => ({
         params,
         request: {
@@ -202,6 +206,45 @@ test.serial('sends request to DP and returns response', async (t) => {
     },
   })
 })
+
+test.serial(
+  'backgroundSleepMs delays data provider requests until the configured sleep has elapsed on the fake clock',
+  async (t) => {
+    const bgSleepMs = 2_000
+    const fromSymbol = 'BGSLEEPCHK'
+    let dataProviderRequests = 0
+
+    axiosMock
+      .onPost(URL + endpoint, {
+        pairs: [{ base: fromSymbol, quote: to }],
+      })
+      .reply(() => {
+        dataProviderRequests++
+        return [200, {}]
+      })
+
+    const adapter = new Adapter({
+      name: 'TEST',
+      defaultEndpoint: 'test',
+      endpoints: [
+        new AdapterEndpoint({
+          name: 'test',
+          inputParameters,
+          transport: new MockHttpTransport(true, bgSleepMs),
+        }),
+      ],
+    })
+
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+    await testAdapter.request({ from: fromSymbol, to })
+
+    t.is(dataProviderRequests, 0)
+    await runAllUntilTime(t.context.clock, bgSleepMs / 2)
+    t.is(dataProviderRequests, 0)
+    await runAllUntilTime(t.context.clock, bgSleepMs)
+    t.is(dataProviderRequests, 1)
+  },
+)
 
 test.serial(
   'per minute rate limit of 4 with one batch transport results in a call every 15s',
