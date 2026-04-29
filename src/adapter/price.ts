@@ -145,9 +145,15 @@ export class PriceAdapter<
           includesDetails?.endpoints === undefined ||
           includesDetails?.endpoints?.includes(req.requestContext.endpointName)
         ) {
+
           if (includesDetails) {
             requestData.base = includesDetails.from || requestData.base
             requestData.quote = includesDetails.to || requestData.quote
+          }
+
+          if (this.config.settings.ASSET_CASE_INSENSITIVE) {
+            requestData.base = requestData.base.toLowerCase()
+            requestData.quote = requestData.quote.toLowerCase()
           }
 
           const inverse = includesDetails?.inverse || false
