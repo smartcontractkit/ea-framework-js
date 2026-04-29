@@ -46,6 +46,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     settings: T['Settings'],
   ) => string
   defaultTransport?: string
+  fallbackTransport?: Record<string, string>
 
   constructor(params: AdapterEndpointParams<T>) {
     this.name = params.name
@@ -55,6 +56,14 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       this.transportRoutes = params.transportRoutes
       this.customRouter = params.customRouter
       this.defaultTransport = params.defaultTransport
+      this.fallbackTransport = params.fallbackTransport
+        ? Object.fromEntries(
+            Object.entries(params.fallbackTransport).map(([k, v]) => [
+              k.toLowerCase(),
+              v.toLowerCase(),
+            ]),
+          )
+        : undefined
     } else {
       this.transportRoutes = new TransportRoutes<T>().register(
         DEFAULT_TRANSPORT_NAME,
@@ -69,6 +78,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.customOutputValidation = params.customOutputValidation
     this.overrides = params.overrides
     this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
+
+    this.validateFallbackTransport()
   }
 
   /**
@@ -186,6 +197,22 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     return transportName
   }
 
+  getFallbackTransportNameForRequest(primaryTransportName: string, settings: T['Settings']) {
+    if (!settings.TRANSPORT_FALLBACK_ENABLED || !this.fallbackTransport) {
+      logger.trace('TRANSPORT_FALLBACK_ENABLED is false or fallbackTransport is not set')
+      return
+    }
+
+    const fallbackTransportName = this.fallbackTransport[primaryTransportName.toLowerCase()]
+
+    if (fallbackTransportName) {
+      logger.debug(`Request can fall back to transport "${fallbackTransportName}"`)
+      return fallbackTransportName
+    } else {
+      logger.trace(`No fallback transport defined for "${primaryTransportName}"`)
+    }
+  }
+
   /**
    * Default routing strategy. Will try and use the transport override if present
    * or transport input parameter in the request body.
@@ -204,5 +231,41 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       return requestOverrides['transport']
     }
     return rawRequestBody.data?.transport
+  }
+
+  private validateFallbackTransport() {
+    if (this.cacheKeyGenerator && this.fallbackTransport) {
+      throw new AdapterError({
+        message: 'fallbackTransport not allowed for endpoints with cacheKeyGenerator',
+        statusCode: 404,
+      })
+    }
+
+    Object.entries(this.fallbackTransport || {}).forEach(([primary, fallback]) => {
+      if (primary === fallback) {
+        throw new AdapterError({
+          statusCode: 400,
+          message: `Fallback transport "${fallback}" cannot be the same as primary transport.`,
+        })
+      }
+
+      if (!this.transportRoutes.get(primary)) {
+        throw new AdapterError({
+          statusCode: 400,
+          message: `No primary transport found for key "${primary}", must be one of ${JSON.stringify(
+            this.transportRoutes.routeNames(),
+          )}`,
+        })
+      }
+
+      if (!this.transportRoutes.get(fallback)) {
+        throw new AdapterError({
+          statusCode: 400,
+          message: `No fallback transport found for key "${fallback}", must be one of ${JSON.stringify(
+            this.transportRoutes.routeNames(),
+          )}`,
+        })
+      }
+    })
   }
 }

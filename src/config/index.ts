@@ -276,6 +276,11 @@ export const BaseSettingsDefinition = {
     default: 200,
     validate: validator.integer({ min: 10, max: 1000 }),
   },
+  TRANSPORT_FALLBACK_ENABLED: {
+    description: 'Flag to enable endpoint fallback transports when configured',
+    type: 'boolean',
+    default: false,
+  },
   DEFAULT_CACHE_KEY: {
     description: 'Default key to be used when one cannot be determined from request parameters',
     type: 'string',

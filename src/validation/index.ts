@@ -125,14 +125,31 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
       req.requestContext.cacheKey = `${cachePrefix}${cacheKey}`
     } else {
-      const transportName = req.requestContext.transportName
-      req.requestContext.cacheKey = calculateCacheKey({
+      const commonCacheKeyParams = {
         data: req.requestContext.data,
         adapterName: adapter.name,
         endpointName: endpoint.name,
-        transportName,
         adapterSettings: adapter.config.settings,
+      }
+
+      req.requestContext.cacheKey = calculateCacheKey({
+        ...commonCacheKeyParams,
+        transportName: req.requestContext.transportName,
       })
+
+      const fallbackTransportName = endpoint.getFallbackTransportNameForRequest(
+        req.requestContext.transportName,
+        adapter.config.settings,
+      )
+      if (fallbackTransportName) {
+        req.requestContext.fallback = {
+          transportName: fallbackTransportName,
+          cacheKey: calculateCacheKey({
+            ...commonCacheKeyParams,
+            transportName: fallbackTransportName,
+          }),
+        }
+      }
     }
 
     done()

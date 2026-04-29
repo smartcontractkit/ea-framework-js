@@ -6,7 +6,7 @@ import MockAdapter from 'axios-mock-adapter'
 import { Adapter, AdapterEndpoint } from '../../src/adapter'
 import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { Metrics, retrieveCost } from '../../src/metrics'
-import { HttpTransport } from '../../src/transports'
+import { HttpTransport, TransportRoutes } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../../src/util/testing-utils'
 
@@ -56,8 +56,8 @@ type RestEndpointTypes = {
 
 const endpoint = '/price'
 
-const createAdapterEndpoint = (): AdapterEndpoint<RestEndpointTypes> => {
-  const restEndpointTransport = new HttpTransport<RestEndpointTypes>({
+const createRestTransport = (shouldFail: boolean) =>
+  new HttpTransport<RestEndpointTypes>({
     prepareRequests: (params) => {
       return params.map((req) => ({
         params: [req],
@@ -73,28 +73,35 @@ const createAdapterEndpoint = (): AdapterEndpoint<RestEndpointTypes> => {
       }))
     },
     parseResponse: (params, res) => {
-      return [
-        {
-          params: params[0],
-          response: {
-            data: res.data,
-            statusCode: 200,
-            result: res.data.price,
-            timestamps: {
-              providerIndicatedTimeUnixMs: Date.now() - 100,
+      return shouldFail && params[0].from === 'fail'
+        ? []
+        : [
+            {
+              params: params[0],
+              response: {
+                data: res.data,
+                statusCode: 200,
+                result: res.data.price,
+                timestamps: {
+                  providerIndicatedTimeUnixMs: Date.now() - 100,
+                },
+              },
             },
-          },
-        },
-      ]
+          ]
     },
   })
 
-  return new AdapterEndpoint({
+const createAdapterEndpoint = () =>
+  new AdapterEndpoint({
     name: 'TEST',
     inputParameters,
-    transport: restEndpointTransport,
+    transportRoutes: new TransportRoutes<RestEndpointTypes>()
+      .register('rest', createRestTransport(true))
+      .register('restprimary', createRestTransport(true))
+      .register('restfallback', createRestTransport(false)),
+    defaultTransport: 'rest',
+    fallbackTransport: { restprimary: 'restfallback' },
   })
-}
 
 const from = 'ETH'
 const to = 'USD'
@@ -103,6 +110,7 @@ const price = 1234
 test.before(async (t) => {
   t.context.clock = installTimers()
   process.env['METRICS_ENABLED'] = 'true'
+  process.env['TRANSPORT_FALLBACK_ENABLED'] = 'true'
   const config = new AdapterConfig(
     {},
     {
@@ -192,7 +200,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_set_count',
     labels: {
       feed_id,
-      participant_id: `TEST-test-default_single_transport-${feed_id}`,
+      participant_id: `TEST-test-rest-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 2,
@@ -202,7 +210,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_max_age',
     labels: {
       feed_id,
-      participant_id: `TEST-test-default_single_transport-${feed_id}`,
+      participant_id: `TEST-test-rest-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 90000,
@@ -212,7 +220,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_staleness_seconds',
     labels: {
       feed_id,
-      participant_id: `TEST-test-default_single_transport-${feed_id}`,
+      participant_id: `TEST-test-rest-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 0,
@@ -265,7 +273,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_get_count',
     labels: {
       feed_id,
-      participant_id: `TEST-test-default_single_transport-${feed_id}`,
+      participant_id: `TEST-test-rest-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 1,
@@ -275,7 +283,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_get_values',
     labels: {
       feed_id,
-      participant_id: `TEST-test-default_single_transport-${feed_id}`,
+      participant_id: `TEST-test-rest-${feed_id}`,
       cache_type: 'local',
     },
     expectedValue: 1234,
@@ -285,7 +293,7 @@ test.serial('test basic metrics', async (t) => {
     name: 'cache_data_staleness_seconds',
     labels: {
       feed_id,
-      participant_id: `TEST-test-default_single_transport-${feed_id}`,
+      participant_id: `TEST-test-rest-${feed_id}`,
       cache_type: 'local',
     },
   })
@@ -332,6 +340,30 @@ test.serial('validate response.meta has the correct properties', async (t) => {
   t.deepEqual(response.meta, {
     adapterName: 'TEST',
     metrics: { feedId: '{"from":"eth","to":"usd"}' },
+    transportName: 'rest',
+  })
+})
+
+test.serial('validate response.meta uses fallback transport', async (t) => {
+  axiosMock
+    .onGet(`${URL}${endpoint}`, {
+      params: {
+        base: 'fail',
+        quote: to,
+      },
+    })
+    .reply(200, {
+      price,
+    })
+
+  const response = (
+    await t.context.testAdapter.request({ from: 'fail', to, transport: 'restprimary' })
+  ).json()
+
+  t.deepEqual(response.meta, {
+    adapterName: 'TEST',
+    metrics: { feedId: '{"from":"fail","to":"usd"}' },
+    transportName: 'restfallback',
   })
 })
 

@@ -15,6 +15,7 @@ import {
   highestRateLimitTiers,
 } from '../rate-limiting'
 import { RateLimiterFactory, RateLimitingStrategy } from '../rate-limiting/factory'
+import { Transport } from '../transports'
 import {
   AdapterRequest,
   AdapterResponse,
@@ -449,6 +450,44 @@ export class Adapter<
     const endpoint = this.endpointsMap[req.requestContext.endpointName]
     const transport = endpoint.transportRoutes.get(req.requestContext.transportName)
 
+    const { fallback } = req.requestContext
+    if (!fallback) {
+      return this.handleSingleTransportRequest(req, replySent, transport)
+    }
+
+    const fallbackReq = {
+      ...req,
+      requestContext: {
+        ...req.requestContext,
+        transportName: fallback.transportName,
+        cacheKey: fallback.cacheKey,
+      },
+    } as AdapterRequest<EmptyInputParameters>
+
+    const fallbackResponsePromise = this.handleSingleTransportRequest(
+      fallbackReq,
+      replySent,
+      endpoint.transportRoutes.get(fallback.transportName),
+    )
+      .then((response) => ({ response }))
+      .catch((error) => ({ error }))
+
+    try {
+      return await this.handleSingleTransportRequest(req, replySent, transport)
+    } catch (primaryError) {
+      const fallbackResponse = await fallbackResponsePromise
+      if ('response' in fallbackResponse) {
+        return fallbackResponse.response
+      }
+      throw primaryError
+    }
+  }
+
+  private async handleSingleTransportRequest(
+    req: AdapterRequest<EmptyInputParameters>,
+    replySent: Promise<unknown>,
+    transport: Transport<EndpointGenerics>,
+  ): Promise<Readonly<AdapterResponse>> {
     // First try to find the response in our cache, keep it ready
     const cachedResponse = await this.findResponseInCache(req)
 

@@ -2,6 +2,7 @@ import untypedTest, { TestFn } from 'ava'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../../src/adapter'
 import { Cache, calculateCacheKey } from '../../src/cache'
 import { AdapterConfig, BaseAdapterSettings, BaseSettingsDefinition } from '../../src/config'
+import { TransportRoutes } from '../../src/transports'
 import { AdapterRequest, AdapterResponse } from '../../src/util'
 import { NopTransport, NopTransportTypes, TestAdapter } from '../../src/util/testing-utils'
 import { InputParameters } from '../../src/validation'
@@ -170,6 +171,58 @@ test.serial('custom cache key', async (t) => {
     endpoint: 'test-custom-cache-key',
   })
   t.is(response.json().result, 'test:custom_cache_key')
+})
+
+test.serial('builds fallback cache key from fallback transport name', async (t) => {
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        TRANSPORT_FALLBACK_ENABLED: true,
+      },
+    },
+  )
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test-fallback-cache-key',
+    config,
+    endpoints: [
+      new AdapterEndpoint<NopTransportTypes>({
+        name: 'test-fallback-cache-key',
+        transportRoutes: new TransportRoutes<NopTransportTypes>()
+          .register(
+            'primary',
+            new (class extends NopTransport {
+              override async foregroundExecute(
+                req: AdapterRequest<NopTransportTypes['Parameters']>,
+              ) {
+                return {
+                  data: null,
+                  statusCode: 200,
+                  result: req.requestContext.fallback?.cacheKey as unknown as null,
+                  timestamps: {
+                    providerDataRequestedUnixMs: 0,
+                    providerDataReceivedUnixMs: 0,
+                    providerIndicatedTimeUnixMs: undefined,
+                  },
+                }
+              }
+            })(),
+          )
+          .register('fallback', new NopTransport()),
+        defaultTransport: 'primary',
+        fallbackTransport: { primary: 'fallback' },
+      }),
+    ],
+  })
+  const testAdapter = await TestAdapter.start(adapter, t.context)
+
+  const response = await testAdapter.request({})
+
+  t.is(
+    response.json().result,
+    `TEST-test-fallback-cache-key-fallback-${BaseSettingsDefinition.DEFAULT_CACHE_KEY.default}`,
+  )
 })
 
 test.serial('custom cache key is truncated if over max size', async (t) => {
