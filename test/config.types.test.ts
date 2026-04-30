@@ -1,5 +1,5 @@
 import test from 'ava'
-import { SettingsDefinitionMap, SettingDefinition, Settings } from '../src/config'
+import { AdapterConfig, SettingDefinition, Settings } from '../src/config'
 
 // This file has type declarations that test the types of the config system at
 // compile time.
@@ -158,7 +158,7 @@ const _settingsType: ExpectEqual<
 void _settingsType
 
 // Reproduces the bug from `packages/sources/liveart/src/config/index.ts`.
-// Annotating the variable with the default `SettingsDefinitionMap` (no
+// Annotating the variable with the default `AdapterConfig` (no
 // inferred generic) widens the settings map to `Record<string,
 // SettingDefinition>`. Any custom setting then resolves via an index
 // signature whose value type is the full `SettingType<SettingDefinition>`
@@ -168,20 +168,19 @@ void _settingsType
 // distributive over `SettingDefinition`), which silently allowed values
 // like `adapterSettings.API_BASE_URL` to be passed into stricter types
 // such as Axios's `baseURL: string | undefined`.
-const wideConfig: SettingsDefinitionMap = {
+const wideConfig: AdapterConfig = new AdapterConfig({
   API_BASE_URL: {
     type: 'string',
     description: 'API base URL',
     required: true,
     default: 'https://example.com',
   },
-}
-void wideConfig
+})
 
-const _wideConfigAccess: ExpectEqual<
-  Settings<typeof wideConfig>['API_BASE_URL'],
-  string | number | boolean | undefined
-> = true
+wideConfig.initialize()
+
+// @ts-expect-error TS2339: Property 'API_BASE_URL' does not exist on type 'AdapterConfig<SettingsDefinitionMap>'.
+const _wideConfigAccess = wideConfig.settings.API_BASE_URL
 void _wideConfigAccess
 
 // The tests below are not directly a test of the config types, but it

@@ -532,14 +532,22 @@ export type SettingDefinition =
 type HasDefault = { default: SettingValueType }
 type IsRequired = { required: true }
 
-type OptionalSettingKeys<T extends SettingsDefinitionMap> = {
-  [K in keyof T]: T[K] extends HasDefault | IsRequired ? never : K
+type IsOptional = {
+  default?: never
+  required?: false
+  // With just `default` and `required` both optional, the type matches `{}`,
+  // which means it's a weak type which gets treated differently by TypeScript.
+  // So we add `description`, which is anyway guaranteed to be present.
+  description: string
+}
+
+type NonOptionalSettingKeys<T extends SettingsDefinitionMap> = {
+  [K in keyof T]: T[K] extends HasDefault | IsRequired ? K : never
 }[keyof T]
 
-type NonOptionalSettingKeys<T extends SettingsDefinitionMap> = Exclude<
-  keyof T,
-  OptionalSettingKeys<T>
->
+type OptionalSettingKeys<T extends SettingsDefinitionMap> = {
+  [K in keyof T]: T[K] extends IsOptional ? K : never
+}[keyof T]
 
 export type Settings<T extends SettingsDefinitionMap> = {
   -readonly [K in OptionalSettingKeys<T>]?: SettingType<T[K]>
