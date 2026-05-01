@@ -537,18 +537,7 @@ export class EnvGetter<
     this.settingsDefinition = settingsDefinition
     this.prefix = prefix
 
-    if (!name.includes(settingsDefinition.variablePlaceholder)) {
-      throw new Error(
-        `Placeholder '${settingsDefinition.variablePlaceholder}' must occur in setting name '${name}'.`,
-      )
-    }
-
-    // If the setting name is 'NETWORK_RPC_URL' and `variablePlaceholder` is
-    // 'NETWORK', then `namePattern` will be /([A-Z0-9_]+)_RPC_URL/ to match
-    // all relevant environment variables and extract the variable part.
-    const namePattern = new RegExp(
-      `^${getEnvName(name, prefix).replace(settingsDefinition.variablePlaceholder, '([A-Z0-9_]+)')}$`,
-    )
+    const namePattern = this.getNamePattern(name, settingsDefinition.variablePlaceholder, prefix)
     for (const [envVarName, value] of Object.entries(process.env)) {
       const match = envVarName.match(namePattern)
       if (!match) {
@@ -567,6 +556,30 @@ export class EnvGetter<
         }
       }
     }
+  }
+
+  // If the setting name is 'NETWORK_RPC_URL' and `variablePlaceholder` is
+  // 'NETWORK', then `namePattern` will be /([A-Z0-9_]+)_RPC_URL/ to match
+  // all relevant environment variables and extract the variable part.
+  getNamePattern(name: string, placeholder: string, prefix: string) {
+    if (!name.includes(placeholder)) {
+      throw new Error(`Placeholder '${placeholder}' must occur in setting name '${name}'.`)
+    }
+
+    let nameForPattern = name
+    let placeholderForPattern = placeholder
+    if ((prefix ?? '').includes(placeholder)) {
+      // Use a placeholder that's definitely not part of the prefix.
+      placeholderForPattern = `___${prefix}___`
+      nameForPattern = name.replace(placeholder, placeholderForPattern)
+    }
+
+    // We can't inject the regexp before calling getEnvName because getEnvName
+    // checks for valid characters. So we made sure we use a placeholder that
+    // doesn't interfere with the prefix.
+    return new RegExp(
+      `^${getEnvName(nameForPattern, prefix).replace(placeholderForPattern, '([A-Z0-9_]+)')}$`,
+    )
   }
 
   get(variable: string): SettingType<T> {

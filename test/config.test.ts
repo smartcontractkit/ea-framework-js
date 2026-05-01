@@ -539,14 +539,14 @@ test.serial('Setting name must not have invalid characters', async (t) => {
   } catch (error) {
     t.is(
       (error as Error).message,
-      'Invalid environment var name: NETWORK-RPC-URL. Only \'/^[_a-z0-9]+$/i\' is supported.',
+      "Invalid environment var name: NETWORK-RPC-URL. Only '/^[_a-z0-9]+$/i' is supported.",
     )
   }
 })
 
 test.serial('Setting name must contain placeholder', async (t) => {
   const customSettings = {
-    'NETWORK_RPC_URL': {
+    NETWORK_RPC_URL: {
       description: 'RPC URL for the given network',
       type: 'string',
       variablePlaceholder: 'CHAIN',
@@ -559,7 +559,24 @@ test.serial('Setting name must contain placeholder', async (t) => {
   } catch (error) {
     t.is(
       (error as Error).message,
-      'Placeholder \'CHAIN\' must occur in setting name \'NETWORK_RPC_URL\'.',
+      "Placeholder 'CHAIN' must occur in setting name 'NETWORK_RPC_URL'.",
     )
   }
+})
+
+test.serial('Placeholder must not replace prefix', async (t) => {
+  const value = 'setting value'
+  process.env['PREFIX_FOO_SETTING'] = value
+  process.env['PFOOIX_REF_SETTING'] = 'wrong value'
+  const envVarsPrefix = 'PREFIX'
+  const customSettings = {
+    REF_SETTING: {
+      description: 'A settings with a placeholder that is a substring of the prefix',
+      type: 'string',
+      variablePlaceholder: 'REF',
+    },
+  } as const
+  const config = new AdapterConfig(customSettings, { envVarsPrefix })
+  config.initialize()
+  t.is(config.settings.REF_SETTING.get('foo'), value)
 })
