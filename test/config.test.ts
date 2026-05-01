@@ -523,3 +523,43 @@ test.serial('Get variable env var entries', async (t) => {
     },
   ])
 })
+
+test.serial('Setting name must not have invalid characters', async (t) => {
+  const customSettings = {
+    'NETWORK-RPC-URL': {
+      description: 'RPC URL for the given network',
+      type: 'string',
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+  try {
+    const config = new AdapterConfig(customSettings)
+    config.initialize()
+    t.fail()
+  } catch (error) {
+    t.is(
+      (error as Error).message,
+      'Invalid environment var name: NETWORK-RPC-URL. Only \'/^[_a-z0-9]+$/i\' is supported.',
+    )
+  }
+})
+
+test.serial('Setting name must contain placeholder', async (t) => {
+  const customSettings = {
+    'NETWORK_RPC_URL': {
+      description: 'RPC URL for the given network',
+      type: 'string',
+      variablePlaceholder: 'CHAIN',
+    },
+  } as const
+  try {
+    const config = new AdapterConfig(customSettings)
+    config.initialize()
+    t.fail()
+  } catch (error) {
+    t.is(
+      (error as Error).message,
+      'Placeholder \'CHAIN\' must occur in setting name \'NETWORK_RPC_URL\'.',
+    )
+  }
+})

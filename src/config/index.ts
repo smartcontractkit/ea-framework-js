@@ -537,6 +537,12 @@ export class EnvGetter<
     this.settingsDefinition = settingsDefinition
     this.prefix = prefix
 
+    if (!name.includes(settingsDefinition.variablePlaceholder)) {
+      throw new Error(
+        `Placeholder '${settingsDefinition.variablePlaceholder}' must occur in setting name '${name}'.`,
+      )
+    }
+
     // If the setting name is 'NETWORK_RPC_URL' and `variablePlaceholder` is
     // 'NETWORK', then `namePattern` will be /([A-Z0-9_]+)_RPC_URL/ to match
     // all relevant environment variables and extract the variable part.
