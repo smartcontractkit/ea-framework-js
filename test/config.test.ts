@@ -193,6 +193,7 @@ test.serial('sensitive configuration constants are properly flagged', (t) => {
 test.serial('API_KEY prefix/suffix settings are always censored', (t) => {
   process.env['API_KEY_PRIMARY'] = 'prefixed-key'
   process.env['PRIMARY_API_KEY'] = 'suffixed-key'
+  process.env['ETHEREUM_API_KEY'] = 'variable-env-var'
   process.env['NOT_SECRET'] = 'plain-value'
   const customSettings: SettingsDefinitionMap = {
     API_KEY_PRIMARY: {
@@ -203,6 +204,12 @@ test.serial('API_KEY prefix/suffix settings are always censored', (t) => {
     PRIMARY_API_KEY: {
       description: 'API key suffix that is mistakenly marked as insensitive',
       type: 'string',
+      sensitive: false,
+    },
+    NETWORK_API_KEY: {
+      description: 'Variable API key that is mistakenly marked as insensitive',
+      type: 'string',
+      variablePlaceholder: 'NETWORK',
       sensitive: false,
     },
     NOT_SECRET: {
@@ -225,10 +232,12 @@ test.serial('API_KEY prefix/suffix settings are always censored', (t) => {
   const settingsList = buildSettingsList(adapter)
   const apiKeyPrimary = settingsList.find((entry) => entry.name === 'API_KEY_PRIMARY')
   const primaryApiKey = settingsList.find((entry) => entry.name === 'PRIMARY_API_KEY')
+  const ethereumApiKey = settingsList.find((entry) => entry.name === 'ETHEREUM_API_KEY')
   const notSecret = settingsList.find((entry) => entry.name === 'NOT_SECRET')
 
   t.is(apiKeyPrimary?.value, '[API_KEY_PRIMARY REDACTED]')
   t.is(primaryApiKey?.value, '[PRIMARY_API_KEY REDACTED]')
+  t.is(ethereumApiKey?.value, '[ETHEREUM_API_KEY REDACTED]')
   t.is(notSecret?.value, 'plain-value')
 })
 
@@ -268,4 +277,306 @@ test.serial('multiline sensitive configuration constants are properly redacted',
   t.assert(settingEntries.length === 1)
   const settingEntry = settingEntries[0]
   t.assert(settingEntry.value === '[PRIVATE_KEY REDACTED]')
+})
+
+test.serial('Get optional variable env var', async (t) => {
+  const url = 'https://ethereum.rpc.url'
+  process.env['ETHEREUM_RPC_URL'] = url
+  const customSettings = {
+    NETWORK_RPC_URL: {
+      description: 'RPC URL for the given network',
+      type: 'string',
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings)
+  config.initialize()
+  config.validate()
+  t.is(config.settings.NETWORK_RPC_URL.get('ethereum'), url)
+  t.is(config.settings.NETWORK_RPC_URL.get('arbitrum'), undefined)
+})
+
+test.serial('Get required variable env var', async (t) => {
+  const url = 'https://ethereum.rpc.url'
+  process.env['ETHEREUM_RPC_URL'] = url
+  const customSettings = {
+    NETWORK_RPC_URL: {
+      description: 'RPC URL for the given network',
+      type: 'string',
+      required: true,
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings)
+  config.initialize()
+  config.validate()
+  t.is(config.settings.NETWORK_RPC_URL.get('ethereum'), url)
+  try {
+    config.settings.NETWORK_RPC_URL.get('arbitrum')
+    t.fail()
+  } catch (error) {
+    t.is((error as Error).message, 'Missing required environment variable: ARBITRUM_RPC_URL')
+  }
+})
+
+test.serial('Get variable env var with default', async (t) => {
+  const url = 'https://ethereum.rpc.url'
+  const defaultUrl = 'https://default.rpc.url'
+  process.env['ETHEREUM_RPC_URL'] = url
+  const customSettings = {
+    NETWORK_RPC_URL: {
+      description: 'RPC URL for the given network',
+      type: 'string',
+      default: defaultUrl,
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings)
+  config.initialize()
+  config.validate()
+  t.is(config.settings.NETWORK_RPC_URL.get('ethereum'), url)
+  t.is(config.settings.NETWORK_RPC_URL.get('arbitrum'), defaultUrl)
+})
+
+test.serial('Get variable env var with non-word character', async (t) => {
+  const url = 'https://ethereum.rpc.url'
+  process.env['ETHEREUM_1_RPC_URL'] = url
+  const customSettings = {
+    NETWORK_RPC_URL: {
+      description: 'RPC URL for the given network',
+      type: 'string',
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings)
+  config.initialize()
+  config.validate()
+  t.is(config.settings.NETWORK_RPC_URL.get('ethereum-1'), url)
+})
+
+test.serial('Get number variable env var', async (t) => {
+  process.env['ETHEREUM_RPC_CHAIN_ID'] = '1'
+  process.env['ARBITRUM_RPC_CHAIN_ID'] = '42161'
+  const customSettings = {
+    NETWORK_RPC_CHAIN_ID: {
+      description: 'Chain ID for the given network',
+      type: 'number',
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings)
+  config.initialize()
+  config.validate()
+  t.is(config.settings.NETWORK_RPC_CHAIN_ID.get('ethereum'), 1)
+  t.is(config.settings.NETWORK_RPC_CHAIN_ID.get('arbitrum'), 42161)
+})
+
+test.serial('Validate number variable env var', async (t) => {
+  process.env['ETHEREUM_RPC_CHAIN_ID'] = '-1'
+  const customSettings = {
+    NETWORK_RPC_CHAIN_ID: {
+      description: 'Chain ID for the given network',
+      type: 'number',
+      variablePlaceholder: 'NETWORK',
+      validate: validator.integer({ min: 1, max: 10000000 }),
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings)
+  config.initialize()
+  try {
+    config.validate()
+    t.fail()
+  } catch (error) {
+    t.is(
+      (error as Error).message,
+      'Validation failed for the following variables:\nETHEREUM_RPC_CHAIN_ID: Minimum allowed value is 1. Received -1',
+    )
+  }
+})
+
+test.serial('Get enum variable env var', async (t) => {
+  process.env['ETHEREUM_NETWORK_TYPE'] = 'mainnet'
+  process.env['SEPOLIA_NETWORK_TYPE'] = 'testnet'
+  const customSettings = {
+    NETWORK_NETWORK_TYPE: {
+      description: 'Network type for the given blockchain',
+      type: 'enum',
+      options: ['mainnet', 'testnet'],
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings)
+  config.initialize()
+  config.validate()
+  t.is(config.settings.NETWORK_NETWORK_TYPE.get('ethereum'), 'mainnet')
+  t.is(config.settings.NETWORK_NETWORK_TYPE.get('sepolia'), 'testnet')
+})
+
+test.serial('Validate enum variable env var', async (t) => {
+  process.env['SEPOLIA_NETWORK_TYPE'] = 'not_a_valid_option'
+  const customSettings = {
+    NETWORK_NETWORK_TYPE: {
+      description: 'Network type for the given blockchain',
+      type: 'enum',
+      options: ['mainnet', 'testnet'],
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings)
+  try {
+    config.initialize()
+    t.fail()
+  } catch (error) {
+    t.is(
+      (error as Error).message,
+      'Env var "SEPOLIA_NETWORK_TYPE" has value "not_a_valid_option" which is not included in the valid options (mainnet,testnet)',
+    )
+  }
+})
+
+test.serial('Validate enum variable env var with prefix', async (t) => {
+  process.env['PREFIX_ETHEREUM_NETWORK_TYPE'] = 'mainnet'
+  process.env['PREFIX_SEPOLIA_NETWORK_TYPE'] = 'not-valid'
+  const envVarsPrefix = 'PREFIX'
+  const customSettings = {
+    NETWORK_NETWORK_TYPE: {
+      description: 'Network type for the given blockchain',
+      type: 'enum',
+      options: ['mainnet', 'testnet'],
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings, { envVarsPrefix })
+  try {
+    config.initialize()
+    t.fail()
+  } catch (error) {
+    t.is(
+      (error as Error).message,
+      'Env var "SEPOLIA_NETWORK_TYPE" has value "not-valid" which is not included in the valid options (mainnet,testnet)',
+    )
+  }
+})
+
+test.serial('Validate enum env var with prefix', async (t) => {
+  process.env['PREFIX_SEPOLIA_NETWORK_TYPE'] = 'not-valid'
+  const envVarsPrefix = 'PREFIX'
+  const customSettings = {
+    SEPOLIA_NETWORK_TYPE: {
+      description: 'Network type for sepolia',
+      type: 'enum',
+      options: ['mainnet', 'testnet'],
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings, { envVarsPrefix })
+  try {
+    config.initialize()
+    t.fail()
+  } catch (error) {
+    t.is(
+      (error as Error).message,
+      'Env var "SEPOLIA_NETWORK_TYPE" has value "not-valid" which is not included in the valid options (mainnet,testnet)',
+    )
+  }
+})
+
+test.serial('Get variable env var entries', async (t) => {
+  process.env['PREFIX_ETHEREUM_NETWORK_TYPE'] = 'mainnet'
+  process.env['PREFIX_SEPOLIA_NETWORK_TYPE'] = 'testnet'
+  const envVarsPrefix = 'PREFIX'
+  const customSettings = {
+    NETWORK_NETWORK_TYPE: {
+      description: 'Network type for the given blockchain',
+      type: 'enum',
+      options: ['mainnet', 'testnet'],
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings, { envVarsPrefix })
+  config.initialize()
+  config.validate()
+  t.deepEqual(config.settings.NETWORK_NETWORK_TYPE.entries(), [
+    {
+      envVarName: 'PREFIX_ETHEREUM_NETWORK_TYPE',
+      settingKey: 'NETWORK_NETWORK_TYPE',
+      settingName: 'ETHEREUM_NETWORK_TYPE',
+      value: 'mainnet',
+      variable: 'ETHEREUM',
+    },
+    {
+      envVarName: 'PREFIX_SEPOLIA_NETWORK_TYPE',
+      settingKey: 'NETWORK_NETWORK_TYPE',
+      settingName: 'SEPOLIA_NETWORK_TYPE',
+      value: 'testnet',
+      variable: 'SEPOLIA',
+    },
+  ])
+})
+
+test.serial('Setting name must not have invalid characters', async (t) => {
+  const customSettings = {
+    'NETWORK-RPC-URL': {
+      description: 'RPC URL for the given network',
+      type: 'string',
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+  try {
+    const config = new AdapterConfig(customSettings)
+    config.initialize()
+    t.fail()
+  } catch (error) {
+    t.is(
+      (error as Error).message,
+      "Invalid environment var name: NETWORK-RPC-URL. Only '/^[_a-z0-9]+$/i' is supported.",
+    )
+  }
+})
+
+test.serial('Setting name must contain placeholder', async (t) => {
+  const customSettings = {
+    NETWORK_RPC_URL: {
+      description: 'RPC URL for the given network',
+      type: 'string',
+      variablePlaceholder: 'CHAIN',
+    },
+  } as const
+  try {
+    const config = new AdapterConfig(customSettings)
+    config.initialize()
+    t.fail()
+  } catch (error) {
+    t.is(
+      (error as Error).message,
+      "Placeholder 'CHAIN' must occur in setting name 'NETWORK_RPC_URL'.",
+    )
+  }
+})
+
+test.serial('Placeholder must not replace prefix', async (t) => {
+  const value = 'setting value'
+  process.env['PREFIX_FOO_SETTING'] = value
+  process.env['PFOOIX_REF_SETTING'] = 'wrong value'
+  const envVarsPrefix = 'PREFIX'
+  const customSettings = {
+    REF_SETTING: {
+      description: 'A settings with a placeholder that is a substring of the prefix',
+      type: 'string',
+      variablePlaceholder: 'REF',
+    },
+  } as const
+  const config = new AdapterConfig(customSettings, { envVarsPrefix })
+  config.initialize()
+  t.is(config.settings.REF_SETTING.get('foo'), value)
 })

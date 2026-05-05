@@ -397,7 +397,10 @@ export const buildAdapterSettings = <
   customSettings = {} as SettingsDefinitionMap,
   envVarsPrefix = '' as string,
 }): AdapterSettings<CustomSettings> => {
-  const vars = {} as Record<string, SettingValueType | undefined>
+  const vars = {} as Record<
+    string,
+    SettingValueType | undefined | Getter<SettingValueType | undefined>
+  >
 
   // Iterate base adapter env vars
   for (const [key, config] of Object.entries(BaseSettingsDefinition) as Array<
@@ -416,7 +419,7 @@ export const buildAdapterSettings = <
         `Custom env var "${key}" declared, but a base framework env var with that name already exists.`,
       )
     }
-    const value = getEnv(key as string, config, envVarsPrefix) ?? config.default
+    const value = getEnvOrEnvGetter(key as string, config, envVarsPrefix)
     vars[key] = value
   }
 
@@ -457,13 +460,31 @@ const getEnvName = (name: string, prefix = ''): string => {
 
 const isEnvNameValid = (name: string) => /^[_a-z0-9]+$/i.test(name)
 
+export const getEnvOrEnvGetter = (
+  name: string,
+  settingsDefinition: SettingDefinition,
+  prefix = '',
+): SettingValueType | undefined | Getter<SettingValueType | undefined> => {
+  if (settingsDefinition.variablePlaceholder === undefined) {
+    return getEnv(name, settingsDefinition, prefix) ?? settingsDefinition.default
+  }
+  return new EnvGetter(name, settingsDefinition, prefix)
+}
+
 export const getEnv = (
   name: string,
   settingsDefinition: SettingDefinition,
   prefix = '',
 ): SettingValueType | null => {
   const value = process.env[getEnvName(name, prefix)]
+  return parseEnv(value, name, settingsDefinition)
+}
 
+export const parseEnv = (
+  value: string | undefined,
+  name: string,
+  settingsDefinition: SettingDefinition,
+): SettingValueType | null => {
   if (!value || value === '' || value === '""') {
     return null
   }
@@ -485,8 +506,113 @@ export const getEnv = (
   }
 }
 
+type VariableEnvVarEntry<T extends ValidSettingValue> = {
+  // The name used in the settings definition. E.g., 'NETWORK_RPC_URL'
+  settingKey: string
+  // The variable part for a specific instance. E.g., 'ETHEREUM'
+  variable: string
+  // The setting key with the variable part replaced. E.g., 'ETHEREUM_RPC_URL'
+  settingName: string
+  // The actual name in the environment. E.g., 'PREFIX_ETHEREUM_RPC_URL'
+  envVarName: string
+  // The parsed value. E.g., some URL.
+  value: T
+}
+
+export interface Getter<T extends SettingValueType | undefined> {
+  get(variable: string): T
+  entries(): VariableEnvVarEntry<Exclude<T, undefined>>[]
+}
+
+export class EnvGetter<
+  T extends SettingDefinition & IsVariable = Extract<SettingDefinition, IsVariable>,
+> {
+  private name: string
+  private settingsDefinition: T
+  private prefix: string
+  private variableMap: Record<string, VariableEnvVarEntry<SettingTypeWhenPresent<T>>> = {}
+
+  constructor(name: string, settingsDefinition: T, prefix: string) {
+    this.name = name
+    this.settingsDefinition = settingsDefinition
+    this.prefix = prefix
+
+    const namePattern = this.getNamePattern(name, settingsDefinition.variablePlaceholder, prefix)
+    for (const [envVarName, value] of Object.entries(process.env)) {
+      const match = envVarName.match(namePattern)
+      if (!match) {
+        continue
+      }
+      const variablePart = match[1]
+      const settingName = name.replace(settingsDefinition.variablePlaceholder, variablePart)
+      const parsed = parseEnv(value, settingName, settingsDefinition)
+      if (parsed !== null) {
+        this.variableMap[variablePart] = {
+          settingKey: name,
+          variable: variablePart,
+          settingName,
+          envVarName,
+          value: parsed as SettingTypeWhenPresent<T>,
+        }
+      }
+    }
+  }
+
+  // If the setting name is 'NETWORK_RPC_URL' and `variablePlaceholder` is
+  // 'NETWORK', then `namePattern` will be /([A-Z0-9_]+)_RPC_URL/ to match
+  // all relevant environment variables and extract the variable part.
+  getNamePattern(name: string, placeholder: string, prefix: string) {
+    if (!name.includes(placeholder)) {
+      throw new Error(`Placeholder '${placeholder}' must occur in setting name '${name}'.`)
+    }
+
+    let nameForPattern = name
+    let placeholderForPattern = placeholder
+    if ((prefix ?? '').includes(placeholder)) {
+      // Use a placeholder that's definitely not part of the prefix.
+      placeholderForPattern = `___${prefix}___`
+      nameForPattern = name.replace(placeholder, placeholderForPattern)
+    }
+
+    // We can't inject the regexp before calling getEnvName because getEnvName
+    // checks for valid characters. So we made sure we use a placeholder that
+    // doesn't interfere with the prefix.
+    return new RegExp(
+      `^${getEnvName(nameForPattern, prefix).replace(placeholderForPattern, '([A-Z0-9_]+)')}$`,
+    )
+  }
+
+  get(variable: string): SettingType<T> {
+    const canonicalVariable = variable.replace(/\W/g, '_').toUpperCase()
+    if (canonicalVariable in this.variableMap) {
+      return this.variableMap[canonicalVariable].value as SettingType<T>
+    }
+    if (this.settingsDefinition.default !== undefined) {
+      return this.settingsDefinition.default as SettingType<T>
+    }
+    if (!this.settingsDefinition.required) {
+      return undefined as SettingType<T>
+    }
+    const envName = getEnvName(
+      this.name.replace(this.settingsDefinition.variablePlaceholder, canonicalVariable),
+      this.prefix,
+    )
+    throw new Error(`Missing required environment variable: ${envName}`)
+  }
+
+  entries(): VariableEnvVarEntry<SettingTypeWhenPresent<T>>[] {
+    return Object.values(this.variableMap)
+  }
+
+  validate(validationErrors: string[]) {
+    for (const { settingName, value } of Object.values(this.variableMap)) {
+      validateSetting(settingName, value, this.settingsDefinition, validationErrors)
+    }
+  }
+}
+
 type SettingValueType = string | number | boolean
-type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
+type SettingTypeWhenPresent<C extends SettingDefinition> = C['type'] extends 'string'
   ? string
   : C['type'] extends 'number'
     ? number
@@ -497,91 +623,83 @@ type SettingType<C extends SettingDefinition> = C['type'] extends 'string'
           ? C['options'][number]
           : never
         : never
+type SettingType<C extends SettingDefinition> = C extends HasDefault | IsRequired
+  ? SettingTypeWhenPresent<C>
+  : SettingTypeWhenPresent<C> | undefined
+
 export type BaseSettingsDefinitionType = typeof BaseSettingsDefinition
+
+export type SettingDefinitionBase = {
+  description: string
+  sensitive?: boolean
+  required?: boolean
+} & ({ variablePlaceholder?: never } | { variablePlaceholder: string })
+
+export type NonEnumSettingDefinition<TypeString, Type> = SettingDefinitionBase & {
+  type: TypeString
+  default?: Type
+  validate?: Validator<Type>
+  options?: never
+}
+
+export type EnumSettingDefinition = SettingDefinitionBase & {
+  type: 'enum'
+  default?: string
+  validate?: Validator<string>
+  options: readonly string[]
+}
+
 export type SettingDefinition =
-  | {
-      type: 'string'
-      description: string
-      options?: never
-      default?: string
-      validate?: Validator<string>
-      required?: false
-      sensitive?: boolean
-    }
-  | {
-      type: 'string'
-      description: string
-      options?: never
-      default?: string
-      validate?: Validator<string>
-      required: true
-      sensitive?: boolean
-    }
-  | {
-      type: 'number'
-      description: string
-      options?: never
-      default?: number
-      validate?: Validator<number>
-      required?: false
-    }
-  | {
-      type: 'number'
-      description: string
-      options?: never
-      default?: number
-      validate?: Validator<number>
-      required: true
-    }
-  | {
-      type: 'boolean'
-      description: string
-      options?: never
-      default?: boolean
-      validate?: Validator<boolean>
-      required?: false
-    }
-  | {
-      type: 'boolean'
-      description: string
-      options?: never
-      default?: boolean
-      validate?: Validator<boolean>
-      required: true
-    }
-  | {
-      type: 'enum'
-      description: string
-      default?: string
-      options: readonly string[]
-      validate?: Validator<string>
-      required?: false
-    }
-  | {
-      type: 'enum'
-      description: string
-      default?: string
-      options: readonly string[]
-      validate?: Validator<string>
-      required: true
-    }
+  | NonEnumSettingDefinition<'string', string>
+  | NonEnumSettingDefinition<'number', number>
+  | NonEnumSettingDefinition<'boolean', boolean>
+  | EnumSettingDefinition
+
+type HasDefault = { default: SettingValueType }
+type IsRequired = { required: true }
+
+type IsOptional = {
+  default?: never
+  required?: false
+  // With just `default` and `required` both optional, the type matches `{}`,
+  // which means it's a weak type which gets treated differently by TypeScript.
+  // So we add `description`, which is anyway guaranteed to be present.
+  description: string
+}
+
+type IsVariable = { variablePlaceholder: string }
+type IsFixed = {
+  variablePlaceholder?: never
+  // Add description for the same issue with weak types as in IsOptional.
+  description: string
+}
+
+type VariableSettingKeys<T extends SettingsDefinitionMap> = {
+  [K in keyof T]: T[K] extends IsVariable ? K : never
+}[keyof T]
+
+type FixedSettingKeys<T extends SettingsDefinitionMap> = {
+  [K in keyof T]: T[K] extends IsFixed ? K : never
+}[keyof T]
+
+type NonOptionalSettingKeys<T extends SettingsDefinitionMap> = {
+  [K in keyof T]: T[K] extends HasDefault | IsRequired ? K : never
+}[keyof T]
+
+type OptionalSettingKeys<T extends SettingsDefinitionMap> = {
+  [K in keyof T]: T[K] extends IsOptional ? K : never
+}[keyof T]
 
 export type Settings<T extends SettingsDefinitionMap> = {
-  -readonly [K in keyof T as T[K] extends {
-    default: SettingValueType
-  }
-    ? K
-    : T[K]['required'] extends true
-      ? K
-      : never]: SettingType<T[K]>
+  -readonly [K in Extract<FixedSettingKeys<T>, OptionalSettingKeys<T>>]?:
+    | SettingTypeWhenPresent<T[K]>
+    | undefined
 } & {
-  -readonly [K in keyof T as T[K] extends {
-    default: SettingValueType
-  }
-    ? never
-    : T[K]['required'] extends true
-      ? never
-      : K]?: SettingType<T[K]> | undefined
+  -readonly [K in Extract<FixedSettingKeys<T>, NonOptionalSettingKeys<T>>]: SettingTypeWhenPresent<
+    T[K]
+  >
+} & {
+  -readonly [K in VariableSettingKeys<T>]: Getter<SettingType<T[K]>>
 }
 
 export type BaseAdapterSettings = Settings<BaseSettingsDefinitionType>
@@ -646,12 +764,17 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
     Object.entries(BaseSettingsDefinition as SettingsDefinitionMap)
       .concat(Object.entries(this.settingsDefinition || {}))
       .forEach(([name, setting]) => {
-        validateSetting(
-          name,
-          (this.settings as Record<string, ValidSettingValue>)[name],
-          setting,
-          validationErrors,
-        )
+        if (setting.variablePlaceholder !== undefined) {
+          const getter = (this.settings as unknown as Record<string, EnvGetter>)[name]
+          getter.validate(validationErrors)
+        } else {
+          validateSetting(
+            name,
+            (this.settings as Record<string, ValidSettingValue>)[name],
+            setting,
+            validationErrors,
+          )
+        }
       })
 
     if (validationErrors.length > 0) {
@@ -680,10 +803,26 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
             alwaysCensored.some((pattern) => name.includes(pattern))) &&
           (this.settings as Record<string, ValidSettingValue>)[name],
       )
-      .map(([name]) => ({
+      .flatMap(([name]) => {
+        const settings = this.settings as Record<
+          string,
+          ValidSettingValue | Getter<ValidSettingValue>
+        >
+        const settingValue = settings[name]
+        if (settingValue instanceof EnvGetter) {
+          return settingValue
+            .entries()
+            .map(
+              ({ settingName, value }) =>
+                [settingName, value] satisfies [string, ValidSettingValue],
+            )
+        }
+        return [[name as string, settingValue]] as [string, ValidSettingValue][]
+      })
+      .map(([name, value]: [string, ValidSettingValue]) => ({
         key: name,
         value: new RegExp(
-          ((this.settings as Record<string, ValidSettingValue>)[name]! as string)
+          (value! as string)
             // Escaping potential special characters in values before creating regex
             .replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
             // Escaping special case for new line characters. This is needed to properly match and censor private keys,
@@ -718,5 +857,5 @@ export class AdapterConfig<T extends SettingsDefinitionMap = SettingsDefinitionM
 type SettingsObjectSpecifier = {
   __reserved_settings: never
 }
-type ValidSettingValue = string | number | boolean
+export type ValidSettingValue = string | number | boolean
 export type GenericConfigStructure = BaseAdapterSettings & SettingsObjectSpecifier
