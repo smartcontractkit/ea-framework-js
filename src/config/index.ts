@@ -388,6 +388,12 @@ export const BaseSettingsDefinition = {
       'Whether to enable debug enpoints (/debug/*) for this adapter. Enabling them might consume more resources.',
     default: false,
   },
+  NORMALIZE_CASE_INPUTS: {
+    type: 'boolean',
+    description:
+      'When true, normalizes base and quote input parameters to uppercase before cache key computation and subscription registration. Set to false for adapters that require case-sensitive asset identifiers.',
+    default: true,
+  },
 } as const satisfies SettingsDefinitionMap
 
 export const buildAdapterSettings = <

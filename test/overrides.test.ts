@@ -67,6 +67,7 @@ class OverrideTestTransport implements Transport<TestTransportGenerics> {
 }
 
 test.beforeEach(async (t) => {
+  process.env['NORMALIZE_CASE_INPUTS'] = 'false'
   const adapter = new Adapter({
     name: 'TEST_ADAPTER',
     defaultEndpoint: 'test-endpoint',
