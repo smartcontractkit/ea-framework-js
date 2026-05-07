@@ -1,18 +1,18 @@
 import { Clock as InstalledClock } from '@sinonjs/fake-timers'
-import { installTimers } from '../helper'
+import { installTimers } from '../../helper'
 import untypedTest, { TestFn } from 'ava'
 import { FastifyInstance } from 'fastify'
-import { Adapter, AdapterEndpoint } from '../../src/adapter'
-import { AdapterConfig, SettingsDefinitionFromConfig } from '../../src/config'
-import { AdapterRequest } from '../../src/util'
-import { TypeFromDefinition } from '../../src/validation/input-params'
+import { Adapter, AdapterEndpoint } from '../../../src/adapter'
+import { AdapterConfig, SettingsDefinitionFromConfig } from '../../../src/config'
+import { AdapterRequest } from '../../../src/util'
+import { TypeFromDefinition } from '../../../src/validation/input-params'
 import {
   NopTransport,
   TestAdapter,
   assertEqualResponses,
   runAllUntilTime,
-} from '../../src/util/testing-utils'
-import { cacheTestInputParameters, CacheTestTransportTypes } from './helper'
+} from '../../../src/util/testing-utils'
+import { cacheTestInputParameters, CacheTestTransportTypes } from '../helper'
 
 const test = untypedTest as TestFn<{
   clock: InstalledClock
