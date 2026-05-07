@@ -1,4 +1,4 @@
-import { ResponseCache } from '../cache/response'
+import { SimpleResponseCache } from '../cache/response'
 import { AdapterSettings } from '../config'
 import { TransportRoutes } from '../transports'
 import {
@@ -83,7 +83,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     adapterSettings: T['Settings'],
   ): Promise<void> {
     this.adapterName = adapterName
-    const responseCache = new ResponseCache({
+    const responseCache = new SimpleResponseCache({
       dependencies,
       adapterSettings: adapterSettings as AdapterSettings,
       adapterName,
