@@ -9,5 +9,7 @@ runs:
         registry-url: https://registry.npmjs.org
         always-auth: true
         cache: yarn
+    - run: corepack enable
+      shell: bash
     - run: yarn install --frozen-lockfile
       shell: bash
