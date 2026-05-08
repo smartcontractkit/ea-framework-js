@@ -6,6 +6,7 @@ import {
   SettingDefinition,
   SettingsDefinitionMap,
 } from '../src/config'
+import { AdapterError } from '../src/validation/error'
 import { validator } from '../src/validation/utils'
 import { Adapter } from '../src/adapter'
 import { buildSettingsList } from '../src/util/settings'
@@ -317,7 +318,8 @@ test.serial('Get required variable env var', async (t) => {
     config.settings.NETWORK_RPC_URL.get('arbitrum')
     t.fail()
   } catch (error) {
-    t.is((error as Error).message, 'Missing required environment variable: ARBITRUM_RPC_URL')
+    t.is((error as AdapterError).message, 'Missing required environment variable: ARBITRUM_RPC_URL')
+    t.is((error as AdapterError).statusCode, 500)
   }
 })
 

@@ -1,4 +1,5 @@
 import CensorList, { CensorKeyValue } from '../util/censor/censor-list'
+import { AdapterError } from '../validation/error'
 import { Validator, validator } from '../validation/utils'
 
 export const BaseSettingsDefinition = {
@@ -597,7 +598,10 @@ export class EnvGetter<
       this.name.replace(this.settingsDefinition.variablePlaceholder, canonicalVariable),
       this.prefix,
     )
-    throw new Error(`Missing required environment variable: ${envName}`)
+    throw new AdapterError({
+      statusCode: 500,
+      message: `Missing required environment variable: ${envName}`,
+    })
   }
 
   entries(): VariableEnvVarEntry<SettingTypeWhenPresent<T>>[] {
