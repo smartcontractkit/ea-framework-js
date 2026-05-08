@@ -61,6 +61,18 @@ export abstract class ResponseCache<
   abstract write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void>
 
   /**
+   * Sets responses with metadata in the adapter cache
+   *
+   * @param entries - the entries to write to the cache
+   */
+  abstract writeEntries(
+    entries: {
+      key: string
+      value: AdapterResponse<T['Response']>
+    }[],
+  ): Promise<void>
+
+  /**
    * Sets a new TTL value for already cached responses in the adapter cache
    *
    * @param transportName - transport name
@@ -82,7 +94,11 @@ export abstract class ResponseCache<
     return this.cache.get(key)
   }
 
-  protected generateCacheEntry(transportName: string, r: TimestampedProviderResult<T>) {
+  protected generateCacheEntry(
+    transportNameForMeta: string,
+    transportNameForCache: string,
+    r: TimestampedProviderResult<T>,
+  ) {
     const censorList = CensorList.getAll()
     const { data, result, errorMessage } = r.response
     if (!errorMessage && data === undefined) {
@@ -116,6 +132,7 @@ export abstract class ResponseCache<
     if (this.adapterSettings.METRICS_ENABLED && this.adapterSettings.EXPERIMENTAL_METRICS_ENABLED) {
       response.meta = {
         adapterName: calculateAdapterName(this.adapterName, r.params),
+        transportName: transportNameForMeta,
         metrics: {
           feedId: calculateFeedId(
             {
@@ -136,12 +153,12 @@ export abstract class ResponseCache<
     }
 
     return {
-      key: this.getCacheKey(transportName, r.params),
+      key: this.getCacheKey(transportNameForCache, r.params),
       value: response,
     } as const
   }
 
-  private getCacheKey(transportName: string, params: TypeFromDefinition<T['Parameters']>) {
+  getCacheKey(transportName: string, params: TypeFromDefinition<T['Parameters']>) {
     return calculateCacheKey({
       transportName,
       data: params,
