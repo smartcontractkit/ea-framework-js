@@ -12,9 +12,12 @@ export class SimpleResponseCache<
     Response: ResponseGenerics
   },
 > extends ResponseCache<T> {
-  async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
-    const entries = results.map((r) => this.generateCacheEntry(transportName, r))
-
+  async writeEntries(
+    entries: {
+      key: string
+      value: AdapterResponse<T['Response']>
+    }[],
+  ): Promise<void> {
     const ttl = this.adapterSettings.CACHE_MAX_AGE
     await this.cache.setMany(entries, ttl)
 
@@ -34,5 +37,10 @@ export class SimpleResponseCache<
     }
 
     return
+  }
+
+  async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+    const entries = results.map((r) => this.generateCacheEntry(transportName, transportName, r))
+    await this.writeEntries(entries)
   }
 }

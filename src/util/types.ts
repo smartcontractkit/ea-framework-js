@@ -86,6 +86,8 @@ export interface AdapterRequestMeta {
 export interface AdapterResponseMeta extends AdapterRequestMeta {
   /** Name of the adapter */
   adapterName: string
+  /** Name of the transport */
+  transportName: string
 }
 
 /**
