@@ -32,6 +32,35 @@ test('health endpoint returns health OK', async (t) => {
   })
 })
 
+test('TLS_ENABLED with no TLS params should error', async (t) => {
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        TLS_ENABLED: true,
+      },
+    },
+  )
+  const adapter = new Adapter({
+    name: 'TEST',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+  try {
+    await start(adapter)
+  } catch (e: unknown) {
+    t.is(
+      (e as Error).message,
+      'TLS_PRIVATE_KEY and TLS_PUBLIC_KEY environment variables are required when TLS_ENABLED is set to true.',
+    )
+  }
+})
+
 test('MTLS_ENABLED with no TLS params should error', async (t) => {
   const config = new AdapterConfig(
     {},
@@ -56,8 +85,36 @@ test('MTLS_ENABLED with no TLS params should error', async (t) => {
   } catch (e: unknown) {
     t.is(
       (e as Error).message,
-      'TLS_PRIVATE_KEY, TLS_PUBLIC_KEY, and TLS_CA environment variables are required when MTLS_ENABLED is set to true.',
+      'TLS_PRIVATE_KEY and TLS_PUBLIC_KEY environment variables are required when MTLS_ENABLED is set to true.',
     )
+  }
+})
+
+test('MTLS_ENABLED with no TLS_CA should error', async (t) => {
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        MTLS_ENABLED: true,
+        TLS_PRIVATE_KEY: 'dGVzdA==',
+        TLS_PUBLIC_KEY: 'dGVzdA==',
+      },
+    },
+  )
+  const adapter = new Adapter({
+    name: 'TEST',
+    config,
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        transport: new NopTransport(),
+      }),
+    ],
+  })
+  try {
+    await start(adapter)
+  } catch (e: unknown) {
+    t.is((e as Error).message, 'TLS_CA is required when MTLS_ENABLED is true.')
   }
 })
 
@@ -127,12 +184,10 @@ test('requestCert should be false when TLS_ENABLED is set to true', async (t) =>
   adapterSettings.TLS_ENABLED = true
   adapterSettings.TLS_PRIVATE_KEY = 'dGVzdA=='
   adapterSettings.TLS_PUBLIC_KEY = 'dGVzdA=='
-  adapterSettings.TLS_CA = 'dGVzdA=='
   t.deepEqual(getTLSOptions(adapterSettings), {
     https: {
       key: 'dGVzdA==',
       cert: 'dGVzdA==',
-      ca: 'dGVzdA==',
       passphrase: '',
       requestCert: false,
     },
