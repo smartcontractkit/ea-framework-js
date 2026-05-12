@@ -1,9 +1,12 @@
 import { EndpointContext } from '../adapter'
 import { CompareResponseCache } from '../cache/response-cache/compare'
 import { ResponseCache } from '../cache/response'
+import { makeLogger } from '../util'
 import { AdapterRequest, AdapterResponse } from '../util/types'
 import { TypeFromDefinition } from '../validation/input-params'
 import type { Transport, TransportDependencies, TransportGenerics } from '.'
+
+const logger = makeLogger('CompositeTransport')
 
 export type CompositeTransportConfig<T extends TransportGenerics> = {
   transports: Record<string, Transport<T>>
@@ -60,10 +63,25 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
     req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
     adapterSettings: T['Settings'],
   ): Promise<void> {
-    await Promise.all(this.transports.map((t) => t.registerRequest?.(req, adapterSettings)))
+    const results = await Promise.allSettled(
+      this.transports.map((t) => t.registerRequest?.(req, adapterSettings)),
+    )
+    results
+      .filter((r) => r.status === 'rejected')
+      .forEach((r) => {
+        logger.error(`Transport registerRequest failed: ${r.reason}`)
+      })
   }
 
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
-    await Promise.all(this.transports.map((t) => t.backgroundExecute?.(context)))
+    const results = await Promise.allSettled(
+      this.transports.map((t) => t.backgroundExecute?.(context)),
+    )
+
+    results
+      .filter((r) => r.status === 'rejected')
+      .forEach((r) => {
+        logger.error(`Transport backgroundExecute failed: ${r.reason}`)
+      })
   }
 }
