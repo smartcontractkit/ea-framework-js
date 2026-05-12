@@ -3,9 +3,15 @@ import untypedTest, { TestFn } from 'ava'
 import axios, { AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { FastifyInstance } from 'fastify'
-import { Adapter, AdapterEndpoint } from '../../src/adapter'
+import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { CompositeTransport } from '../../src/transports/composite'
-import { HttpTransport } from '../../src/transports'
+import {
+  HttpTransport,
+  Transport,
+  TransportDependencies,
+  TransportGenerics,
+} from '../../src/transports'
+import { ResponseCache } from '../../src/cache/response'
 import { AdapterRequest } from '../../src/util/types'
 import { TestAdapter } from '../../src/util/testing-utils'
 import { TypeFromDefinition } from '../../src/validation/input-params'
@@ -15,6 +21,8 @@ const test = untypedTest as TestFn<{
   clock: ReturnType<typeof installTimers>
   testAdapter: TestAdapter
   api: FastifyInstance | undefined
+  ws: CountingCacheHttpTransport
+  rest: CountingCacheHttpTransport
 }>
 
 process.env['CACHE_POLLING_MAX_RETRIES'] = '20'
@@ -35,20 +43,21 @@ type CacheTestHttpTypes = CacheTestTransportTypes & {
   }
 }
 
-/** HTTP transport that counts `registerRequest` (subscription adds) like the old stub. */
 class CountingCacheHttpTransport extends HttpTransport<CacheTestHttpTypes> {
   registerRequestCalls = 0
 
   constructor(logicalName: string, baseURL: string) {
     super({
-      prepareRequests: (params) => ({
-        params,
-        request: {
-          baseURL,
-          url: '/price',
-          method: 'GET',
-        },
-      }),
+      prepareRequests: (params) =>
+        params.map((p) => ({
+          params: [p],
+          request: {
+            baseURL,
+            url: '/price',
+            method: 'GET',
+            params: { base: p.base, factor: p.factor },
+          },
+        })),
       parseResponse: (params, res: AxiosResponse<{ result: number }>) =>
         params.map((p) => ({
           params: p,
@@ -70,32 +79,121 @@ class CountingCacheHttpTransport extends HttpTransport<CacheTestHttpTypes> {
   }
 }
 
-test.before((t) => {
+test.before(async (t) => {
   t.context.clock = installTimers()
+
+  const ws = new CountingCacheHttpTransport('ws', WS_PROVIDER)
+  const rest = new CountingCacheHttpTransport('rest', REST_PROVIDER)
+  t.context.ws = ws
+  t.context.rest = rest
+
+  const composite = new CompositeTransport<CacheTestHttpTypes>({
+    transports: { ws, rest },
+    shouldUpdate: (next, current) => !current || (next?.result ?? 0) > (current?.result ?? 0),
+  })
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        inputParameters: cacheTestInputParameters,
+        transport: composite,
+      }),
+    ],
+  })
+
+  await TestAdapter.start(adapter, t.context)
 })
 
-test.afterEach(async (t) => {
-  axiosMock.resetHandlers()
-  t.context.clock.reset()
+test.after(async (t) => {
   await t.context.testAdapter?.api.close()
 })
+
+test.afterEach((t) => {
+  t.context.ws.registerRequestCalls = 0
+  t.context.rest.registerRequestCalls = 0
+})
+
+test.serial(
+  'composite transport returns value from working transport when one transport fails to produce a value',
+  async (t) => {
+    axiosMock.onGet(`${WS_PROVIDER}/price`, { params: { base: 'ETH', factor: 5 } }).reply(500)
+    axiosMock
+      .onGet(`${REST_PROVIDER}/price`, { params: { base: 'ETH', factor: 5 } })
+      .reply(200, { result: 42 })
+
+    const res = await t.context.testAdapter.request({ base: 'ETH', factor: 5 })
+
+    t.is(res.statusCode, 200)
+    t.is(res.json().result, 42)
+    t.is(t.context.ws.registerRequestCalls, 1)
+    t.is(t.context.rest.registerRequestCalls, 1)
+  },
+)
 
 test.serial(
   'composite transport merges child writes using shouldUpdate when run under an adapter',
   async (t) => {
-    axiosMock.onGet(`${WS_PROVIDER}/price`).reply(200, { result: 10 })
-    axiosMock.onGet(`${REST_PROVIDER}/price`).reply(200, { result: 100 })
+    axiosMock
+      .onGet(`${WS_PROVIDER}/price`, { params: { base: 'BTC', factor: 3 } })
+      .reply(200, { result: 10 })
+    axiosMock
+      .onGet(`${REST_PROVIDER}/price`, { params: { base: 'BTC', factor: 3 } })
+      .reply(200, { result: 100 })
 
-    const ws = new CountingCacheHttpTransport('ws', WS_PROVIDER)
-    const rest = new CountingCacheHttpTransport('rest', REST_PROVIDER)
+    t.is(t.context.ws.name, 'ws')
+    t.is(t.context.rest.name, 'rest')
+
+    const res = await t.context.testAdapter.request({ base: 'BTC', factor: 3 })
+
+    t.is(res.statusCode, 200)
+    t.is(res.json().result, 100)
+    t.is(t.context.ws.registerRequestCalls, 1)
+    t.is(t.context.rest.registerRequestCalls, 1)
+  },
+)
+
+class ThrowingTransport<T extends TransportGenerics> implements Transport<T> {
+  name!: string
+  responseCache!: ResponseCache<T>
+
+  async initialize(
+    dependencies: TransportDependencies<T>,
+    _adapterSettings: T['Settings'],
+    _endpointName: string,
+    transportName: string,
+  ): Promise<void> {
+    this.name = transportName
+    this.responseCache = dependencies.responseCache
+  }
+
+  async registerRequest(
+    _req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
+    _adapterSettings: T['Settings'],
+  ): Promise<void> {
+    throw new Error('ThrowingTransport.registerRequest intentional error')
+  }
+
+  async backgroundExecute(_context: EndpointContext<T>): Promise<void> {
+    throw new Error('ThrowingTransport.backgroundExecute intentional error')
+  }
+}
+
+test.serial(
+  'composite transport returns value from working transport when the other transport throws in registerRequest and backgroundExecute',
+  async (t) => {
+    const workingTransport = new CountingCacheHttpTransport('working', WS_PROVIDER)
+    const throwingTransport = new ThrowingTransport<CacheTestHttpTypes>()
 
     const composite = new CompositeTransport<CacheTestHttpTypes>({
-      transports: { ws: ws, rest: rest },
-      shouldUpdate: (next, current) => (next?.result ?? 0) > (current?.result ?? 0),
+      transports: { working: workingTransport, throwing: throwingTransport },
+      shouldUpdate: (next, current) => !current || (next?.result ?? 0) > (current?.result ?? 0),
     })
 
     const adapter = new Adapter({
-      name: 'TEST',
+      name: 'TEST_THROWING',
       defaultEndpoint: 'test',
       endpoints: [
         new AdapterEndpoint({
@@ -106,16 +204,19 @@ test.serial(
       ],
     })
 
-    const testAdapter = await TestAdapter.start(adapter, t.context)
+    const localContext = { clock: t.context.clock } as typeof t.context
+    const localAdapter = await TestAdapter.start(adapter, localContext)
 
-    t.is(ws.name, 'ws')
-    t.is(rest.name, 'rest')
+    axiosMock
+      .onGet(`${WS_PROVIDER}/price`, { params: { base: 'LINK', factor: 2 } })
+      .reply(200, { result: 77 })
 
-    const res = await testAdapter.request({ base: 'ETH', factor: 5 })
+    const res = await localAdapter.request({ base: 'LINK', factor: 2 })
 
     t.is(res.statusCode, 200)
-    t.is(res.json().result, 100)
-    t.is(ws.registerRequestCalls, 1)
-    t.is(rest.registerRequestCalls, 1)
+    t.is(res.json().result, 77)
+    t.is(workingTransport.registerRequestCalls, 1)
+
+    await localAdapter.api.close()
   },
 )
