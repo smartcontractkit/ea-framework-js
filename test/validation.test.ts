@@ -837,6 +837,40 @@ test.serial('examples in input parameters', async (t) => {
   ])
 })
 
+test.serial('requestContext has correct endpointName and requestEndpointName', async (t) => {
+  let capturedContext: { endpointName: string; requestEndpointName: string } | undefined
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new AdapterEndpoint({
+        name: 'test',
+        aliases: ['test-alias'],
+        transport: new (class extends NopTransport {
+          override async foregroundExecute(req: AdapterRequest<EmptyInputParameters>) {
+            capturedContext = {
+              endpointName: req.requestContext.endpointName,
+              requestEndpointName: req.requestContext.requestEndpointName,
+            }
+          }
+        })(),
+      }),
+    ],
+  })
+
+  const testAdapter = await TestAdapter.start(adapter, t.context)
+
+  // When using the canonical name, both fields should match
+  await testAdapter.request({ endpoint: 'test' })
+  t.is(capturedContext?.endpointName, 'test')
+  t.is(capturedContext?.requestEndpointName, 'test')
+
+  // When using an alias, endpointName is the canonical name and requestEndpointName is the alias
+  await testAdapter.request({ endpoint: 'test-alias' })
+  t.is(capturedContext?.endpointName, 'test')
+  t.is(capturedContext?.requestEndpointName, 'test-alias')
+})
+
 test.serial('limit size of input parameters', async (t) => {
   process.env['MAX_PAYLOAD_SIZE_LIMIT'] = '1048576'
 
