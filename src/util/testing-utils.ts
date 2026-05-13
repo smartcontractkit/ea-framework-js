@@ -491,9 +491,13 @@ export function setEnvVariables(envVariables: NodeJS.ProcessEnv): void {
 export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): void => {
   // Extend mock WebSocket class to bypass protocol headers error
   class MockWebSocket extends WebSocket {
+    // Separate listener map for ws-style .on()/.emit() (e.g. 'pong'), which mock-socket doesn't support
+    private wsListeners: Map<string, ((...args: unknown[]) => void)[]> = new Map()
+
     constructor(url: string, protocol: string | string[] | Record<string, string> | undefined) {
       super(url, protocol instanceof Object ? undefined : protocol)
     }
+
     // This is part of the 'ws' node library but not the common interface, but it's used in our WS transport
     removeAllListeners() {
       for (const eventType in this.listeners) {
@@ -502,6 +506,22 @@ export const mockWebSocketProvider = (provider: typeof WebSocketClassProvider): 
           delete this.listeners[eventType]
         }
       }
+      this.wsListeners.clear()
+    }
+
+    // Ws-style EventEmitter API used for protocol-level events like 'pong'
+    on(event: string, listener: (...args: unknown[]) => void) {
+      const existing = this.wsListeners.get(event) ?? []
+      this.wsListeners.set(event, [...existing, listener])
+      return this
+    }
+
+    emit(event: string, ...args: unknown[]): boolean {
+      const listeners = this.wsListeners.get(event) ?? []
+      for (const l of listeners) {
+        l(...args)
+      }
+      return listeners.length > 0
     }
   }
 

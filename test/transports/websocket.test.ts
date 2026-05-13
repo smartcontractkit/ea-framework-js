@@ -64,6 +64,7 @@ const createAdapter = (
     connection: WebSocket,
     context: EndpointContext<WebSocketTypes>,
   ) => Promise<void> | void,
+  pongHandler?: (connection: WebSocket, data: Buffer) => void,
 ): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => ENDPOINT_URL,
@@ -96,6 +97,7 @@ const createAdapter = (
         ]
       },
       heartbeat: heartbeatHandler,
+      pong: pongHandler,
     },
     builders: {
       subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
@@ -1307,6 +1309,93 @@ test.serial('does not heartbeat when handler throws an error', async (t) => {
   await runAllUntilTime(t.context.clock, HEARTBEAT_INTERVAL * heartBeatRounds)
 
   t.is(heartbeatCallCount, heartBeatRounds)
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
+test.serial('calls pong handler when a pong frame is received', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  let pongCallCount = 0
+
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', () => {
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
+    })
+  })
+
+  const websocketTransport = new WebSocketTransport<WebSocketTypes>({
+    url: () => ENDPOINT_URL,
+    options: () => ({ headers: { 'x-auth-token': 'token' } }),
+    handlers: {
+      message(message) {
+        if (!message.pair) {
+          return []
+        }
+        const [curBase, curQuote] = message.pair.split('/')
+        return [
+          {
+            params: { base: curBase, quote: curQuote },
+            response: {
+              data: { result: message.value },
+              result: message.value,
+              timestamps: { providerIndicatedTimeUnixMs: Date.now() },
+            },
+          },
+        ]
+      },
+      pong: () => {
+        pongCallCount++
+      },
+    },
+    builders: {
+      subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
+      unsubscribeMessage: (params) => ({
+        request: 'unsubscribe',
+        pair: `${params.base}/${params.quote}`,
+      }),
+    },
+  })
+
+  const webSocketEndpoint = new AdapterEndpoint({
+    name: 'TEST',
+    transport: websocketTransport,
+    inputParameters,
+  })
+
+  const config = new AdapterConfig({}, { envDefaultOverrides: { BACKGROUND_EXECUTE_MS_WS } })
+
+  const adapter = new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    endpoints: [webSocketEndpoint],
+    config,
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: { result: price },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  websocketTransport.wsConnection?.emit('pong')
+
+  t.is(pongCallCount, 1)
 
   testAdapter.api.close()
   mockWsServer.close()
