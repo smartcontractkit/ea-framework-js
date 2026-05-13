@@ -533,10 +533,14 @@ export class WebSocketTransport<
         await this.sendMessages(
           context,
           subscribeMessage
-            ? subscriptions.new.map((sub) => subscribeMessage(sub, context))
+            ? subscriptions.new
+                .map((sub) => subscribeMessage(sub, context))
+                .filter((m) => m !== undefined)
             : subscriptions.new,
           unsubscribeMessage
-            ? subscriptions.stale.map((sub) => unsubscribeMessage(sub, context))
+            ? subscriptions.stale
+                .map((sub) => unsubscribeMessage(sub, context))
+                .filter((m) => m !== undefined)
             : subscriptions.stale,
         )
         recordWsMessageSentMetrics(context, subscriptions.new, subscriptions.stale)

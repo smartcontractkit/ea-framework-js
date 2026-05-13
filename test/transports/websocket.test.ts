@@ -10,6 +10,7 @@ import {
   WebSocketClassProvider,
   WebsocketReverseMappingTransport,
   WebSocketTransport,
+  type WebSocketTransportConfig,
 } from '../../src/transports'
 import { SingleNumberResultResponse, sleep } from '../../src/util'
 import { mockWebSocketProvider, runAllUntilTime, TestAdapter } from '../../src/util/testing-utils'
@@ -65,6 +66,7 @@ const createAdapter = (
     context: EndpointContext<WebSocketTypes>,
   ) => Promise<void> | void,
   pongHandler?: (connection: WebSocket, data: Buffer) => void,
+  buildersOverride?: WebSocketTransportConfig<WebSocketTypes>['builders'],
 ): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => ENDPOINT_URL,
@@ -99,7 +101,7 @@ const createAdapter = (
       heartbeat: heartbeatHandler,
       pong: pongHandler,
     },
-    builders: {
+    builders: buildersOverride ?? {
       subscribeMessage: (params) => `S:${params.base}/${params.quote}`,
       unsubscribeMessage: (params) => ({
         request: 'unsubscribe',
@@ -194,6 +196,81 @@ test.serial('connects to websocket, subscribes, gets message, unsubscribes', asy
     quote,
   })
   t.is(error2.statusCode, 504)
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
+test.serial('filters out undefined subscribe and unsubscribe messages from builders', async (t) => {
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  const messagesReceived: string[] = []
+
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', (data) => {
+      messagesReceived.push(typeof data === 'string' ? data : data.toString())
+      socket.send(
+        JSON.stringify({
+          pair: `ETH/DOGE`,
+          value: price,
+        }),
+      )
+    })
+  })
+
+  const adapter = createAdapter(
+    {
+      WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+      WS_SUBSCRIPTION_TTL: 60_000,
+    },
+    undefined,
+    undefined,
+    {
+      subscribeMessage: (params) => {
+        return params.base === 'SKIP' ? undefined : `S:${params.base}/${params.quote}`
+      },
+      unsubscribeMessage: (params) => {
+        return params.quote === 'SKIPUNSUB' ? undefined : `U:${params.base}/${params.quote}`
+      },
+    },
+  )
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  // ETH first so the socket gets a subscribe + provider message before SKIP (no subscribe payload).
+  await testAdapter.request({ base: 'ETH', quote: 'DOGE' })
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS + 200)
+  await testAdapter.request({ base: 'SKIP', quote: 'DOGE' })
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS + 200)
+  await testAdapter.request({ base: 'ETH', quote: 'SKIPUNSUB' })
+  await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS + 200)
+
+  t.false(
+    messagesReceived.includes('S:SKIP/DOGE'),
+    'no subscribe payload for feeds where subscribeMessage returns undefined',
+  )
+  t.false(
+    messagesReceived.some((m) => m === 'undefined'),
+    'undefined must not be serialized and sent',
+  )
+  t.true(messagesReceived.includes('S:ETH/DOGE'))
+  t.true(messagesReceived.includes('S:ETH/SKIPUNSUB'))
+
+  await runAllUntilTime(
+    t.context.clock,
+    adapter.config.settings.WS_SUBSCRIPTION_TTL + BACKGROUND_EXECUTE_MS_WS * 3 + 100,
+  )
+
+  const unsubscribePayloads = messagesReceived.filter((m) => m.startsWith('U:'))
+  t.false(
+    unsubscribePayloads.some((m) => m === 'U:ETH/SKIPUNSUB'),
+    'unsubscribe builder returned undefined for SKIPUNSUB quote — must not send that payload',
+  )
+  t.true(
+    unsubscribePayloads.includes('U:ETH/DOGE'),
+    'defined unsubscribe payloads are still sent for stale subs that map to a message',
+  )
 
   testAdapter.api.close()
   mockWsServer.close()
