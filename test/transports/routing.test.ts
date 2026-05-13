@@ -269,12 +269,17 @@ class MockSseTransport extends SseTransport<SSETypes> {
   }
 }
 
-const transports = new TransportRoutes<BaseEndpointTypes>()
-  .register('websocket', new MockWebSocketTransport())
-  .register('batch', new MockHttpTransport())
-  .register('sse', new MockSseTransport())
+function createTransportRoutes(): TransportRoutes<BaseEndpointTypes> {
+  return new TransportRoutes<BaseEndpointTypes>()
+    .register('websocket', new MockWebSocketTransport())
+    .register('batch', new MockHttpTransport())
+    .register('sse', new MockSseTransport())
+}
+
+let transports: TransportRoutes<BaseEndpointTypes>
 
 test.beforeEach(async (t) => {
+  transports = createTransportRoutes()
   const sampleEndpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
@@ -401,11 +406,67 @@ test.serial('endpoint routing can route to SSE transport', async (t) => {
   t.assert(internalTransport.registerRequestCalls > 0)
 })
 
+test.serial(
+  'single endpoint cannot register the same transport instance under two route names',
+  async (t) => {
+    const sharedWs = new MockWebSocketTransport()
+
+    const adapter = new Adapter({
+      name: 'SHARED',
+      defaultEndpoint: 'price',
+      config: new AdapterConfig(settings, {}),
+      endpoints: [
+        new AdapterEndpoint<BaseEndpointTypes>({
+          inputParameters,
+          name: 'price',
+          transportRoutes: new TransportRoutes<BaseEndpointTypes>()
+            .register('primary', sharedWs)
+            .register('mirror', sharedWs),
+        }),
+      ],
+    })
+
+    await t.throwsAsync(async () => adapter.initialize(), {
+      message: 'Transport mirror has already been initialized',
+    })
+  },
+)
+
+test.serial(
+  'two endpoints on the same adapter cannot share the same transport instances',
+  async (t) => {
+    const sharedRoutes = createTransportRoutes()
+
+    const adapter = new Adapter({
+      name: 'SHAREDEP',
+      defaultEndpoint: 'price',
+      config: new AdapterConfig(settings),
+      endpoints: [
+        new AdapterEndpoint<BaseEndpointTypes>({
+          inputParameters,
+          name: 'price',
+          transportRoutes: sharedRoutes,
+        }),
+        new AdapterEndpoint<BaseEndpointTypes>({
+          inputParameters,
+          name: 'quote',
+          transportRoutes: sharedRoutes,
+        }),
+      ],
+    })
+
+    await t.throwsAsync(async () => adapter.initialize(), {
+      message: 'Transport websocket has already been initialized',
+    })
+  },
+)
+
 test.serial('custom router is applied to get valid transport to route to', async (t) => {
+  const testTransports = createTransportRoutes()
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transportRoutes: transports,
+    transportRoutes: testTransports,
     customRouter: () => 'batch',
   })
 
@@ -459,15 +520,16 @@ test.serial('custom router is applied to get valid transport to route to', async
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
+  const internalTransport = testTransports.get('batch') as unknown as MockHttpTransport
   t.assert(internalTransport.registerRequestCalls > 0)
 })
 
 test.serial('custom router returns invalid transport and request fails', async (t) => {
+  const testTransports = createTransportRoutes()
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transportRoutes: transports,
+    transportRoutes: testTransports,
     customRouter: () => 'qweqwe',
   })
 
@@ -527,10 +589,11 @@ test.serial('custom router returns invalid transport and request fails', async (
 })
 
 test.serial('missing transport in input params with no default fails request', async (t) => {
+  const testTransports = createTransportRoutes()
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transportRoutes: transports,
+    transportRoutes: testTransports,
   })
 
   const customConfig = new AdapterConfig(settings, {
@@ -588,10 +651,11 @@ test.serial('missing transport in input params with no default fails request', a
 })
 
 test.serial('missing transport in input params with default succeeds', async (t) => {
+  const testTransports = createTransportRoutes()
   const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
     inputParameters,
     name: 'price', // /price
-    transportRoutes: transports,
+    transportRoutes: testTransports,
     defaultTransport: 'batch',
   })
 
@@ -644,7 +708,7 @@ test.serial('missing transport in input params with default succeeds', async (t)
   })
   t.is(error.statusCode, 504)
 
-  const internalTransport = transports.get('batch') as unknown as MockHttpTransport
+  const internalTransport = testTransports.get('batch') as unknown as MockHttpTransport
   t.assert(internalTransport.registerRequestCalls > 0)
 })
 
@@ -789,10 +853,11 @@ test.serial('invalid transport override is skipped', async (t) => {
 test.serial(
   'transport and transport override are ignored when custom router returns a value',
   async (t) => {
+    const testTransports = createTransportRoutes()
     const endpoint = new AdapterEndpoint<BaseEndpointTypes>({
       inputParameters,
       name: 'price', // /price
-      transportRoutes: transports,
+      transportRoutes: testTransports,
       customRouter: () => 'batch',
     })
 
@@ -851,7 +916,7 @@ test.serial(
     })
     t.is(error.statusCode, 504)
 
-    const internalTransport = transports.get('batch') as unknown as MockHttpTransport
+    const internalTransport = testTransports.get('batch') as unknown as MockHttpTransport
     t.assert(internalTransport.registerRequestCalls > 0)
   },
 )
