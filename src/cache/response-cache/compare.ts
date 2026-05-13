@@ -46,13 +46,23 @@ export class CompareResponseCache<
   }
 
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
-    const entries: {
+    await this.writeEntries(
+      results.map((result) => this.generateCacheEntry(transportName, this.transportName, result)),
+    )
+  }
+
+  async writeEntries(
+    entries: {
+      key: string
+      value: AdapterResponse<T['Response']>
+    }[],
+  ) {
+    const filteredEntries: {
       key: string
       value: AdapterResponse<T['Response']>
     }[] = []
 
-    for (const result of results) {
-      const { key, value } = this.generateCacheEntry(transportName, this.transportName, result)
+    for (const { key, value } of entries) {
       if (!this.shouldUpdate(value, this.localCache.get(key))) {
         continue
       }
@@ -60,18 +70,14 @@ export class CompareResponseCache<
       if (!this.shouldUpdate(value, entryInCache)) {
         continue
       }
-      entries.push({ key, value })
+      filteredEntries.push({ key, value })
     }
 
-    await this.responseCache.writeEntries(entries)
+    await this.responseCache.writeEntries(filteredEntries)
 
-    entries.forEach(({ key, value }) => {
+    filteredEntries.forEach(({ key, value }) => {
       this.localCache.set(key, value)
     })
-  }
-
-  async writeEntries() {
-    throw new Error('Use write instead for CompareResponseCache')
   }
 
   override async writeTTL(
