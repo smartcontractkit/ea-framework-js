@@ -70,7 +70,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       cacheKey: '',
       data: validatedData,
       endpointName: endpoint.name,
-      rawEndpointName: endpointParam,
+      requestEndpointName: endpointParam,
     } as AdapterRequestContext<TypeFromDefinition<InputParametersDefinition>>
 
     // We do it afterwards so the custom routers can have a request with a requestContext fulfilled (sans transportName, ofc)
@@ -151,7 +151,7 @@ export const errorCatchingMiddleware = (err: Error, req: FastifyRequest, res: Fa
       cacheKey: errorLabel,
       data: undefined,
       endpointName: errorLabel,
-      rawEndpointName: errorLabel,
+      requestEndpointName: errorLabel,
       transportName: errorLabel,
       meta: { error: err },
     }

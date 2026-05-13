@@ -246,30 +246,21 @@ test.serial('filters out undefined subscribe and unsubscribe messages from build
   await testAdapter.request({ base: 'ETH', quote: 'SKIPUNSUB' })
   await runAllUntilTime(t.context.clock, BACKGROUND_EXECUTE_MS_WS + 200)
 
-  t.false(
-    messagesReceived.includes('S:SKIP/DOGE'),
-    'no subscribe payload for feeds where subscribeMessage returns undefined',
+  t.deepEqual(
+    messagesReceived,
+    ['S:ETH/DOGE', 'S:ETH/SKIPUNSUB'],
+    'after three requests: SKIP yields no subscribe payload; only defined subscribe strings are sent',
   )
-  t.false(
-    messagesReceived.some((m) => m === 'undefined'),
-    'undefined must not be serialized and sent',
-  )
-  t.true(messagesReceived.includes('S:ETH/DOGE'))
-  t.true(messagesReceived.includes('S:ETH/SKIPUNSUB'))
 
   await runAllUntilTime(
     t.context.clock,
     adapter.config.settings.WS_SUBSCRIPTION_TTL + BACKGROUND_EXECUTE_MS_WS * 3 + 100,
   )
 
-  const unsubscribePayloads = messagesReceived.filter((m) => m.startsWith('U:'))
-  t.false(
-    unsubscribePayloads.some((m) => m === 'U:ETH/SKIPUNSUB'),
-    'unsubscribe builder returned undefined for SKIPUNSUB quote — must not send that payload',
-  )
-  t.true(
-    unsubscribePayloads.includes('U:ETH/DOGE'),
-    'defined unsubscribe payloads are still sent for stale subs that map to a message',
+  t.deepEqual(
+    messagesReceived,
+    ['S:ETH/DOGE', 'S:ETH/SKIPUNSUB', 'U:ETH/DOGE', 'U:SKIP/DOGE'],
+    'full outbound WS payload sequence: subscribes in order, then per-TTL stale unsubs (no U for SKIPUNSUB quote)',
   )
 
   testAdapter.api.close()

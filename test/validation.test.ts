@@ -837,8 +837,8 @@ test.serial('examples in input parameters', async (t) => {
   ])
 })
 
-test.serial('requestContext has correct endpointName and rawEndpointName', async (t) => {
-  let capturedContext: { endpointName: string; rawEndpointName: string } | undefined
+test.serial('requestContext has correct endpointName and requestEndpointName', async (t) => {
+  let capturedContext: { endpointName: string; requestEndpointName: string } | undefined
 
   const adapter = new Adapter({
     name: 'TEST',
@@ -850,7 +850,7 @@ test.serial('requestContext has correct endpointName and rawEndpointName', async
           override async foregroundExecute(req: AdapterRequest<EmptyInputParameters>) {
             capturedContext = {
               endpointName: req.requestContext.endpointName,
-              rawEndpointName: req.requestContext.rawEndpointName,
+              requestEndpointName: req.requestContext.requestEndpointName,
             }
           }
         })(),
@@ -863,12 +863,12 @@ test.serial('requestContext has correct endpointName and rawEndpointName', async
   // When using the canonical name, both fields should match
   await testAdapter.request({ endpoint: 'test' })
   t.is(capturedContext?.endpointName, 'test')
-  t.is(capturedContext?.rawEndpointName, 'test')
+  t.is(capturedContext?.requestEndpointName, 'test')
 
-  // When using an alias, endpointName is the canonical name and rawEndpointName is the alias
+  // When using an alias, endpointName is the canonical name and requestEndpointName is the alias
   await testAdapter.request({ endpoint: 'test-alias' })
   t.is(capturedContext?.endpointName, 'test')
-  t.is(capturedContext?.rawEndpointName, 'test-alias')
+  t.is(capturedContext?.requestEndpointName, 'test-alias')
 })
 
 test.serial('limit size of input parameters', async (t) => {
