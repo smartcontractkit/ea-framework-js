@@ -32,6 +32,9 @@ export type AdapterRequestContext<T> = {
   /** Name of the endpoint this payload should be directed to */
   endpointName: string
 
+  /** Name of the endpoint from input before aliasing */
+  requestEndpointName: string
+
   /** Name of the transport this payload should be directed to */
   transportName: string
 

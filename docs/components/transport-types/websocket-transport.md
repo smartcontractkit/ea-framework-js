@@ -158,6 +158,23 @@ The heartbeat interval is controlled by the `WS_HEARTBEAT_INTERVAL_MS` adapter s
 
 **Note:** The heartbeat only starts if the `heartbeat` handler is provided. If you don't need heartbeat functionality, simply omit the `heartbeat` handler.
 
+### Pong handler (optional)
+
+When using WebSocket protocol-level pings (via `connection.ping()`), the server will respond with a `pong` frame. The `pong` handler lets you react to those responses — for example, to track latency, log liveness confirmations, or reset a timeout.
+
+```typescript
+handlers: {
+  heartbeat: (connection) => {
+    connection.ping()
+  },
+  pong: (connection, data) => {
+    logger.debug('Received pong from server', { data: data.toString() })
+  },
+}
+```
+
+The `pong` handler receives the WebSocket connection and a `Buffer` containing any data the server included in the pong frame. It is optional — if omitted, pong frames are silently ignored.
+
 ### Retrieving and storing the response or errors
 
 As shown in the first example, the **handlers** object accepts a function called **message** which will be executed when Data Provider sends a message through the WS connection. It takes this message as its first argument and the adapter context as the second, and should build and return a list of response objects (_ProviderResult_) that will be stored in the response cache for the endpoint.

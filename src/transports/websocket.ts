@@ -83,6 +83,15 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
     heartbeat?: (wsConnection: WebSocket, context: EndpointContext<T>) => Promise<void> | void
 
     /**
+     * Handles when the WS receives a pong
+     *
+     * @param wsConnection - the WebSocket with an established connection
+     * @param data - the data received by the WS
+     * @returns void
+     */
+    pong?: (wsConnection: WebSocket, data: Buffer) => void
+
+    /**
      * Handles when the websocket connection dispatches an error event
      * Optional to let the adapter handle the event in its own way if it decides to
      *
@@ -371,6 +380,9 @@ export class WebSocketTransport<
     )
     connection.addEventListener('error', handlers.error)
     connection.addEventListener('close', handlers.close)
+    if (this.config.handlers.pong) {
+      connection.on('pong', (data) => this.config.handlers.pong?.(connection, data))
+    }
 
     return connection
   }
@@ -521,10 +533,14 @@ export class WebSocketTransport<
         await this.sendMessages(
           context,
           subscribeMessage
-            ? subscriptions.new.map((sub) => subscribeMessage(sub, context))
+            ? subscriptions.new
+                .map((sub) => subscribeMessage(sub, context))
+                .filter((m) => m !== undefined)
             : subscriptions.new,
           unsubscribeMessage
-            ? subscriptions.stale.map((sub) => unsubscribeMessage(sub, context))
+            ? subscriptions.stale
+                .map((sub) => unsubscribeMessage(sub, context))
+                .filter((m) => m !== undefined)
             : subscriptions.stale,
         )
         recordWsMessageSentMetrics(context, subscriptions.new, subscriptions.stale)
