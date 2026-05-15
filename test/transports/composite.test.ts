@@ -4,12 +4,14 @@ import axios, { AxiosResponse } from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { FastifyInstance } from 'fastify'
 import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
-import { CompositeTransport } from '../../src/transports/composite'
+import { AdapterError } from '../../src/validation/error'
+import { AdapterConfig } from '../../src/config'
 import {
   HttpTransport,
   Transport,
   TransportDependencies,
   TransportGenerics,
+  TransportRoutes,
 } from '../../src/transports'
 import { ResponseCache } from '../../src/cache/response'
 import { AdapterRequest } from '../../src/util/types'
@@ -39,7 +41,7 @@ const axiosMock = new MockAdapter(axios)
 type CacheTestHttpTypes = CacheTestTransportTypes & {
   Provider: {
     RequestBody: unknown
-    ResponseBody: { result: number }
+    ResponseBody: { result: number; ts?: number }
   }
 }
 
@@ -58,12 +60,17 @@ class CountingCacheHttpTransport extends HttpTransport<CacheTestHttpTypes> {
             params: { base: p.base, factor: p.factor },
           },
         })),
-      parseResponse: (params, res: AxiosResponse<{ result: number }>) =>
+      parseResponse: (params, res: AxiosResponse<{ result: number; ts?: number }>) =>
         params.map((p) => ({
           params: p,
           response: {
             data: null,
             result: res.data.result,
+            timestamps: {
+              providerDataRequestedUnixMs: 0,
+              providerDataReceivedUnixMs: 0,
+              providerIndicatedTimeUnixMs: res.data.ts ?? 1,
+            },
           },
         })),
     })
@@ -87,11 +94,6 @@ test.before(async (t) => {
   t.context.ws = ws
   t.context.rest = rest
 
-  const composite = new CompositeTransport<CacheTestHttpTypes>({
-    transports: { ws, rest },
-    shouldUpdate: (next, current) => !current || (next?.result ?? 0) > (current?.result ?? 0),
-  })
-
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'test',
@@ -99,9 +101,13 @@ test.before(async (t) => {
       new AdapterEndpoint({
         name: 'test',
         inputParameters: cacheTestInputParameters,
-        transport: composite,
+        enableCompositeTransport: true,
+        transportRoutes: new TransportRoutes<CacheTestHttpTypes>()
+          .register('ws', ws)
+          .register('rest', rest),
       }),
     ],
+    config: new AdapterConfig({}, { envDefaultOverrides: { COMPOSITE_TRANSPORT: true } }),
   })
 
   await TestAdapter.start(adapter, t.context)
@@ -122,7 +128,7 @@ test.serial(
     axiosMock.onGet(`${WS_PROVIDER}/price`, { params: { base: 'ETH', factor: 5 } }).reply(500)
     axiosMock
       .onGet(`${REST_PROVIDER}/price`, { params: { base: 'ETH', factor: 5 } })
-      .reply(200, { result: 42 })
+      .reply(200, { result: 42, ts: 100 })
 
     const res = await t.context.testAdapter.request({ base: 'ETH', factor: 5 })
 
@@ -134,19 +140,19 @@ test.serial(
 )
 
 test.serial(
-  'composite transport merges child writes using shouldUpdate when run under an adapter',
+  'composite transport merges child writes by providerIndicatedTimeUnixMs when run under an adapter',
   async (t) => {
     axiosMock
       .onGet(`${WS_PROVIDER}/price`, { params: { base: 'BTC', factor: 3 } })
-      .reply(200, { result: 10 })
+      .reply(200, { result: 10, ts: 1000 })
     axiosMock
       .onGet(`${REST_PROVIDER}/price`, { params: { base: 'BTC', factor: 3 } })
-      .reply(200, { result: 100 })
+      .reply(200, { result: 100, ts: 2000 })
 
     t.is(t.context.ws.name, 'ws')
     t.is(t.context.rest.name, 'rest')
 
-    const res = await t.context.testAdapter.request({ base: 'BTC', factor: 3 })
+    const res = await t.context.testAdapter.request({ base: 'BTC', factor: 3, transport: 'rest' })
 
     t.is(res.statusCode, 200)
     t.is(res.json().result, 100)
@@ -187,11 +193,6 @@ test.serial(
     const workingTransport = new CountingCacheHttpTransport('working', WS_PROVIDER)
     const throwingTransport = new ThrowingTransport<CacheTestHttpTypes>()
 
-    const composite = new CompositeTransport<CacheTestHttpTypes>({
-      transports: { working: workingTransport, throwing: throwingTransport },
-      shouldUpdate: (next, current) => !current || (next?.result ?? 0) > (current?.result ?? 0),
-    })
-
     const adapter = new Adapter({
       name: 'TEST_THROWING',
       defaultEndpoint: 'test',
@@ -199,9 +200,13 @@ test.serial(
         new AdapterEndpoint({
           name: 'test',
           inputParameters: cacheTestInputParameters,
-          transport: composite,
+          enableCompositeTransport: true,
+          transportRoutes: new TransportRoutes<CacheTestHttpTypes>()
+            .register('working', workingTransport)
+            .register('throwing', throwingTransport),
         }),
       ],
+      config: new AdapterConfig({}, { envDefaultOverrides: { COMPOSITE_TRANSPORT: true } }),
     })
 
     const localContext = { clock: t.context.clock } as typeof t.context
@@ -209,7 +214,7 @@ test.serial(
 
     axiosMock
       .onGet(`${WS_PROVIDER}/price`, { params: { base: 'LINK', factor: 2 } })
-      .reply(200, { result: 77 })
+      .reply(200, { result: 77, ts: 100 })
 
     const res = await localAdapter.request({ base: 'LINK', factor: 2 })
 
@@ -218,5 +223,69 @@ test.serial(
     t.is(workingTransport.registerRequestCalls, 1)
 
     await localAdapter.api.close()
+  },
+)
+
+test.serial(
+  'enableCompositeTransport does not use composite routing when COMPOSITE_TRANSPORT is false',
+  async (t) => {
+    const ws = new CountingCacheHttpTransport('ws', WS_PROVIDER)
+    const rest = new CountingCacheHttpTransport('rest', REST_PROVIDER)
+
+    const adapter = new Adapter({
+      name: 'TEST_COMPOSITE_OFF',
+      defaultEndpoint: 'test',
+      endpoints: [
+        new AdapterEndpoint({
+          name: 'test',
+          inputParameters: cacheTestInputParameters,
+          enableCompositeTransport: true,
+          transportRoutes: new TransportRoutes<CacheTestHttpTypes>()
+            .register('ws', ws)
+            .register('rest', rest),
+        }),
+      ],
+      config: new AdapterConfig({}, { envDefaultOverrides: { COMPOSITE_TRANSPORT: false } }),
+    })
+
+    const localContext = { clock: t.context.clock } as typeof t.context
+    const localAdapter = await TestAdapter.start(adapter, localContext)
+
+    axiosMock
+      .onGet(`${REST_PROVIDER}/price`, { params: { base: 'SOL', factor: 7 } })
+      .reply(200, { result: 99, ts: 50 })
+
+    const res = await localAdapter.request({ base: 'SOL', factor: 7, transport: 'rest' })
+
+    t.is(res.statusCode, 200)
+    t.is(res.json().result, 99)
+    t.is(ws.registerRequestCalls, 0)
+    t.is(rest.registerRequestCalls, 1)
+
+    await localAdapter.api.close()
+  },
+)
+
+test.serial(
+  'AdapterEndpoint throws when enableCompositeTransport is true with only one transport',
+  (t) => {
+    const onlyTransport = new CountingCacheHttpTransport('only', WS_PROVIDER)
+
+    const error = t.throws<AdapterError>(
+      () =>
+        new AdapterEndpoint({
+          name: 'test',
+          inputParameters: cacheTestInputParameters,
+          enableCompositeTransport: true,
+          transportRoutes: new TransportRoutes<CacheTestHttpTypes>().register(
+            'only',
+            onlyTransport,
+          ),
+        }),
+      { instanceOf: AdapterError },
+    )
+
+    t.is(error?.message, 'Composite transport requires at least 2 transports')
+    t.is(error?.statusCode, 400)
   },
 )
