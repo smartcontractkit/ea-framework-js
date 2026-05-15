@@ -2,33 +2,18 @@ import { EndpointContext } from '../adapter'
 import { CompareResponseCache } from '../cache/response-cache/compare'
 import { ResponseCache } from '../cache/response'
 import { makeLogger } from '../util'
-import { AdapterRequest, AdapterResponse } from '../util/types'
+import { AdapterRequest } from '../util/types'
 import { TypeFromDefinition } from '../validation/input-params'
 import type { Transport, TransportDependencies, TransportGenerics } from '.'
 
 const logger = makeLogger('CompositeTransport')
 
-export type CompositeTransportConfig<T extends TransportGenerics> = {
-  transports: Record<string, Transport<T>>
-
-  /**
-   * @param next - the next response to be written to the cache
-   * @param current - the current response in the cache
-   * @returns true if next should replace current in cache
-   */
-  shouldUpdate: (
-    next: AdapterResponse<T['Response']>,
-    current?: AdapterResponse<T['Response']>,
-  ) => boolean
-}
-
-// Send requests to multiple transports and merge responses into a single cache according to shouldUpdate
+// Send requests to multiple transports and merge responses into a single cache according to bigger providerIndicatedTimeUnixMs
 export class CompositeTransport<T extends TransportGenerics> implements Transport<T> {
   name!: string
   responseCache!: ResponseCache<T>
-  private transports: Transport<T>[] = []
 
-  constructor(private readonly config: CompositeTransportConfig<T>) {}
+  constructor(private readonly transports: Record<string, Transport<T>>) {}
 
   async initialize(
     dependencies: TransportDependencies<T>,
@@ -42,11 +27,13 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
     const compareCache = new CompareResponseCache(
       transportName,
       this.responseCache,
-      this.config.shouldUpdate,
+      (next, current) =>
+        (next.timestamps?.providerIndicatedTimeUnixMs ?? 0) >
+        (current?.timestamps?.providerIndicatedTimeUnixMs ?? 0),
     )
 
     await Promise.all(
-      Object.entries(this.config.transports).map(([name, transport]) =>
+      Object.entries(this.transports).map(([name, transport]) =>
         transport.initialize(
           { ...dependencies, responseCache: compareCache },
           adapterSettings,
@@ -55,8 +42,6 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
         ),
       ),
     )
-
-    this.transports = Object.values(this.config.transports)
   }
 
   async registerRequest(
@@ -64,7 +49,7 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
     adapterSettings: T['Settings'],
   ): Promise<void> {
     const results = await Promise.allSettled(
-      this.transports.map((t) => t.registerRequest?.(req, adapterSettings)),
+      Object.values(this.transports).map((t) => t.registerRequest?.(req, adapterSettings)),
     )
     results
       .filter((r) => r.status === 'rejected')
@@ -75,7 +60,7 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
 
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
     const results = await Promise.allSettled(
-      this.transports.map((t) => t.backgroundExecute?.(context)),
+      Object.values(this.transports).map((t) => t.backgroundExecute?.(context)),
     )
 
     results
