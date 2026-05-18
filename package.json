@@ -47,7 +47,7 @@
     "@eslint/eslintrc": "3.3.5",
     "@eslint/js": "10.0.1",
     "@sinonjs/fake-timers": "15.4.0",
-    "@types/node": "24.12.3",
+    "@types/node": "24.12.4",
     "@types/sinonjs__fake-timers": "15.0.1",
     "@types/ws": "8.18.1",
     "@typescript-eslint/eslint-plugin": "8.59.2",
