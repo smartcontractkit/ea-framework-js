@@ -555,9 +555,7 @@ test.serial('should not inflate failover metric while connection is closed', asy
       transport_name: 'default_single_transport',
       url: ENDPOINT_URL,
     },
-    // This should be 1 but it's constantly increasing because the transport
-    // doesn't realize the connection is closed.
-    expectedValue: 49,
+    expectedValue: 1,
   })
 
   testAdapter.api.close()

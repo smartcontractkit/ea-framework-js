@@ -426,7 +426,6 @@ export class WebSocketTransport<
       timeSinceLastActivity > 0 &&
       timeSinceLastActivity > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
 
-    let connectionClosed = this.connectionClosed()
     logger.trace(`WS conn staleness info: 
       now: ${now} |
       timeSinceLastMessage: ${timeSinceLastMessage} |
@@ -460,7 +459,7 @@ export class WebSocketTransport<
     const urlChanged = this.currentUrl !== urlFromConfig
 
     // Check if we should close the current connection
-    if (!connectionClosed && (urlChanged || connectionUnresponsive)) {
+    if (!this.connectionClosed() && (urlChanged || connectionUnresponsive)) {
       if (urlChanged) {
         logger.info('Websocket URL has changed, closing connection to reconnect...')
         censorLogs(() =>
@@ -484,7 +483,7 @@ export class WebSocketTransport<
         await sleep(1000 - timeSinceConnectionOpened)
       }
       this.wsConnection?.close(1000)
-      connectionClosed = true
+      this.wsConnection = undefined
 
       if (subscriptions.desired.length) {
         // Clear subscription metrics for all active subscriptions
@@ -500,7 +499,7 @@ export class WebSocketTransport<
     }
 
     // Check if we need to open a new connection
-    if (connectionClosed && subscriptions.desired.length) {
+    if (this.connectionClosed() && subscriptions.desired.length) {
       logger.debug('No established connection and new subscriptions available, connecting to WS')
       const options =
         this.config.options && (await this.config.options(context, subscriptions.desired))
@@ -518,14 +517,13 @@ export class WebSocketTransport<
       this.wsConnection = await this.establishWsConnection(context, urlFromConfig, options)
 
       // Now that we successfully opened the connection, we can reset the variables
-      connectionClosed = false
       this.connectionOpenedAt = Date.now()
     }
 
     // Send messages only if the connection is open
     // Otherwise we could encounter the case where we just closed the connection because there's no desired ones,
     // but without this check we'd attempt to send out all the unsubscribe messages
-    if (!connectionClosed) {
+    if (!this.connectionClosed()) {
       logger.debug('Connection is open, sending subs/unsubs if there are any')
       const builders = this.config.builders
       if (builders) {
