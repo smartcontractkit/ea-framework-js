@@ -13,7 +13,12 @@ import {
   type WebSocketTransportConfig,
 } from '../../src/transports'
 import { SingleNumberResultResponse, sleep } from '../../src/util'
-import { mockWebSocketProvider, runAllUntilTime, TestAdapter } from '../../src/util/testing-utils'
+import {
+  mockWebSocketProvider,
+  runAllUntil,
+  runAllUntilTime,
+  TestAdapter,
+} from '../../src/util/testing-utils'
 import { InputParameters } from '../../src/validation'
 
 export const test = untypedTest as TestFn<{
@@ -485,6 +490,80 @@ test.serial('reconnects if provider stops sending expected messages', async (t) 
   testAdapter.api.close()
   mockWsServer.close()
   await t.context.clock.runToLastAsync()
+})
+
+test.serial('should not inflate failover metric while connection is closed', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  const WS_SUBSCRIPTION_UNRESPONSIVE_TTL = 120_000
+  process.env['METRICS_ENABLED'] = 'true'
+  eaMetrics.clear()
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  let connectionCounter = 0
+
+  mockWsServer.on('connection', (socket) => {
+    let counter = 0
+    const parseMessage = () => {
+      if (counter++ === 0) {
+        socket.send(JSON.stringify({ error: '' }))
+      }
+    }
+    connectionCounter++
+    socket.on('message', parseMessage)
+  })
+
+  const adapter = createAdapter({
+    WS_SUBSCRIPTION_TTL: 30_000,
+    WS_SUBSCRIPTION_UNRESPONSIVE_TTL,
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  const error = await testAdapter.request({
+    base,
+    quote,
+  })
+  t.is(error.statusCode, 504)
+
+  await runAllUntil(t.context.clock, () => connectionCounter >= 1)
+  t.is(connectionCounter, 1)
+
+  await runAllUntilTime(t.context.clock, WS_SUBSCRIPTION_UNRESPONSIVE_TTL + 1000)
+
+  // The connection was closed because it was unresponsive but it wasn't
+  // reopened because all the subscriptions expired.
+  t.is(connectionCounter, 1)
+  ;(await testAdapter.getMetrics()).assert(t, {
+    name: 'ws_connection_failover_count',
+    labels: {
+      transport_name: 'default_single_transport',
+      url: ENDPOINT_URL,
+    },
+    expectedValue: 1,
+  })
+
+  // Even after waiting a long time, the connection counter and failover metric
+  // should remain the same.
+  await runAllUntilTime(t.context.clock, 2 * WS_SUBSCRIPTION_UNRESPONSIVE_TTL)
+  t.is(connectionCounter, 1)
+  ;(await testAdapter.getMetrics()).assert(t, {
+    name: 'ws_connection_failover_count',
+    labels: {
+      transport_name: 'default_single_transport',
+      url: ENDPOINT_URL,
+    },
+    // This should be 1 but it's constantly increasing because the transport
+    // doesn't realize the connection is closed.
+    expectedValue: 49,
+  })
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+  process.env['METRICS_ENABLED'] = 'false'
 })
 
 test.serial('resubscribes after reconnection if server closes connection', async (t) => {
