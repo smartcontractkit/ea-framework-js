@@ -152,7 +152,7 @@ export default class extends Generator.default {
     )
 
     // Create endpoint and transport files
-    Object.values(this.props.endpoints).forEach(({ inputEndpointName, inputTransports, endpointAliases }) => {
+    Object.values(this.props.endpoints).forEach(({ inputEndpointName, inputTransports, endpointAliases, normalizedEndpointNameCap }) => {
       if (inputTransports.length > 1) {
         // Router endpoints
         this.fs.copyTpl(
@@ -171,7 +171,7 @@ export default class extends Generator.default {
           this.fs.copyTpl(
             this.templatePath(`src/transport/${transport.type}.ts.ejs`),
             this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/transport/${inputEndpointName}-${transport.type}.ts`),
-            { inputEndpointName, includeComments: this.props.includeComments },
+            { inputEndpointName, normalizedEndpointNameCap, includeComments: this.props.includeComments }
           )
         })
       } else {
@@ -191,7 +191,7 @@ export default class extends Generator.default {
         this.fs.copyTpl(
           this.templatePath(`src/transport/${inputTransports[0].type}.ts.ejs`),
           this.destinationPath(`${this.args[0]}/${this.props.adapterName}/src/transport/${inputEndpointName}.ts`),
-          { inputEndpointName, includeComments: this.props.includeComments },
+          { inputEndpointName, normalizedEndpointNameCap, includeComments: this.props.includeComments },
         )
       }
     })
@@ -219,10 +219,20 @@ export default class extends Generator.default {
     // Create adapter.test.ts if there is at least one endpoint with httpTransport
     if (httpEndpoints.length) {
       this.fs.copyTpl(
-        this.templatePath(`test/adapter.test.ts.ejs`),
+        this.templatePath(`test/integration/adapter.test.ts.ejs`),
         this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/adapter.test.ts`),
         { endpoints: httpEndpoints, transportName: 'rest', setBgExecuteMsEnv: false },
       )
+
+      // Create http unit test files
+      for (const { inputEndpointName, normalizedEndpointNameCap, inputTransports } of httpEndpoints) {
+        const transportFileBaseName = inputTransports.length > 1 ? `${inputEndpointName}-http` : inputEndpointName
+        this.fs.copyTpl(
+          this.templatePath(`test/unit/http.test.ts.ejs`),
+          this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/unit/${transportFileBaseName}.test.ts`),
+          { inputEndpointName, normalizedEndpointNameCap, transportFileBaseName },
+        )
+      }
     }
 
     // Create adapter.test.ts or adapter-ws.test.ts if there is at least one endpoint with wsTransport
@@ -232,7 +242,7 @@ export default class extends Generator.default {
         fileName = 'adapter-ws.test.ts'
       }
       this.fs.copyTpl(
-        this.templatePath(`test/adapter-ws.test.ts.ejs`),
+        this.templatePath(`test/integration/adapter-ws.test.ts.ejs`),
         this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/${fileName}`),
         { endpoints: wsEndpoints },
       )
@@ -248,7 +258,7 @@ export default class extends Generator.default {
         fileName = 'adapter-custom-fg.test.ts'
       }
       this.fs.copyTpl(
-        this.templatePath(`test/adapter.test.ts.ejs`),
+        this.templatePath(`test/integration/adapter.test.ts.ejs`),
         this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/${fileName}`),
         { endpoints: customFgEndpoints, transportName: 'customfg', setBgExecuteMsEnv: false },
       )
@@ -259,7 +269,7 @@ export default class extends Generator.default {
         fileName = 'adapter-custom-bg.test.ts'
       }
       this.fs.copyTpl(
-        this.templatePath(`test/adapter.test.ts.ejs`),
+        this.templatePath(`test/integration/adapter.test.ts.ejs`),
         this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/${fileName}`),
         { endpoints: customBgEndpoints, transportName: 'custombg', setBgExecuteMsEnv: true },
       )
@@ -267,7 +277,7 @@ export default class extends Generator.default {
 
     // Copy test fixtures
     this.fs.copyTpl(
-      this.templatePath(`test/fixtures.ts.ejs`),
+      this.templatePath(`test/integration/fixtures.ts.ejs`),
       this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/fixtures.ts`),
       {
         includeWsFixtures: wsEndpoints.length > 0,
