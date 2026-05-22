@@ -107,6 +107,21 @@ export async function runAllUntilTime(clock: InstalledClock, time: number): Prom
   }
 }
 
+export async function runAllUntilSettled<T>(
+  clock: InstalledClock,
+  promise: Promise<T>,
+): Promise<T> {
+  let settled = false
+  try {
+    // Return the derived promise to avoid unhandled promise rejections.
+    return promise.finally(() => {
+      settled = true
+    })
+  } finally {
+    await runAllUntil(clock, () => settled)
+  }
+}
+
 export class RedisMock {
   store = new LocalCache<string>(10000)
   keys: { [key: string]: string } = {}
