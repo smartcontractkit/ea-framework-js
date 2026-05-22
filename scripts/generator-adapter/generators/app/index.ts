@@ -246,6 +246,16 @@ export default class extends Generator.default {
         this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/${fileName}`),
         { endpoints: wsEndpoints },
       )
+
+      // Create ws unit test files
+      for (const { inputEndpointName, normalizedEndpointNameCap, inputTransports } of wsEndpoints) {
+        const transportFileBaseName = inputTransports.length > 1 ? `${inputEndpointName}-ws` : inputEndpointName
+        this.fs.copyTpl(
+          this.templatePath(`test/unit/ws.test.ts.ejs`),
+          this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/unit/${transportFileBaseName}.test.ts`),
+          { inputEndpointName, normalizedEndpointNameCap, transportFileBaseName },
+        )
+      }
     }
 
     // Create adapter.test.ts or adapter-custom.test.ts if there is at least one endpoint with customTransport.
