@@ -6,7 +6,7 @@
   "repository": "git://github.com/smartcontractkit/ea-framework-js.git",
   "packageManager": "yarn@1.22.22",
   "dependencies": {
-    "@date-fns/tz": "1.4.1",
+    "@date-fns/tz": "1.5.0",
     "ajv": "8.20.0",
     "axios": "1.16.1",
     "eventsource": "4.1.0",
