@@ -1,9 +1,9 @@
 import { isAddress } from 'ethers'
 import { address as solanaAddress } from '@solana/kit'
 
-export const validateEthereumAddress = (address?: string | null) => isAddress(address)
+export const isValidEthereumAddress = (address?: string | null) => isAddress(address)
 
-export const validateEthereumWithdrawalCredentials = (address?: string | null) => {
+export const isValidEthereumWithdrawalCredentials = (address?: string | null) => {
   if (!address || address.length === 0) {
     return false
   }
@@ -15,7 +15,7 @@ export const validateEthereumWithdrawalCredentials = (address?: string | null) =
   )
 }
 
-export const validateBitcoinAddress = (address?: string | null) => {
+export const isValidBitcoinAddress = (address?: string | null) => {
   if (!address || address.length === 0) {
     return false
   }
@@ -33,7 +33,7 @@ export const validateBitcoinAddress = (address?: string | null) => {
   }
 }
 
-export const validateSolanaAddress = (address?: string | null) => {
+export const isValidSolanaAddress = (address?: string | null) => {
   if (!address || address.length === 0) {
     return false
   }
