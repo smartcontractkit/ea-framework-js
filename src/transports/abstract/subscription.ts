@@ -19,6 +19,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   subscriptionSet!: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
   subscriptionTtl!: number
   name!: string
+  initialized = false
 
   async initialize(
     dependencies: TransportDependencies<T>,
@@ -26,6 +27,10 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     endpointName: string,
     name: string,
   ): Promise<void> {
+    if (this.initialized) {
+      throw new Error(`Transport ${name} has already been initialized`)
+    }
+    this.initialized = true
     this.responseCache = dependencies.responseCache
     this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName, name)
     this.subscriptionTtl = this.getSubscriptionTtlFromConfig(adapterSettings) // Will be implemented by subclasses
