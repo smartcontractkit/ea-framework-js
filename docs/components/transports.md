@@ -13,6 +13,7 @@ The v3 framework provides transports to fetch data from a Provider using the com
 - [HTTP Transport](./transport-types/http-transport.md)
 - [Websocket Transport](./transport-types/websocket-transport.md)
 - [SSE Transport](./transport-types/sse-transport.md)
+- [Composite Transport](./transport-types/composite-transport.md)
 - [Custom Transport](./transport-types/custom-transport.md)
 
 ### Abstract Transports

@@ -1,6 +1,7 @@
-import { ResponseCache } from '../cache/response'
+import { SimpleResponseCache } from '../cache/response'
 import { AdapterSettings } from '../config'
 import { TransportRoutes } from '../transports'
+import { CompositeTransport } from '../transports/composite'
 import {
   AdapterRequest,
   AdapterRequestData,
@@ -46,6 +47,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     settings: T['Settings'],
   ) => string
   defaultTransport?: string
+  enableCompositeTransport?: boolean
 
   constructor(params: AdapterEndpointParams<T>) {
     this.name = params.name
@@ -55,6 +57,13 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       this.transportRoutes = params.transportRoutes
       this.customRouter = params.customRouter
       this.defaultTransport = params.defaultTransport
+      this.enableCompositeTransport = params.enableCompositeTransport
+      if (params.enableCompositeTransport && this.transportRoutes.routeNames().length < 2) {
+        throw new AdapterError({
+          statusCode: 400,
+          message: `Composite transport requires at least 2 transports`,
+        })
+      }
     } else {
       this.transportRoutes = new TransportRoutes<T>().register(
         DEFAULT_TRANSPORT_NAME,
@@ -83,7 +92,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     adapterSettings: T['Settings'],
   ): Promise<void> {
     this.adapterName = adapterName
-    const responseCache = new ResponseCache({
+    const responseCache = new SimpleResponseCache({
       dependencies,
       adapterSettings: adapterSettings as AdapterSettings,
       adapterName,
@@ -94,6 +103,20 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     const transportDependencies = {
       ...dependencies,
       responseCache,
+    }
+
+    if (this.enableCompositeTransport && !adapterSettings.COMPOSITE_TRANSPORT) {
+      logger.warn(
+        `enableCompositeTransport true for endpoint "${this.name}", but COMPOSITE_TRANSPORT is not enabled`,
+      )
+    }
+
+    if (this.enableCompositeTransport && adapterSettings.COMPOSITE_TRANSPORT) {
+      logger.debug(`Enabling composite transport for endpoint "${this.name}"...`)
+      this.transportRoutes = new TransportRoutes<T>().register(
+        DEFAULT_TRANSPORT_NAME,
+        new CompositeTransport(Object.fromEntries(this.transportRoutes.entries())),
+      )
     }
 
     logger.debug(`Initializing transports for endpoint "${this.name}"...`)

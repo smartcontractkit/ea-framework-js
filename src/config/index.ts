@@ -389,6 +389,11 @@ export const BaseSettingsDefinition = {
       'Whether to enable debug enpoints (/debug/*) for this adapter. Enabling them might consume more resources.',
     default: false,
   },
+  COMPOSITE_TRANSPORT: {
+    type: 'boolean',
+    description: 'Whether to use enableCompositeTransport parameter in AdapterEndpoint',
+    default: false,
+  },
 } as const satisfies SettingsDefinitionMap
 
 export const buildAdapterSettings = <
