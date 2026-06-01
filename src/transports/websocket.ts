@@ -44,10 +44,25 @@ export interface WebSocketUrlConfigFunctionParameters {
 }
 
 type WebSocketIndividualBuilders<T extends WebsocketTransportGenerics> = {
+  /**
+   * Builds a WS message that will be sent to subscribe to a specific feed
+   *
+   * @param params - the body of the adapter request
+   * @param context - the background context for the Adapter
+   * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
+   */
   subscribeMessage?: (
     params: TypeFromDefinition<T['Parameters']>,
     context: EndpointContext<T>,
   ) => unknown
+
+  /**
+   * Builds a WS message that will be sent to unsubscribe to a specific feed
+   *
+   * @param params - the body of the adapter request
+   * @param context - the background context for the Adapter
+   * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
+   */
   unsubscribeMessage?: (
     params: TypeFromDefinition<T['Parameters']>,
     context: EndpointContext<T>,
@@ -55,28 +70,29 @@ type WebSocketIndividualBuilders<T extends WebsocketTransportGenerics> = {
 }
 
 type WebSocketBatchBuilders<T extends WebsocketTransportGenerics> = {
+  /**
+   * Builds a single WS message that will be sent to subscribe to multiple feeds at once
+   *
+   * @param params - the list of adapter requests to subscribe to in this batch
+   * @param context - the background context for the Adapter
+   * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
+   */
   batchSubscribeMessage?: (
     params: TypeFromDefinition<T['Parameters']>[],
     context: EndpointContext<T>,
   ) => unknown
+
+  /**
+   * Builds a single WS message that will be sent to unsubscribe from multiple feeds at once
+   *
+   * @param params - the list of adapter requests to unsubscribe from in this batch
+   * @param context - the background context for the Adapter
+   * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
+   */
   batchUnsubscribeMessage?: (
     params: TypeFromDefinition<T['Parameters']>[],
     context: EndpointContext<T>,
   ) => unknown
-}
-
-function usesBatchWsBuilders<T extends WebsocketTransportGenerics>(
-  builders: WebSocketIndividualBuilders<T> | WebSocketBatchBuilders<T>,
-): builders is WebSocketBatchBuilders<T> & {
-  batchSubscribeMessage: NonNullable<WebSocketBatchBuilders<T>['batchSubscribeMessage']>
-  batchUnsubscribeMessage: NonNullable<WebSocketBatchBuilders<T>['batchUnsubscribeMessage']>
-} {
-  return (
-    'batchSubscribeMessage' in builders &&
-    'batchUnsubscribeMessage' in builders &&
-    !!builders.batchSubscribeMessage &&
-    !!builders.batchUnsubscribeMessage
-  )
 }
 
 /**
@@ -162,9 +178,9 @@ export interface WebSocketTransportConfig<T extends WebsocketTransportGenerics> 
 
   /**
    * Map of "builders", functions that will be used to prepare specific WS messages.
-   * Provide either batch builders (`batchSubscribeMessage` / `batchUnsubscribeMessage`)
-   * or per-subscription builders (`subscribeMessage` / `unsubscribeMessage`), not both.
-   * When both batch builders are configured, the batch path is used.
+   * Provide either per-subscription builders (`subscribeMessage` / `unsubscribeMessage`)
+   * or batch builders (`batchSubscribeMessage` / `batchUnsubscribeMessage`), not both.
+   * When `batchSubscribeMessage` is present, the batch path is used.
    */
   builders?: WebSocketIndividualBuilders<T> | WebSocketBatchBuilders<T>
 }
@@ -544,7 +560,7 @@ export class WebSocketTransport<
       logger.debug('Connection is open, sending subs/unsubs if there are any')
       const builders = this.config.builders
       if (builders) {
-        if (usesBatchWsBuilders(builders)) {
+        if ('batchSubscribeMessage' in builders) {
           const { batchSubscribeMessage, batchUnsubscribeMessage } = builders
           await this.sendMessages(
             context,
