@@ -183,6 +183,9 @@ type MultiTransportAdapterEndpointParams<T extends EndpointGenerics> = {
 
   /** If no value is returned from the custom router or the default (transport param), which transport to use */
   defaultTransport?: string
+
+  /** If true, roll all transportRoutes under a new CompositeTransport */
+  enableCompositeTransport?: boolean
 }
 
 /**

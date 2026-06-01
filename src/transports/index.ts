@@ -7,6 +7,7 @@ import { InputParametersDefinition, TypeFromDefinition } from '../validation/inp
 export * from './http'
 export * from './sse'
 export * from './websocket'
+export * from './composite'
 
 /**
  * Helper struct type that will be used to pass types to the generic parameters of a Transport.
