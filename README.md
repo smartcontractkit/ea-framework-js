@@ -1,7 +1,7 @@
 # EA Framework v3
 
 [![NPM version](https://img.shields.io/npm/v/@chainlink/external-adapter-framework.svg?style=flat)](https://www.npmjs.com/package/@chainlink/external-adapter-framework)
-![Coverage](https://img.shields.io/badge/coverage-99.09%25-green)
+![Coverage](https://img.shields.io/badge/coverage-99.06%25-green)
 
 Framework to create External adapters, microservices that serve as middleware to facilitate connections between Chainlink Nodes and Data Providers (DP).
 
@@ -40,6 +40,7 @@ yarn # Install yarn dependencies
     - [Subscription](./docs/components/transport-types/subscription-transport.md)
     - [Streaming](./docs/components/transport-types/streaming-transport.md)
     - [Custom](./docs/components/transport-types/custom-transport.md)
+    - [Composite](./docs/components/transport-types/composite-transport.md)
 - Guides
   - [Porting a v2 EA to v3](./docs/guides/porting-a-v2-ea-to-v3.md)
   - [Creating a new v3 EA](./docs/guides/creating-a-new-v3-ea.md)
