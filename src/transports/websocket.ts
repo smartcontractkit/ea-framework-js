@@ -552,7 +552,9 @@ export class WebSocketTransport<
               ? [batchSubscribeMessage(subscriptions.new, context)].filter((m) => m !== undefined)
               : subscriptions.new,
             batchUnsubscribeMessage
-              ? [batchUnsubscribeMessage(subscriptions.stale, context)].filter((m) => m !== undefined)
+              ? [batchUnsubscribeMessage(subscriptions.stale, context)].filter(
+                  (m) => m !== undefined,
+                )
               : subscriptions.stale,
           )
         } else {
