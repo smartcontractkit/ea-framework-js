@@ -57,27 +57,28 @@ export class CompareResponseCache<
       value: AdapterResponse<T['Response']>
     }[],
   ) {
-    const filteredEntries: {
-      key: string
-      value: AdapterResponse<T['Response']>
-    }[] = []
+    const filteredEntries = (
+      await Promise.all(
+        entries.flatMap(async ({ key, value }) => {
+          if (!this.shouldUpdate(value, this.localCache.get(key))) {
+            return []
+          }
+          const entryInCache = await this.get(key)
+          if (!this.shouldUpdate(value, entryInCache)) {
+            return []
+          }
+          return [{ key, value }]
+        }),
+      )
+    ).flat()
 
-    for (const { key, value } of entries) {
-      if (!this.shouldUpdate(value, this.localCache.get(key))) {
-        continue
-      }
-      const entryInCache = await this.get(key)
-      if (!this.shouldUpdate(value, entryInCache)) {
-        continue
-      }
-      filteredEntries.push({ key, value })
+    if (filteredEntries.length > 0) {
+      await this.responseCache.writeEntries(filteredEntries)
+
+      filteredEntries.forEach(({ key, value }) => {
+        this.localCache.set(key, value)
+      })
     }
-
-    await this.responseCache.writeEntries(filteredEntries)
-
-    filteredEntries.forEach(({ key, value }) => {
-      this.localCache.set(key, value)
-    })
   }
 
   override async writeTTL(

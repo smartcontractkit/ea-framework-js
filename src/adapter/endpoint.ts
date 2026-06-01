@@ -1,6 +1,7 @@
 import { SimpleResponseCache } from '../cache/response'
 import { AdapterSettings } from '../config'
-import { CompositeTransport, TransportRoutes } from '../transports'
+import { TransportRoutes } from '../transports'
+import { CompositeTransport } from '../transports/composite'
 import {
   AdapterRequest,
   AdapterRequestData,
@@ -102,6 +103,12 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     const transportDependencies = {
       ...dependencies,
       responseCache,
+    }
+
+    if (this.enableCompositeTransport && !adapterSettings.COMPOSITE_TRANSPORT) {
+      logger.warn(
+        `enableCompositeTransport true for endpoint "${this.name}", but COMPOSITE_TRANSPORT is not enabled`,
+      )
     }
 
     if (this.enableCompositeTransport && adapterSettings.COMPOSITE_TRANSPORT) {

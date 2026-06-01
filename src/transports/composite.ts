@@ -48,25 +48,25 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
     req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
     adapterSettings: T['Settings'],
   ): Promise<void> {
+    const entries = Object.entries(this.transports)
     const results = await Promise.allSettled(
-      Object.values(this.transports).map((t) => t.registerRequest?.(req, adapterSettings)),
+      entries.map(([, t]) => t.registerRequest?.(req, adapterSettings)),
     )
-    results
-      .filter((r) => r.status === 'rejected')
-      .forEach((r) => {
-        logger.error(`Transport registerRequest failed: ${r.reason}`)
-      })
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        logger.error(`Transport "${entries[i][0]}" registerRequest failed: ${r.reason}`)
+      }
+    })
   }
 
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
-    const results = await Promise.allSettled(
-      Object.values(this.transports).map((t) => t.backgroundExecute?.(context)),
-    )
+    const entries = Object.entries(this.transports)
+    const results = await Promise.allSettled(entries.map(([, t]) => t.backgroundExecute?.(context)))
 
-    results
-      .filter((r) => r.status === 'rejected')
-      .forEach((r) => {
-        logger.error(`Transport backgroundExecute failed: ${r.reason}`)
-      })
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        logger.error(`Transport "${entries[i][0]}" backgroundExecute failed: ${r.reason}`)
+      }
+    })
   }
 }
