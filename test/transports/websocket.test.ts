@@ -2335,4 +2335,3 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
   mockWsServer.close()
   await t.context.clock.runToLastAsync()
 })
-
