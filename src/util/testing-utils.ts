@@ -93,6 +93,7 @@ export async function runPeriodicAsyncBackgroundExecution(
 }
 
 export async function runAllUntil(clock: InstalledClock, isComplete: () => boolean): Promise<void> {
+  await clock.tickAsync(0)
   while (!isComplete()) {
     await clock.nextAsync()
   }
@@ -228,7 +229,7 @@ export function assertEqualResponses(
   t.deepEqual(expected, actual)
 }
 
-class TestMetrics {
+export class TestMetrics {
   map = new Map<string, number>()
 
   private replaceQuotes(s: string) {
@@ -261,7 +262,7 @@ class TestMetrics {
     }
   }
 
-  private get(
+  get(
     t: ExecutionContext,
     { name, labels }: { name: string; labels?: Record<string, string> },
   ): number | undefined {
