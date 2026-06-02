@@ -31,7 +31,7 @@ export class FixedIntervalRateLimiter implements RateLimiter {
   msUntilNextExecution(): number {
     const now = Date.now()
 
-    if (!this.lastRequestAt) {
+    if (this.lastRequestAt === null) {
       logger.trace(
         `First request for the rate limiter, sending immediately. All subsequent requests will wait ${this.period}ms.`,
       )
