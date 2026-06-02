@@ -1,6 +1,6 @@
 # Websocket Transport
 
-The `WebSocketTransport` is used to fetch data from a Provider using Websocket protocol. In order to use it you need to provide a `url` function to provide the address where the WS connection should be established, and a handler for any `message` events received from the Websocket connection. Additionally, you can also provide options for the connection, a handler for Websocket `open` events (e.g. for authentication flows), and builders to customize subscribe and unsubscribe messages.
+The `WebSocketTransport` is used to fetch data from a Provider using Websocket protocol. In order to use it you need to provide a `url` function to provide the address where the WS connection should be established, and a handler for any `message` events received from the Websocket connection. Additionally, you can also provide options for the connection, a handler for Websocket `open` events (e.g. for authentication flows), and builders to customize subscribe and unsubscribe messages (either per feed or as a batch).
 
 Example usage of WebSocketTransport:
 
@@ -107,7 +107,42 @@ In the example above, after the connection is established a custom authenticatio
 
 ### Sending messages
 
-As shown in the first example, **builders** object contains two methods, **subscribeMessage** and **unsubscribeMessage**. These methods can be provided for the WS transport to use to send subscription/unsubscription messages to Data Provider. Both accept _params_ which is the current input parameters of the request and should return object or string as payload that will be sent to Data Provider. If the payload is object it will be automatically stringified to JSON.
+The **builders** object prepares subscribe and unsubscribe messages sent to the Data Provider. Configure **either** the per-subscription builders or the batch builders, not both. When `batchSubscribeMessage` is present, the batch path is used.
+
+#### Per-subscription builders
+
+As shown in the first example, **builders** can contain **subscribeMessage** and **unsubscribeMessage**. These methods are called once per feed. Both accept _params_ (the current input parameters of the request) and should return an object or string payload. Objects are automatically stringified to JSON. Returning `undefined` skips sending that message.
+
+```typescript
+builders: {
+  subscribeMessage: (params) => ({
+    action: 'subscribe',
+    symbols: [`${params.base}.${params.quote}`],
+  }),
+  unsubscribeMessage: (params) => `UNSUBSCRIBE:${params.base}.${params.quote}`,
+}
+```
+
+#### Batch builders
+
+Some providers accept a single message that subscribes or unsubscribes from multiple feeds at once. Use **batchSubscribeMessage** and **batchUnsubscribeMessage** instead of the per-subscription methods above.
+
+Each batch builder receives the full list of new or stale subscriptions for the current background execute cycle and returns **one** message. The transport sends that message as a single WebSocket frame.
+
+```typescript
+builders: {
+  batchSubscribeMessage: (params) => ({
+    action: 'subscribe',
+    pairs: params.map((p) => `${p.base}/${p.quote}`),
+  }),
+  batchUnsubscribeMessage: (params) => ({
+    action: 'unsubscribe',
+    pairs: params.map((p) => `${p.base}/${p.quote}`),
+  }),
+}
+```
+
+When a feed is added or removed, only the delta (`subscriptions.new` or `subscriptions.stale`) is passed to the batch builder, so each cycle may produce a message covering one or more feeds depending on what changed.
 
 ### Heartbeat messages
 
