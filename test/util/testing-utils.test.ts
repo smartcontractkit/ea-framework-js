@@ -6,6 +6,7 @@ import {
   runAllUntilSettled,
   runAllUntilTime,
 } from '../../src/util/testing-utils'
+import { sleep } from '../../src/util'
 import { installTimers } from '../helper'
 
 test('make a stub', async (t) => {
@@ -165,6 +166,23 @@ test.serial(
   },
 )
 
+test.serial('runAllUntil does not advance time unnecessarily', async (t) => {
+  const clock = installTimers()
+  try {
+    let counter = 0
+    Promise.resolve().then(() => {
+      counter++
+    })
+    sleep(10) // Give runAllUntil a timer to advance to, although it shouldn't.
+    t.is(counter, 0)
+    await runAllUntil(clock, () => counter === 1)
+    t.is(counter, 1)
+    t.is(clock.now, 0)
+  } finally {
+    clock.uninstall()
+  }
+})
+
 test.serial(
   'runAllUntilTime advances clock by the specified amount and runs scheduled callbacks',
   async (t) => {
@@ -220,3 +238,24 @@ test.serial(
     }
   },
 )
+
+test.serial('runAllUntilSettled should not advance time unnecessarily', async (t) => {
+  const clock = installTimers()
+  try {
+    let done = false
+    const promise = new Promise<void>((resolve) => {
+      Promise.resolve().then(() => {
+        done = true
+        resolve()
+      })
+    })
+    sleep(10) // Give runAllUntil a timer to advance to, although it shouldn't.
+
+    t.is(done, false)
+    await runAllUntilSettled(clock, promise)
+    t.is(done, true)
+    t.is(clock.now, 0)
+  } finally {
+    clock.uninstall()
+  }
+})
