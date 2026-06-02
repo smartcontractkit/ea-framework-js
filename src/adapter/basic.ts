@@ -84,6 +84,7 @@ export class Adapter<
 
     this.config.initialize()
     this.normalizeEndpointNames()
+    this.filterEndpoints()
     this.calculateRateLimitAllocations()
     this.shutdownNotifier = new EventEmitter()
   }
@@ -181,6 +182,40 @@ export class Adapter<
     for (const endpoint of this.endpoints) {
       endpoint.name = endpoint.name.toLowerCase()
       endpoint.aliases = endpoint.aliases?.map((a) => a.toLowerCase())
+    }
+  }
+
+  private filterEndpoints() {
+    const enabledEndpoints = this.config.settings.EA_ENABLED_ENDPOINTS
+    if (!enabledEndpoints) {
+      return
+    }
+
+    const enabledSet = new Set(
+      enabledEndpoints.split(',').map((name) => name.trim().toLowerCase()),
+    )
+
+    const allNames = this.endpoints.map((e) => e.name)
+    this.endpoints = this.endpoints.filter((e) => enabledSet.has(e.name))
+
+    const excluded = allNames.filter((name) => !enabledSet.has(name))
+    if (excluded.length) {
+      logger.info(
+        `EA_ENABLED_ENDPOINTS is set — loaded [${this.endpoints.map((e) => e.name).join(', ')}], excluded [${excluded.join(', ')}]`,
+      )
+    }
+
+    if (this.endpoints.length === 0) {
+      throw new Error(
+        `EA_ENABLED_ENDPOINTS is set to "${enabledEndpoints}" but none of the adapter endpoints match. Available: [${allNames.join(', ')}]`,
+      )
+    }
+
+    if (this.defaultEndpoint && !enabledSet.has(this.defaultEndpoint)) {
+      logger.warn(
+        `Default endpoint "${this.defaultEndpoint}" was excluded by EA_ENABLED_ENDPOINTS, clearing it`,
+      )
+      this.defaultEndpoint = undefined
     }
   }
 

@@ -394,6 +394,12 @@ export const BaseSettingsDefinition = {
     description: 'Whether to use enableCompositeTransport parameter in AdapterEndpoint',
     default: false,
   },
+  EA_ENABLED_ENDPOINTS: {
+    description:
+      'Comma-separated list of endpoint names to load. If not set, all endpoints are loaded. Useful for local development to reduce log noise.',
+    type: 'string',
+    sensitive: false,
+  },
 } as const satisfies SettingsDefinitionMap
 
 export const buildAdapterSettings = <
