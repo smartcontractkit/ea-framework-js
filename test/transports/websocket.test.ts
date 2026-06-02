@@ -1945,3 +1945,154 @@ test.serial(
     await t.context.clock.runToLastAsync()
   },
 )
+
+const createBatchAdapter = (): Adapter => {
+  const websocketTransport = new WebSocketTransport<WebSocketTypes>({
+    url: () => ENDPOINT_URL,
+    handlers: {
+      message(message) {
+        if (!message.pair) {
+          return []
+        }
+        const [base, quote] = message.pair.split('/')
+        return [
+          {
+            params: { base, quote },
+            response: {
+              data: {
+                result: message.value,
+              },
+              result: message.value,
+              timestamps: {
+                providerIndicatedTimeUnixMs: Date.now(),
+              },
+            },
+          },
+        ]
+      },
+    },
+    builders: {
+      batchSubscribeMessage: (params) => ({
+        request: 'subscribe',
+        pairs: params.map((p) => `${p.base}/${p.quote}`),
+      }),
+      batchUnsubscribeMessage: (params) => ({
+        request: 'unsubscribe',
+        pairs: params.map((p) => `${p.base}/${p.quote}`),
+      }),
+    },
+  })
+
+  const webSocketEndpoint = new AdapterEndpoint({
+    name: 'TEST',
+    transport: websocketTransport,
+    inputParameters,
+  })
+
+  const config = new AdapterConfig(
+    {},
+    {
+      envDefaultOverrides: {
+        BACKGROUND_EXECUTE_MS_WS,
+        WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+      },
+    },
+  )
+
+  return new Adapter({
+    name: 'TEST',
+    defaultEndpoint: 'test',
+    endpoints: [webSocketEndpoint],
+    config,
+  })
+}
+
+test.serial('batch builders send one subscribe message for multiple feeds', async (t) => {
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  const subscribeMessages: Array<{ request: string; pairs: string[] }> = []
+
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', (rawMsg) => {
+      const parsed = JSON.parse(rawMsg.toString())
+      if (parsed.request === 'subscribe') {
+        subscribeMessages.push(parsed)
+        for (const pair of parsed.pairs) {
+          socket.send(JSON.stringify({ pair, value: price }))
+        }
+      }
+    })
+  })
+
+  const adapter = createBatchAdapter()
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base: 'ETH', quote: 'USD' },
+    expectedCacheSize: 1,
+    expectedResponse: {
+      data: { result: price },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base: 'BTC', quote: 'USD' },
+    expectedCacheSize: 2,
+    expectedResponse: {
+      data: { result: price },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+
+  t.is(subscribeMessages.length, 2)
+  t.deepEqual(subscribeMessages[0].pairs, ['ETH/USD'])
+  t.deepEqual(subscribeMessages[1].pairs, ['BTC/USD'])
+})
+
+test.serial('batch builders send one unsubscribe message when feeds go stale', async (t) => {
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', (rawMsg) => {
+      const parsed = JSON.parse(rawMsg.toString())
+      if (parsed.request === 'subscribe') {
+        for (const pair of parsed.pairs) {
+          socket.send(JSON.stringify({ pair, value: price }))
+        }
+      }
+    })
+  })
+
+  const adapter = createBatchAdapter()
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base: 'ETH', quote: 'USD' },
+    expectedResponse: {
+      data: { result: price },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  const duration =
+    Math.ceil(CACHE_MAX_AGE / adapter.config.settings.WS_SUBSCRIPTION_TTL) *
+      adapter.config.settings.WS_SUBSCRIPTION_TTL +
+    1
+  await runAllUntilTime(t.context.clock, duration)
+
+  const error = await testAdapter.request({ base: 'ETH', quote: 'USD' })
+  t.is(error.statusCode, 504)
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
