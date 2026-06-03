@@ -162,10 +162,10 @@ builders: {
 },
 ```
 
-| Mode | `batchSubscribeMessage` receives | Sent when |
-|------|----------------------------------|-----------|
-| `delta` (default) | `subscriptions.new` | `subscriptions.new.length > 0` |
-| `snapshot` | `subscriptions.desired` | `subscriptions.new.length > 0` |
+| Mode              | `batchSubscribeMessage` receives | Sent when                      |
+| ----------------- | -------------------------------- | ------------------------------ |
+| `delta` (default) | `subscriptions.new`              | `subscriptions.new.length > 0` |
+| `snapshot`        | `subscriptions.desired`          | `subscriptions.new.length > 0` |
 
 Unsubscribe messages are always sent for `subscriptions.stale` only. When both new and stale feeds exist in the same cycle, unsubscribes are sent before subscribes.
 

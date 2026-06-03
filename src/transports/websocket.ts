@@ -451,15 +451,16 @@ export class WebSocketTransport<
           context,
           // Avoid sending subscribe/unsubscribe messages if nothing new to send
           batchSubscribeMessage && subscriptions.new.length > 0
-            ? [batchSubscribeMessage(batchSubscriptionInputs, context)].filter((m) => m !== undefined)
+            ? [batchSubscribeMessage(batchSubscriptionInputs, context)].filter(
+                (m) => m !== undefined,
+              )
             : subscriptions.new,
           batchUnsubscribeMessage && subscriptions.stale.length > 0
             ? [batchUnsubscribeMessage(subscriptions.stale, context)].filter((m) => m !== undefined)
             : subscriptions.stale,
         )
       } else {
-        const { subscribeMessage, unsubscribeMessage } =
-          builders as WebSocketIndividualBuilders<T>
+        const { subscribeMessage, unsubscribeMessage } = builders as WebSocketIndividualBuilders<T>
         await this.sendMessages(
           context,
           subscribeMessage
