@@ -142,7 +142,32 @@ builders: {
 }
 ```
 
-When a feed is added or removed, only the delta (`subscriptions.new` or `subscriptions.stale`) is passed to the batch builder, so each cycle may produce a message covering one or more feeds depending on what changed.
+When a feed is added or removed, only the delta (`subscriptions.new` or `subscriptions.stale`) is passed to the batch builder by default, so each cycle may produce a message covering one or more feeds depending on what changed.
+
+#### Snapshot batch subscribe
+
+Some providers require the full desired subscription list on every subscribe message (not just new feeds). Set `options.batchSubscribeMode` to `'snapshot'`:
+
+```typescript
+builders: {
+  options: { batchSubscribeMode: 'snapshot' },
+  batchSubscribeMessage: (desired) => ({
+    action: 'subscribe',
+    pairs: desired.map((p) => `${p.base}/${p.quote}`),
+  }),
+  batchUnsubscribeMessage: (params) => ({
+    action: 'unsubscribe',
+    pairs: [`${params.base}/${params.quote}`],
+  }),
+},
+```
+
+| Mode              | `batchSubscribeMessage` receives | Sent when                      |
+| ----------------- | -------------------------------- | ------------------------------ |
+| `delta` (default) | `subscriptions.new`              | `subscriptions.new.length > 0` |
+| `snapshot`        | `subscriptions.desired`          | `subscriptions.new.length > 0` |
+
+Unsubscribe messages are always sent for `subscriptions.stale` only. When both new and stale feeds exist in the same cycle, unsubscribes are sent before subscribes.
 
 ### Heartbeat messages
 
