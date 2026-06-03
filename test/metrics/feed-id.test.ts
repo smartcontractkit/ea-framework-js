@@ -25,6 +25,11 @@ test.serial('no parameters returns N/A', async (t) => {
   t.is(calculateFeedId(t.context, {}), 'N/A')
 })
 
+test.serial('no parameters returns empty JSON', async (t) => {
+  t.context.adapterSettings.FEED_ID_JSON = true
+  t.is(calculateFeedId(t.context, {}), JSON.stringify({}))
+})
+
 test.serial('builds feed ID correctly from input params', async (t) => {
   t.context.inputParameters = new InputParameters({
     base: {

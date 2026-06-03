@@ -147,7 +147,7 @@ const calculateKey = <T extends EndpointGenerics>({
   adapterSettings: T['Settings']
 }) => {
   const paramsKey = Object.keys(data).length
-    ? calculateParamsKey(data, adapterSettings.MAX_COMMON_KEY_SIZE)
+    ? calculateParamsKey(data, adapterSettings.MAX_COMMON_KEY_SIZE, adapterSettings.FEED_ID_JSON)
     : adapterSettings.DEFAULT_CACHE_KEY
   return `${endpointName}-${transportName}-${paramsKey}`
 }
@@ -183,9 +183,10 @@ export const calculateFeedId = <T extends EndpointGenerics>(
 ): string => {
   if (Object.keys(data).length === 0) {
     logger.trace(`Cannot generate Feed ID without data`)
-    return 'N/A'
+    return adapterSettings.FEED_ID_JSON ? JSON.stringify({}) :'N/A'
   }
-  return calculateParamsKey(data, adapterSettings.MAX_COMMON_KEY_SIZE)
+  return calculateParamsKey(
+    data, adapterSettings.MAX_COMMON_KEY_SIZE, adapterSettings.FEED_ID_JSON)
 }
 
 /**
@@ -201,7 +202,7 @@ export const calculateFeedId = <T extends EndpointGenerics>(
  * // equals `{"base":"eth","quote":"btc"}`
  * ```
  */
-const calculateParamsKey = (data: unknown, maxSize: number): string => {
+const calculateParamsKey = (data: unknown, maxSize: number, isJsonOutput: boolean = false): string => {
   if (data && typeof data !== 'object') {
     throw new Error('Data to calculate cache key should be an object')
   }
@@ -209,6 +210,16 @@ const calculateParamsKey = (data: unknown, maxSize: number): string => {
   const cacheKey = JSON.stringify(data, (_, value) => {
     if (value && typeof value === 'string') {
       return value.toLowerCase()
+    }
+    
+    // We need to make cache keys/sha1 hashes deterministic
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return Object.keys(value)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, key) => {
+          acc[key] = (value as Record<string, unknown>)[key]
+          return acc
+        }, {})
     }
     return value
   })
@@ -219,7 +230,9 @@ const calculateParamsKey = (data: unknown, maxSize: number): string => {
     )
     const shasum = crypto.createHash('sha1')
     shasum.update(cacheKey)
-    return shasum.digest('base64')
+    const hash = shasum.digest('base64')
+
+    return isJsonOutput ? JSON.stringify({hash}) : hash
   }
 
   return cacheKey
