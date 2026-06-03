@@ -1946,7 +1946,10 @@ test.serial(
   },
 )
 
-const createBatchAdapter = (): Adapter => {
+const createBatchAdapter = (
+  envDefaultOverrides: Record<string, string | number | symbol>,
+  buildersOverride?: WebSocketTransportConfig<WebSocketTypes>['builders'],
+): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => ENDPOINT_URL,
     handlers: {
@@ -1971,15 +1974,17 @@ const createBatchAdapter = (): Adapter => {
         ]
       },
     },
-    builders: {
-      batchSubscribeMessage: (params) => ({
-        request: 'subscribe',
-        pairs: params.map((p) => `${p.base}/${p.quote}`),
-      }),
-      batchUnsubscribeMessage: (params) => ({
-        request: 'unsubscribe',
-        pairs: params.map((p) => `${p.base}/${p.quote}`),
-      }),
+    builders: buildersOverride ?? {
+      customSubscriptionMessages: (context, subscriptions) => {
+        const messages = []
+        if (subscriptions.new.length > 0) {
+          messages.push({ pairs: subscriptions.desired.map((s) => `${s.base}/${s.quote}`), request: 'subscribe' })
+        }
+        if (subscriptions.stale.length > 0) {
+          messages.push({ pairs: subscriptions.stale.map((s) => `${s.base}/${s.quote}`), request: 'unsubscribe' })
+        }
+        return messages
+      }
     },
   })
 
@@ -1994,7 +1999,7 @@ const createBatchAdapter = (): Adapter => {
     {
       envDefaultOverrides: {
         BACKGROUND_EXECUTE_MS_WS,
-        WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+        ...envDefaultOverrides,
       },
     },
   )
@@ -2024,7 +2029,7 @@ test.serial('batch builders send one subscribe message for multiple feeds', asyn
     })
   })
 
-  const adapter = createBatchAdapter()
+  const adapter = createBatchAdapter({})
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
   await testAdapter.startBackgroundExecuteThenGetResponse(t, {
@@ -2053,12 +2058,13 @@ test.serial('batch builders send one subscribe message for multiple feeds', asyn
 
   t.is(subscribeMessages.length, 2)
   t.deepEqual(subscribeMessages[0].pairs, ['ETH/USD'])
-  t.deepEqual(subscribeMessages[1].pairs, ['BTC/USD'])
+  t.deepEqual(subscribeMessages[1].pairs, ['ETH/USD', 'BTC/USD'])
 })
 
-test.serial('batch builders send one unsubscribe message when feeds go stale', async (t) => {
+test.only('batch builders send one unsubscribe message when feeds go stale', async (t) => {
   mockWebSocketProvider(WebSocketClassProvider)
   const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  const unsubscribeMessages: Array<{ request: string; pairs: string[] }> = []
 
   mockWsServer.on('connection', (socket) => {
     socket.on('message', (rawMsg) => {
@@ -2067,11 +2073,16 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
         for (const pair of parsed.pairs) {
           socket.send(JSON.stringify({ pair, value: price }))
         }
+      } else if (parsed.request === 'unsubscribe') {
+        unsubscribeMessages.push(parsed)
       }
     })
   })
 
-  const adapter = createBatchAdapter()
+  const adapter = createBatchAdapter({
+      WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+      WS_SUBSCRIPTION_TTL: 10_000,
+  })
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
   await testAdapter.startBackgroundExecuteThenGetResponse(t, {
@@ -2083,11 +2094,27 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
     },
   })
 
-  const duration =
-    Math.ceil(CACHE_MAX_AGE / adapter.config.settings.WS_SUBSCRIPTION_TTL) *
-      adapter.config.settings.WS_SUBSCRIPTION_TTL +
-    1
-  await runAllUntilTime(t.context.clock, duration)
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base: 'BTC', quote: 'USD' },
+    expectedResponse: {
+      data: { result: price },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  await runAllUntilTime(t.context.clock, 3_000)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base: 'BTC', quote: 'USD' },
+    expectedResponse: {
+      data: { result: price },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  await runAllUntilTime(t.context.clock, 8_000)
 
   const error = await testAdapter.request({ base: 'ETH', quote: 'USD' })
   t.is(error.statusCode, 504)
@@ -2095,4 +2122,7 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
   testAdapter.api.close()
   mockWsServer.close()
   await t.context.clock.runToLastAsync()
+
+  t.is(unsubscribeMessages.length, 1)
+  t.deepEqual(unsubscribeMessages[0].pairs, ['ETH/USD'])
 })

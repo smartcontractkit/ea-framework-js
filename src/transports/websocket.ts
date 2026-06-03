@@ -69,6 +69,20 @@ type WebSocketIndividualBuilders<T extends WebsocketTransportGenerics> = {
   ) => unknown
 }
 
+type WebSocketCustomBuilders<T extends WebsocketTransportGenerics> = {
+  /**
+   * Builds a WS message that will be sent to subscribe to a specific feed
+   *
+   * @param context - the background context for the Adapter
+   * @param subscriptions - the body of the adapter request
+   * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
+   */
+  customSubscriptionMessages: (
+    context: EndpointContext<T>,
+    subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
+  ) => unknown[] | void
+}
+
 /**
  * Config object that is provided to the WebSocketTransport constructor.
  */
@@ -149,19 +163,14 @@ export type WebSocketTransportConfig<T extends WebsocketTransportGenerics> = {
       context: EndpointContext<T>,
     ) => ProviderResult<T>[] | undefined
   }
-} & (
-  {
-    /**
-     * Map of "builders", functions that will be used to prepare specific WS messages.
-     * Provide either per-subscription builders (`subscribeMessage` / `unsubscribeMessage`)
-     * or batch builders (`batchSubscribeMessage` / `batchUnsubscribeMessage`), not both.
-     * When `batchSubscribeMessage` is present, the batch path is used.
-     */
-    builders?: WebSocketIndividualBuilders<T>
-  } | {
-    subscriptionHandler?: (context: EndpointContext<T>, subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>) => unknown[]
-  }
-)
+  /**
+   * Map of "builders", functions that will be used to prepare specific WS messages.
+   * Provide either per-subscription builders (`subscribeMessage` / `unsubscribeMessage`)
+   * or batch builders (`batchSubscribeMessage` / `batchUnsubscribeMessage`), not both.
+   * When `batchSubscribeMessage` is present, the batch path is used.
+   */
+  builders?: WebSocketIndividualBuilders<T> | WebSocketCustomBuilders<T>
+}
 
 /**
  * Helper struct type that will be used to pass types to the generic parameters of a Transport.
@@ -179,7 +188,7 @@ export type WebsocketTransportGenerics = TransportGenerics & {
   }
 }
 
-const defaultHandleSubscriptions = <T extends WebsocketTransportGenerics,> (builders: WebSocketIndividualBuilders<T>) => (context: EndpointContext<T>, subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>) => {
+const defaultSubscriptionMessageBuilder = <T extends WebsocketTransportGenerics,> (builders: WebSocketIndividualBuilders<T>) => (context: EndpointContext<T>, subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>) => {
   const { subscribeMessage, unsubscribeMessage } = builders as WebSocketIndividualBuilders<T>
   const subscribeMessages = subscribeMessage
     ? subscriptions.new
@@ -191,7 +200,7 @@ const defaultHandleSubscriptions = <T extends WebsocketTransportGenerics,> (buil
       .map((sub) => unsubscribeMessage(sub, context))
       .filter((m) => m !== undefined)
     : subscriptions.stale
-  return [...subscribeMessages, ...unsubscribeMessages]
+  return [...unsubscribeMessages, ...subscribeMessages]
 }
 
 /**
@@ -209,14 +218,16 @@ export class WebSocketTransport<
   connectionOpenedAt = 0
   streamHandlerInvocationsWithNoConnection = 0
   heartbeatInterval?: NodeJS.Timeout
-  handleSubscriptions?: (context: EndpointContext<T>, subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>) => unknown[]
+  subscriptionMessageBuilder?: (context: EndpointContext<T>, subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>) => unknown[] | void
 
   constructor(private config: WebSocketTransportConfig<T>) {
     super()
-    if ("builders" in config && config.builders) {
-      this.handleSubscriptions = defaultHandleSubscriptions(config.builders)
-    } else if ("subscriptionHandler" in config) {
-      this.handleSubscriptions = config.subscriptionHandler
+    if (config.builders) {
+      if ('customSubscriptionMessages' in config.builders) {
+        this.subscriptionMessageBuilder = config.builders.customSubscriptionMessages
+      } else {
+        this.subscriptionMessageBuilder = defaultSubscriptionMessageBuilder(config.builders)
+      }
     }
   }
 
@@ -555,10 +566,14 @@ export class WebSocketTransport<
     if (!this.connectionClosed()) {
       logger.debug('Connection is open, sending subs/unsubs if there are any')
 
-      if (this.handleSubscriptions) {
-        const messages = this.handleSubscriptions(context, subscriptions)
-        await this.sendMessages(context, messages)
-        recordWsMessageSentMetrics(context, subscriptions.new, subscriptions.stale)
+      if (this.subscriptionMessageBuilder) {
+        const messages = this.subscriptionMessageBuilder(context, subscriptions)
+        if (messages && messages.length > 0) {
+          await this.sendMessages(context, messages)
+          recordWsMessageSentMetrics(context, subscriptions.new, subscriptions.stale)
+        } else {
+          logger.trace("No messages to send")
+        }
       } else {
         logger.trace(
           "This ws transport has no builders configured, so we're not sending any messages",
