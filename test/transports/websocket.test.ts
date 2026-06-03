@@ -7,6 +7,7 @@ import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
 import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import {
+  BatchSubscribeMode,
   WebSocketClassProvider,
   WebsocketReverseMappingTransport,
   WebSocketTransport,
@@ -1946,7 +1947,7 @@ test.serial(
   },
 )
 
-const createBatchAdapter = (): Adapter => {
+const createBatchAdapter = (batchSubscribeMode?: BatchSubscribeMode): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => ENDPOINT_URL,
     handlers: {
@@ -1972,6 +1973,7 @@ const createBatchAdapter = (): Adapter => {
       },
     },
     builders: {
+      ...(batchSubscribeMode ? { options: { batchSubscribeMode} } : {}),
       batchSubscribeMessage: (params) => ({
         request: 'subscribe',
         pairs: params.map((p) => `${p.base}/${p.quote}`),
@@ -2007,7 +2009,7 @@ const createBatchAdapter = (): Adapter => {
   })
 }
 
-test.serial('batch builders send one subscribe message for multiple feeds', async (t) => {
+test.serial('batch builders (delta) send one subscribe message for multiple feeds', async (t) => {
   mockWebSocketProvider(WebSocketClassProvider)
   const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   const subscribeMessages: Array<{ request: string; pairs: string[] }> = []
@@ -2026,7 +2028,7 @@ test.serial('batch builders send one subscribe message for multiple feeds', asyn
 
   const adapter = createBatchAdapter()
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
-
+  
   await testAdapter.startBackgroundExecuteThenGetResponse(t, {
     requestData: { base: 'ETH', quote: 'USD' },
     expectedCacheSize: 1,
@@ -2056,7 +2058,7 @@ test.serial('batch builders send one subscribe message for multiple feeds', asyn
   t.deepEqual(subscribeMessages[1].pairs, ['BTC/USD'])
 })
 
-test.serial('batch builders send one unsubscribe message when feeds go stale', async (t) => {
+test.serial('batch builders (delta) send unsubscribe when feeds go stale', async (t) => {
   mockWebSocketProvider(WebSocketClassProvider)
   const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
 
@@ -2095,4 +2097,52 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
   testAdapter.api.close()
   mockWsServer.close()
   await t.context.clock.runToLastAsync()
+})
+
+test.serial('batch builders (snapshot) pass subscriptions.desired on incremental add', async (t) => {
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  const subscribeMessages: Array<{ request: string; pairs: string[] }> = []
+
+  mockWsServer.on('connection', (socket) => {
+    socket.on('message', (rawMsg) => {
+      const parsed = JSON.parse(rawMsg.toString())
+      if (parsed.request === 'subscribe') {
+        subscribeMessages.push(parsed)
+        for (const pair of parsed.pairs) {
+          socket.send(JSON.stringify({ pair, value: price }))
+        }
+      }
+    })
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(createBatchAdapter('snapshot'), t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base: 'ETH', quote: 'USD' },
+    expectedCacheSize: 1,
+    expectedResponse: {
+      data: { result: price },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base: 'BTC', quote: 'USD' },
+    expectedCacheSize: 2,
+    expectedResponse: {
+      data: { result: price },
+      result: price,
+      statusCode: 200,
+    },
+  })
+
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+
+  t.is(subscribeMessages.length, 2)
+  t.deepEqual(subscribeMessages[0].pairs, ['ETH/USD'])
+  t.deepEqual(subscribeMessages[1].pairs, ['ETH/USD', 'BTC/USD'])
 })

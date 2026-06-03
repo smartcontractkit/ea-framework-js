@@ -118,10 +118,10 @@ export class TransportRoutes<T extends TransportGenerics> {
   private map: Record<string, Transport<T>> = {}
 
   register<T2 extends T>(name: string, transport: Transport<T2>) {
-    // This is intentional, to keep names to one word only
-    if (name !== DEFAULT_TRANSPORT_NAME && !/^[a-z]+$/.test(name)) {
+    // This is intentional, to keep names to one word only + numbers
+    if (name !== DEFAULT_TRANSPORT_NAME && !/^[a-z0-9]+$/.test(name)) {
       throw new Error(
-        `Transport name "${name}" is invalid. Names in the AdapterEndpoint transports map can only include lowercase letters.`,
+        `Transport name "${name}" is invalid. Names in the AdapterEndpoint transports map can only include lowercase letters and numbers.`,
       )
     }
     if (this.map[name]) {

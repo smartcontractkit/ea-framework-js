@@ -69,11 +69,22 @@ type WebSocketIndividualBuilders<T extends WebsocketTransportGenerics> = {
   ) => unknown
 }
 
+/** Selector type for batch subscription mode */
+export type BatchSubscribeMode = 'delta' | 'snapshot'
+
+export type WebSocketBatchBuilderOptions = {
+  /**
+   * `delta` (default): `batchSubscribeMessage` receives `subscriptions.new`.
+   * `snapshot`: when `subscriptions.new` is non-empty, receives `subscriptions.desired`.
+   */
+  batchSubscribeMode?: BatchSubscribeMode
+}
+
 type WebSocketBatchBuilders<T extends WebsocketTransportGenerics> = {
   /**
    * Builds a single WS message that will be sent to subscribe to multiple feeds at once
    *
-   * @param params - the list of adapter requests to subscribe to in this batch
+   * @param params - the list of adapter requests to subscribe to in this batch, dependent on WebSocketBatchBuilderOptions.batchSubscribeMode
    * @param context - the background context for the Adapter
    * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
    */
@@ -93,6 +104,11 @@ type WebSocketBatchBuilders<T extends WebsocketTransportGenerics> = {
     params: TypeFromDefinition<T['Parameters']>[],
     context: EndpointContext<T>,
   ) => unknown
+
+  /**
+   * Optional parameters used when building batch subscribe/unsubscribe messages
+   */
+  options?: WebSocketBatchBuilderOptions
 }
 
 /**
@@ -420,11 +436,58 @@ export class WebSocketTransport<
     return connection
   }
 
+  private async sendSubscriptionMessages(
+    context: EndpointContext<T>,
+    subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
+  ): Promise<void> {
+    logger.debug('Connection is open, sending subs/unsubs if there are any')
+    const builders = this.config.builders
+    if (builders) {
+      if ('batchSubscribeMessage' in builders) {
+        const { batchSubscribeMessage, batchUnsubscribeMessage, options } = builders
+        const mode = options?.batchSubscribeMode ?? 'delta'
+        const batchSubscriptionInputs = mode === 'delta' ? subscriptions.new : subscriptions.desired
+        await this.sendMessages(
+          context,
+          // Avoid sending subscribe/unsubscribe messages if nothing new to send
+          batchSubscribeMessage && subscriptions.new.length > 0
+            ? [batchSubscribeMessage(batchSubscriptionInputs, context)].filter((m) => m !== undefined)
+            : subscriptions.new,
+          batchUnsubscribeMessage && subscriptions.stale.length > 0
+            ? [batchUnsubscribeMessage(subscriptions.stale, context)].filter((m) => m !== undefined)
+            : subscriptions.stale,
+        )
+      } else {
+        const { subscribeMessage, unsubscribeMessage } =
+          builders as WebSocketIndividualBuilders<T>
+        await this.sendMessages(
+          context,
+          subscribeMessage
+            ? subscriptions.new
+                .map((sub) => subscribeMessage(sub, context))
+                .filter((m) => m !== undefined)
+            : subscriptions.new,
+          unsubscribeMessage
+            ? subscriptions.stale
+                .map((sub) => unsubscribeMessage(sub, context))
+                .filter((m) => m !== undefined)
+            : subscriptions.stale,
+        )
+      }
+      recordWsMessageSentMetrics(context, subscriptions.new, subscriptions.stale)
+    } else {
+      logger.trace(
+        "This ws transport has no builders configured, so we're not sending any messages",
+      )
+    }
+  }
+
   async sendMessages(context: EndpointContext<T>, subscribes: unknown[], unsubscribes: unknown[]) {
     const serializedSubscribes = subscribes.map(this.serializeMessage)
     const serializedUnsubscribes = unsubscribes.map(this.serializeMessage)
 
-    const messages = serializedSubscribes.concat(serializedUnsubscribes)
+    // Order unsubscribes before subscribes in case of overlap race condition
+    const messages = serializedUnsubscribes.concat(serializedSubscribes)
 
     if (messages.length > 0) {
       logger.debug(`There are ${messages.length} messages to send`)
@@ -557,45 +620,7 @@ export class WebSocketTransport<
     // Otherwise we could encounter the case where we just closed the connection because there's no desired ones,
     // but without this check we'd attempt to send out all the unsubscribe messages
     if (!this.connectionClosed()) {
-      logger.debug('Connection is open, sending subs/unsubs if there are any')
-      const builders = this.config.builders
-      if (builders) {
-        if ('batchSubscribeMessage' in builders) {
-          const { batchSubscribeMessage, batchUnsubscribeMessage } = builders
-          await this.sendMessages(
-            context,
-            batchSubscribeMessage
-              ? [batchSubscribeMessage(subscriptions.new, context)].filter((m) => m !== undefined)
-              : subscriptions.new,
-            batchUnsubscribeMessage
-              ? [batchUnsubscribeMessage(subscriptions.stale, context)].filter(
-                  (m) => m !== undefined,
-                )
-              : subscriptions.stale,
-          )
-        } else {
-          const { subscribeMessage, unsubscribeMessage } =
-            builders as WebSocketIndividualBuilders<T>
-          await this.sendMessages(
-            context,
-            subscribeMessage
-              ? subscriptions.new
-                  .map((sub) => subscribeMessage(sub, context))
-                  .filter((m) => m !== undefined)
-              : subscriptions.new,
-            unsubscribeMessage
-              ? subscriptions.stale
-                  .map((sub) => unsubscribeMessage(sub, context))
-                  .filter((m) => m !== undefined)
-              : subscriptions.stale,
-          )
-        }
-        recordWsMessageSentMetrics(context, subscriptions.new, subscriptions.stale)
-      } else {
-        logger.trace(
-          "This ws transport has no builders configured, so we're not sending any messages",
-        )
-      }
+      await this.sendSubscriptionMessages(context, subscriptions)
     }
 
     // Record WS subscription metrics
