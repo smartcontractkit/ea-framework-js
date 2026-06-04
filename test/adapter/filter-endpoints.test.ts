@@ -10,10 +10,10 @@ test.before(() => {
 const makeEndpoint = (name: string) => new AdapterEndpoint({ name, transport: new NopTransport() })
 
 test.afterEach(() => {
-  delete process.env['EA_ENABLED_ENDPOINTS']
+  delete process.env['ENABLED_ENDPOINTS']
 })
 
-test('loads all endpoints when EA_ENABLED_ENDPOINTS is not set', (t) => {
+test('loads all endpoints when ENABLED_ENDPOINTS is not set', (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     endpoints: [makeEndpoint('price'), makeEndpoint('volume')],
@@ -22,7 +22,7 @@ test('loads all endpoints when EA_ENABLED_ENDPOINTS is not set', (t) => {
 })
 
 test('filters to only the named endpoints', (t) => {
-  process.env['EA_ENABLED_ENDPOINTS'] = 'price'
+  process.env['ENABLED_ENDPOINTS'] = 'price'
   const adapter = new Adapter({
     name: 'TEST',
     endpoints: [makeEndpoint('price'), makeEndpoint('volume')],
@@ -31,8 +31,8 @@ test('filters to only the named endpoints', (t) => {
   t.is(adapter.endpoints[0].name, 'price')
 })
 
-test('trims whitespace and lowercases names in EA_ENABLED_ENDPOINTS', (t) => {
-  process.env['EA_ENABLED_ENDPOINTS'] = ' Price , VOLUME '
+test('trims whitespace and lowercases names in ENABLED_ENDPOINTS', (t) => {
+  process.env['ENABLED_ENDPOINTS'] = ' Price , VOLUME '
   const adapter = new Adapter({
     name: 'TEST',
     endpoints: [makeEndpoint('price'), makeEndpoint('volume')],
@@ -40,15 +40,15 @@ test('trims whitespace and lowercases names in EA_ENABLED_ENDPOINTS', (t) => {
   t.is(adapter.endpoints.length, 2)
 })
 
-test('throws when no endpoints match EA_ENABLED_ENDPOINTS', (t) => {
-  process.env['EA_ENABLED_ENDPOINTS'] = 'nonexistent'
+test('throws when no endpoints match ENABLED_ENDPOINTS', (t) => {
+  process.env['ENABLED_ENDPOINTS'] = 'nonexistent'
   t.throws(() => new Adapter({ name: 'TEST', endpoints: [makeEndpoint('price')] }), {
     message: /nonexistent/,
   })
 })
 
-test('clears defaultEndpoint when it is excluded by EA_ENABLED_ENDPOINTS', (t) => {
-  process.env['EA_ENABLED_ENDPOINTS'] = 'volume'
+test('clears defaultEndpoint when it is excluded by ENABLED_ENDPOINTS', (t) => {
+  process.env['ENABLED_ENDPOINTS'] = 'volume'
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',
@@ -57,8 +57,8 @@ test('clears defaultEndpoint when it is excluded by EA_ENABLED_ENDPOINTS', (t) =
   t.is(adapter.defaultEndpoint, undefined)
 })
 
-test('keeps defaultEndpoint when it is included in EA_ENABLED_ENDPOINTS', (t) => {
-  process.env['EA_ENABLED_ENDPOINTS'] = 'price'
+test('keeps defaultEndpoint when it is included in ENABLED_ENDPOINTS', (t) => {
+  process.env['ENABLED_ENDPOINTS'] = 'price'
   const adapter = new Adapter({
     name: 'TEST',
     defaultEndpoint: 'price',

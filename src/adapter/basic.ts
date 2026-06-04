@@ -186,7 +186,7 @@ export class Adapter<
   }
 
   private filterEndpoints() {
-    const enabledEndpoints = this.config.settings.EA_ENABLED_ENDPOINTS
+    const enabledEndpoints = this.config.settings.ENABLED_ENDPOINTS
     if (!enabledEndpoints) {
       return
     }
@@ -199,19 +199,19 @@ export class Adapter<
     const excluded = allNames.filter((name) => !enabledSet.has(name))
     if (excluded.length) {
       logger.info(
-        `EA_ENABLED_ENDPOINTS is set — loaded [${this.endpoints.map((e) => e.name).join(', ')}], excluded [${excluded.join(', ')}]`,
+        `ENABLED_ENDPOINTS is set — loaded [${this.endpoints.map((e) => e.name).join(', ')}], excluded [${excluded.join(', ')}]`,
       )
     }
 
     if (this.endpoints.length === 0) {
       throw new Error(
-        `EA_ENABLED_ENDPOINTS is set to "${enabledEndpoints}" but none of the adapter endpoints match. Available: [${allNames.join(', ')}]`,
+        `ENABLED_ENDPOINTS is set to "${enabledEndpoints}" but none of the adapter endpoints match. Available: [${allNames.join(', ')}]`,
       )
     }
 
     if (this.defaultEndpoint && !enabledSet.has(this.defaultEndpoint)) {
       logger.warn(
-        `Default endpoint "${this.defaultEndpoint}" was excluded by EA_ENABLED_ENDPOINTS, clearing it`,
+        `Default endpoint "${this.defaultEndpoint}" was excluded by ENABLED_ENDPOINTS, clearing it`,
       )
       this.defaultEndpoint = undefined
     }
