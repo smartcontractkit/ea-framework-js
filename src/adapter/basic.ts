@@ -185,12 +185,19 @@ export class Adapter<
     }
   }
 
+  /**
+   * Filters the adapter's endpoints based on the ENABLED_ENDPOINTS setting.
+   * If ENABLED_ENDPOINTS is not set, all endpoints are loaded.
+   * If ENABLED_ENDPOINTS is set, only the specified endpoints are loaded.
+   * Throws an error if none of the specified endpoints match.
+   */
   private filterEndpoints() {
     const enabledEndpoints = this.config.settings.ENABLED_ENDPOINTS
     if (!enabledEndpoints) {
       return
     }
 
+    // Normalize the ENABLED_ENDPOINTS values
     const enabledSet = new Set(enabledEndpoints.split(',').map((name) => name.trim().toLowerCase()))
 
     const allNames = this.endpoints.map((e) => e.name)
@@ -203,12 +210,14 @@ export class Adapter<
       )
     }
 
+    // Throws error if none of the specified endpoints match
     if (this.endpoints.length === 0) {
       throw new Error(
         `ENABLED_ENDPOINTS is set to "${enabledEndpoints}" but none of the adapter endpoints match. Available: [${allNames.join(', ')}]`,
       )
     }
 
+    // Clear default endpoint if it is not included in the enabled endpoints
     if (this.defaultEndpoint && !enabledSet.has(this.defaultEndpoint)) {
       logger.warn(
         `Default endpoint "${this.defaultEndpoint}" was excluded by ENABLED_ENDPOINTS, clearing it`,
