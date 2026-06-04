@@ -7,8 +7,7 @@ test.before(() => {
   LoggerFactoryProvider.set()
 })
 
-const makeEndpoint = (name: string) =>
-  new AdapterEndpoint({ name, transport: new NopTransport() })
+const makeEndpoint = (name: string) => new AdapterEndpoint({ name, transport: new NopTransport() })
 
 test.afterEach(() => {
   delete process.env['EA_ENABLED_ENDPOINTS']

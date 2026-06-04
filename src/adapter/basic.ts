@@ -191,9 +191,7 @@ export class Adapter<
       return
     }
 
-    const enabledSet = new Set(
-      enabledEndpoints.split(',').map((name) => name.trim().toLowerCase()),
-    )
+    const enabledSet = new Set(enabledEndpoints.split(',').map((name) => name.trim().toLowerCase()))
 
     const allNames = this.endpoints.map((e) => e.name)
     this.endpoints = this.endpoints.filter((e) => enabledSet.has(e.name))
