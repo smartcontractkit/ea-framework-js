@@ -136,8 +136,8 @@ test.serial('builds cache key correctly from input params', async (t) => {
     factor: 123,
     proper: true,
     details: {
-      asd: 'qwe',
       zxc: 432,
+      asd: 'qwe',
     },
     nullable: null,
   })

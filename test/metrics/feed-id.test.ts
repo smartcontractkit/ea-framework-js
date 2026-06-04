@@ -30,6 +30,12 @@ test.serial('no parameters returns empty JSON', async (t) => {
   t.is(calculateFeedId(t.context, {}), JSON.stringify({}))
 })
 
+test.serial('long feed id returns JSON with hash', async (t) => {
+  t.context.adapterSettings.FEED_ID_JSON = true
+  t.context.adapterSettings.MAX_COMMON_KEY_SIZE = 1
+  t.is(calculateFeedId(t.context, {test: "test"}), JSON.stringify({hash:"SzkCEKs7NV6rxiz4/VbpzPnLKEM="}))
+})
+
 test.serial('builds feed ID correctly from input params', async (t) => {
   t.context.inputParameters = new InputParameters({
     base: {
