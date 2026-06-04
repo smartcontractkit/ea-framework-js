@@ -56,7 +56,11 @@ export class BasicCacheSetterTransport extends NopTransport<CacheTestTransportTy
   }
 }
 
+// Transport that gives a different result each time, even across different
+// instances.
 export class DifferentResultTransport extends NopTransport<CacheTestTransportTypes> {
+  static nextResult = Date.now()
+
   override async foregroundExecute(
     req: AdapterRequest<TypeFromDefinition<typeof cacheTestInputParameters.definition>>,
   ): Promise<void> {
@@ -65,7 +69,7 @@ export class DifferentResultTransport extends NopTransport<CacheTestTransportTyp
         params: req.requestContext.data,
         response: {
           data: null,
-          result: Date.now(),
+          result: DifferentResultTransport.nextResult++,
           timestamps: {
             providerDataRequestedUnixMs: 0,
             providerDataReceivedUnixMs: 0,
