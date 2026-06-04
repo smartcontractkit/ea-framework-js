@@ -136,14 +136,14 @@ test.serial('builds cache key correctly from input params', async (t) => {
     factor: 123,
     proper: true,
     details: {
-      asd: 'qwe',
       zxc: 432,
+      asd: 'qwe',
     },
     nullable: null,
   })
   t.is(
     response.json().result,
-    'TEST-test-default_single_transport-{"base":"eth","factor":123,"proper":true,"details":{"asd":"qwe","zxc":432}}',
+    'TEST-test-default_single_transport-{"base":"eth","details":{"asd":"qwe","zxc":432},"factor":123,"proper":true}',
   )
 })
 
