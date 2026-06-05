@@ -1,5 +1,5 @@
 import { TransportDependencies } from '@chainlink/external-adapter-framework/transports'
-import { ResponseCache } from '@chainlink/external-adapter-framework/cache/response'
+import { calculateHttpRequestKey } from '@chainlink/external-adapter-framework/cache'
 import { Requester } from '@chainlink/external-adapter-framework/util/requester'
 import {
   AdapterResponse, sleep, makeLogger
@@ -9,34 +9,31 @@ import { EndpointContext } from '@chainlink/external-adapter-framework/adapter'
 import { BaseEndpointTypes, inputParameters } from '../endpoint/<%= inputEndpointName %>'
 import { AdapterError } from '@chainlink/external-adapter-framework/validation/error'
 
-const logger = makeLogger('CustomTransport')
+const logger = makeLogger('<%= normalizedEndpointNameCap %>Transport')
 
 type RequestParams = typeof inputParameters.validated
 
-<% if (includeComments) { -%>
-// CustomTransport extends base types from endpoint and adds additional, Provider-specific types (if needed).
-<% } -%>
-export type CustomTransportTypes = BaseEndpointTypes & {
-  Provider: {
-    RequestBody: never
-    ResponseBody: any
+type PriceResponse = {
+  [symbol: string]: {
+    price: number
   }
 }
+
 <% if (includeComments) { -%>
-// CustomTransport is used to perform custom data fetching and processing from a Provider. The framework provides built-in transports to
-// fetch data from a Provider using several protocols, including `http`, `websocket`, and `sse`. Use CustomTransport when the Provider uses
+// <%= normalizedEndpointNameCap %>Transport is used to perform custom data fetching and processing from a Provider. The framework provides built-in transports to
+// fetch data from a Provider using several protocols, including `http`, `websocket`, and `sse`. Use <%= normalizedEndpointNameCap %>Transport when the Provider uses
 // different protocol, or you need custom functionality that built-in transports don't support. For example, custom, multistep authentication
 // for requests, paginated requests, on-chain data retrieval using third party libraries, and so on.
 <% } -%>
-export class CustomTransport extends SubscriptionTransport<CustomTransportTypes> {
+export class <%= normalizedEndpointNameCap %>Transport extends SubscriptionTransport<BaseEndpointTypes> {
 <% if (includeComments) { -%>
-  // name of the transport, used for logging
+  // name of the endpoint, used to calculate the request key
 <% } -%>
-  name!: string
+  endpointName!: string
 <% if (includeComments) { -%>
-  // cache instance for caching responses from provider
+  // instance of adapter config
 <% } -%>
-  responseCache!: ResponseCache<CustomTransportTypes>
+  config!: BaseEndpointTypes['Settings']
 <% if (includeComments) { -%>
   // instance of Requester to be used for data fetching. Use this instance to perform http calls
 <% } -%>
@@ -46,8 +43,15 @@ export class CustomTransport extends SubscriptionTransport<CustomTransportTypes>
   // REQUIRED. Transport will be automatically initialized by the framework using this method. It will be called with transport
   // dependencies, adapter settings, endpoint name, and transport name as arguments. Use this method to initialize transport state
 <% } -%>
-  async initialize(dependencies: TransportDependencies<CustomTransportTypes>, adapterSettings: CustomTransportTypes['Settings'], endpointName: string, transportName: string): Promise<void> {
+  async initialize(
+    dependencies: TransportDependencies<BaseEndpointTypes>,
+    adapterSettings: BaseEndpointTypes['Settings'],
+    endpointName: string,
+    transportName: string
+  ): Promise<void> {
     await super.initialize(dependencies, adapterSettings, endpointName, transportName)
+    this.config = adapterSettings
+    this.endpointName = endpointName
     this.requester = dependencies.requester
   }
 <% if (includeComments) { -%>
@@ -55,13 +59,13 @@ export class CustomTransport extends SubscriptionTransport<CustomTransportTypes>
   // and an array of all the entries in the subscription set as second argument. Use this method to handle the incoming
   // request, process it and save it in the cache.
 <% } -%>
-  async backgroundHandler(context: EndpointContext<CustomTransportTypes>, entries: RequestParams[]) {
+  async backgroundHandler(context: EndpointContext<BaseEndpointTypes>, entries: RequestParams[]) {
     await Promise.all(entries.map(async (param) => this.handleRequest(param)))
     await sleep(context.adapterSettings.BACKGROUND_EXECUTE_MS)
   }
 
   async handleRequest(param: RequestParams) {
-    let response: AdapterResponse<CustomTransportTypes['Response']>
+    let response: AdapterResponse<BaseEndpointTypes['Response']>
     try {
       response = await this._handleRequest(param)
     } catch (e) {
@@ -81,19 +85,56 @@ export class CustomTransport extends SubscriptionTransport<CustomTransportTypes>
   }
 
   async _handleRequest(
-    _: RequestParams,
-  ): Promise<AdapterResponse<CustomTransportTypes['Response']>> {
+    params: RequestParams,
+  ): Promise<AdapterResponse<BaseEndpointTypes['Response']>> {
 
-     const providerDataRequestedUnixMs = Date.now()
+    const providerDataRequestedUnixMs = Date.now()
 
-     // custom transport logic
+    // custom transport logic
+
+    const requestConfig = {
+      method: 'POST',
+      baseURL: this.config.API_ENDPOINT,
+      url: '/cryptocurrency/price',
+      headers: {
+        'X_API_KEY': this.config.API_KEY,
+      },
+      data: {
+        symbol: params.base.toUpperCase(),
+        convert: params.quote.toUpperCase(),
+      },
+    }
+
+    const response = await this.requester.request<PriceResponse>(
+      calculateHttpRequestKey<BaseEndpointTypes>({
+        context: {
+          adapterSettings: this.config,
+          inputParameters,
+          endpointName: this.endpointName,
+        },
+        data: requestConfig.data,
+        transportName: this.name,
+      }),
+      requestConfig,
+    )
+
+    const data = response.response.data
+    const baseSymbol = params.base.toUpperCase()
+    const result = data[baseSymbol]?.price
+
+    if (result === undefined) {
+      throw new AdapterError({
+        statusCode: 502,
+        message: `The data provider didn't return any value for ${params.base}/${params.quote}`,
+      })
+    }
 
     return {
       data: {
-        result: 2000,
+        result,
       },
       statusCode: 200,
-      result: 2000,
+      result,
       timestamps: {
         providerDataRequestedUnixMs,
         providerDataReceivedUnixMs: Date.now(),
@@ -102,9 +143,9 @@ export class CustomTransport extends SubscriptionTransport<CustomTransportTypes>
     }
   }
 
-  getSubscriptionTtlFromConfig(adapterSettings: CustomTransportTypes['Settings']): number {
+  getSubscriptionTtlFromConfig(adapterSettings: BaseEndpointTypes['Settings']): number {
     return adapterSettings.WARMUP_SUBSCRIPTION_TTL
   }
 }
 
-export const customSubscriptionTransport = new CustomTransport()
+export const customSubscriptionTransport = new <%= normalizedEndpointNameCap %>Transport()

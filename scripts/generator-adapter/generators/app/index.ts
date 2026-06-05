@@ -223,7 +223,7 @@ export default class extends Generator.default {
       this.fs.copyTpl(
         this.templatePath(`test/integration/adapter.test.ts.ejs`),
         this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/adapter.test.ts`),
-        { endpoints: httpEndpoints, transportName: 'rest', setBgExecuteMsEnv: false },
+        { endpoints: httpEndpoints, transportName: 'rest', setBgExecuteMsEnv: false, mockPostResponse: false },
       )
 
       // Create http unit test files
@@ -272,9 +272,11 @@ export default class extends Generator.default {
       this.fs.copyTpl(
         this.templatePath(`test/integration/adapter.test.ts.ejs`),
         this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/${fileName}`),
-        { endpoints: customFgEndpoints, transportName: 'customfg', setBgExecuteMsEnv: false },
+        { endpoints: customFgEndpoints, transportName: 'customfg', setBgExecuteMsEnv: false, mockPostResponse: false },
       )
     }
+
+    // Create adapter.test.ts or adapter-custombg.test.ts if there is at least one endpoint with customBgTransport
     if (customBgEndpoints.length) {
       let fileName = 'adapter.test.ts'
       if (httpEndpoints.length || wsEndpoints.length || customFgEndpoints.length) {
@@ -283,8 +285,18 @@ export default class extends Generator.default {
       this.fs.copyTpl(
         this.templatePath(`test/integration/adapter.test.ts.ejs`),
         this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/${fileName}`),
-        { endpoints: customBgEndpoints, transportName: 'custombg', setBgExecuteMsEnv: true },
+        { endpoints: customBgEndpoints, transportName: 'custombg', setBgExecuteMsEnv: true, mockPostResponse: true },
       )
+
+      // Create customBg unit test files
+      for (const { inputEndpointName, normalizedEndpointNameCap, inputTransports } of customBgEndpoints) {
+        const transportFileBaseName = inputTransports.length > 1 ? `${inputEndpointName}-custombg` : inputEndpointName
+        this.fs.copyTpl(
+          this.templatePath(`test/unit/custombg.test.ts.ejs`),
+          this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/unit/${transportFileBaseName}.test.ts`),
+          { inputEndpointName, normalizedEndpointNameCap, transportFileBaseName },
+        )
+      }
     }
 
     // Copy test fixtures
@@ -293,7 +305,8 @@ export default class extends Generator.default {
       this.destinationPath(`${this.args[0]}/${this.props.adapterName}/test/integration/fixtures.ts`),
       {
         includeWsFixtures: wsEndpoints.length > 0,
-        includeHttpFixtures: httpEndpoints.length > 0 || customBgEndpoints.length > 0 || customFgEndpoints.length > 0,
+        includeHttpFixtures: httpEndpoints.length > 0 || customFgEndpoints.length > 0,
+        includeCustomBgFixtures: customBgEndpoints.length > 0
       },
     )
 
