@@ -12,7 +12,7 @@ import { EvictedError, TurnQueue } from './turn-queue'
 
 const logger = makeLogger('Requester')
 
-interface QueuedRequest<T = unknown> {
+interface PendingRequest<T = unknown> {
   key: string
   config: AxiosRequestConfig
   retries: number
@@ -42,7 +42,7 @@ interface RequesterResult<T> {
  */
 export class Requester {
   private queue: TurnQueue
-  private map = {} as Record<string, QueuedRequest>
+  private pendingRequestMap = new Map<string, PendingRequest>()
   private maxRetries: number
   private timeout: number
   private sleepBeforeRequeueingMs: number
@@ -71,7 +71,7 @@ export class Requester {
     cost?: number,
   ): Promise<RequesterResult<T>> {
     // If there's already a queued request, reuse it's existing promise
-    const existingQueuedRequest = this.map[key]
+    const existingQueuedRequest = this.pendingRequestMap.get(key)
     if (existingQueuedRequest) {
       censorLogs(() =>
         logger.trace(`Request already exists, returning queued promise (Key: ${key})`),
@@ -82,32 +82,32 @@ export class Requester {
     // Set configured timeout for all requests unless manually specified
     req.timeout = req.timeout || this.timeout
 
-    const queuedRequest = {
+    const pendingRequest = {
       key,
       config: req,
       retries: 0,
       cost,
-    } as QueuedRequest<T>
+    } as PendingRequest<T>
 
-    this.map[queuedRequest.key] = queuedRequest as QueuedRequest
+    this.pendingRequestMap.set(pendingRequest.key, pendingRequest as PendingRequest)
 
-    queuedRequest.promise = this.executeRequestWithRetries(queuedRequest)
+    pendingRequest.promise = this.executeRequestWithRetries(pendingRequest)
 
     try {
-      return await queuedRequest.promise
+      return await pendingRequest.promise
     } finally {
-      delete this.map[queuedRequest.key]
+      this.pendingRequestMap.delete(pendingRequest.key)
     }
   }
 
   private async executeRequestWithRetries<T>(
-    queuedRequest: QueuedRequest<T>,
+    pendingRequest: PendingRequest<T>,
   ): Promise<RequesterResult<T>> {
     for (let retries = 0; ; retries++) {
-      queuedRequest.retries = retries
+      pendingRequest.retries = retries
       try {
-        await this.waitBeforeExecutingRequest(queuedRequest)
-        return await this.executeRequest(queuedRequest)
+        await this.waitBeforeExecutingRequest(pendingRequest)
+        return await this.executeRequest(pendingRequest)
       } catch (e) {
         if (e instanceof AdapterRateLimitError) {
           // Too many requests in the queue. Don't retry.
@@ -130,7 +130,7 @@ export class Requester {
   // Waits for the request to have its turn in the queue and for the rate
   // limiter. Throws if the request was removed from the queue due to overflow
   // while waiting for its turn.
-  private async waitBeforeExecutingRequest<T>(req: QueuedRequest<T>): Promise<void> {
+  private async waitBeforeExecutingRequest<T>(req: PendingRequest<T>): Promise<void> {
     try {
       metrics.get('requesterQueueSize').inc()
       await this.queue.run(async () => {
@@ -160,7 +160,7 @@ export class Requester {
     }
   }
 
-  private async executeRequest<T>(req: QueuedRequest<T>): Promise<RequesterResult<T>> {
+  private async executeRequest<T>(req: PendingRequest<T>): Promise<RequesterResult<T>> {
     const { key, config } = req
 
     const providerDataRequested = Date.now()
