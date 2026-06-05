@@ -61,15 +61,12 @@ describe('<%= normalizedEndpointNameCap %>Transport', () => {
 
   type RequestConfig = {
     baseURL: string
+    url: string
     method: 'POST'
+    headers: Record<string, string>
     data: {
-      method: 'account_info'
-      params: [
-        {
-          account: string
-          ledger_index: 'validated'
-        },
-      ]
+      symbol: string
+      convert: string
     }
   }
 
@@ -102,11 +99,6 @@ describe('<%= normalizedEndpointNameCap %>Transport', () => {
       data: requestConfig.data,
       transportName,
     })
-    /*
-    expect(log).toBeCalledWith(`Generated HTTP request queue key: "${requestKey}"`)
-    expect(log).toBeCalledTimes(1)
-    log.mockClear()
-    */
     return requestKey
   }
 
@@ -228,7 +220,7 @@ describe('<%= normalizedEndpointNameCap %>Transport', () => {
     it('should throw if response does not include price', async () => {
       const from = 'ETH'
       const to = 'USD'
-      const price = undefined
+      const price = undefined as unknown as number
 
       const params = makeStub('params', {
         base: from,

@@ -1,6 +1,5 @@
 import { TransportDependencies } from '@chainlink/external-adapter-framework/transports'
 import { calculateHttpRequestKey } from '@chainlink/external-adapter-framework/cache'
-import { ResponseCache } from '@chainlink/external-adapter-framework/cache/response'
 import { Requester } from '@chainlink/external-adapter-framework/util/requester'
 import {
   AdapterResponse, sleep, makeLogger
@@ -21,25 +20,12 @@ type PriceResponse = {
 }
 
 <% if (includeComments) { -%>
-// <%= normalizedEndpointNameCap %>Transport extends base types from endpoint and adds additional, Provider-specific types (if needed).
-<% } -%>
-export type <%= normalizedEndpointNameCap %>TransportTypes = BaseEndpointTypes & {
-  Provider: {
-    RequestBody: never
-    ResponseBody: any
-  }
-}
-<% if (includeComments) { -%>
 // <%= normalizedEndpointNameCap %>Transport is used to perform custom data fetching and processing from a Provider. The framework provides built-in transports to
 // fetch data from a Provider using several protocols, including `http`, `websocket`, and `sse`. Use <%= normalizedEndpointNameCap %>Transport when the Provider uses
 // different protocol, or you need custom functionality that built-in transports don't support. For example, custom, multistep authentication
 // for requests, paginated requests, on-chain data retrieval using third party libraries, and so on.
 <% } -%>
-export class <%= normalizedEndpointNameCap %>Transport extends SubscriptionTransport<<%= normalizedEndpointNameCap %>TransportTypes> {
-<% if (includeComments) { -%>
-  // name of the transport, used for logging
-<% } -%>
-  name!: string
+export class <%= normalizedEndpointNameCap %>Transport extends SubscriptionTransport<BaseEndpointTypes> {
 <% if (includeComments) { -%>
   // name of the endpoint, used to calculate the request key
 <% } -%>
@@ -49,10 +35,6 @@ export class <%= normalizedEndpointNameCap %>Transport extends SubscriptionTrans
 <% } -%>
   config!: BaseEndpointTypes['Settings']
 <% if (includeComments) { -%>
-  // cache instance for caching responses from provider
-<% } -%>
-  responseCache!: ResponseCache<<%= normalizedEndpointNameCap %>TransportTypes>
-<% if (includeComments) { -%>
   // instance of Requester to be used for data fetching. Use this instance to perform http calls
 <% } -%>
   requester!: Requester
@@ -61,7 +43,12 @@ export class <%= normalizedEndpointNameCap %>Transport extends SubscriptionTrans
   // REQUIRED. Transport will be automatically initialized by the framework using this method. It will be called with transport
   // dependencies, adapter settings, endpoint name, and transport name as arguments. Use this method to initialize transport state
 <% } -%>
-  async initialize(dependencies: TransportDependencies<<%= normalizedEndpointNameCap %>TransportTypes>, adapterSettings: <%= normalizedEndpointNameCap %>TransportTypes['Settings'], endpointName: string, transportName: string): Promise<void> {
+  async initialize(
+    dependencies: TransportDependencies<BaseEndpointTypes>,
+    adapterSettings: BaseEndpointTypes['Settings'],
+    endpointName: string,
+    transportName: string
+  ): Promise<void> {
     await super.initialize(dependencies, adapterSettings, endpointName, transportName)
     this.config = adapterSettings
     this.endpointName = endpointName
@@ -72,13 +59,13 @@ export class <%= normalizedEndpointNameCap %>Transport extends SubscriptionTrans
   // and an array of all the entries in the subscription set as second argument. Use this method to handle the incoming
   // request, process it and save it in the cache.
 <% } -%>
-  async backgroundHandler(context: EndpointContext<<%= normalizedEndpointNameCap %>TransportTypes>, entries: RequestParams[]) {
+  async backgroundHandler(context: EndpointContext<BaseEndpointTypes>, entries: RequestParams[]) {
     await Promise.all(entries.map(async (param) => this.handleRequest(param)))
     await sleep(context.adapterSettings.BACKGROUND_EXECUTE_MS)
   }
 
   async handleRequest(param: RequestParams) {
-    let response: AdapterResponse<<%= normalizedEndpointNameCap %>TransportTypes['Response']>
+    let response: AdapterResponse<BaseEndpointTypes['Response']>
     try {
       response = await this._handleRequest(param)
     } catch (e) {
@@ -99,7 +86,7 @@ export class <%= normalizedEndpointNameCap %>Transport extends SubscriptionTrans
 
   async _handleRequest(
     params: RequestParams,
-  ): Promise<AdapterResponse<<%= normalizedEndpointNameCap %>TransportTypes['Response']>> {
+  ): Promise<AdapterResponse<BaseEndpointTypes['Response']>> {
 
     const providerDataRequestedUnixMs = Date.now()
 
@@ -156,7 +143,7 @@ export class <%= normalizedEndpointNameCap %>Transport extends SubscriptionTrans
     }
   }
 
-  getSubscriptionTtlFromConfig(adapterSettings: <%= normalizedEndpointNameCap %>TransportTypes['Settings']): number {
+  getSubscriptionTtlFromConfig(adapterSettings: BaseEndpointTypes['Settings']): number {
     return adapterSettings.WARMUP_SUBSCRIPTION_TTL
   }
 }

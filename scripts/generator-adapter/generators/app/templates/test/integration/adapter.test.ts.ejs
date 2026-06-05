@@ -3,11 +3,7 @@ import {
   setEnvVariables,
 } from '@chainlink/external-adapter-framework/util/testing-utils'
 import * as nock from 'nock'
-<% if (mockPostResponse) { %>
-import { mockPostResponseSuccess } from './fixtures'
-<% } else { %>
-import { mockResponseSuccess } from './fixtures'
-<% } %>
+import { <% if (mockPostResponse) { %>mockPostResponseSuccess<% } else { %>mockResponseSuccess<% } %> } from './fixtures'
 
 describe('execute', () => {
   let spy: jest.SpyInstance
