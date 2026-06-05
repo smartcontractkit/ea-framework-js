@@ -1,3 +1,4 @@
+import { SettingsDefinitionFromConfig } from '@chainlink/external-adapter-framework/config'
 import { WebSocketClassProvider } from '@chainlink/external-adapter-framework/transports'
 import {
   TestAdapter,
@@ -5,13 +6,15 @@ import {
   mockWebSocketProvider,
   MockWebsocketServer,
 } from '@chainlink/external-adapter-framework/util/testing-utils'
-import FakeTimers from '@sinonjs/fake-timers'
+import FakeTimers, { InstalledClock } from '@sinonjs/fake-timers'
+import { config } from '../../src/config'
 import { mockWebsocketServer } from './fixtures'
 
+type SettingsDefinition = SettingsDefinitionFromConfig<typeof config>
 
 describe('websocket', () => {
   let mockWsServer: MockWebsocketServer | undefined
-  let testAdapter: TestAdapter
+  let testAdapter: TestAdapter<SettingsDefinition>
   const wsEndpoint = 'ws://localhost:9090'
   let oldEnv: NodeJS.ProcessEnv
 <% for(let i=0; i<endpoints.length; i++) {%>
@@ -32,7 +35,7 @@ describe('websocket', () => {
     const adapter = (await import('./../../src')).adapter
     testAdapter = await TestAdapter.startWithMockedCache(adapter, {
       clock: FakeTimers.install(),
-      testAdapter: {} as TestAdapter<never>,
+      testAdapter: {} as TestAdapter<SettingsDefinition>,
     })
 
     // Send initial request to start background execute and wait for cache to be filled with results
@@ -44,7 +47,7 @@ describe('websocket', () => {
   afterAll(async () => {
     setEnvVariables(oldEnv)
     mockWsServer?.close()
-    testAdapter.clock?.uninstall()
+    ;(testAdapter.clock as InstalledClock | undefined)?.uninstall()
     await testAdapter.api.close()
   })
 <% for(var i=0; i<endpoints.length; i++) {%>
