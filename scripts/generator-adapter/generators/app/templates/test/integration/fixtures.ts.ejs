@@ -1,4 +1,4 @@
-<% if (includeHttpFixtures) { %>import nock from 'nock'<% } %>
+<% if (includeHttpFixtures || includeCustomBgFixtures) { %>import nock from 'nock'<% } %>
 <% if (includeWsFixtures) { %>import { MockWebsocketServer } from '@chainlink/external-adapter-framework/util/testing-utils'<% } %>
 <% if (includeHttpFixtures) { %>
 export const mockResponseSuccess = (): nock.Scope =>
@@ -22,11 +22,32 @@ export const mockResponseSuccess = (): nock.Scope =>
       ])
       .persist()
 <% } %>
+<% if (includeCustomBgFixtures) { %>
+export const mockPostResponseSuccess = (): nock.Scope =>
+    nock('https://dataproviderapi.com', {
+      encodedQueryParams: true,
+    })
+      .post('/cryptocurrency/price', {
+        symbol: 'ETH',
+        convert: 'USD',
+      })
+      .reply(200, () => ({ ETH: { price: 10000 } }), [
+        'Content-Type',
+        'application/json',
+        'Connection',
+        'close',
+        'Vary',
+        'Accept-Encoding',
+        'Vary',
+        'Origin',
+      ])
+      .persist()
+<% } %>
 <% if (includeWsFixtures) { %>
 export const mockWebsocketServer = (URL: string): MockWebsocketServer => {
     const mockWsServer = new MockWebsocketServer(URL, { mock: false })
     mockWsServer.on('connection', (socket) => {
-      socket.on('message', (message) => {
+      socket.on('message', (_message) => {
           return socket.send(
             JSON.stringify({
               success: true,

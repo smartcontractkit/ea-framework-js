@@ -213,7 +213,7 @@ test.serial(
 )
 
 test.serial(
-  'should not remove request from the queue while its still being rate limited',
+  'should remove request from the queue while its still being rate limited',
   wrapTest(async (t) => {
     const params1 = { param: 'test1' }
     const params2 = { param: 'test2' }
@@ -225,14 +225,15 @@ test.serial(
 
     const promise1 = makeRequest(t, params1)
     const promise2 = makeRequest(t, params2)
-    t.is(await getMetric(t, 'requester_queue_size'), 1)
 
-    // Sleeping shorter than the rate limit interval so the second request should
-    // still be in the queue.
+    // Sleeping shorter than the rate limit interval so the second request is
+    // still being rate limited.
     await sleep(rateLimitIntervalMs - 10)
 
-    // But the requester is too eager and removed it before it waiting for the
-    // reate limit.
+    // It's already removed from the queue because the rate limiting is
+    // specific to (the cost of) the request. So once we start rate limiting
+    // the request we are committed to it and don't want to evict it from the
+    // queue.
     t.is(await getMetric(t, 'requester_queue_size'), 0)
 
     const promise3 = makeRequest(t, params3)
@@ -244,6 +245,7 @@ test.serial(
 
     // When adding the fifth request, the queue overflowed so the queue size is
     // still 2.
+    await sleep(0)
     t.is(await getMetric(t, 'requester_queue_size'), 2)
     t.is(await getMetric(t, 'requester_queue_overflow'), 1)
 
@@ -674,13 +676,7 @@ test.serial(
       // Ignore
     }
 
-    t.is(
-      await getTotalRequestDuration(t),
-      (adapterSettings.RETRY + 1) * requestLatency +
-        // This is a bug. The request duration should not include the sleep time
-        // between retries.
-        adapterSettings.RETRY * adapterSettings.REQUESTER_SLEEP_BEFORE_REQUEUEING_MS,
-    )
+    t.is(await getTotalRequestDuration(t), (adapterSettings.RETRY + 1) * requestLatency)
   }),
 )
 
@@ -737,9 +733,7 @@ test.serial(
       {
         params: { param: param2 },
         timestamp: t0 + rateLimitIntervalMs,
-        // This should be 'async2' but because of a bug it's 'async1'.
-        // The test tests what's implemented so it can pass until the bug is fixed.
-        asyncLocal: 'async1',
+        asyncLocal: 'async2',
       },
     ])
   }),

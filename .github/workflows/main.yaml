@@ -89,8 +89,10 @@ jobs:
           DEBUG=* yo "$path_to_generator" examples
           cd examples/example-adapter
           yarn build
+          yarn tsc -b --noEmit tsconfig.test.json
           yarn test
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EXTERNAL_ADAPTER_GENERATOR_NO_INTERACTIVE: 'true'
           EXTERNAL_ADAPTER_GENERATOR_STANDALONE: 'true'
+          EXTERNAL_ADAPTER_GENERATOR_USE_LOCAL_FRAMEWORK_VERSION: 'true'
