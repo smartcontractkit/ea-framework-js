@@ -133,7 +133,7 @@ export class Requester {
   private async waitBeforeExecutingRequest<T>(req: PendingRequest<T>): Promise<void> {
     try {
       metrics.get('requesterQueueSize').inc()
-      await this.queue.run(async () => {
+      await this.queue.runInTurn(async () => {
         metrics.get('requesterQueueSize').dec()
         // Wait until the rate limiter allows the request to be executed
         await this.rateLimiter.waitForRateLimit(req.cost)

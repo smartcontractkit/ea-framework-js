@@ -78,7 +78,7 @@ export class TurnQueue {
     this.last = ready
   }
 
-  async run(task: () => Promise<void>): Promise<void> {
+  async runInTurn(task: () => Promise<void>): Promise<void> {
     const turn = await this.takeTurn()
     if (!turn) {
       throw new EvictedError('Too many pending turns')

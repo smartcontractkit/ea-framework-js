@@ -14,8 +14,8 @@ type Run = {
   promise: Promise<void>
 }
 
-// Starts a queue.run() whose task blocks until finish() is called, so a test
-// can hold a turn and observe whether the caller is running, finished, or
+// Starts a queue.runInTurn() whose task blocks until finish() is called, so a
+// test can hold a turn and observe whether the caller is running, finished, or
 // evicted.
 const startRun = (queue: TurnQueue): Run => {
   const [blockUntilFinished, unblock] = deferredPromise<void>()
@@ -28,7 +28,7 @@ const startRun = (queue: TurnQueue): Run => {
     promise: Promise.resolve(),
   }
   run.promise = queue
-    .run(async () => {
+    .runInTurn(async () => {
       run.started = true
       await blockUntilFinished
     })
@@ -103,12 +103,12 @@ test('runs waiting tasks in FIFO order', async (t) => {
 test('releases the turn even if the task throws', async (t) => {
   const queue = new TurnQueue(5)
 
-  const failing = queue.run(async () => {
+  const failing = queue.runInTurn(async () => {
     throw new Error('boom')
   })
   const next = startRun(queue)
 
-  // The error from the task propagates to the run() caller.
+  // The error from the task propagates to the runInTurn() caller.
   await t.throwsAsync(failing, { message: 'boom' })
   await flush()
 
