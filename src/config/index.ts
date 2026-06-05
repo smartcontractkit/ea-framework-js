@@ -305,6 +305,11 @@ export const BaseSettingsDefinition = {
     default: 300,
     validate: validator.integer({ min: 150, max: 500 }),
   },
+  FEED_ID_JSON: {
+    description: 'Flag to specify whether make feed id always a JSON string or not',
+    type: 'boolean',
+    default: false,
+  },
   MTLS_ENABLED: {
     description: 'Flag to specify whether mutual TLS/SSL is enabled or not',
     type: 'boolean',

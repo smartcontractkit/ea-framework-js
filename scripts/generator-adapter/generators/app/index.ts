@@ -56,6 +56,7 @@ export default class extends Generator.default {
   // with the same content in the same directory and extend from it. Also, new packages and config files (jest, babel) will be added
   // to be able to run the tests
   standalone = process.env.EXTERNAL_ADAPTER_GENERATOR_STANDALONE === 'true'
+  useLocalFrameworkVersion = process.env.EXTERNAL_ADAPTER_GENERATOR_USE_LOCAL_FRAMEWORK_VERSION === 'true'
 
   constructor(args, opts) {
     super(args, opts, { customInstallTask: true })
@@ -96,11 +97,12 @@ export default class extends Generator.default {
     const endpointNames = Object.values(endpoints).map(e => e.normalizedEndpointName).join(', ')
 
     const includeComments = await this._promptConfirmation(adapterName, endpointNames)
+    const frameworkVersion = this.useLocalFrameworkVersion
+      ? 'file:../../dist/src'
+      : (await require('../../../package.json')).version
 
     this.props = {
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      frameworkVersion: (await require('../../../package.json')).version,
+      frameworkVersion,
       adapterName,
       endpoints,
       endpointNames,

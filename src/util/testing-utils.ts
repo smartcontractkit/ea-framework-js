@@ -602,6 +602,7 @@ export const allowedUndefinedStubProps = [
   'toJSON',
   'asymmetricMatch',
   'then',
+  'FEED_ID_JSON',
 ]
 
 const isStubPropAllowedUndefined = (prop: string | symbol) => {
