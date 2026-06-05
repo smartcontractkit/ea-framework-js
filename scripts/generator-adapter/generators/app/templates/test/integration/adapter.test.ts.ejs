@@ -1,13 +1,17 @@
+import { SettingsDefinitionFromConfig } from '@chainlink/external-adapter-framework/config'
 import {
   TestAdapter,
   setEnvVariables,
 } from '@chainlink/external-adapter-framework/util/testing-utils'
 import * as nock from 'nock'
-import { mockResponseSuccess } from './fixtures'
+import { config } from '../../src/config'
+import { <% if (mockPostResponse) { %>mockPostResponseSuccess<% } else { %>mockResponseSuccess<% } %> } from './fixtures'
+
+type SettingsDefinition = SettingsDefinitionFromConfig<typeof config>
 
 describe('execute', () => {
   let spy: jest.SpyInstance
-  let testAdapter: TestAdapter
+  let testAdapter: TestAdapter<SettingsDefinition>
   let oldEnv: NodeJS.ProcessEnv
 
   beforeAll(async () => {
@@ -20,7 +24,7 @@ describe('execute', () => {
     const adapter = (await import('./../../src')).adapter
     adapter.rateLimiting = undefined
     testAdapter = await TestAdapter.startWithMockedCache(adapter, {
-      testAdapter: {} as TestAdapter<never>,
+      testAdapter: {} as TestAdapter<SettingsDefinition>,
     })
   })
 
@@ -41,11 +45,15 @@ describe('execute', () => {
         endpoint: '<%= endpoints[i].inputEndpointName %>',
         transport: '<%= transportName %>'
       }
+<% if (mockPostResponse) { %>
+      mockPostResponseSuccess()
+<% } else { %>
       mockResponseSuccess()
+<% } %>
       const response = await testAdapter.request(data)
-      expect(response.statusCode).toBe(200)
       expect(response.json()).toMatchSnapshot()
+      expect(response.statusCode).toBe(200)
     })
   })
-      <% } %>
+<% } %>
 })
