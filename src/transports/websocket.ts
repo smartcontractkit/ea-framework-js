@@ -188,20 +188,25 @@ export type WebsocketTransportGenerics = TransportGenerics & {
   }
 }
 
-const defaultSubscriptionMessageBuilder = <T extends WebsocketTransportGenerics,> (builders: WebSocketIndividualBuilders<T>) => (context: EndpointContext<T>, subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>) => {
-  const { subscribeMessage, unsubscribeMessage } = builders as WebSocketIndividualBuilders<T>
-  const subscribeMessages = subscribeMessage
-    ? subscriptions.new
-      .map((sub) => subscribeMessage(sub, context))
-      .filter((m) => m !== undefined)
-    : subscriptions.new
-  const unsubscribeMessages = unsubscribeMessage
-    ? subscriptions.stale
-      .map((sub) => unsubscribeMessage(sub, context))
-      .filter((m) => m !== undefined)
-    : subscriptions.stale
-  return [...unsubscribeMessages, ...subscribeMessages]
-}
+const defaultSubscriptionMessageBuilder =
+  <T extends WebsocketTransportGenerics>(builders: WebSocketIndividualBuilders<T>) =>
+  (
+    context: EndpointContext<T>,
+    subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
+  ) => {
+    const { subscribeMessage, unsubscribeMessage } = builders as WebSocketIndividualBuilders<T>
+    const subscribeMessages = subscribeMessage
+      ? subscriptions.new
+          .map((sub) => subscribeMessage(sub, context))
+          .filter((m) => m !== undefined)
+      : subscriptions.new
+    const unsubscribeMessages = unsubscribeMessage
+      ? subscriptions.stale
+          .map((sub) => unsubscribeMessage(sub, context))
+          .filter((m) => m !== undefined)
+      : subscriptions.stale
+    return [...unsubscribeMessages, ...subscribeMessages]
+  }
 
 /**
  * Transport implementation that takes incoming requests, adds them to an [[subscriptionSet]] and,
@@ -218,7 +223,10 @@ export class WebSocketTransport<
   connectionOpenedAt = 0
   streamHandlerInvocationsWithNoConnection = 0
   heartbeatInterval?: NodeJS.Timeout
-  subscriptionMessageBuilder?: (context: EndpointContext<T>, subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>) => unknown[] | void
+  subscriptionMessageBuilder?: (
+    context: EndpointContext<T>,
+    subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
+  ) => unknown[] | void
 
   constructor(private config: WebSocketTransportConfig<T>) {
     super()
@@ -572,7 +580,7 @@ export class WebSocketTransport<
           await this.sendMessages(context, messages)
           recordWsMessageSentMetrics(context, subscriptions.new, subscriptions.stale)
         } else {
-          logger.trace("No messages to send")
+          logger.trace('No messages to send')
         }
       } else {
         logger.trace(
