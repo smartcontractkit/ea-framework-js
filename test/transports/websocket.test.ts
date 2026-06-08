@@ -1946,7 +1946,9 @@ test.serial(
   },
 )
 
-const createBatchAdapter = (): Adapter => {
+const createBatchAdapter = (
+  envDefaultOverrides?: Record<string, string | number | symbol>,
+): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => ENDPOINT_URL,
     handlers: {
@@ -2004,6 +2006,7 @@ const createBatchAdapter = (): Adapter => {
         BACKGROUND_EXECUTE_MS_WS,
         WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
         WS_SUBSCRIPTION_TTL: 10_000,
+        ...envDefaultOverrides,
       },
     },
   )
@@ -2083,13 +2086,14 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
     })
   })
 
-  const adapter = createBatchAdapter()
-  t.is(adapter.config.settings.WS_SUBSCRIPTION_TTL, 10_000)
+  const adapter = createBatchAdapter({ WS_SUBSCRIPTION_TTL: 60_000 })
+  t.is(adapter.config.settings.WS_SUBSCRIPTION_TTL, 60_000)
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
   await testAdapter.startBackgroundExecuteThenGetResponse(t, {
     requestData: { base: 'ETH', quote: 'USD' },
+    expectedCacheSize: 1,
     expectedResponse: {
       data: { result: price },
       result: price,
@@ -2099,6 +2103,7 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
 
   await testAdapter.startBackgroundExecuteThenGetResponse(t, {
     requestData: { base: 'BTC', quote: 'USD' },
+    expectedCacheSize: 2,
     expectedResponse: {
       data: { result: price },
       result: price,
@@ -2109,11 +2114,7 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
   // Refresh BTC only; ETH subscription TTL is not extended.
   await testAdapter.request({ base: 'BTC', quote: 'USD' })
 
-  // Same pattern as the per-subscription stale-unsub test above.
-  await runAllUntilTime(
-    t.context.clock,
-    adapter.config.settings.WS_SUBSCRIPTION_TTL + BACKGROUND_EXECUTE_MS_WS * 3 + 100,
-  )
+  await runAllUntil(t.context.clock, () => unsubscribeMessages.length >= 1)
 
   testAdapter.api.close()
   mockWsServer.close()
