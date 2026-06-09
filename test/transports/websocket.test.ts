@@ -2022,110 +2022,110 @@ const createCustomSubscriptionsAdapter = (
 test.serial(
   'custom subscription builder sends one subscribe message for multiple feeds',
   async (t) => {
-  mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
-  const subscribeMessages: Array<{ request: string; pairs: string[] }> = []
+    mockWebSocketProvider(WebSocketClassProvider)
+    const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+    const subscribeMessages: Array<{ request: string; pairs: string[] }> = []
 
-  mockWsServer.on('connection', (socket) => {
-    socket.on('message', (rawMsg) => {
-      const parsed = JSON.parse(rawMsg.toString())
-      if (parsed.request === 'subscribe') {
-        subscribeMessages.push(parsed)
-        for (const pair of parsed.pairs) {
-          socket.send(JSON.stringify({ pair, value: price }))
+    mockWsServer.on('connection', (socket) => {
+      socket.on('message', (rawMsg) => {
+        const parsed = JSON.parse(rawMsg.toString())
+        if (parsed.request === 'subscribe') {
+          subscribeMessages.push(parsed)
+          for (const pair of parsed.pairs) {
+            socket.send(JSON.stringify({ pair, value: price }))
+          }
         }
-      }
+      })
     })
-  })
 
-  const adapter = createCustomSubscriptionsAdapter()
-  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+    const adapter = createCustomSubscriptionsAdapter()
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
-    requestData: { base: 'ETH', quote: 'USD' },
-    expectedCacheSize: 1,
-    expectedResponse: {
-      data: { result: price },
-      result: price,
-      statusCode: 200,
-    },
-  })
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base: 'ETH', quote: 'USD' },
+      expectedCacheSize: 1,
+      expectedResponse: {
+        data: { result: price },
+        result: price,
+        statusCode: 200,
+      },
+    })
 
-  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
-    requestData: { base: 'BTC', quote: 'USD' },
-    expectedCacheSize: 2,
-    expectedResponse: {
-      data: { result: price },
-      result: price,
-      statusCode: 200,
-    },
-  })
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base: 'BTC', quote: 'USD' },
+      expectedCacheSize: 2,
+      expectedResponse: {
+        data: { result: price },
+        result: price,
+        statusCode: 200,
+      },
+    })
 
-  testAdapter.api.close()
-  mockWsServer.close()
-  await t.context.clock.runToLastAsync()
+    testAdapter.api.close()
+    mockWsServer.close()
+    await t.context.clock.runToLastAsync()
 
-  t.is(subscribeMessages.length, 2)
-  t.deepEqual(subscribeMessages[0].pairs, ['ETH/USD'])
-  t.deepEqual(subscribeMessages[1].pairs, ['ETH/USD', 'BTC/USD'])
+    t.is(subscribeMessages.length, 2)
+    t.deepEqual(subscribeMessages[0].pairs, ['ETH/USD'])
+    t.deepEqual(subscribeMessages[1].pairs, ['ETH/USD', 'BTC/USD'])
   },
 )
 
 test.serial(
   'custom subscription builder sends one unsubscribe message when feeds go stale',
   async (t) => {
-  mockWebSocketProvider(WebSocketClassProvider)
-  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
-  const unsubscribeMessages: Array<{ request: string; pairs: string[] }> = []
+    mockWebSocketProvider(WebSocketClassProvider)
+    const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+    const unsubscribeMessages: Array<{ request: string; pairs: string[] }> = []
 
-  mockWsServer.on('connection', (socket) => {
-    socket.on('message', (rawMsg) => {
-      const parsed = JSON.parse(rawMsg.toString())
-      if (parsed.request === 'subscribe') {
-        for (const pair of parsed.pairs) {
-          socket.send(JSON.stringify({ pair, value: price }))
+    mockWsServer.on('connection', (socket) => {
+      socket.on('message', (rawMsg) => {
+        const parsed = JSON.parse(rawMsg.toString())
+        if (parsed.request === 'subscribe') {
+          for (const pair of parsed.pairs) {
+            socket.send(JSON.stringify({ pair, value: price }))
+          }
+        } else if (parsed.request === 'unsubscribe') {
+          unsubscribeMessages.push(parsed)
         }
-      } else if (parsed.request === 'unsubscribe') {
-        unsubscribeMessages.push(parsed)
-      }
+      })
     })
-  })
 
-  const adapter = createCustomSubscriptionsAdapter({ WS_SUBSCRIPTION_TTL: 60_000 })
-  t.is(adapter.config.settings.WS_SUBSCRIPTION_TTL, 60_000)
+    const adapter = createCustomSubscriptionsAdapter({ WS_SUBSCRIPTION_TTL: 60_000 })
+    t.is(adapter.config.settings.WS_SUBSCRIPTION_TTL, 60_000)
 
-  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
-  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
-    requestData: { base: 'ETH', quote: 'USD' },
-    expectedCacheSize: 1,
-    expectedResponse: {
-      data: { result: price },
-      result: price,
-      statusCode: 200,
-    },
-  })
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base: 'ETH', quote: 'USD' },
+      expectedCacheSize: 1,
+      expectedResponse: {
+        data: { result: price },
+        result: price,
+        statusCode: 200,
+      },
+    })
 
-  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
-    requestData: { base: 'BTC', quote: 'USD' },
-    expectedCacheSize: 2,
-    expectedResponse: {
-      data: { result: price },
-      result: price,
-      statusCode: 200,
-    },
-  })
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base: 'BTC', quote: 'USD' },
+      expectedCacheSize: 2,
+      expectedResponse: {
+        data: { result: price },
+        result: price,
+        statusCode: 200,
+      },
+    })
 
-  // Refresh BTC only; ETH subscription TTL is not extended.
-  await testAdapter.request({ base: 'BTC', quote: 'USD' })
+    // Refresh BTC only; ETH subscription TTL is not extended.
+    await testAdapter.request({ base: 'BTC', quote: 'USD' })
 
-  await runAllUntil(t.context.clock, () => unsubscribeMessages.length >= 1)
+    await runAllUntil(t.context.clock, () => unsubscribeMessages.length >= 1)
 
-  testAdapter.api.close()
-  mockWsServer.close()
-  await t.context.clock.runToLastAsync()
+    testAdapter.api.close()
+    mockWsServer.close()
+    await t.context.clock.runToLastAsync()
 
-  t.is(unsubscribeMessages.length, 1)
-  t.deepEqual(unsubscribeMessages[0].pairs, ['ETH/USD'])
+    t.is(unsubscribeMessages.length, 1)
+    t.deepEqual(unsubscribeMessages[0].pairs, ['ETH/USD'])
   },
 )
