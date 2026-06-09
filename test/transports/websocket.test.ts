@@ -1946,7 +1946,7 @@ test.serial(
   },
 )
 
-const createBatchAdapter = (
+const createCustomSubscriptionsAdapter = (
   envDefaultOverrides?: Record<string, string | number | symbol>,
 ): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
@@ -2019,7 +2019,9 @@ const createBatchAdapter = (
   })
 }
 
-test.serial('batch builders send one subscribe message for multiple feeds', async (t) => {
+test.serial(
+  'custom subscription builder sends one subscribe message for multiple feeds',
+  async (t) => {
   mockWebSocketProvider(WebSocketClassProvider)
   const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   const subscribeMessages: Array<{ request: string; pairs: string[] }> = []
@@ -2036,7 +2038,7 @@ test.serial('batch builders send one subscribe message for multiple feeds', asyn
     })
   })
 
-  const adapter = createBatchAdapter()
+  const adapter = createCustomSubscriptionsAdapter()
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
   await testAdapter.startBackgroundExecuteThenGetResponse(t, {
@@ -2066,9 +2068,12 @@ test.serial('batch builders send one subscribe message for multiple feeds', asyn
   t.is(subscribeMessages.length, 2)
   t.deepEqual(subscribeMessages[0].pairs, ['ETH/USD'])
   t.deepEqual(subscribeMessages[1].pairs, ['ETH/USD', 'BTC/USD'])
-})
+  },
+)
 
-test.serial('batch builders send one unsubscribe message when feeds go stale', async (t) => {
+test.serial(
+  'custom subscription builder sends one unsubscribe message when feeds go stale',
+  async (t) => {
   mockWebSocketProvider(WebSocketClassProvider)
   const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
   const unsubscribeMessages: Array<{ request: string; pairs: string[] }> = []
@@ -2086,7 +2091,7 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
     })
   })
 
-  const adapter = createBatchAdapter({ WS_SUBSCRIPTION_TTL: 60_000 })
+  const adapter = createCustomSubscriptionsAdapter({ WS_SUBSCRIPTION_TTL: 60_000 })
   t.is(adapter.config.settings.WS_SUBSCRIPTION_TTL, 60_000)
 
   const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
@@ -2122,4 +2127,5 @@ test.serial('batch builders send one unsubscribe message when feeds go stale', a
 
   t.is(unsubscribeMessages.length, 1)
   t.deepEqual(unsubscribeMessages[0].pairs, ['ETH/USD'])
-})
+  },
+)

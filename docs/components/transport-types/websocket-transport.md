@@ -107,7 +107,7 @@ In the example above, after the connection is established a custom authenticatio
 
 ### Sending messages
 
-The **builders** object prepares subscribe and unsubscribe messages sent to the Data Provider. Configure **either** the per-subscription builders or the batch builders, not both. When `batchSubscribeMessage` is present, the batch path is used.
+The **builders** object prepares subscribe and unsubscribe messages sent to the Data Provider. Configure **either** the per-subscription builders or a custom subscription builder, not both.
 
 #### Per-subscription builders
 
@@ -123,26 +123,32 @@ builders: {
 }
 ```
 
-#### Batch builders
+#### Custom subscription builder
 
-Some providers accept a single message that subscribes or unsubscribes from multiple feeds at once. Use **batchSubscribeMessage** and **batchUnsubscribeMessage** instead of the per-subscription methods above.
+Some EAs need custom subscription handling—for example, batching multiple feeds into a single message. Use **customSubscriptionMessages** instead of the per-subscription methods above.
 
-Each batch builder receives the full list of new or stale subscriptions for the current background execute cycle and returns **one** message. The transport sends that message as a single WebSocket frame.
+The custom builder receives subscription deltas for the current background execute cycle (`subscriptions.new`, `subscriptions.stale`, and `subscriptions.desired`) and returns an array of messages to send. Return an empty array when there is nothing to send.
 
 ```typescript
 builders: {
-  batchSubscribeMessage: (params) => ({
-    action: 'subscribe',
-    pairs: params.map((p) => `${p.base}/${p.quote}`),
-  }),
-  batchUnsubscribeMessage: (params) => ({
-    action: 'unsubscribe',
-    pairs: params.map((p) => `${p.base}/${p.quote}`),
-  }),
+  customSubscriptionMessages: (_context, subscriptions) => {
+    const messages = []
+    if (subscriptions.new.length > 0) {
+      messages.push({
+        action: 'subscribe',
+        pairs: subscriptions.new.map((p) => `${p.base}/${p.quote}`),
+      })
+    }
+    if (subscriptions.stale.length > 0) {
+      messages.push({
+        action: 'unsubscribe',
+        pairs: subscriptions.stale.map((p) => `${p.base}/${p.quote}`),
+      })
+    }
+    return messages
+  },
 }
 ```
-
-When a feed is added or removed, only the delta (`subscriptions.new` or `subscriptions.stale`) is passed to the batch builder, so each cycle may produce a message covering one or more feeds depending on what changed.
 
 ### Heartbeat messages
 

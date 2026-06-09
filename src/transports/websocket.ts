@@ -71,16 +71,18 @@ type WebSocketIndividualBuilders<T extends WebsocketTransportGenerics> = {
 
 type WebSocketCustomBuilders<T extends WebsocketTransportGenerics> = {
   /**
-   * Builds a WS message that will be sent to subscribe to a specific feed
+   * Builds WS messages to subscribe and/or unsubscribe from feeds.
+   * Use this instead of per-subscription builders when an EA needs custom
+   * subscription handling (e.g. batching multiple feeds into one message).
    *
    * @param context - the background context for the Adapter
-   * @param subscriptions - the body of the adapter request
-   * @returns the WS message (can be any type as long as the [[WebSocket]] doesn't complain)
+   * @param subscriptions - new, stale, and desired subscription deltas for this cycle
+   * @returns WS messages to send; an empty array means nothing to send
    */
   customSubscriptionMessages: (
     context: EndpointContext<T>,
     subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
-  ) => unknown[] | void
+  ) => unknown[]
 }
 
 /**
@@ -166,8 +168,7 @@ export type WebSocketTransportConfig<T extends WebsocketTransportGenerics> = {
   /**
    * Map of "builders", functions that will be used to prepare specific WS messages.
    * Provide either per-subscription builders (`subscribeMessage` / `unsubscribeMessage`)
-   * or batch builders (`batchSubscribeMessage` / `batchUnsubscribeMessage`), not both.
-   * When `batchSubscribeMessage` is present, the batch path is used.
+   * or a custom builder (`customSubscriptionMessages`), not both.
    */
   builders?: WebSocketIndividualBuilders<T> | WebSocketCustomBuilders<T>
 }
@@ -226,7 +227,7 @@ export class WebSocketTransport<
   subscriptionMessageBuilder?: (
     context: EndpointContext<T>,
     subscriptions: SubscriptionDeltas<TypeFromDefinition<T['Parameters']>>,
-  ) => unknown[] | void
+  ) => unknown[]
 
   constructor(private config: WebSocketTransportConfig<T>) {
     super()
@@ -576,7 +577,7 @@ export class WebSocketTransport<
 
       if (this.subscriptionMessageBuilder) {
         const messages = this.subscriptionMessageBuilder(context, subscriptions)
-        if (messages && messages.length > 0) {
+        if (messages?.length > 0) {
           await this.sendMessages(context, messages)
           recordWsMessageSentMetrics(context, subscriptions.new, subscriptions.stale)
         } else {
