@@ -17,7 +17,8 @@ export class CompareResponseCache<
   // A local map to keep track of the most recent entries written to the responseCache
   // We compare with this first before comparing with value in cache
   // so that we can reduce cache reads
-  localCache: Map<string, AdapterResponse<T['Response']>>
+  localCache: Map<string, { value: AdapterResponse<T['Response']>; writtenAt: number }>
+  staleThreshold: number
   // True if next should replace current in cache
   shouldUpdate: (
     next: AdapterResponse<T['Response']>,
@@ -31,6 +32,7 @@ export class CompareResponseCache<
       next: AdapterResponse<T['Response']>,
       current?: AdapterResponse<T['Response']>,
     ) => boolean,
+    staleThreshold = Infinity,
   ) {
     super({
       inputParameters: responseCache.inputParameters,
@@ -42,6 +44,7 @@ export class CompareResponseCache<
     this.transportName = transportName
     this.responseCache = responseCache
     this.localCache = new Map()
+    this.staleThreshold = staleThreshold
     this.shouldUpdate = shouldUpdate
   }
 
@@ -57,15 +60,23 @@ export class CompareResponseCache<
       value: AdapterResponse<T['Response']>
     }[],
   ) {
+    const now = Date.now()
     const filteredEntries = (
       await Promise.all(
         entries.flatMap(async ({ key, value }) => {
-          if (!this.shouldUpdate(value, this.localCache.get(key))) {
+          const local = this.localCache.get(key)
+          const isLocalExpired = !!local && now - local.writtenAt >= this.staleThreshold
+          const localValue = local && !isLocalExpired ? local.value : undefined
+          if (!this.shouldUpdate(value, localValue)) {
             return []
           }
-          const entryInCache = await this.get(key)
-          if (!this.shouldUpdate(value, entryInCache)) {
-            return []
+          // Skip the Redis check when the local entry is expired — the incoming write
+          // should take over regardless of what Redis has at that point.
+          if (!isLocalExpired) {
+            const entryInCache = await this.get(key)
+            if (!this.shouldUpdate(value, entryInCache)) {
+              return []
+            }
           }
           return [{ key, value }]
         }),
@@ -76,7 +87,7 @@ export class CompareResponseCache<
       await this.responseCache.writeEntries(filteredEntries)
 
       filteredEntries.forEach(({ key, value }) => {
-        this.localCache.set(key, value)
+        this.localCache.set(key, { value, writtenAt: now })
       })
     }
   }

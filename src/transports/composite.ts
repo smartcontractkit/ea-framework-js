@@ -30,24 +30,12 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
     const compareCache = new CompareResponseCache(
       transportName,
       this.responseCache,
-      (next, current) => {
-        // If newer timestamp, return true.
-        // If same timestamp and value, return true to refresh TTL. This may be from another transport.
-        // If same timestamp and different value but current entry is older than staleThreshold, return true to avoid serving stale data after a transport goes silent.
-        // If same timestamp and different value and current entry is fresh, return false to avoid rubberbanding between transports.
-        const newTimestamp = next.timestamps?.providerIndicatedTimeUnixMs ?? 0
-        const currentTimestamp = current?.timestamps?.providerIndicatedTimeUnixMs ?? 0
-        const newReceivedTimestamp = next.timestamps?.providerDataReceivedUnixMs ?? 0
-        const currentReceivedTimestamp = current?.timestamps?.providerDataReceivedUnixMs ?? 0
-        const newData = JSON.stringify(next.data)
-        const currentData = JSON.stringify(current?.data)
-        return (
-          newTimestamp > currentTimestamp ||
-          (newTimestamp === currentTimestamp && newData === currentData) ||
-          (newTimestamp === currentTimestamp &&
-            newReceivedTimestamp > currentReceivedTimestamp + staleThreshold)
-        )
-      },
+      (next, current) =>
+        // Write if the incoming value has a newer provider timestamp
+        // Also writes if the local cache entry has gone stale in the underlying CompareResponseCache
+        (next.timestamps?.providerIndicatedTimeUnixMs ?? 0) >
+        (current?.timestamps?.providerIndicatedTimeUnixMs ?? 0),
+      staleThreshold,
     )
 
     await Promise.all(
