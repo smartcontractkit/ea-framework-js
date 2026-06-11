@@ -14,10 +14,6 @@ export class CompareResponseCache<
   readonly transportName: string
   // The actual cache where responses are written to
   responseCache: ResponseCache<T>
-  // A local map to keep track of the most recent entries written to the responseCache
-  // We compare with this first before comparing with value in cache
-  // so that we can reduce cache reads
-  localCache: Map<string, AdapterResponse<T['Response']>>
   // True if next should replace current in cache
   shouldUpdate: (
     next: AdapterResponse<T['Response']>,
@@ -41,7 +37,6 @@ export class CompareResponseCache<
     })
     this.transportName = transportName
     this.responseCache = responseCache
-    this.localCache = new Map()
     this.shouldUpdate = shouldUpdate
   }
 
@@ -60,11 +55,8 @@ export class CompareResponseCache<
     const filteredEntries = (
       await Promise.all(
         entries.flatMap(async ({ key, value }) => {
-          if (!this.shouldUpdate(value, this.localCache.get(key))) {
-            return []
-          }
-          const entryInCache = await this.get(key)
-          if (!this.shouldUpdate(value, entryInCache)) {
+          const current = await this.get(key)
+          if (!this.shouldUpdate(value, current)) {
             return []
           }
           return [{ key, value }]
@@ -74,10 +66,6 @@ export class CompareResponseCache<
 
     if (filteredEntries.length > 0) {
       await this.responseCache.writeEntries(filteredEntries)
-
-      filteredEntries.forEach(({ key, value }) => {
-        this.localCache.set(key, value)
-      })
     }
   }
 

@@ -28,6 +28,8 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
       transportName,
       this.responseCache,
       (next, current) =>
+        // Write if the incoming value has a newer provider timestamp
+        // Also writes if the previous cache entry is stale/expired
         (next.timestamps?.providerIndicatedTimeUnixMs ?? 0) >
         (current?.timestamps?.providerIndicatedTimeUnixMs ?? 0),
     )
@@ -61,6 +63,10 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
 
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
     const entries = Object.entries(this.transports)
+
+    // Note that this will wait for the slowest transport to resolve before completing
+    // this shared backgroundExecute loop and stalling the faster transport(s).
+    // Consider setting lower timeouts on the individual transports if this becomes an issue.
     const results = await Promise.allSettled(entries.map(([, t]) => t.backgroundExecute?.(context)))
 
     results.forEach((r, i) => {
