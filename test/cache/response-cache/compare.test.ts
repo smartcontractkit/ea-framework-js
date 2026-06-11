@@ -97,7 +97,7 @@ test('shouldUpdate checks the backing cache when no prior write through compareC
   await simpleCache.write('merged', [providerResult(params, 100)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 100)
 
-  // shouldUpdate sees the backing cache value and blocks the lower write
+  // Sees the backing cache value and blocks the lower write
   await compareCache.write('merged', [providerResult(params, 25)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 100)
 })
