@@ -41,7 +41,7 @@ const axiosMock = new MockAdapter(axios)
 type CacheTestHttpTypes = CacheTestTransportTypes & {
   Provider: {
     RequestBody: unknown
-    ResponseBody: { result: number; ts?: number; received?: number }
+    ResponseBody: { result: number; ts?: number }
   }
 }
 
@@ -62,7 +62,7 @@ class CountingCacheHttpTransport extends HttpTransport<CacheTestHttpTypes> {
         })),
       parseResponse: (
         params,
-        res: AxiosResponse<{ result: number; ts?: number; received?: number }>,
+        res: AxiosResponse<{ result: number; ts?: number }>,
       ) =>
         params.map((p) => ({
           params: p,
@@ -71,7 +71,7 @@ class CountingCacheHttpTransport extends HttpTransport<CacheTestHttpTypes> {
             result: res.data.result,
             timestamps: {
               providerDataRequestedUnixMs: 0,
-              providerDataReceivedUnixMs: res.data.received ?? 0,
+              providerDataReceivedUnixMs: 0,
               providerIndicatedTimeUnixMs: res.data.ts ?? 1,
             },
           },
@@ -313,57 +313,6 @@ test.serial(
   },
 )
 
-test.serial(
-  'composite transport allows overwrite when current entry is stale despite same timestamp',
-  async (t) => {
-    const ws = new CountingCacheHttpTransport('ws', WS_PROVIDER)
-    const rest = new CountingCacheHttpTransport('rest', REST_PROVIDER)
-
-    const adapter = new Adapter({
-      name: 'TEST_STALENESS',
-      defaultEndpoint: 'test',
-      endpoints: [
-        new AdapterEndpoint({
-          name: 'test',
-          inputParameters: cacheTestInputParameters,
-          enableCompositeTransport: true,
-          transportRoutes: new TransportRoutes<CacheTestHttpTypes>()
-            .register('ws', ws)
-            .register('rest', rest),
-        }),
-      ],
-      config: new AdapterConfig(
-        {},
-        {
-          envDefaultOverrides: {
-            COMPOSITE_TRANSPORT: true,
-            COMPOSITE_TRANSPORT_STALE_THRESHOLD_MS: 1000,
-          },
-        },
-      ),
-    })
-
-    const localContext = { clock: t.context.clock } as typeof t.context
-    const localAdapter = await TestAdapter.start(adapter, localContext)
-
-    // WS writes first at ts=500, received=0
-    axiosMock
-      .onGet(`${WS_PROVIDER}/price`, { params: { base: 'NEAR', factor: 1 } })
-      .reply(200, { result: 10, ts: 500, received: 0 })
-    // REST writes at the same ts=500 but received=2000 (2s later, exceeding the 1000ms threshold)
-    // and a slightly different value due to rounding — should be allowed through
-    axiosMock
-      .onGet(`${REST_PROVIDER}/price`, { params: { base: 'NEAR', factor: 1 } })
-      .reply(200, { result: 11, ts: 500, received: 2000 })
-
-    const res = await localAdapter.request({ base: 'NEAR', factor: 1 })
-
-    t.is(res.statusCode, 200)
-    t.is(res.json().result, 11)
-
-    await localAdapter.api.close()
-  },
-)
 
 test.serial(
   'AdapterEndpoint throws when enableCompositeTransport is true with only one transport',

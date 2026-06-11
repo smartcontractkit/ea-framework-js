@@ -57,7 +57,7 @@ test('writes under CompareResponseCache transportName', async (t) => {
   t.is(entry?.meta?.transportName, 'ws')
 })
 
-test('second write override first write', async (t) => {
+test('second write overrides first write', async (t) => {
   const compareCache = new CompareResponseCache('merged', buildSimpleCache(), () => true)
 
   const params = { base: 'ETH', factor: 1 }
@@ -81,38 +81,10 @@ test('shouldUpdate can block write when new value is not fresher than cache', as
 
   await compareCache.write('merged', [providerResult(params, 25)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 50)
-  t.is(compareCache.localCache.size, 1)
 })
 
-test('stale local entry allows write to bypass shouldUpdate result against Redis', async (t) => {
+test('shouldUpdate checks the backing cache when no prior write through compareCache', async (t) => {
   const simpleCache = buildSimpleCache()
-  const compareCache = new CompareResponseCache(
-    'merged',
-    simpleCache,
-    (next, current) => (next?.result || 0) > (current?.result || 0),
-    1000, // 1s staleThreshold
-  )
-
-  const params = { base: 'ETH', factor: 1 }
-
-  // Write value=100 through compareCache so the local map has an entry
-  await compareCache.write('merged', [providerResult(params, 100)])
-  t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 100)
-
-  // Manually expire the local map entry by backdating writtenAt
-  const key = compareCache.getCacheKey('merged', params)
-  const local = compareCache.localCache.get(key)!
-  compareCache.localCache.set(key, { ...local, writtenAt: local.writtenAt - 2000 })
-
-  // Value=25 would normally be blocked by shouldUpdate (25 < 100), but the local entry
-  // is stale so the Redis check is skipped and the write goes through
-  await compareCache.write('merged', [providerResult(params, 25)])
-  t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 25)
-})
-
-test('shouldUpdate can block write without old value in localCache', async (t) => {
-  const simpleCache = buildSimpleCache()
-
   const compareCache = new CompareResponseCache(
     'merged',
     simpleCache,
@@ -121,10 +93,12 @@ test('shouldUpdate can block write without old value in localCache', async (t) =
 
   const params = { base: 'ETH', factor: 1 }
 
+  // Write directly to the backing cache, bypassing compareCache
   await simpleCache.write('merged', [providerResult(params, 100)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 100)
 
+  // shouldUpdate sees the backing cache value and blocks the lower write
   await compareCache.write('merged', [providerResult(params, 25)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 100)
-  t.is(compareCache.localCache.size, 0)
 })
+

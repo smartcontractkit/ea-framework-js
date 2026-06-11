@@ -399,12 +399,6 @@ export const BaseSettingsDefinition = {
     description: 'Whether to use enableCompositeTransport parameter in AdapterEndpoint',
     default: false,
   },
-  COMPOSITE_TRANSPORT_STALE_THRESHOLD_MS: {
-    type: 'number',
-    description:
-      'The maximum amount of time in milliseconds before a composite transport cache entry is considered stale. Defaults to CACHE_MAX_AGE / 2 if not set.',
-    validate: validator.integer({ min: 1000, max: 60 * 60 * 1000 }), // Max 1 hour
-  },
 } as const satisfies SettingsDefinitionMap
 
 export const buildAdapterSettings = <

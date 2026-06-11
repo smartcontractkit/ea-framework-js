@@ -24,18 +24,14 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
     this.name = transportName
     this.responseCache = dependencies.responseCache
 
-    const staleThreshold =
-      adapterSettings.COMPOSITE_TRANSPORT_STALE_THRESHOLD_MS ?? adapterSettings.CACHE_MAX_AGE / 2
-
     const compareCache = new CompareResponseCache(
       transportName,
       this.responseCache,
       (next, current) =>
         // Write if the incoming value has a newer provider timestamp
-        // Also writes if the local cache entry has gone stale in the underlying CompareResponseCache
+        // Also writes if the previous cache entry is stale/expired
         (next.timestamps?.providerIndicatedTimeUnixMs ?? 0) >
         (current?.timestamps?.providerIndicatedTimeUnixMs ?? 0),
-      staleThreshold,
     )
 
     await Promise.all(
