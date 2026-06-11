@@ -60,10 +60,7 @@ class CountingCacheHttpTransport extends HttpTransport<CacheTestHttpTypes> {
             params: { base: p.base, factor: p.factor },
           },
         })),
-      parseResponse: (
-        params,
-        res: AxiosResponse<{ result: number; ts?: number }>,
-      ) =>
+      parseResponse: (params, res: AxiosResponse<{ result: number; ts?: number }>) =>
         params.map((p) => ({
           params: p,
           response: {
@@ -312,7 +309,6 @@ test.serial(
     await localAdapter.api.close()
   },
 )
-
 
 test.serial(
   'AdapterEndpoint throws when enableCompositeTransport is true with only one transport',

@@ -101,4 +101,3 @@ test('shouldUpdate checks the backing cache when no prior write through compareC
   await compareCache.write('merged', [providerResult(params, 25)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 100)
 })
-
