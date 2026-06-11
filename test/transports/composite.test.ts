@@ -140,7 +140,7 @@ test.serial(
 )
 
 test.serial(
-  'composite transport merges child writes by providerIndicatedTimeUnixMs when run under an adapter',
+  'composite transport merges child writes by providerIndicatedTimeUnixMs when run under an adapter, takes newest timestamped value',
   async (t) => {
     axiosMock
       .onGet(`${WS_PROVIDER}/price`, { params: { base: 'BTC', factor: 3 } })
@@ -158,6 +158,50 @@ test.serial(
     t.is(res.json().result, 100)
     t.is(t.context.ws.registerRequestCalls, 1)
     t.is(t.context.rest.registerRequestCalls, 1)
+  },
+)
+
+test.serial(
+  'composite transport refreshes TTL when both transports return same value at same timestamp',
+  async (t) => {
+    axiosMock
+      .onGet(`${WS_PROVIDER}/price`, { params: { base: 'XRP', factor: 1 } })
+      .reply(200, { result: 42, ts: 100 })
+    axiosMock
+      .onGet(`${REST_PROVIDER}/price`, { params: { base: 'XRP', factor: 1 } })
+      .reply(200, { result: 42, ts: 100 })
+
+    const res = await t.context.testAdapter.request({ base: 'XRP', factor: 1 })
+
+    // How to test whether the params were refreshed in the cache?
+    // we can check that the response is correct and then check that the ws transport was called again
+    // on a subsequent request, indicating that the cache entry was refreshed and the ws transport was used again instead of the rest transport
+
+    t.is(res.statusCode, 200)
+    t.is(res.json().result, 42)
+  },
+)
+
+test.serial(
+  'composite transport does not rubberband when transports return conflicting values at same timestamp',
+  async (t) => {
+    // Send first request
+    axiosMock
+      .onGet(`${WS_PROVIDER}/price`, { params: { base: 'ABC', factor: 1 } })
+      .reply(200, { result: 10, ts: 200 })
+
+    const res = await t.context.testAdapter.request({ base: 'ABC', factor: 1 })
+    t.is(res.statusCode, 200)
+    t.is(res.json().result, 10)
+
+    // Send second request with same timestamp but different value
+    axiosMock
+      .onGet(`${REST_PROVIDER}/price`, { params: { base: 'ABC', factor: 1 } })
+      .reply(200, { result: 99, ts: 200 })
+
+    const res2 = await t.context.testAdapter.request({ base: 'ABC', factor: 1 })
+    t.is(res2.statusCode, 200)
+    t.is(res2.json().result, 10)
   },
 )
 

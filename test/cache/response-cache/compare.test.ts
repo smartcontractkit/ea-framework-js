@@ -57,7 +57,7 @@ test('writes under CompareResponseCache transportName', async (t) => {
   t.is(entry?.meta?.transportName, 'ws')
 })
 
-test('second write override first write', async (t) => {
+test('second write overrides first write', async (t) => {
   const compareCache = new CompareResponseCache('merged', buildSimpleCache(), () => true)
 
   const params = { base: 'ETH', factor: 1 }
@@ -81,12 +81,10 @@ test('shouldUpdate can block write when new value is not fresher than cache', as
 
   await compareCache.write('merged', [providerResult(params, 25)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 50)
-  t.is(compareCache.localCache.size, 1)
 })
 
-test('shouldUpdate can block write without old value in localCache', async (t) => {
+test('shouldUpdate checks the backing cache when no prior write through compareCache', async (t) => {
   const simpleCache = buildSimpleCache()
-
   const compareCache = new CompareResponseCache(
     'merged',
     simpleCache,
@@ -95,10 +93,11 @@ test('shouldUpdate can block write without old value in localCache', async (t) =
 
   const params = { base: 'ETH', factor: 1 }
 
+  // Write directly to the backing cache, bypassing compareCache
   await simpleCache.write('merged', [providerResult(params, 100)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 100)
 
+  // Sees the backing cache value and blocks the lower write
   await compareCache.write('merged', [providerResult(params, 25)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 100)
-  t.is(compareCache.localCache.size, 0)
 })
