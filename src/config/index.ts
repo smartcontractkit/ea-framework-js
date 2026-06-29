@@ -706,8 +706,7 @@ type OptionalSettingKeys<T extends SettingsDefinitionMap> = {
 
 export type Settings<T extends SettingsDefinitionMap> = {
   -readonly [K in Extract<FixedSettingKeys<T>, OptionalSettingKeys<T>>]?:
-    | SettingTypeWhenPresent<T[K]>
-    | undefined
+    SettingTypeWhenPresent<T[K]> | undefined
 } & {
   -readonly [K in Extract<FixedSettingKeys<T>, NonOptionalSettingKeys<T>>]: SettingTypeWhenPresent<
     T[K]
