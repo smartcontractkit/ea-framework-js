@@ -203,13 +203,13 @@ type EmptyDefinition = {} // eslint-disable-line
 export type TypeFromDefinition<T extends InputParametersDefinition> = unknown extends T
   ? any
   : {
-      -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
-        ? K
-        : never]: TypeFromParameter<T[K]>
+      -readonly [
+        K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true ? K : never
+      ]: TypeFromParameter<T[K]>
     } & {
-      -readonly [K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true
-        ? never
-        : K]?: TypeFromParameter<T[K]>
+      -readonly [
+        K in keyof T as TypeFromDefinitionIsDefined<T[K]> extends true ? never : K
+      ]?: TypeFromParameter<T[K]>
     }
 /* eslint-enable */
 

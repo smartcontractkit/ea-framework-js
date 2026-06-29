@@ -264,22 +264,19 @@ type SuccessfulResponse<T extends ResponseGenerics> = TimestampedSuccessfulRespo
  * Response body from the EA, before timestamps, defaults and metadata are filled in
  */
 export type PartialAdapterResponse<T extends ResponseGenerics = ResponseGenerics> =
-  | PartialSuccessfulResponse<T>
-  | ProviderErrorResponse
+  PartialSuccessfulResponse<T> | ProviderErrorResponse
 
 /**
  * Response body from the EA with timestamps, before defaults and metadata are filled in
  */
 export type TimestampedAdapterResponse<T extends ResponseGenerics = ResponseGenerics> =
-  | TimestampedSuccessfulResponse<T>
-  | TimestampedProviderErrorResponse
+  TimestampedSuccessfulResponse<T> | TimestampedProviderErrorResponse
 
 /**
  * Shape of the response body from the adapter
  */
 export type AdapterResponse<T extends ResponseGenerics = ResponseGenerics> =
-  | SuccessfulResponse<T>
-  | TimestampedProviderErrorResponse
+  SuccessfulResponse<T> | TimestampedProviderErrorResponse
 
 export type SingleNumberResultResponse = {
   Result: number
