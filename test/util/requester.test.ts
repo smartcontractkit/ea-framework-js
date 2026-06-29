@@ -78,6 +78,7 @@ test.beforeEach((t) => {
   metrics.initialize()
   t.context.clock.reset()
   recordedRequests.length = 0
+  requestLatency = 0
   t.context.requester = makeRequester()
 })
 
@@ -496,7 +497,7 @@ test.serial(
 )
 
 test.serial(
-  'should reuse a dupcliate request that is already sent but does not have a response yet',
+  'should reuse a duplicate request that is already sent but does not have a response yet',
   wrapTest(async (t) => {
     const params1 = { param: 'test1' }
     const params2 = params1
@@ -535,6 +536,39 @@ test.serial(
     t.deepEqual([resultTime1 - t0, resultTime2 - t0], [requestLatency, requestLatency])
 
     // No additional request was made.
+    t.deepEqual(recordedRequests, [
+      {
+        params: params1,
+        timestamp: t0,
+      },
+    ])
+  }),
+)
+
+test.serial(
+  'should reuse a duplicate request that is made immediately after the previous request',
+  wrapTest(async (t) => {
+    const params1 = { param: 'test1' }
+    const params2 = params1
+
+    const t0 = Date.now()
+
+    let resultTime1 = 0
+    let resultTime2 = 0
+
+    const promise1 = makeRequest(t, params1)
+    promise1.then(() => {
+      resultTime1 = Date.now()
+    })
+    const promise2 = makeRequest(t, params2)
+    promise2.then(() => {
+      resultTime2 = Date.now()
+    })
+
+    t.deepEqual(await Promise.all([promise1, promise2]), [params1, params2])
+
+    t.deepEqual([resultTime1 - t0, resultTime2 - t0], [0, 0])
+
     t.deepEqual(recordedRequests, [
       {
         params: params1,
