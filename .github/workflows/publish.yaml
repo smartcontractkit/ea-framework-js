@@ -22,7 +22,7 @@ jobs:
     outputs:
       VERSION_TAG: ${{ steps.get-version-tag.outputs.VERSION_TAG }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - id: version-check
         run: |
           PACKAGE_VERSION=$(cat package.json \
