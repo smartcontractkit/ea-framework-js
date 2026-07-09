@@ -532,6 +532,7 @@ type VariableEnvVarEntry<T extends ValidSettingValue> = {
 
 export interface Getter<T extends SettingValueType | undefined> {
   get(variable: string): T
+  getEnvVarName(variable: string): string
   entries(): VariableEnvVarEntry<Exclude<T, undefined>>[]
 }
 
@@ -593,8 +594,12 @@ export class EnvGetter<
     )
   }
 
+  private getCanonicalVariable(variable: string): string {
+    return variable.replace(/\W/g, '_').toUpperCase()
+  }
+
   get(variable: string): SettingType<T> {
-    const canonicalVariable = variable.replace(/\W/g, '_').toUpperCase()
+    const canonicalVariable = this.getCanonicalVariable(variable)
     if (canonicalVariable in this.variableMap) {
       return this.variableMap[canonicalVariable].value as SettingType<T>
     }
@@ -604,14 +609,21 @@ export class EnvGetter<
     if (!this.settingsDefinition.required) {
       return undefined as SettingType<T>
     }
-    const envName = getEnvName(
-      this.name.replace(this.settingsDefinition.variablePlaceholder, canonicalVariable),
-      this.prefix,
-    )
+    const envName = this.getEnvVarName(variable)
     throw new AdapterError({
       statusCode: 500,
       message: `Missing required environment variable: ${envName}`,
     })
+  }
+
+  getEnvVarName(variable: string): string {
+    return getEnvName(
+      this.name.replace(
+        this.settingsDefinition.variablePlaceholder,
+        this.getCanonicalVariable(variable),
+      ),
+      this.prefix,
+    )
   }
 
   entries(): VariableEnvVarEntry<SettingTypeWhenPresent<T>>[] {
