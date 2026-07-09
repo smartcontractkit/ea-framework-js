@@ -526,6 +526,27 @@ test.serial('Get variable env var entries', async (t) => {
   ])
 })
 
+test.serial('Get variable env var name', async (t) => {
+  const envVarsPrefix = 'PREFIX'
+  const customSettings = {
+    NETWORK_NETWORK_TYPE: {
+      description: 'Network type for the given blockchain',
+      type: 'enum',
+      options: ['mainnet', 'testnet'],
+      variablePlaceholder: 'NETWORK',
+    },
+  } as const
+
+  const config = new AdapterConfig(customSettings, { envVarsPrefix })
+  config.initialize()
+  config.validate()
+  t.is(
+    config.settings.NETWORK_NETWORK_TYPE.getEnvVarName('ethereum'),
+    'PREFIX_ETHEREUM_NETWORK_TYPE',
+  )
+  t.is(config.settings.NETWORK_NETWORK_TYPE.getEnvVarName('a.b$c'), 'PREFIX_A_B_C_NETWORK_TYPE')
+})
+
 test.serial('Setting name must not have invalid characters', async (t) => {
   const customSettings = {
     'NETWORK-RPC-URL': {
