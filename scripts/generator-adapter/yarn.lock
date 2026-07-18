@@ -349,7 +349,7 @@
   resolved "https://registry.yarnpkg.com/@types/normalize-package-data/-/normalize-package-data-2.4.4.tgz#56e2cc26c397c038fab0e3a917a12d5c5909e901"
   integrity sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==
 
-"@types/vinyl@^2.0.12", "@types/vinyl@^2.0.7":
+"@types/vinyl@^2.0.7":
   version "2.0.12"
   resolved "https://registry.yarnpkg.com/@types/vinyl/-/vinyl-2.0.12.tgz#17642ca9a8ae10f3db018e9f885da4188db4c6e6"
   integrity sha512-Sr2fYMBUVGYq8kj3UthXFAu5UN6ZW+rYr4NACjZQJvHvj+c8lYv0CahmZ2P/r7iUkN44gGUBwqxZkrKXYPb7cw==
@@ -872,13 +872,11 @@ mem-fs-editor@^11.0.1:
     textextensions "^6.11.0"
     vinyl "^3.0.0"
 
-mem-fs@4.1.4:
-  version "4.1.4"
-  resolved "https://registry.yarnpkg.com/mem-fs/-/mem-fs-4.1.4.tgz#4835fe66b98dbc5ae2a3bffd58dc2a974f8372f2"
-  integrity sha512-NlRHmUiEcxDHI7FeDlrrTZP5YFvnoS74wEf5OrQ7NAg83B2Rv3oF+FWr961I0rVdxkKbZMjq2BcV7VFWGFPkog==
+mem-fs@4.1.5:
+  version "4.1.5"
+  resolved "https://registry.npmjs.org/mem-fs/-/mem-fs-4.1.5.tgz#d242adc7ff75a28d4aa2a7186fcbeeaceaaefb7d"
+  integrity sha512-6aWRo1jLo82ngo44tPQXjzINN7gvSNWhMU96I+O5nsJWdPi5vbUJWMTDGZDb/AVpCJRpaLGcFgrIBIpyk0DuUA==
   dependencies:
-    "@types/node" ">=18"
-    "@types/vinyl" "^2.0.12"
     vinyl "^3.0.1"
     vinyl-file "^5.0.0"
 
