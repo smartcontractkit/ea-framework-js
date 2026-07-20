@@ -6,8 +6,6 @@ runs:
     - uses: actions/setup-node@v6
       with:
         node-version: 24.18
-        registry-url: https://registry.npmjs.org
-        always-auth: true
         cache: yarn
     - run: corepack enable
       shell: bash
