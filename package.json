@@ -19,7 +19,7 @@
     "redlock": "5.0.0-beta.2",
     "ws": "8.21.1",
     "ethers": "6.17.0",
-    "@solana/kit": "6.10.0"
+    "@solana/kit": "7.0.0"
   },
   "scripts": {
     "build": "rm -rf dist/src && mkdir -p ./dist/src && cp package.json dist/src && cp README.md dist/src && tsc && yarn pre-build-generator",
