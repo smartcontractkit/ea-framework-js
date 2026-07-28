@@ -127,26 +127,6 @@ export const adapter = new Adapter({
 })
 ```
 
-## Test Payload
-
-The test payload is not specified as a parameter for an adapter. It is defined in the `test-payload.json` file in the root-level of the adapter folder. It is used for soak testing the adapter. An example of this file is shown below.
-
-```json
-{
-  "requests": [
-    {
-      "base": "ETH",
-      "quote": "USD"
-    },
-    {
-      "base": "JPY",
-      "quote": "USD",
-      "endpoint": "forex"
-    }
-  ]
-}
-```
-
 ## Request Validation & Transformation
 
 This diagram expands on the `Validation Middleware` section of the `EA v3 Design` diagram in [Basics](../basics.md#ea-v3-design)
