@@ -118,7 +118,6 @@ export default class extends Generator.default {
       'CHANGELOG.md',
       'package.json',
       'README.md',
-      'test-payload.json',
       'tsconfig.json',
       'tsconfig.test.json',
     ]
