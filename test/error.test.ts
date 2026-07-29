@@ -1,7 +1,7 @@
 import untypedTest, { ExecutionContext, TestFn } from 'ava'
 import { ReplyError as RedisError } from 'ioredis'
 import { Adapter, AdapterEndpoint } from '../src/adapter'
-import { AdapterResponse, ResponseTimestamps } from '../src/util'
+import { AdapterResponse, ResponseTimestamps, getVersions } from '../src/util'
 import {
   AdapterConnectionError,
   AdapterCustomError,
@@ -90,6 +90,7 @@ test('Adapter error returns default status of 500', async (t) => {
     },
     status: 'errored',
     statusCode: 500,
+    versions: getVersions(),
   })
 })
 
@@ -122,6 +123,7 @@ test('Adapter error returns specified 200, with accompanying provider status cod
     status: 'errored',
     statusCode: 200,
     providerStatusCode: 504,
+    versions: getVersions(),
   })
 })
 

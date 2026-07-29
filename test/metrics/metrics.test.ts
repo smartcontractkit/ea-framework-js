@@ -9,6 +9,7 @@ import { Metrics, retrieveCost } from '../../src/metrics'
 import { HttpTransport } from '../../src/transports'
 import { InputParameters } from '../../src/validation'
 import { TestAdapter } from '../../src/util/testing-utils'
+import { getVersions } from '../../src/util'
 
 const test = untypedTest as TestFn<{
   testAdapter: TestAdapter
@@ -333,6 +334,7 @@ test.serial('validate response.meta has the correct properties', async (t) => {
     adapterName: 'TEST',
     metrics: { feedId: '{"from":"eth","to":"usd"}' },
     transportName: 'default_single_transport',
+    versions: getVersions(),
   })
 })
 

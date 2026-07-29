@@ -3,7 +3,13 @@ import { join } from 'path'
 import * as client from 'prom-client'
 import { AdapterSettings } from '../config'
 import { getTLSOptions, httpsOptions } from '../index'
-import { AdapterRequest, censorLogs, makeLogger } from '../util'
+import {
+  AdapterRequest,
+  censorLogs,
+  getAdapterVersion,
+  getFrameworkVersion,
+  makeLogger,
+} from '../util'
 import { AdapterError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
 import { HttpRequestType, requestDurationBuckets } from './constants'
@@ -42,9 +48,12 @@ export function setupMetricsServer(name: string, adapterSettings: AdapterSetting
 
 export const setupMetrics = (name: string): void => {
   client.collectDefaultMetrics()
+  // Note the "app_" prefix is meaningful: TestMetrics strips labels with that prefix so that
+  // assertions don't have to restate the app-level default labels on every metric
   client.register.setDefaultLabels({
     app_name: name || 'N/A',
-    app_version: process.env['npm_package_version'],
+    app_version: getAdapterVersion(),
+    app_framework_version: getFrameworkVersion(),
   })
 }
 

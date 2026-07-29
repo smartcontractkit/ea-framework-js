@@ -9,8 +9,10 @@ import registerDebugEndpoints from './debug/router'
 import { buildMetricsMiddleware, setupMetricsServer } from './metrics'
 import {
   AdapterRequest,
+  AdapterResponse,
   AdapterRouteGeneric,
   censorLogs,
+  getVersions,
   loggingContextMiddleware,
   makeLogger,
 } from './util'
@@ -193,6 +195,32 @@ export const expose = async <T extends SettingsDefinitionMap>(
   return api
 }
 
+/**
+ * Adds the adapter and framework versions to a response's metadata, right before it is sent back.
+ *
+ * This is deliberately done at egress rather than when the response is written to the cache: cache
+ * entries are shared across instances and outlive deployments, so a version baked into them could
+ * describe a different instance than the one actually serving the response.
+ *
+ * @param response - the response about to be sent back
+ * @param adapter - the adapter serving the response
+ * @param req - the incoming request the response is for
+ * @returns a copy of the response with versions added to its metadata
+ */
+const withVersions = (
+  response: Readonly<AdapterResponse>,
+  adapter: Adapter,
+  req: AdapterRequest<EmptyInputParameters>,
+): AdapterResponse => ({
+  ...response,
+  meta: {
+    ...response.meta,
+    adapterName: response.meta?.adapterName ?? adapter.name,
+    transportName: response.meta?.transportName ?? req.requestContext.transportName,
+    versions: getVersions(),
+  },
+})
+
 async function buildRestApi(adapter: Adapter) {
   const TLSOptions: httpsOptions | Record<string, unknown> = getTLSOptions(adapter.config.settings)
   const app = fastify({
@@ -234,12 +262,15 @@ async function buildRestApi(adapter: Adapter) {
       url: adapter.config.settings.BASE_URL,
       method: 'POST',
       handler: async (req, reply) => {
+        const adapterRequest = req as AdapterRequest<EmptyInputParameters>
         const response = await adapter.handleRequestWithValidation(
-          req as AdapterRequest<EmptyInputParameters>,
+          adapterRequest,
           reply as unknown as Promise<unknown>,
         )
 
-        return reply.code(response.statusCode || 200).send(response)
+        return reply
+          .code(response.statusCode || 200)
+          .send(withVersions(response, adapter, adapterRequest))
       },
     })
 

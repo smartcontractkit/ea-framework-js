@@ -1,5 +1,8 @@
 import { HttpRequestType } from '../metrics/constants'
 import { ResponseTimestamps } from '../util'
+// Imported directly rather than through the "util" barrel: there is an existing import cycle
+// between util and validation, and version.ts has no project-local imports of its own.
+import { AdapterVersions, getVersions } from '../util/version'
 
 type ErrorBasic = {
   name: string
@@ -15,6 +18,9 @@ export type AdapterErrorResponse = {
   statusCode: number
   providerStatusCode?: number
   error: ErrorBasic | ErrorFull
+
+  /** Versions of the adapter and framework that produced this error */
+  versions: AdapterVersions
 }
 
 export class AdapterError extends Error {
@@ -75,6 +81,7 @@ export class AdapterError extends Error {
       statusCode: this.statusCode,
       providerStatusCode: this.providerStatusCode,
       error: showDebugInfo ? errorFull : errorBasic,
+      versions: getVersions(),
     }
   }
 }

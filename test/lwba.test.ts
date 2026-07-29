@@ -14,7 +14,7 @@ import {
   lwbaEndpointInputParametersDefinition,
   priceEndpointInputParametersDefinition,
 } from '../src/adapter'
-import { AdapterRequest, AdapterResponse } from '../src/util'
+import { AdapterRequest, AdapterResponse, getVersions } from '../src/util'
 import { EmptyCustomSettings } from '../src/config'
 import { TypeFromDefinition } from '../src/validation/input-params'
 import { Transport } from '../src/transports'
@@ -177,6 +177,7 @@ test('Invariant violation fails LWBA validation (bid <= mid <= ask)', async (t) 
       message:
         'Invariant violation. Mid price must be between bid and ask prices. Got: (bid: 123.1, mid: 123.4, ask: 123.3)',
     },
+    versions: getVersions(),
   })
 
   const response = await testAdapter.request({
@@ -222,6 +223,7 @@ test('Invariant violation fails LWBA validation (bid, mid or ask not found)', as
       message:
         'Invariant violation. LWBA response must contain mid, bid and ask prices. Got: (bid: null, mid: 123.4, ask: 123.3)',
     },
+    versions: getVersions(),
   })
 
   const response = await testAdapter.request({

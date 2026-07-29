@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { Adapter } from '../adapter'
 import { AdapterError } from '../validation/error'
 import { InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
+import { AdapterVersions } from './version'
 declare module 'fastify' {
   export interface FastifyRequest {
     requestContext: AdapterRequestContext<unknown>
@@ -91,6 +92,8 @@ export interface AdapterResponseMeta extends AdapterRequestMeta {
   adapterName: string
   /** Name of the transport */
   transportName: string
+  /** Versions of the adapter and framework that produced this response */
+  versions?: AdapterVersions
 }
 
 /**
@@ -214,11 +217,18 @@ type ProviderErrorResponse = {
 
   /** Error message that will be sent back from the adapter */
   errorMessage: string
+
+  /**
+   * Metadata relevant to this response.
+   * Not set by transports; the framework fills this in when the response is sent back.
+   */
+  meta?: AdapterResponseMeta
 } & {
-  // Ensure the union types below (e.g. [[AdapterResponse]]) are mutually exclusive
+  // Ensure the union types below (e.g. [[AdapterResponse]]) are mutually exclusive.
+  // Note "meta" is deliberately not one of these markers: "data" and "result" already make the
+  // union discriminable, and provider error responses need to be able to carry metadata.
   data?: never
   result?: never
-  meta?: never
 }
 
 /**

@@ -1,12 +1,14 @@
 import { randomUUID } from 'crypto'
 import { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { hostname } from 'os'
 import pino from 'pino'
 import pretty from 'pino-pretty'
 import { BaseSettingsDefinition } from '../config'
 import { EmptyInputParameters } from '../validation/input-params'
 import CensorList, { CensorKeyValue } from './censor/censor-list'
 import { AdapterRequest } from './types'
+import { getAdapterVersion, getFrameworkVersion } from './version'
 
 export const asyncLocalStorage = new AsyncLocalStorage()
 
@@ -17,7 +19,7 @@ export type Store = {
 const stream = pretty({
   levelFirst: true,
   levelLabel: 'level',
-  ignore: 'layer,pid,hostname,correlationId,color',
+  ignore: 'layer,pid,hostname,correlationId,color,adapterVersion,frameworkVersion',
   messageFormat: `\x1b[0m[{correlationId}] {color}[{layer}]\x1b[0m {msg}`,
   translateTime: 'yyyy-mm-dd HH:MM:ss.l',
 })
@@ -26,6 +28,14 @@ const stream = pretty({
 const baseLogger = pino(
   {
     level: process.env['LOG_LEVEL']?.toLowerCase() || BaseSettingsDefinition.LOG_LEVEL.default,
+    // Note pino's default base is { pid, hostname }, so both have to be restated here to be kept.
+    // Resolved once on logger construction, so this adds no per-log-line cost.
+    base: {
+      pid: process.pid,
+      hostname: hostname(),
+      adapterVersion: getAdapterVersion(),
+      frameworkVersion: getFrameworkVersion(),
+    },
     formatters: {
       level(label) {
         return { level: label }
