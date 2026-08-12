@@ -41,7 +41,7 @@
   },
   "resolutions": {
     "cross-spawn": "7.0.6",
-    "flatted": "3.4.3",
+    "flatted": "3.4.4",
     "lodash": "4.18.1"
   },
   "devDependencies": {
