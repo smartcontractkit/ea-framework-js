@@ -1,5 +1,5 @@
 import { TransportGenerics } from '../transports'
-import { AdapterLWBAError } from '../validation/error'
+import { TimestampedProviderResult } from '../util'
 import { AdapterEndpoint } from './endpoint'
 import { AdapterEndpointParams, PriceEndpointInputParametersDefinition } from './index'
 
@@ -70,18 +70,29 @@ export class LwbaEndpoint<T extends LwbaEndpointGenerics> extends AdapterEndpoin
       }
     }
 
-    // All LWBA requests must have a mid, bid, and ask
-    // Response validation ensures that we meet the invariant: bid <= mid <= ask
-    params.customOutputValidation = (output) => {
-      const data = output.data as LwbaResponseDataFields['Data']
-      const error = validateLwbaResponse(data.bid, data.mid, data.ask)
-
-      if (error) {
-        throw new AdapterLWBAError({ statusCode: 500, message: error })
-      }
-
-      return undefined
-    }
     super(params)
+  }
+
+  protected override resultValidator(
+    result: TimestampedProviderResult<T>,
+  ): TimestampedProviderResult<T> {
+    if ('errorMessage' in result.response) {
+      return result
+    }
+
+    const { bid, mid, ask } = result.response.data as LwbaResponseDataFields['Data']
+    const error = validateLwbaResponse(bid, mid, ask)
+    if (error) {
+      return {
+        params: result.params,
+        response: {
+          statusCode: 502,
+          errorMessage: error,
+          timestamps: result.response.timestamps,
+        },
+      }
+    }
+
+    return result
   }
 }
