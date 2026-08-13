@@ -14,7 +14,7 @@ import {
   TransportRoutes,
 } from '../../src/transports'
 import { ResponseCache } from '../../src/cache/response'
-import { AdapterRequest } from '../../src/util/types'
+import { AdapterRequest, TimestampedProviderResult } from '../../src/util/types'
 import { TestAdapter } from '../../src/util/testing-utils'
 import { TypeFromDefinition } from '../../src/validation/input-params'
 import { cacheTestInputParameters, CacheTestTransportTypes } from '../cache/helper'
@@ -269,6 +269,59 @@ test.serial(
     await localAdapter.api.close()
   },
 )
+
+test.serial('composite transport propagates resultValidator to child transports', async (t) => {
+  const ws = new CountingCacheHttpTransport('ws', WS_PROVIDER)
+  const rest = new CountingCacheHttpTransport('rest', REST_PROVIDER)
+
+  class ValidatorEndpoint extends AdapterEndpoint<CacheTestHttpTypes> {
+    protected override resultValidator(result: TimestampedProviderResult<CacheTestHttpTypes>) {
+      const response = result.response
+      if ('errorMessage' in response) {
+        return result
+      }
+      return {
+        params: result.params,
+        response: {
+          data: null,
+          result: response.result * 2,
+          timestamps: response.timestamps,
+        },
+      }
+    }
+  }
+
+  const adapter = new Adapter({
+    name: 'TEST_VALIDATOR',
+    defaultEndpoint: 'test',
+    endpoints: [
+      new ValidatorEndpoint({
+        name: 'test',
+        inputParameters: cacheTestInputParameters,
+        enableCompositeTransport: true,
+        transportRoutes: new TransportRoutes<CacheTestHttpTypes>()
+          .register('ws', ws)
+          .register('rest', rest),
+      }),
+    ],
+    config: new AdapterConfig({}, { envDefaultOverrides: { COMPOSITE_TRANSPORT: true } }),
+  })
+
+  const localContext = { clock: t.context.clock } as typeof t.context
+  const localAdapter = await TestAdapter.start(adapter, localContext)
+
+  axiosMock.onGet(`${WS_PROVIDER}/price`, { params: { base: 'ETH', factor: 5 } }).reply(500)
+  axiosMock
+    .onGet(`${REST_PROVIDER}/price`, { params: { base: 'ETH', factor: 5 } })
+    .reply(200, { result: 21, ts: 100 })
+
+  const res = await localAdapter.request({ base: 'ETH', factor: 5 })
+
+  t.is(res.statusCode, 200)
+  t.is(res.json().result, 42)
+
+  await localAdapter.api.close()
+})
 
 test.serial(
   'enableCompositeTransport does not use composite routing when COMPOSITE_TRANSPORT is false',

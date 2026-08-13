@@ -2,7 +2,7 @@ import { EndpointContext } from '../adapter'
 import { CompareResponseCache } from '../cache/response-cache/compare'
 import { ResponseCache } from '../cache/response'
 import { makeLogger } from '../util'
-import { AdapterRequest } from '../util/types'
+import { AdapterRequest, TimestampedProviderResult } from '../util/types'
 import { TypeFromDefinition } from '../validation/input-params'
 import type { Transport, TransportDependencies, TransportGenerics } from '.'
 
@@ -12,6 +12,22 @@ const logger = makeLogger('CompositeTransport')
 export class CompositeTransport<T extends TransportGenerics> implements Transport<T> {
   name!: string
   responseCache!: ResponseCache<T>
+
+  private _resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
+
+  get resultValidator():
+    ((result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>) | undefined {
+    return this._resultValidator
+  }
+
+  set resultValidator(
+    validator: ((result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>) | undefined,
+  ) {
+    this._resultValidator = validator
+    for (const child of Object.values(this.transports)) {
+      child.resultValidator = validator
+    }
+  }
 
   constructor(private readonly transports: Record<string, Transport<T>>) {}
 
