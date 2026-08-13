@@ -108,16 +108,19 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
       const eventHandlerGenerator = (listener: (typeof this.config.eventListeners)[0]) => {
         return (e: MessageEvent) => {
           const providerDataReceived = Date.now()
-          const results = listener.parseResponse(e).map((r) => {
-            const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
-            const result = r as TimestampedProviderResult<T>
-            result.response.timestamps = {
-              providerDataStreamEstablishedUnixMs: this.providerDataStreamEstablished,
-              providerDataReceivedUnixMs: providerDataReceived,
-              providerIndicatedTimeUnixMs: partialResponse.timestamps?.providerIndicatedTimeUnixMs,
-            }
-            return result
-          })
+          const results = listener
+            .parseResponse(e)
+            .map((r) => {
+              const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
+              const result = r as TimestampedProviderResult<T>
+              result.response.timestamps = {
+                providerDataStreamEstablishedUnixMs: this.providerDataStreamEstablished,
+                providerDataReceivedUnixMs: providerDataReceived,
+                providerIndicatedTimeUnixMs: partialResponse.timestamps?.providerIndicatedTimeUnixMs,
+              }
+              return result
+            })
+            .map((r) => (this.resultValidator ? this.resultValidator(r) : r))
           this.responseCache.write(this.name, results)
         }
       }

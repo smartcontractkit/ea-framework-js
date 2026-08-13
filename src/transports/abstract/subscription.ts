@@ -2,7 +2,7 @@ import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
 import { ResponseCache } from '../../cache/response'
 import { metrics } from '../../metrics'
-import { SubscriptionSet, censorLogs, makeLogger } from '../../util'
+import { SubscriptionSet, TimestampedProviderResult, censorLogs, makeLogger } from '../../util'
 import { AdapterRequest } from '../../util/types'
 import { TypeFromDefinition } from '../../validation/input-params'
 
@@ -20,6 +20,13 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   subscriptionTtl!: number
   name!: string
   initialized = false
+
+  /**
+   * Optional validator injected by the endpoint during initialization. Applied to each provider result
+   * before it is written to the response cache, allowing endpoint subclasses to enforce invariants
+   * pre-cache and pre-gRPC.
+   */
+  resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
 
   async initialize(
     dependencies: TransportDependencies<T>,
