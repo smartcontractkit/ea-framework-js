@@ -116,7 +116,8 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
               result.response.timestamps = {
                 providerDataStreamEstablishedUnixMs: this.providerDataStreamEstablished,
                 providerDataReceivedUnixMs: providerDataReceived,
-                providerIndicatedTimeUnixMs: partialResponse.timestamps?.providerIndicatedTimeUnixMs,
+                providerIndicatedTimeUnixMs:
+                  partialResponse.timestamps?.providerIndicatedTimeUnixMs,
               }
               return result
             })

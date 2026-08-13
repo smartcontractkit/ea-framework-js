@@ -322,7 +322,8 @@ export class WebSocketTransport<
         const parsed = this.deserializeMessage(event.data)
         censorLogs(() => logger.trace(`Got ws message: ${event.data}`))
         const providerDataReceived = Date.now()
-        const results = this.config.handlers.message(parsed, context)
+        const results = this.config.handlers
+          .message(parsed, context)
           ?.map((r) => {
             const result = r as TimestampedProviderResult<T>
             const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>

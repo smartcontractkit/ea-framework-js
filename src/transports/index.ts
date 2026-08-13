@@ -1,7 +1,12 @@
 import { AdapterDependencies, DEFAULT_TRANSPORT_NAME, EndpointContext } from '../adapter'
 import { ResponseCache } from '../cache/response'
 import { BaseAdapterSettings } from '../config'
-import { AdapterRequest, AdapterResponse, ResponseGenerics, TimestampedProviderResult } from '../util/types'
+import {
+  AdapterRequest,
+  AdapterResponse,
+  ResponseGenerics,
+  TimestampedProviderResult,
+} from '../util/types'
 import { InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
 
 export * from './http'
