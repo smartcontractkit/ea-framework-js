@@ -37,16 +37,6 @@ export const isProviderError = (
  * the response cache and reaches the Node as a 502. Throwing inside
  * HttpTransport.parseResponse would fall into a generic catch and be dropped.
  *
- * | input            | output           |
- * |------------------|------------------|
- * | null, undefined  | 502              |
- * | NaN, "NaN"       | 502              |
- * | "", "   "        | 502              |
- * | {}, [], booleans | 502              |
- * | +/-Infinity      | 502              |
- * | 12.3, "12.3"     | { result: 12.3 } |
- * | 0, "0"           | { result: 0 }    | (default; see acceptZeroValue)
- *
  * @param value - the raw, uncoerced value from the provider response
  * @param errorMessage - message returned to the caller when the value is invalid
  * @param options - see ValidateResultNumberOptions
