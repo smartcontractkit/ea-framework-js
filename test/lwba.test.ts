@@ -153,9 +153,7 @@ type LwbaResultValidator = (
   result: TimestampedProviderResult<LwbaEndpointGenerics>,
 ) => TimestampedProviderResult<LwbaEndpointGenerics>
 
-const getResultValidator = (
-  endpoint: LwbaEndpoint<LwbaEndpointGenerics>,
-): LwbaResultValidator =>
+const getResultValidator = (endpoint: LwbaEndpoint<LwbaEndpointGenerics>): LwbaResultValidator =>
   (endpoint as unknown as { resultValidator: LwbaResultValidator }).resultValidator
 
 test('Invariant violation fails LWBA validation via resultValidator (bid <= mid <= ask)', (t) => {

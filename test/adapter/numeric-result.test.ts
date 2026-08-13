@@ -8,10 +8,7 @@ import {
 import { ResponseCache } from '../../src/cache/response'
 import { AdapterDependencies } from '../../src/adapter/types'
 import { buildAdapterSettings, EmptyCustomSettings } from '../../src/config'
-import {
-  RateLimiterFactory,
-  RateLimitingStrategy,
-} from '../../src/rate-limiting/factory'
+import { RateLimiterFactory, RateLimitingStrategy } from '../../src/rate-limiting/factory'
 import { SubscriptionTransport } from '../../src/transports/abstract/subscription'
 import {
   AdapterResponse,
@@ -50,7 +47,7 @@ class FakeResponseCache extends ResponseCache<TestEndpointGenerics> {
   }
 
   async writeEntries(
-    entries: {
+    _entries: {
       key: string
       value: AdapterResponse<TestEndpointGenerics['Response']>
     }[],
