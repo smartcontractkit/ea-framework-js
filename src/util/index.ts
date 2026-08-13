@@ -1,4 +1,5 @@
 export * from './logger'
+export * from './result-number'
 export * from './subscription-set/subscription-set'
 export * from './types'
 
