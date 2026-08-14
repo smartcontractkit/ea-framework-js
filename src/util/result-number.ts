@@ -19,13 +19,6 @@ export interface ValidateResultNumberOptions {
 }
 
 /**
- * Type guard for the error branch of ValidatedResultNumber.
- */
-export const isProviderError = (
-  v: ValidatedResultNumber,
-): v is { statusCode: 502; errorMessage: string } => 'statusCode' in v
-
-/**
  * Validates that a raw value from a data provider is a usable numeric result.
  *
  * The raw value is checked BEFORE any Number() coercion so that null/undefined
@@ -56,7 +49,7 @@ export function validateResultNumber(
     isWrongType || trimmed === '' || !Number.isFinite(num) || (!acceptZeroValue && num === 0)
 
   if (isInvalid) {
-    logger.warn(`${errorMessage} (received: ${JSON.stringify(value)})`)
+    logger.warn({ received: value }, errorMessage)
     return { statusCode: 502, errorMessage }
   }
 

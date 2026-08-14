@@ -1,6 +1,10 @@
 import test from 'ava'
 import { LoggerFactoryProvider } from '../../src/util/logger'
-import { isProviderError, validateResultNumber } from '../../src/util/result-number'
+import { validateResultNumber, ValidatedResultNumber } from '../../src/util/result-number'
+
+const isProviderError = (
+  v: ValidatedResultNumber,
+): v is { statusCode: 502; errorMessage: string } => 'statusCode' in v
 
 test.before(() => {
   LoggerFactoryProvider.set()
