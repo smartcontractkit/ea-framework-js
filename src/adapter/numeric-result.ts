@@ -1,14 +1,20 @@
-import { PriceEndpoint, PriceEndpointGenerics } from './price'
-import { AdapterEndpointParams } from './types'
-import { TimestampedProviderResult } from '../util'
+import { AdapterEndpoint } from './endpoint'
+import { AdapterEndpointParams, EndpointGenerics } from './types'
+import { SingleNumberResultResponse, TimestampedProviderResult } from '../util'
+
+export type NumericResultEndpointGenerics = EndpointGenerics & {
+  Response: SingleNumberResultResponse
+}
 
 /**
- * A NumericResultEndpoint is a specific type of PriceEndpoint that validates the numeric result
- * before it is written to the response cache. It is meant for single-number price endpoints where
- * a null, undefined, NaN, or non-finite result from the provider should surface as a 502 error,
- * enabling the Chainlink Node to fall back to the bridge cache (last known good value).
+ * A NumericResultEndpoint is an endpoint that validates the numeric result before it is written
+ * to the response cache. It is meant for single-number endpoints where a null, undefined, NaN,
+ * or non-finite result from the provider should surface as a 502 error, enabling the Chainlink Node
+ * to fall back to the bridge cache (last known good value).
  */
-export class NumericResultEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {
+export class NumericResultEndpoint<
+  T extends NumericResultEndpointGenerics,
+> extends AdapterEndpoint<T> {
   acceptZeroValue: boolean
 
   constructor(params: AdapterEndpointParams<T> & { acceptZeroValue?: boolean }) {
