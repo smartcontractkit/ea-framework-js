@@ -39,7 +39,10 @@ export class SimpleResponseCache<
     return
   }
 
-  async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+  protected async _write(
+    transportName: string,
+    results: TimestampedProviderResult<T>[],
+  ): Promise<void> {
     const entries = results.map((r) => this.generateCacheEntry(transportName, transportName, r))
     await this.writeEntries(entries)
   }

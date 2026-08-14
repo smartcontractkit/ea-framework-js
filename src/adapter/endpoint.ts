@@ -6,6 +6,7 @@ import {
   AdapterRequest,
   AdapterRequestData,
   Overrides,
+  TimestampedProviderResult,
   makeLogger,
   getCanonicalAdapterName,
   canonicalizeAdapterNameKeys,
@@ -40,6 +41,14 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
   customOutputValidation?: CustomOutputValidator | undefined
+
+  /**
+   * Optional validator that can be overridden by endpoint subclasses to validate or transform
+   * a provider result before it is written to the response cache and published to gRPC subscribers.
+   * Runs after the transport has built the result and attached timestamps, but before the cache write.
+   */
+  protected resultValidator?(result: TimestampedProviderResult<T>): TimestampedProviderResult<T>
+
   requestTransforms: RequestTransform<T>[]
   overrides?: Record<string, string> | undefined
   customRouter?: (
@@ -99,6 +108,10 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       endpointName: this.name,
       inputParameters: this.inputParameters,
     })
+
+    if (this.resultValidator) {
+      responseCache.resultValidator = this.resultValidator.bind(this)
+    }
 
     const transportDependencies = {
       ...dependencies,
