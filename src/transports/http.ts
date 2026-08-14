@@ -254,7 +254,6 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
           }
           return result
         })
-        .map((r) => (this.resultValidator ? this.resultValidator(r) : r))
 
       // Record cost of data provider call
       const cost = retrieveCost(requesterResult.response.data)

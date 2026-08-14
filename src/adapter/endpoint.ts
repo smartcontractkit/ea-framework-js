@@ -109,6 +109,10 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       inputParameters: this.inputParameters,
     })
 
+    if (this.resultValidator) {
+      responseCache.resultValidator = this.resultValidator.bind(this)
+    }
+
     const transportDependencies = {
       ...dependencies,
       responseCache,
@@ -131,9 +135,6 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     logger.debug(`Initializing transports for endpoint "${this.name}"...`)
     for (const [transportName, transport] of this.transportRoutes.entries()) {
       await transport.initialize(transportDependencies, adapterSettings, this.name, transportName)
-      if (this.resultValidator) {
-        transport.resultValidator = this.resultValidator.bind(this)
-      }
     }
   }
 

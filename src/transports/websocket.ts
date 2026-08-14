@@ -322,19 +322,16 @@ export class WebSocketTransport<
         const parsed = this.deserializeMessage(event.data)
         censorLogs(() => logger.trace(`Got ws message: ${event.data}`))
         const providerDataReceived = Date.now()
-        const results = this.config.handlers
-          .message(parsed, context)
-          ?.map((r) => {
-            const result = r as TimestampedProviderResult<T>
-            const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
-            result.response.timestamps = {
-              providerDataStreamEstablishedUnixMs: this.providerDataStreamEstablished,
-              providerDataReceivedUnixMs: providerDataReceived,
-              providerIndicatedTimeUnixMs: partialResponse.timestamps?.providerIndicatedTimeUnixMs,
-            }
-            return result
-          })
-          ?.map((r) => (this.resultValidator ? this.resultValidator(r) : r))
+        const results = this.config.handlers.message(parsed, context)?.map((r) => {
+          const result = r as TimestampedProviderResult<T>
+          const partialResponse = r.response as PartialSuccessfulResponse<T['Response']>
+          result.response.timestamps = {
+            providerDataStreamEstablishedUnixMs: this.providerDataStreamEstablished,
+            providerDataReceivedUnixMs: providerDataReceived,
+            providerIndicatedTimeUnixMs: partialResponse.timestamps?.providerIndicatedTimeUnixMs,
+          }
+          return result
+        })
         logger.trace(`Writing ${results?.length ?? 0} responses to cache`)
         if (Array.isArray(results) && results.length > 0) {
           // Updating the last message received time here, to only care about messages we use

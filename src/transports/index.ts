@@ -1,12 +1,7 @@
 import { AdapterDependencies, DEFAULT_TRANSPORT_NAME, EndpointContext } from '../adapter'
 import { ResponseCache } from '../cache/response'
 import { BaseAdapterSettings } from '../config'
-import {
-  AdapterRequest,
-  AdapterResponse,
-  ResponseGenerics,
-  TimestampedProviderResult,
-} from '../util/types'
+import { AdapterRequest, AdapterResponse, ResponseGenerics } from '../util/types'
 import { InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
 
 export * from './http'
@@ -61,12 +56,6 @@ export type TransportDependencies<T extends TransportGenerics> = AdapterDependen
 export interface Transport<T extends TransportGenerics> {
   name: string
   responseCache: ResponseCache<T>
-
-  /**
-   * Optional validator injected by the endpoint during initialization. Applied to each provider result
-   * before it is written to the response cache.
-   */
-  resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
 
   /**
    * Initializes the transport in the Adapter context.

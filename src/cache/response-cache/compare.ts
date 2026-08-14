@@ -40,7 +40,10 @@ export class CompareResponseCache<
     this.shouldUpdate = shouldUpdate
   }
 
-  async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+  protected async _write(
+    transportName: string,
+    results: TimestampedProviderResult<T>[],
+  ): Promise<void> {
     await this.writeEntries(
       results.map((result) => this.generateCacheEntry(transportName, this.transportName, result)),
     )

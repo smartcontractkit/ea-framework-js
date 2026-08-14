@@ -2,7 +2,7 @@ import { EndpointContext } from '../adapter'
 import { CompareResponseCache } from '../cache/response-cache/compare'
 import { ResponseCache } from '../cache/response'
 import { makeLogger } from '../util'
-import { AdapterRequest, TimestampedProviderResult } from '../util/types'
+import { AdapterRequest } from '../util/types'
 import { TypeFromDefinition } from '../validation/input-params'
 import type { Transport, TransportDependencies, TransportGenerics } from '.'
 
@@ -12,22 +12,6 @@ const logger = makeLogger('CompositeTransport')
 export class CompositeTransport<T extends TransportGenerics> implements Transport<T> {
   name!: string
   responseCache!: ResponseCache<T>
-
-  private _resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
-
-  get resultValidator():
-    ((result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>) | undefined {
-    return this._resultValidator
-  }
-
-  set resultValidator(
-    validator: ((result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>) | undefined,
-  ) {
-    this._resultValidator = validator
-    for (const child of Object.values(this.transports)) {
-      child.resultValidator = validator
-    }
-  }
 
   constructor(private readonly transports: Record<string, Transport<T>>) {}
 
@@ -49,6 +33,9 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
         (next.timestamps?.providerIndicatedTimeUnixMs ?? 0) >
         (current?.timestamps?.providerIndicatedTimeUnixMs ?? 0),
     )
+    // Propagate the endpoint's validator to the compare cache so results are validated
+    // before being compared and written to the outer cache.
+    compareCache.resultValidator = this.responseCache.resultValidator
 
     await Promise.all(
       Object.entries(this.transports).map(([name, transport]) =>

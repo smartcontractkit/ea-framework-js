@@ -270,7 +270,7 @@ test.serial(
   },
 )
 
-test.serial('composite transport propagates resultValidator to child transports', async (t) => {
+test.serial('composite transport applies endpoint resultValidator to final response', async (t) => {
   const ws = new CountingCacheHttpTransport('ws', WS_PROVIDER)
   const rest = new CountingCacheHttpTransport('rest', REST_PROVIDER)
 

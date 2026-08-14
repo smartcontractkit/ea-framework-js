@@ -44,8 +44,8 @@ test.before(() => {
 class FakeResponseCache extends ResponseCache<TestEndpointGenerics> {
   writes: TimestampedProviderResult<TestEndpointGenerics>[] = []
 
-  async write(
-    transportName: string,
+  protected async _write(
+    _transportName: string,
     results: TimestampedProviderResult<TestEndpointGenerics>[],
   ): Promise<void> {
     this.writes.push(...results)
@@ -71,33 +71,34 @@ class FakeTransport extends SubscriptionTransport<TestEndpointGenerics> {
   }
 
   async produceResult(result: TimestampedProviderResult<TestEndpointGenerics>): Promise<void> {
-    const validated = this.resultValidator ? this.resultValidator(result) : result
-    await this.responseCache.write(this.name, [validated])
+    await this.responseCache.write(this.name, [result])
   }
 }
 
-class ValidatingEndpoint extends AdapterEndpoint<TestEndpointGenerics> {
-  protected override resultValidator(
-    result: TimestampedProviderResult<TestEndpointGenerics>,
-  ): TimestampedProviderResult<TestEndpointGenerics> {
-    if ('errorMessage' in result.response) {
-      return result
-    }
-
-    const value = result.response.result
-    if (!Number.isFinite(value)) {
-      return {
-        params: result.params,
-        response: {
-          statusCode: 502,
-          errorMessage: `Invalid result: ${value}`,
-          timestamps: result.response.timestamps,
-        },
-      }
-    }
-
+const validateResult = (
+  result: TimestampedProviderResult<TestEndpointGenerics>,
+): TimestampedProviderResult<TestEndpointGenerics> => {
+  if ('errorMessage' in result.response) {
     return result
   }
+
+  const value = result.response.result
+  if (!Number.isFinite(value)) {
+    return {
+      params: result.params,
+      response: {
+        statusCode: 502,
+        errorMessage: `Invalid result: ${value}`,
+        timestamps: result.response.timestamps,
+      },
+    }
+  }
+
+  return result
+}
+
+class ValidatingEndpoint extends AdapterEndpoint<TestEndpointGenerics> {
+  protected override resultValidator = validateResult
 }
 
 const buildDependencies = (): AdapterDependencies => {
@@ -119,7 +120,7 @@ const buildDependencies = (): AdapterDependencies => {
   }
 }
 
-test('resultValidator is wired from endpoint to transport', async (t) => {
+test('resultValidator is wired from endpoint to response cache', async (t) => {
   const endpoint = new ValidatingEndpoint({
     name: 'test',
     inputParameters,
@@ -131,7 +132,7 @@ test('resultValidator is wired from endpoint to transport', async (t) => {
   await endpoint.initialize('TEST', dependencies, adapterSettings)
 
   const transport = endpoint.transportRoutes.get('default_single_transport') as FakeTransport
-  t.truthy(transport.resultValidator)
+  t.truthy(transport.responseCache.resultValidator)
 })
 
 test('resultValidator transforms invalid results before cache write', async (t) => {
@@ -154,6 +155,7 @@ test('resultValidator transforms invalid results before cache write', async (t) 
     adapterSettings,
     dependencies,
   })
+  fakeCache.resultValidator = validateResult
   transport.responseCache = fakeCache
 
   const badResult: TimestampedProviderResult<TestEndpointGenerics> = {
