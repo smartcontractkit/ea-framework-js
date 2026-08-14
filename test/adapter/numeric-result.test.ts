@@ -39,8 +39,8 @@ test.before(() => {
 class FakeResponseCache extends ResponseCache<TestEndpointGenerics> {
   writes: TimestampedProviderResult<TestEndpointGenerics>[] = []
 
-  async write(
-    transportName: string,
+  protected async _write(
+    _transportName: string,
     results: TimestampedProviderResult<TestEndpointGenerics>[],
   ): Promise<void> {
     this.writes.push(...results)
@@ -66,8 +66,7 @@ class FakeTransport extends SubscriptionTransport<TestEndpointGenerics> {
   }
 
   async produceResult(result: TimestampedProviderResult<TestEndpointGenerics>): Promise<void> {
-    const validated = this.resultValidator ? this.resultValidator(result) : result
-    await this.responseCache.write(this.name, [validated])
+    await this.responseCache.write(this.name, [result])
   }
 }
 
@@ -127,6 +126,10 @@ test('NumericResultEndpoint accepts a valid number', async (t) => {
     adapterSettings,
     dependencies,
   })
+  const endpointValidator = getResultValidator(endpoint)
+  fakeCache.resultValidator = endpointValidator
+    ? (result) => endpointValidator.call(endpoint, result)
+    : undefined
   transport.responseCache = fakeCache
 
   await transport.produceResult(makeResult(123.45))
@@ -154,6 +157,10 @@ test('NumericResultEndpoint rejects null result', async (t) => {
     adapterSettings,
     dependencies,
   })
+  const endpointValidator = getResultValidator(endpoint)
+  fakeCache.resultValidator = endpointValidator
+    ? (result) => endpointValidator.call(endpoint, result)
+    : undefined
   transport.responseCache = fakeCache
 
   const result = makeResult(null as unknown as number)
@@ -184,6 +191,10 @@ test('NumericResultEndpoint rejects NaN result', async (t) => {
     adapterSettings,
     dependencies,
   })
+  const endpointValidator = getResultValidator(endpoint)
+  fakeCache.resultValidator = endpointValidator
+    ? (result) => endpointValidator.call(endpoint, result)
+    : undefined
   transport.responseCache = fakeCache
 
   await transport.produceResult(makeResult(NaN))
@@ -212,6 +223,10 @@ test('NumericResultEndpoint rejects non-finite result', async (t) => {
     adapterSettings,
     dependencies,
   })
+  const endpointValidator = getResultValidator(endpoint)
+  fakeCache.resultValidator = endpointValidator
+    ? (result) => endpointValidator.call(endpoint, result)
+    : undefined
   transport.responseCache = fakeCache
 
   await transport.produceResult(makeResult(Infinity))
@@ -240,6 +255,10 @@ test('NumericResultEndpoint accepts 0 by default', async (t) => {
     adapterSettings,
     dependencies,
   })
+  const endpointValidator = getResultValidator(endpoint)
+  fakeCache.resultValidator = endpointValidator
+    ? (result) => endpointValidator.call(endpoint, result)
+    : undefined
   transport.responseCache = fakeCache
 
   await transport.produceResult(makeResult(0))
@@ -268,6 +287,10 @@ test('NumericResultEndpoint rejects 0 when acceptZeroValue is false', async (t) 
     adapterSettings,
     dependencies,
   })
+  const endpointValidator = getResultValidator(endpoint)
+  fakeCache.resultValidator = endpointValidator
+    ? (result) => endpointValidator.call(endpoint, result)
+    : undefined
   transport.responseCache = fakeCache
 
   await transport.produceResult(makeResult(0))
@@ -296,6 +319,10 @@ test('NumericResultEndpoint passes through existing error responses', async (t) 
     adapterSettings,
     dependencies,
   })
+  const endpointValidator = getResultValidator(endpoint)
+  fakeCache.resultValidator = endpointValidator
+    ? (result) => endpointValidator.call(endpoint, result)
+    : undefined
   transport.responseCache = fakeCache
 
   const errorResult: TimestampedProviderResult<TestEndpointGenerics> = {

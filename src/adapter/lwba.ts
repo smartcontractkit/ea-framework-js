@@ -1,5 +1,6 @@
 import { TransportGenerics } from '../transports'
 import { TimestampedProviderResult } from '../util'
+import { AdapterLWBAError } from '../validation/error'
 import { AdapterEndpoint } from './endpoint'
 import { AdapterEndpointParams, PriceEndpointInputParametersDefinition } from './index'
 
@@ -68,6 +69,30 @@ export class LwbaEndpoint<T extends LwbaEndpointGenerics> extends AdapterEndpoin
       if (params.name !== alias && !params.aliases.includes(alias)) {
         params.aliases.push(alias)
       }
+    }
+
+    // Also validate on the response path for backwards compatibility with custom transports
+    // that return responses directly from foregroundExecute.
+    const existingValidation = params.customOutputValidation
+    params.customOutputValidation = (output) => {
+      if (existingValidation) {
+        const result = existingValidation(output)
+        if (result !== undefined) {
+          return result
+        }
+      }
+
+      if (output.statusCode !== 200) {
+        return undefined
+      }
+
+      const data = output.data as LwbaResponseDataFields['Data']
+      const error = validateLwbaResponse(data.bid, data.mid, data.ask)
+      if (error) {
+        throw new AdapterLWBAError({ statusCode: 500, message: error })
+      }
+
+      return undefined
     }
 
     super(params)
