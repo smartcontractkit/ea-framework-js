@@ -197,3 +197,34 @@ test('resultValidator transforms invalid results before cache write', async (t) 
   const goodWritten = fakeCache.writes[1].response as { result: number }
   t.is(goodWritten.result, 123)
 })
+
+test('ResponseCache base class applies resultValidator before _write', async (t) => {
+  const cache = new FakeResponseCache({
+    inputParameters,
+    adapterName: 'TEST',
+    endpointName: 'test',
+    adapterSettings: buildAdapterSettings({}),
+    dependencies: buildDependencies(),
+  })
+  cache.resultValidator = validateResult
+
+  const badResult: TimestampedProviderResult<TestEndpointGenerics> = {
+    params: { base: 'BTC', quote: 'USD' },
+    response: {
+      data: { result: NaN },
+      result: NaN,
+      timestamps: {
+        providerDataRequestedUnixMs: 0,
+        providerDataReceivedUnixMs: 0,
+        providerIndicatedTimeUnixMs: undefined,
+      },
+    },
+  }
+
+  await cache.write('default_single_transport', [badResult])
+
+  t.is(cache.writes.length, 1)
+  const written = cache.writes[0].response as TimestampedProviderErrorResponse
+  t.is(written.statusCode, 502)
+  t.is(written.errorMessage, 'Invalid result: NaN')
+})
