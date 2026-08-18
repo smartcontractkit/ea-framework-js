@@ -119,3 +119,13 @@ test('properly handle circular references', async (t) => {
   const log = censor(a, CensorList.getAll())
   t.is(log, '[Unknown]')
 })
+
+test('properly handle bigint values', async (t) => {
+  const log = censor({ value: 123n }, CensorList.getAll())
+  t.deepEqual(log, { value: '123' })
+})
+
+test('properly handle nested bigint values', async (t) => {
+  const log = censor({ apiKey: 'mock-api-key', tx: { gasLimit: 21000n } }, CensorList.getAll())
+  t.deepEqual(log, { apiKey: '[API_KEY REDACTED]', tx: { gasLimit: '21000' } })
+})
