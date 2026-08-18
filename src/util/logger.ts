@@ -219,14 +219,23 @@ export const loggingContextMiddleware = (
 export function censor(obj: any, censorList: CensorKeyValue[], throwOnError = false) {
   let stringified: string | undefined
   try {
-    // JSON.stringify(obj) will fail if obj contains a circular reference.
-    // If it fails, we fall back to replacing it with "[Unknown]".
+    // JSON.stringify(obj) will fail if obj contains a circular reference or a bigint.
     stringified = JSON.stringify(obj)
-  } catch (e) {
-    if (throwOnError) {
-      throw e
+  } catch {
+    try {
+      // Retry with a bigint-safe replacer in case the failure was due to a bigint value.
+      // JSON.stringify with a replacer function is slower, so we only pay that cost when
+      // the fast path above actually fails, rather than on every call.
+      stringified = JSON.stringify(obj, (_key, value) => {
+        return typeof value === 'bigint' ? value.toString() : value
+      })
+    } catch (e) {
+      // Still fails (e.g. a genuine circular reference) - fall back to "[Unknown]".
+      if (throwOnError) {
+        throw e
+      }
+      return '[Unknown]'
     }
-    return '[Unknown]'
   }
 
   if (typeof stringified !== 'string') {
