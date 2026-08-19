@@ -14,7 +14,12 @@ import {
   lwbaEndpointInputParametersDefinition,
   priceEndpointInputParametersDefinition,
 } from '../src/adapter'
-import { AdapterRequest, AdapterResponse } from '../src/util'
+import {
+  AdapterRequest,
+  AdapterResponse,
+  TimestampedProviderErrorResponse,
+  TimestampedProviderResult,
+} from '../src/util'
 import { EmptyCustomSettings } from '../src/config'
 import { TypeFromDefinition } from '../src/validation/input-params'
 import { Transport } from '../src/transports'
@@ -144,92 +149,75 @@ test('Successful response passes LWBA validation', async (t) => {
   t.is(response.json().data.ask, 123.3)
 })
 
-test('Invariant violation fails LWBA validation (bid <= mid <= ask)', async (t) => {
-  const mockResponse: AdapterResponse<LWBATestTypes['Response']> = {
-    result: null,
-    data: {
-      bid: 123.1,
-      mid: 123.4,
-      ask: 123.3,
-    },
-    statusCode: 200,
-    timestamps: {
-      providerDataRequestedUnixMs: 0,
-      providerDataReceivedUnixMs: 0,
-      providerIndicatedTimeUnixMs: undefined,
-    },
-  }
+type LwbaResultValidator = (
+  result: TimestampedProviderResult<LwbaEndpointGenerics>,
+) => TimestampedProviderResult<LwbaEndpointGenerics>
 
-  const testAdapter = await buildAdapter(t.context, (req) => {
-    t.deepEqual(req.requestContext.data, {
-      base: 'BTC',
-      quote: 'USD',
-    })
+const getResultValidator = (endpoint: LwbaEndpoint<LwbaEndpointGenerics>): LwbaResultValidator =>
+  (endpoint as unknown as { resultValidator: LwbaResultValidator }).resultValidator
 
-    return mockResponse
-  })
+test('Invariant violation fails LWBA validation via resultValidator (bid <= mid <= ask)', (t) => {
+  const lwbaEndpoint = new LwbaEndpoint({
+    name: 'lwba_test',
+    inputParameters: new InputParameters(lwbaEndpointInputParametersDefinition),
+    transport: new NopTransport(),
+  }) as LwbaEndpoint<LwbaEndpointGenerics>
 
-  const expectedError = JSON.stringify({
-    status: 'errored',
-    statusCode: 500,
-    error: {
-      name: 'AdapterLWBAError',
-      message:
-        'Invariant violation. Mid price must be between bid and ask prices. Got: (bid: 123.1, mid: 123.4, ask: 123.3)',
+  const result = getResultValidator(lwbaEndpoint)({
+    params: { base: 'BTC', quote: 'USD' },
+    response: {
+      result: null,
+      data: {
+        bid: 123.1,
+        mid: 123.4,
+        ask: 123.3,
+      },
+      timestamps: {
+        providerDataRequestedUnixMs: 0,
+        providerDataReceivedUnixMs: 0,
+        providerIndicatedTimeUnixMs: undefined,
+      },
     },
   })
 
-  const response = await testAdapter.request({
-    base: 'BTC',
-    quote: 'USD',
-    endpoint: 'lwba_test',
-  })
-
-  t.is(response.statusCode, 500)
-  t.is(JSON.stringify(response.json()), expectedError)
+  const written = result.response as TimestampedProviderErrorResponse
+  t.is(written.statusCode, 502)
+  t.true(
+    written.errorMessage.includes(
+      'Invariant violation. Mid price must be between bid and ask prices.',
+    ),
+  )
 })
 
-test('Invariant violation fails LWBA validation (bid, mid or ask not found)', async (t) => {
-  const mockResponse: AdapterResponse<LWBATestTypes['Response']> = {
-    result: null,
-    data: {
-      bid: null as never,
-      mid: 123.4,
-      ask: 123.3,
-    },
-    statusCode: 200,
-    timestamps: {
-      providerDataRequestedUnixMs: 0,
-      providerDataReceivedUnixMs: 0,
-      providerIndicatedTimeUnixMs: undefined,
-    },
-  }
+test('Invariant violation fails LWBA validation via resultValidator (bid, mid or ask not found)', (t) => {
+  const lwbaEndpoint = new LwbaEndpoint({
+    name: 'lwba_test',
+    inputParameters: new InputParameters(lwbaEndpointInputParametersDefinition),
+    transport: new NopTransport(),
+  }) as LwbaEndpoint<LwbaEndpointGenerics>
 
-  const testAdapter = await buildAdapter(t.context, (req) => {
-    t.deepEqual(req.requestContext.data, {
-      base: 'BTC',
-      quote: 'USD',
-    })
-
-    return mockResponse
-  })
-
-  const expectedError = JSON.stringify({
-    status: 'errored',
-    statusCode: 500,
-    error: {
-      name: 'AdapterLWBAError',
-      message:
-        'Invariant violation. LWBA response must contain mid, bid and ask prices. Got: (bid: null, mid: 123.4, ask: 123.3)',
+  const result = getResultValidator(lwbaEndpoint)({
+    params: { base: 'BTC', quote: 'USD' },
+    response: {
+      result: null,
+      data: {
+        bid: null as never,
+        mid: 123.4,
+        ask: 123.3,
+      },
+      timestamps: {
+        providerDataRequestedUnixMs: 0,
+        providerDataReceivedUnixMs: 0,
+        providerIndicatedTimeUnixMs: undefined,
+      },
     },
   })
 
-  const response = await testAdapter.request({
-    base: 'BTC',
-    quote: 'USD',
-    endpoint: 'lwba_test',
-  })
-
-  t.is(response.statusCode, 500)
-  t.is(JSON.stringify(response.json()), expectedError)
+  const written = result.response as TimestampedProviderErrorResponse
+  t.is(written.statusCode, 502)
+  t.true(
+    written.errorMessage.includes(
+      'Invariant violation. LWBA response must contain mid, bid and ask prices.',
+    ),
+  )
 })

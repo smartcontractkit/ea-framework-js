@@ -30,6 +30,7 @@ export abstract class ResponseCache<
   endpointName: string
   adapterSettings: AdapterSettings
   dependencies: AdapterDependencies
+  resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
 
   constructor({
     inputParameters,
@@ -53,12 +54,30 @@ export abstract class ResponseCache<
   }
 
   /**
-   * Sets responses in the adapter cache (adding necessary metadata and defaults)
+   * Sets responses in the adapter cache (adding necessary metadata and defaults).
+   * Applies the endpoint's optional resultValidator before delegating to the subclass-specific
+   * cache write implementation.
    *
    * @param transportName - transport name
    * @param results - the entries to write to the cache
    */
-  abstract write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void>
+  async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+    const resultValidator = this.resultValidator
+    const validated = resultValidator ? results.map((r) => resultValidator(r)) : results
+    return this._write(transportName, validated)
+  }
+
+  /**
+   * Subclass-specific implementation of the cache write. Subclasses must implement this instead of
+   * overriding write() so that resultValidator is always applied consistently.
+   *
+   * @param transportName - transport name
+   * @param results - the entries to write to the cache
+   */
+  protected abstract _write(
+    transportName: string,
+    results: TimestampedProviderResult<T>[],
+  ): Promise<void>
 
   /**
    * Sets responses with metadata in the adapter cache
