@@ -186,7 +186,11 @@ test('MarketStatusEndpoint - with custom input validation', async (t) => {
   })
   t.is(response4.statusCode, 200, 'Should succeed with valid weekend when type is 24/5')
 
-  t.is(customValidationCallCount, 2, 'Custom validation is only called when built-in validation passes')
+  t.is(
+    customValidationCallCount,
+    2,
+    'Custom validation is only called when built-in validation passes',
+  )
 
   await testAdapter.api.close()
 })
