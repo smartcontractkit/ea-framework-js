@@ -73,7 +73,8 @@ export class MarketStatusEndpoint<
   T extends MarketStatusEndpointGenerics,
 > extends AdapterEndpoint<T> {
   constructor(params: AdapterEndpointParams<T>) {
-    params.customInputValidation = (req, _adapterSettings) => {
+    const originalCustomInputValidation = params.customInputValidation
+    params.customInputValidation = (req, adapterSettings) => {
       const data = req.requestContext.data as Record<string, string>
       if (data['type'] === '24/5') {
         parseWeekendString(data['weekend'])
@@ -84,7 +85,7 @@ export class MarketStatusEndpoint<
           message: '[Param: weekend] must be empty when [Param: type] is regular',
         })
       }
-      return undefined
+      return originalCustomInputValidation?.(req, adapterSettings)
     }
     super(params)
   }
