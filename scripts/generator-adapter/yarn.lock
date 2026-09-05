@@ -376,10 +376,10 @@
   resolved "https://registry.yarnpkg.com/@yeoman/namespace/-/namespace-1.0.1.tgz#8034277c4a62bdf41e05e2d890bc674bc320eb99"
   integrity sha512-XGdYL0HCoPvrzW7T8bxD6RbCY/B8uvR2jpOzJc/yEwTueKHwoVhjSLjVXkokQAO0LNl8nQFLVZ1aKfr2eFWZeA==
 
-"@yeoman/types@1.13.0":
-  version "1.13.0"
-  resolved "https://registry.npmjs.org/@yeoman/types/-/types-1.13.0.tgz#64b78db4e40b6c9fb9e92f9552e5e624458548e3"
-  integrity sha512-M7+TSQWo8c2/P5nUdCJb1Y8yDBgcMyIeKxCxM+1JeTfXDvanBRPrD5GzdvgesUr3LCq+xtEqH2f31wkRjPWplg==
+"@yeoman/types@1.13.1":
+  version "1.13.1"
+  resolved "https://registry.npmjs.org/@yeoman/types/-/types-1.13.1.tgz#0d5370de9f7235e9bdb08a55ae915a04e8ac4253"
+  integrity sha512-HNwITXGjzxct9j3cvyHvCKUA/isuvtLHHGtEH5Com1vFOqYMTZZ16Skk+UM7GJDKqhTEJaIhF/xY7O2/ByQ/sA==
 
 ansi-regex@^6.0.1:
   version "6.1.0"
