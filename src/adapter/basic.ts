@@ -123,7 +123,11 @@ export class Adapter<
 
     this.dependencies = this.initializeDependencies(dependencies)
 
-    if (this.config.settings.EA_MODE !== 'reader' && this.dependencies.cache.lock) {
+    if (
+      this.config.settings.EA_MODE !== 'reader' &&
+      this.config.settings.CACHE_LOCK_ENABLED &&
+      this.dependencies.cache.lock
+    ) {
       const [lockAcquiredPromise, lockAcquiredResolve, lockAcquiredReject] =
         deferredPromise<boolean>()
       this.lockAcquiredPromise = lockAcquiredPromise
