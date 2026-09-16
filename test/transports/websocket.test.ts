@@ -446,6 +446,78 @@ test.serial('reconnects if connection becomes unresponsive', async (t) => {
   await t.context.clock.runToLastAsync()
 })
 
+test.serial('reconnects once connection exceeds MAX_WS_CONNECTION_AGE_SECONDS', async (t) => {
+  const base = 'ETH'
+  const quote = 'DOGE'
+  // Minimum allowed value for the setting
+  const MAX_WS_CONNECTION_AGE_SECONDS = 300
+  process.env['METRICS_ENABLED'] = 'true'
+  eaMetrics.clear()
+
+  // Mock WS
+  mockWebSocketProvider(WebSocketClassProvider)
+  const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+  let connectionCounter = 0
+
+  mockWsServer.on('connection', (socket) => {
+    connectionCounter++
+    const sendPrice = () =>
+      socket.send(
+        JSON.stringify({
+          pair: `${base}/${quote}`,
+          value: price,
+        }),
+      )
+    socket.on('message', sendPrice)
+    // Keep sending messages well within WS_SUBSCRIPTION_UNRESPONSIVE_TTL so the connection is
+    // never considered unresponsive, isolating the max-age-triggered reconnect being tested here.
+    const keepAliveInterval = setInterval(sendPrice, 60_000)
+    socket.on('close', () => clearInterval(keepAliveInterval))
+  })
+
+  const adapter = createAdapter({
+    // Kept well above the test duration so the subscription doesn't go stale and interfere
+    WS_SUBSCRIPTION_TTL: 400_000,
+    WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 120_000,
+    MAX_WS_CONNECTION_AGE_SECONDS,
+  })
+
+  const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+  await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+    requestData: { base, quote },
+    expectedResponse: {
+      data: {
+        result: price,
+      },
+      result: price,
+      statusCode: 200,
+    },
+  })
+  t.is(connectionCounter, 1)
+
+  // Advance well past the (jittered) max connection age so the transport is forced to reconnect
+  await runAllUntilTime(
+    t.context.clock,
+    MAX_WS_CONNECTION_AGE_SECONDS * 1000 + BACKGROUND_EXECUTE_MS_WS * 2,
+  )
+
+  t.is(connectionCounter, 2)
+
+  // A max-age-triggered reconnect is a normal closure (code 1000), unlike an abnormal
+  // closure that would be counted as a failover.
+  ;(await testAdapter.getMetrics()).assert(t, {
+    name: 'ws_connection_closures',
+    labels: { code: '1000', url: ENDPOINT_URL },
+    expectedValue: 1,
+  })
+
+  process.env['METRICS_ENABLED'] = 'false'
+  testAdapter.api.close()
+  mockWsServer.close()
+  await t.context.clock.runToLastAsync()
+})
+
 test.serial('reconnects if provider stops sending expected messages', async (t) => {
   const base = 'ETH'
   const quote = 'DOGE'

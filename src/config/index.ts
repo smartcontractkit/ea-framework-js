@@ -263,6 +263,12 @@ export const BaseSettingsDefinition = {
     default: 10_000,
     validate: validator.integer({ min: 5_000, max: 300_000 }),
   },
+  MAX_WS_CONNECTION_AGE_SECONDS: {
+    description:
+      'Opt-in maximum age (in seconds) a WebSocket connection is allowed to live before the adapter proactively closes and reopens it, to avoid the risk of it going stale on the data provider side. A hardcoded 20% jitter is subtracted from this value so that not all instances reconnect at the same time (the connection will never live longer than this value). Disabled (no forced reconnection) by default.',
+    type: 'number',
+    validate: validator.integer({ min: 300 }),
+  },
   CACHE_POLLING_MAX_RETRIES: {
     description:
       'Max amount of times to attempt to find EA response in the cache after the Transport has been set up',
