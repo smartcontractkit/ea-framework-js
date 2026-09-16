@@ -222,6 +222,8 @@ export class WebSocketTransport<
   currentUrl = ''
   lastMessageReceivedAt = 0
   connectionOpenedAt = 0
+  /** Jittered max age (in ms) for the current connection; set when a new connection is opened. */
+  connectionMaxAgeMs?: number
   streamHandlerInvocationsWithNoConnection = 0
   heartbeatInterval?: NodeJS.Timeout
   subscriptionMessageBuilder?: (
@@ -258,6 +260,17 @@ export class WebSocketTransport<
       .get('wsConnectionFailoverCount')
       .labels({ transport_name: this.name, url: filteredUrl })
       .set(this.streamHandlerInvocationsWithNoConnection)
+  }
+
+  /**
+   * Rolls a fresh max connection age for a newly opened connection, jittered down by up to 20%
+   * so connections across instances don't all expire at the same time. The connection will never
+   * be allowed to live longer than maxConnectionAgeSeconds.
+   */
+  private rollConnectionMaxAgeMs(maxConnectionAgeSeconds: number): number {
+    const maxAgeMs = maxConnectionAgeSeconds * 1000
+    const jitterMs = maxAgeMs * 0.2 * Math.random()
+    return maxAgeMs - jitterMs
   }
 
   serializeMessage(payload: unknown): string {
@@ -475,13 +488,20 @@ export class WebSocketTransport<
       timeSinceLastActivity > 0 &&
       timeSinceLastActivity > context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL
 
-    logger.trace(`WS conn staleness info: 
+    // Opt-in: force a reconnection once the connection has lived past its (jittered) max age,
+    // to avoid the risk of it going stale on the data provider's end.
+    const connectionExpired =
+      this.connectionMaxAgeMs !== undefined && timeSinceConnectionOpened > this.connectionMaxAgeMs
+
+    logger.trace(`WS conn staleness info:
       now: ${now} |
       timeSinceLastMessage: ${timeSinceLastMessage} |
       timeSinceConnectionOpened: ${timeSinceConnectionOpened} |
       timeSinceLastActivity: ${timeSinceLastActivity} |
       subscriptionUnresponsiveTtl: ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL} |
       connectionUnresponsive: ${connectionUnresponsive} |
+      connectionMaxAgeMs: ${this.connectionMaxAgeMs} |
+      connectionExpired: ${connectionExpired} |
     `)
 
     // The var connectionUnresponsive checks whether the time since last activity on
@@ -508,17 +528,21 @@ export class WebSocketTransport<
     const urlChanged = this.currentUrl !== urlFromConfig
 
     // Check if we should close the current connection
-    if (!this.connectionClosed() && (urlChanged || connectionUnresponsive)) {
+    if (!this.connectionClosed() && (urlChanged || connectionUnresponsive || connectionExpired)) {
       if (urlChanged) {
         logger.info('Websocket URL has changed, closing connection to reconnect...')
         censorLogs(() =>
           logger.debug(`Websocket URL changed from ${this.currentUrl} to ${urlFromConfig}`),
         )
-      } else {
+      } else if (connectionUnresponsive) {
         censorLogs(() =>
           logger.info(
             `Last message was received ${timeSinceLastMessage} ago, exceeding the threshold of ${context.adapterSettings.WS_SUBSCRIPTION_UNRESPONSIVE_TTL}ms, closing connection...`,
           ),
+        )
+      } else {
+        logger.info(
+          `Connection has reached its max age (open for ${timeSinceConnectionOpened}ms, limit ${this.connectionMaxAgeMs}ms), closing connection to reconnect...`,
         )
       }
 
@@ -567,6 +591,9 @@ export class WebSocketTransport<
 
       // Now that we successfully opened the connection, we can reset the variables
       this.connectionOpenedAt = Date.now()
+      this.connectionMaxAgeMs = context.adapterSettings.MAX_WS_CONNECTION_AGE_SECONDS
+        ? this.rollConnectionMaxAgeMs(context.adapterSettings.MAX_WS_CONNECTION_AGE_SECONDS)
+        : undefined
     }
 
     // Send messages only if the connection is open
