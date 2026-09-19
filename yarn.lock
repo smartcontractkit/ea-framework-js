@@ -2024,10 +2024,10 @@ fast-uri@^3.0.0, fast-uri@^3.0.1:
   resolved "https://registry.yarnpkg.com/fast-uri/-/fast-uri-3.1.2.tgz"
   integrity sha512-rVjf7ArG3LTk+FS6Yw81V1DLuZl1bRbNrev6Tmd/9RaroeeRRJhAt7jg/6YFxbvAQXUCavSoZhPPj6oOx+5KjQ==
 
-fastify@5.12.4:
-  version "5.12.4"
-  resolved "https://registry.npmjs.org/fastify/-/fastify-5.12.4.tgz#b87ddbda72f4b430612bea742342ae8b650446ac"
-  integrity sha512-zATD676fP6tBMsn+jQ7Q5/cO/Qo+149TXH0dUqUKel+1/hcZxwIbnflqtPa9EjlrvpY8eCZcL3M1UYrMc31Y7g==
+fastify@5.12.5:
+  version "5.12.5"
+  resolved "https://registry.npmjs.org/fastify/-/fastify-5.12.5.tgz#e3a6937e154a51332889a30ff3b8f97db52d7355"
+  integrity sha512-OB2k1dlxs5/NAABqeKV2FUHkSD2BbENsCak8yULVcymn3fHIPDVa9TI3SDnJSWYSllZmSYuZXy2gTnsT+Sut1A==
   dependencies:
     "@fastify/ajv-compiler" "^4.0.5"
     "@fastify/error" "^4.0.0"
