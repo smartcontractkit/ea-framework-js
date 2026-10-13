@@ -10,6 +10,9 @@
     "yeoman-generator",
     "extnerl-adapter-generator"
   ],
+  "resolutions": {
+    "simple-git": "4.0.2"
+  },
   "devDependencies": {
     "yeoman-generator": "7.5.1",
     "@yeoman/types": "1.13.1",
