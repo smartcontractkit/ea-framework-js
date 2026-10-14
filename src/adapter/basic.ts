@@ -84,6 +84,7 @@ export class Adapter<
 
     this.config.initialize()
     this.normalizeEndpointNames()
+    this.filterEndpoints()
     this.calculateRateLimitAllocations()
     this.shutdownNotifier = new EventEmitter()
   }
@@ -181,6 +182,47 @@ export class Adapter<
     for (const endpoint of this.endpoints) {
       endpoint.name = endpoint.name.toLowerCase()
       endpoint.aliases = endpoint.aliases?.map((a) => a.toLowerCase())
+    }
+  }
+
+  /**
+   * Filters the adapter's endpoints based on the ENABLED_ENDPOINTS setting.
+   * If ENABLED_ENDPOINTS is not set, all endpoints are loaded.
+   * If ENABLED_ENDPOINTS is set, only the specified endpoints are loaded.
+   * Throws an error if none of the specified endpoints match.
+   */
+  private filterEndpoints() {
+    const enabledEndpoints = this.config.settings.ENABLED_ENDPOINTS
+    if (!enabledEndpoints) {
+      return
+    }
+
+    // Normalize the ENABLED_ENDPOINTS values
+    const enabledSet = new Set(enabledEndpoints.split(',').map((name) => name.trim().toLowerCase()))
+
+    const allNames = this.endpoints.map((e) => e.name)
+    this.endpoints = this.endpoints.filter((e) => enabledSet.has(e.name))
+
+    const excluded = allNames.filter((name) => !enabledSet.has(name))
+    if (excluded.length) {
+      logger.info(
+        `ENABLED_ENDPOINTS is set — loaded [${this.endpoints.map((e) => e.name).join(', ')}], excluded [${excluded.join(', ')}]`,
+      )
+    }
+
+    // Throws error if none of the specified endpoints match
+    if (this.endpoints.length === 0) {
+      throw new Error(
+        `ENABLED_ENDPOINTS is set to "${enabledEndpoints}" but none of the adapter endpoints match. Available: [${allNames.join(', ')}]`,
+      )
+    }
+
+    // Clear default endpoint if it is not included in the enabled endpoints
+    if (this.defaultEndpoint && !enabledSet.has(this.defaultEndpoint)) {
+      logger.warn(
+        `Default endpoint "${this.defaultEndpoint}" was excluded by ENABLED_ENDPOINTS, clearing it`,
+      )
+      this.defaultEndpoint = undefined
     }
   }
 
