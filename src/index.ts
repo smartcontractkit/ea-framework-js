@@ -130,13 +130,7 @@ export const start = async <T extends SettingsDefinitionMap>(
     if (err instanceof ExecutionError) {
       throw err
     }
-    censorLogs(() =>
-      logger.error({
-        name: err.name,
-        stack: err.stack,
-        message: err.message,
-      }),
-    )
+    censorLogs(() => logger.error(err))
   })
 
   if (
