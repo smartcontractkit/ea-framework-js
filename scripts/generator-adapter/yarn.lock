@@ -357,10 +357,10 @@
     "@types/expect" "^1.20.4"
     "@types/node" "*"
 
-"@yeoman/adapter@4.0.2":
-  version "4.0.2"
-  resolved "https://registry.yarnpkg.com/@yeoman/adapter/-/adapter-4.0.2.tgz#e1424226cf90077c979d24010db5dd8e385d3504"
-  integrity sha512-4uttbNuZ/guMBRhf7R6TCfnLT6XY1HGpxsq6vpHRM3AVr5G6Qz7xXqxG2kdMzBGtIuH5CkXz0k/Byl27GsvIkg==
+"@yeoman/adapter@4.0.3":
+  version "4.0.3"
+  resolved "https://registry.npmjs.org/@yeoman/adapter/-/adapter-4.0.3.tgz#f8337ff3c45a6e8f6bc20e4142618e8a7d80b8a0"
+  integrity sha512-cY1GoZmvv4e8SRuCgt2dI8QnJaxaSA0fWCGvu/IleLYBpAjWHjPUfVBbgG39Q6GkHokPsntaQTkAvNgMbPjJqA==
   dependencies:
     "@inquirer/core" "^11.1.5"
     "@inquirer/prompts" "^8.3.0"
