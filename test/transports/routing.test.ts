@@ -205,9 +205,7 @@ class MockHttpTransport extends HttpTransport<HttpTypes> {
 
 type SSETypes = BaseEndpointTypes & {
   Provider: {
-    RequestBody: {
-      pairs: ProviderRequestBody[]
-    }
+    RequestBody: never
     ResponseBody: ProviderResponseBody
   }
 }
