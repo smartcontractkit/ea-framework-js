@@ -872,10 +872,10 @@ mem-fs-editor@^11.0.1:
     textextensions "^6.11.0"
     vinyl "^3.0.0"
 
-mem-fs@4.1.5:
-  version "4.1.5"
-  resolved "https://registry.npmjs.org/mem-fs/-/mem-fs-4.1.5.tgz#d242adc7ff75a28d4aa2a7186fcbeeaceaaefb7d"
-  integrity sha512-6aWRo1jLo82ngo44tPQXjzINN7gvSNWhMU96I+O5nsJWdPi5vbUJWMTDGZDb/AVpCJRpaLGcFgrIBIpyk0DuUA==
+mem-fs@6.0.0:
+  version "6.0.0"
+  resolved "https://registry.npmjs.org/mem-fs/-/mem-fs-6.0.0.tgz#40719ed8f000970b908388251330f636df3886f6"
+  integrity sha512-sj1/T9x/ypgRQQk4NDhA9QTtBr2woET2ayxkvCLoDPQXQ3DPkbeC+kQj7SiP8kn6Hi9ld8lVBCSj/KtZswP3jg==
   dependencies:
     vinyl "^3.0.1"
     vinyl-file "^5.0.0"
