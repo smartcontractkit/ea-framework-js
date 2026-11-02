@@ -1931,17 +1931,17 @@ ethers@6.17.0:
     tslib "2.7.0"
     ws "8.21.0"
 
-eventsource-parser@^3.0.1:
-  version "3.0.8"
-  resolved "https://registry.yarnpkg.com/eventsource-parser/-/eventsource-parser-3.0.8.tgz"
-  integrity sha512-70QWGkr4snxr0OXLRWsFLeRBIRPuQOvt4s8QYjmUlmlkyTZkRqS7EDVRZtzU3TiyDbXSzaOeF0XUKy8PchzukQ==
+eventsource-parser@^4.1.2:
+  version "4.1.3"
+  resolved "https://registry.npmjs.org/eventsource-parser/-/eventsource-parser-4.1.3.tgz#365be753e773294b363516f01b2e26a12b834ec7"
+  integrity sha512-jZVIVilXZfAx6H20ZKKEj5dabbpD9ETmMj3uHsjMmgBzBHB6tsHrmdWB4mAiy3amtN6MOoVkfXRQu4wf1n88Rw==
 
-eventsource@4.1.1:
-  version "4.1.1"
-  resolved "https://registry.npmjs.org/eventsource/-/eventsource-4.1.1.tgz#89ad4c69cdd26e19ebb8fb1d79608fccac4bf67b"
-  integrity sha512-D6bTRWh6KahHTK/m4WnjPQyEinNPf9eFLEZSEoj7d6fTibspnAVYfzHvirL7u/aoX5d9YYfIkBVAhmigUELk9w==
+eventsource@5.1.4:
+  version "5.1.4"
+  resolved "https://registry.npmjs.org/eventsource/-/eventsource-5.1.4.tgz#9a0d9790a9be28951fa95d9da5b7c843692e24d5"
+  integrity sha512-awkjURTcaMUKjtEqM/78nMtFSfGcgGST6EbXGV2/E7LJXzWwnNaByn1zACiX9VluWzokVeHpjRdzo3nZr9zhMg==
   dependencies:
-    eventsource-parser "^3.0.1"
+    eventsource-parser "^4.1.2"
 
 execa@^9.6.1:
   version "9.6.1"
