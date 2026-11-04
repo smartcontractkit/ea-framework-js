@@ -7,7 +7,7 @@ Framework to create External adapters, microservices that serve as middleware to
 
 ## Requirements
 
-- Node.js 22+
+- Node.js 22.12+
 - Yarn
 
 ### Optional development tools
