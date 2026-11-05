@@ -217,16 +217,21 @@ export const loggingContextMiddleware = (
 // Obj is typed as "any" because it could be a variety of structures in the logger
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function censor(obj: any, censorList: CensorKeyValue[], throwOnError = false) {
+  // Name/message/stack are non-enumerable own properties on Error, so a plain
+  // JSON.stringify would silently drop them; pull them up before serializing.
+  const target =
+    obj instanceof Error ? { ...obj, name: obj.name, message: obj.message, stack: obj.stack } : obj
+
   let stringified: string | undefined
   try {
-    // JSON.stringify(obj) will fail if obj contains a circular reference or a bigint.
-    stringified = JSON.stringify(obj)
+    // JSON.stringify(target) will fail if target contains a circular reference or a bigint.
+    stringified = JSON.stringify(target)
   } catch {
     try {
       // Retry with a bigint-safe replacer in case the failure was due to a bigint value.
       // JSON.stringify with a replacer function is slower, so we only pay that cost when
       // the fast path above actually fails, rather than on every call.
-      stringified = JSON.stringify(obj, (_key, value) => {
+      stringified = JSON.stringify(target, (_key, value) => {
         return typeof value === 'bigint' ? value.toString() : value
       })
     } catch (e) {

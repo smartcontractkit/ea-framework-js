@@ -129,3 +129,19 @@ test('properly handle nested bigint values', async (t) => {
   const log = censor({ apiKey: 'mock-api-key', tx: { gasLimit: 21000n } }, CensorList.getAll())
   t.deepEqual(log, { apiKey: '[API_KEY REDACTED]', tx: { gasLimit: '21000' } })
 })
+
+test('properly surfaces message/stack when given an Error', async (t) => {
+  const error = new Error('mock-api-key failure')
+  const log = censor(error, CensorList.getAll())
+  t.is(log.name, 'Error')
+  t.is(log.message, '[API_KEY REDACTED] failure')
+  t.truthy(log.stack)
+})
+
+test('properly surfaces custom enumerable properties alongside message/stack', async (t) => {
+  const error = Object.assign(new Error('boom'), { code: 'CALL_EXCEPTION' })
+  const log = censor(error, CensorList.getAll())
+  t.is(log.message, 'boom')
+  t.is(log.code, 'CALL_EXCEPTION')
+  t.truthy(log.stack)
+})
