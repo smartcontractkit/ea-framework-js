@@ -15,6 +15,6 @@
     "@yeoman/types": "1.13.1",
     "mem-fs": "6.0.0",
     "@yeoman/adapter": "5.1.1",
-    "@types/node": "24.19.2"
+    "@types/node": "26.6.6"
   }
 }
