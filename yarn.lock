@@ -2043,10 +2043,10 @@ fast-uri@^3.0.0, fast-uri@^3.0.1:
   resolved "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.9.tgz#f1deba822b1d6ac79da2f860e872a63470cff203"
   integrity sha512-hS/0Wt3Ya043oKXs0sIxrMpKQITXhMLIrVAKKXi4gozGC9v7YRWVnXIZzjNPTO02M9BdxLCWqK1yRXgNziVyJQ==
 
-fastify@5.12.7:
-  version "5.12.7"
-  resolved "https://registry.npmjs.org/fastify/-/fastify-5.12.7.tgz#e8f9859b1ae908ba38bbdb0572d358788c4a4b46"
-  integrity sha512-v4pEPsTRPuqlDIYiQFB+BHjVN4SdHX9u0ABk0ZDUKbbdY1vsNryUd1j4Z+jQEZajvYIVk047Kimva9/AJ79GYw==
+fastify@5.12.8:
+  version "5.12.8"
+  resolved "https://registry.npmjs.org/fastify/-/fastify-5.12.8.tgz#1465a8219391618e5201696042c6de0105070a49"
+  integrity sha512-moP8exb2sCHLUbJkwp+I6C0padhy4D8lp0SdmzY7HhSdZuqm7O/u3o2aq7u8okaQ//33QDzj3G/u+FsSdB8Qzw==
   dependencies:
     "@fastify/ajv-compiler" "^4.0.5"
     "@fastify/error" "^4.0.0"
@@ -2055,7 +2055,7 @@ fastify@5.12.7:
     abstract-logging "^2.0.1"
     avvio "^9.0.0"
     fast-json-stringify "^7.0.0"
-    find-my-way "^9.6.0"
+    find-my-way "^9.10.0"
     light-my-request "^6.0.0"
     pino "^9.14.0 || ^10.1.0"
     process-warning "^5.1.0"
@@ -2102,7 +2102,7 @@ fill-range@^7.1.1:
   dependencies:
     to-regex-range "^5.0.1"
 
-find-my-way@^9.6.0:
+find-my-way@^9.10.0:
   version "9.10.0"
   resolved "https://registry.npmjs.org/find-my-way/-/find-my-way-9.10.0.tgz#4e91651f61f9fed7af95d436e5beb8de762e1fb7"
   integrity sha512-eru+uCPQ2g+nLBkf84MHP/KyNNMar0BDy0j+i8Fb72GF9/YHBZ58q7FODUtfVV7XU9nfRUHXSmaM8NmZcIbZ4Q==
