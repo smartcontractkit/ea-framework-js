@@ -369,7 +369,9 @@ export class QuoteInversionPolicy<
     quote.bid = newBid
     quote.ask = newAsk
     quote.mid = newMid
-    quote.midSource = providerMidPresent ? 'provider' : 'computed'
+    if ('midSource' in quote) {
+      quote.midSource = providerMidPresent ? 'provider' : 'computed'
+    }
 
     return {
       params: result.params,

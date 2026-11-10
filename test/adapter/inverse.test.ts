@@ -186,7 +186,7 @@ test('quote policy uses provider mid when present', (t) => {
   t.true(Math.abs(data.bid - 1 / 1.2) < 1e-12)
   t.true(Math.abs(data.ask - 1 / 1) < 1e-12)
   t.true(Math.abs(data.mid - 1 / 1.1) < 1e-12)
-  t.is(data.midSource, 'provider')
+  t.false('midSource' in data)
 })
 
 test('quote policy computes mid when provider mid is absent', (t) => {
@@ -199,7 +199,22 @@ test('quote policy computes mid when provider mid is absent', (t) => {
   const data = (output.response as { data: LwbaResponseDataFields['Data'] }).data
   const expectedMid = (1 / 1.2 + 1 / 1) / 2
   t.true(Math.abs(data.mid - expectedMid) < 1e-12)
-  t.is(data.midSource, 'computed')
+  t.false('midSource' in data)
+})
+
+test('quote policy preserves and updates midSource only when present', (t) => {
+  const attempt = quoteAttempt(1, 1.2, 1.1)
+  const inputData = (attempt.response as { data: Record<string, unknown> }).data
+  inputData['midSource'] = 'computed'
+
+  const output = quotePolicy.transform(attempt)
+  t.is(isError(output), false)
+  if (isError(output)) {
+    return
+  }
+
+  const data = (output.response as { data: Record<string, unknown> }).data
+  t.is(data['midSource'], 'provider')
 })
 
 test('quote policy swaps auxiliary sizes without rejecting missing values', (t) => {

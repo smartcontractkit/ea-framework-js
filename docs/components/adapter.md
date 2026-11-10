@@ -107,8 +107,9 @@ The request only enables inversion. The endpoint chooses the fields and validity
 - `LwbaEndpoint` / quote responses:
   - `bid' = 1 / ask`
   - `ask' = 1 / bid`
-  - mid uses the provider mid when present and records `midSource: "provider"`
-  - otherwise mid is computed from the inverted bid/ask midpoint and records `midSource: "computed"`
+  - mid uses the provider mid when present
+  - otherwise mid is computed from the inverted bid/ask midpoint
+  - `midSource` is owned by the asset-class policy; inversion only updates it when it is already present
   - optional `bidSize`/`askSize` are swapped as auxiliary fields
 
 Inversion rejects with a 502 when the raw or inverted value is missing, non-finite, zero, negative, or violates the quote invariants. Error responses from the provider are never inverted.

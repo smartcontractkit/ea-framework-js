@@ -219,7 +219,7 @@ test.serial('foreground LWBA response is inverted through the quote policy', asy
   t.is(response.json().data.bid, 1 / 1.2)
   t.is(response.json().data.ask, 1)
   t.is(response.json().data.mid, 1 / 1.1)
-  t.is(response.json().data.midSource, 'provider')
+  t.false('midSource' in response.json().data)
 })
 
 test.serial('inversion config is rejected on an endpoint without a policy', async (t) => {
