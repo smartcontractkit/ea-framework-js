@@ -13,9 +13,15 @@ import {
   TransportGenerics,
   TransportRoutes,
 } from '../../src/transports'
+import { CompositeTransport } from '../../src/transports/composite'
+import { AdapterDependencies } from '../../src/adapter/types'
+import { LocalCache } from '../../src/cache/local'
 import { ResponseCache } from '../../src/cache/response'
+import { SimpleResponseCache } from '../../src/cache/response-cache/simple'
+import { InversionPolicy } from '../../src/adapter/inverse'
 import { AdapterRequest, TimestampedProviderResult } from '../../src/util/types'
 import { TestAdapter } from '../../src/util/testing-utils'
+import { InputParameters } from '../../src/validation'
 import { TypeFromDefinition } from '../../src/validation/input-params'
 import { cacheTestInputParameters, CacheTestTransportTypes } from '../cache/helper'
 
@@ -384,5 +390,91 @@ test.serial(
 
     t.is(error?.message, 'Composite transport requires at least 2 transports')
     t.is(error?.statusCode, 400)
+  },
+)
+
+class CompositeRecordingTransport implements Transport<CacheTestTransportTypes> {
+  name!: string
+  responseCache!: ResponseCache<CacheTestTransportTypes>
+
+  constructor(public supportsInversion: boolean) {}
+
+  async initialize(
+    dependencies: TransportDependencies<CacheTestTransportTypes>,
+    _adapterSettings: CacheTestTransportTypes['Settings'],
+    _endpointName: string,
+    transportName: string,
+  ): Promise<void> {
+    this.name = transportName
+    this.responseCache = dependencies.responseCache
+  }
+}
+
+const buildOuterResponseCache = () => {
+  const config = new AdapterConfig({})
+  config.initialize()
+  config.settings.METRICS_ENABLED = true
+  config.settings.EXPERIMENTAL_METRICS_ENABLED = true
+  config.validate()
+
+  const responseCache = new SimpleResponseCache<CacheTestTransportTypes>({
+    dependencies: { cache: new LocalCache(100) } as unknown as AdapterDependencies,
+    adapterSettings: config.settings,
+    adapterName: 'TEST',
+    endpointName: 'test',
+    inputParameters: new InputParameters(cacheTestInputParameters.definition),
+  })
+
+  return { responseCache, settings: config.settings }
+}
+
+test.serial('composite transport propagates inversion policy to child caches', async (t) => {
+  const { responseCache, settings } = buildOuterResponseCache()
+  const policy: InversionPolicy<CacheTestTransportTypes> = {
+    id: 'test-policy',
+    version: 1,
+    validateRequestConfig: () => ({ enabled: true }),
+    resolveConfig: () => ({ enabled: true, policyId: 'test-policy', policyVersion: 1 }),
+    transform: (result) => result,
+  }
+  const resultValidator = (result: TimestampedProviderResult<CacheTestTransportTypes>) => result
+  responseCache.inversionPolicy = policy
+  responseCache.resultValidator = resultValidator
+
+  const ws = new CompositeRecordingTransport(true)
+  const rest = new CompositeRecordingTransport(true)
+  const composite = new CompositeTransport<CacheTestTransportTypes>({ ws, rest })
+
+  await composite.initialize(
+    { responseCache } as unknown as TransportDependencies<CacheTestTransportTypes>,
+    settings,
+    'test',
+    'composite',
+  )
+
+  t.true(composite.supportsInversion)
+  t.is(ws.responseCache.inversionPolicy, policy)
+  t.is(ws.responseCache.resultValidator, resultValidator)
+  t.is(rest.responseCache.inversionPolicy, policy)
+  t.is(rest.responseCache.resultValidator, resultValidator)
+})
+
+test.serial(
+  'composite transport does not advertise inversion when a child does not support it',
+  async (t) => {
+    const { responseCache, settings } = buildOuterResponseCache()
+
+    const ws = new CompositeRecordingTransport(true)
+    const rest = new CompositeRecordingTransport(false)
+    const composite = new CompositeTransport<CacheTestTransportTypes>({ ws, rest })
+
+    await composite.initialize(
+      { responseCache } as unknown as TransportDependencies<CacheTestTransportTypes>,
+      settings,
+      'test',
+      'composite',
+    )
+
+    t.false(composite.supportsInversion)
   },
 )

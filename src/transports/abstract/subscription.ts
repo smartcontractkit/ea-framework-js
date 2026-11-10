@@ -2,7 +2,7 @@ import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
 import {
   calculateProviderParamsKey,
-  getInversionConfig,
+  hasInversionEnabled,
   stableStringify,
   stripInversionConfig,
 } from '../../adapter/inverse'
@@ -99,6 +99,13 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   private groupProviderEntries(
     entries: TypeFromDefinition<T['Parameters']>[],
   ): TypeFromDefinition<T['Parameters']>[] {
+    const hasInversion = entries.some((entry) => hasInversionEnabled(entry))
+
+    if (!hasInversion) {
+      this.providerVariants.clear()
+      return entries
+    }
+
     const groups = new Map<string, TypeFromDefinition<T['Parameters']>[]>()
 
     for (const entry of entries) {
@@ -115,9 +122,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
 
     const providerEntries: TypeFromDefinition<T['Parameters']>[] = []
     for (const [key, group] of groups) {
-      const hasInversionVariant = group.some(
-        (entry) => getInversionConfig(entry as Record<string, unknown>)?.enabled,
-      )
+      const hasInversionVariant = group.some((entry) => hasInversionEnabled(entry))
 
       if (!hasInversionVariant) {
         // Preserve exact previous behavior for groups without inversion.
@@ -151,7 +156,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
       const key = calculateProviderParamsKey(params)
       const variants = this.providerVariants.get(key)
 
-      if (!variants?.length || getInversionConfig(params)?.enabled) {
+      if (!variants?.length || hasInversionEnabled(params)) {
         return [result]
       }
 

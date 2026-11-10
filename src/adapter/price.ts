@@ -13,7 +13,7 @@ import {
 } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams } from './index'
-import { getInversionConfig, SingleValueInversionPolicy } from './inverse'
+import { hasInversionEnabled, SingleValueInversionPolicy } from './inverse'
 
 /**
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
@@ -182,7 +182,7 @@ export class PriceAdapter<
     if (
       this.includesMap &&
       req.requestContext.priceMeta?.inverse &&
-      !getInversionConfig(req.requestContext.data)
+      !hasInversionEnabled(req.requestContext.data)
     ) {
       // We need to search in the reverse order (quote -> base) because the request transform will have inverted the pair
 

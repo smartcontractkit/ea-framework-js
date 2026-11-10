@@ -13,7 +13,7 @@ import {
   getCanonicalAdapterName,
   canonicalizeAdapterNameKeys,
 } from '../util'
-import { getInversionConfig, InversionPolicy } from './inverse'
+import { hasInversionEnabled, InversionPolicy } from './inverse'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -174,8 +174,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     data: TypeFromDefinition<T['Parameters']>,
   ): AdapterResponse<T['Response']> {
     const policy = this.inversionPolicy
-    const config = getInversionConfig(data)
-    if (!policy || !config?.enabled) {
+    if (!policy || !hasInversionEnabled(data)) {
       return response
     }
 

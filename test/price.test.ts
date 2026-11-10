@@ -411,6 +411,61 @@ test('explicit inversion with includes does not double invert', async (t) => {
   t.is(response.json().data.result, 0.5)
 })
 
+test('explicitly disabled inversion is a no-op and preserves includes behavior', async (t) => {
+  const includes = [
+    {
+      from: 'ETH',
+      to: 'BTC',
+      includes: [
+        {
+          from: 'BTC',
+          to: 'ETH',
+          inverse: true,
+        },
+      ],
+    },
+  ]
+
+  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
+    result: 2,
+    data: {
+      result: 2,
+    },
+    statusCode: 200,
+    timestamps: {
+      providerDataRequestedUnixMs: 0,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
+    },
+  }
+
+  let seenCacheKey = ''
+  const testAdapter = await buildAdapter(
+    t.context,
+    (req) => {
+      seenCacheKey = req.requestContext.cacheKey
+      t.deepEqual(req.requestContext.data, {
+        base: 'BTC',
+        quote: 'ETH',
+      })
+      return mockResponse
+    },
+    includes,
+  )
+
+  const response = await testAdapter.request({
+    base: 'ETH',
+    quote: 'BTC',
+    endpoint: 'test',
+    inversion: { enabled: false },
+  })
+
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, 0.5)
+  t.is(response.json().data.result, 0.5)
+  t.is(seenCacheKey, 'TEST-test-default_single_transport-{"base":"btc","quote":"eth"}')
+})
+
 test('basic adapter endpoints bypass includes logic successfully', async (t) => {
   const includes = [
     {

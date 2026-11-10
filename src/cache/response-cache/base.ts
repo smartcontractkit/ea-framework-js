@@ -1,5 +1,5 @@
 import { AdapterDependencies } from '../../adapter'
-import { getInversionConfig, InversionPolicy } from '../../adapter/inverse'
+import { hasInversionEnabled, InversionPolicy } from '../../adapter/inverse'
 import { AdapterSettings } from '../../config'
 import {
   AdapterResponse,
@@ -66,22 +66,39 @@ export abstract class ResponseCache<
    */
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
     const inversionPolicy = this.inversionPolicy
-    const transformed = inversionPolicy
-      ? results.map((result) => {
-          const config = getInversionConfig(result.params)
-          if (!config?.enabled || 'errorMessage' in result.response) {
-            return result
-          }
+    const hasInversion = inversionPolicy
+      ? results.some((result) => hasInversionEnabled(result.params))
+      : false
 
-          const inverted = inversionPolicy.transform(result)
-          const failed = !('errorMessage' in result.response) && 'errorMessage' in inverted.response
-          metrics
-            .get(failed ? 'inversionRejected' : 'inversionApplied')
-            .labels({ adapter_endpoint: this.endpointName, policy: inversionPolicy.id })
-            .inc()
-          return inverted
-        })
-      : results
+    const transformed =
+      inversionPolicy && hasInversion
+        ? results.map((result) => {
+            if (!hasInversionEnabled(result.params) || 'errorMessage' in result.response) {
+              return result
+            }
+
+            let inverted: TimestampedProviderResult<T>
+            try {
+              inverted = inversionPolicy.transform(result)
+            } catch {
+              inverted = {
+                params: result.params,
+                response: {
+                  statusCode: 502,
+                  errorMessage: 'Inversion failed: policy transform threw an unexpected error',
+                  timestamps: result.response.timestamps,
+                },
+              }
+            }
+
+            const failed = 'errorMessage' in inverted.response
+            metrics
+              .get(failed ? 'inversionRejected' : 'inversionApplied')
+              .labels({ adapter_endpoint: this.endpointName, policy: inversionPolicy.id })
+              .inc()
+            return inverted
+          })
+        : results
 
     const resultValidator = this.resultValidator
     const validated = resultValidator ? transformed.map((r) => resultValidator(r)) : transformed

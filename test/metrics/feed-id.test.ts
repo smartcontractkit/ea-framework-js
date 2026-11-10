@@ -55,3 +55,19 @@ test.serial('builds feed ID correctly from input params', async (t) => {
   const data = { base: 'ETH', quote: 'BTC' }
   t.is(calculateFeedId(t.context, data), '{"base":"eth","quote":"btc"}')
 })
+
+test.serial('resolved inversion config creates a distinct feed ID', async (t) => {
+  const raw = { base: 'ETH', quote: 'BTC' }
+  const inverse = {
+    ...raw,
+    inversion: {
+      enabled: true,
+      policyId: 'single-value',
+      policyVersion: 1,
+    },
+  }
+
+  t.is(calculateFeedId(t.context, raw), '{"base":"eth","quote":"btc"}')
+  t.not(calculateFeedId(t.context, inverse), calculateFeedId(t.context, raw))
+  t.true(calculateFeedId(t.context, inverse).includes('"inversion"'))
+})

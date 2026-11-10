@@ -116,10 +116,15 @@ Inversion rejects with a 502 when the raw or inverted value is missing, non-fini
 Backward compatibility:
 
 - Requests without `inversion` follow the existing code path, cache keys, and response shapes.
+- `inversion: { "enabled": false }` is a no-op. It is not persisted in the request params, so the cache key, feed ID, and legacy `includes.json` behavior are identical to a request that omits `inversion`.
 - Existing `includes.json` behavior is unchanged.
-- If both `includes.json` and an explicit `inversion` config apply, the explicit config wins and the legacy read-path inversion is skipped.
+- If both `includes.json` and an enabled explicit `inversion` config apply, the explicit config wins and the legacy read-path inversion is skipped.
 - Inversion config is stripped before provider requests and subscriptions; raw and inverse variants share a single provider subscription.
-- The config must only be sent to EA versions that support request-driven inversion.
+- The resolved policy id/version are part of the request params, so they are included in cache keys and feed IDs. A policy version bump therefore changes the inverse cache key and feed ID; coordinate that change across all readers and writers.
+- The config must only be sent to EA versions that support request-driven inversion. Older EAs silently ignore unknown request params, so RDD/jobspec changes must be version-gated.
+- Inversion is rejected with a 400 on endpoints with a custom `cacheKeyGenerator`, because the framework cannot guarantee that the generated key distinguishes raw and inverse variants.
+- Custom transports must set `supportsInversion = true` and pass every result through `resolveResultVariants` before writing to the response cache. Otherwise inversion requests are rejected with a 400.
+- `foregroundExecute` implementations must return the raw provider response. The framework applies inversion to the immediate response; pre-inverted values would be inverted twice.
 
 ## Request Transforms
 

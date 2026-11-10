@@ -54,6 +54,15 @@ const assertInversionTransportSupported = (
   }
 }
 
+const assertInversionCacheKeySupported = (endpoint: AdapterEndpoint<EndpointGenerics>): void => {
+  if (endpoint.cacheKeyGenerator) {
+    throw new AdapterInputError({
+      statusCode: 400,
+      message: `Endpoint "${endpoint.name}" does not support inversion with a custom cacheKeyGenerator`,
+    })
+  }
+}
+
 const attachResolvedInversion = (
   endpoint: AdapterEndpoint<EndpointGenerics>,
   data: Record<string, unknown>,
@@ -128,6 +137,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     if (inversionConfig?.enabled) {
       assertInversionTransportSupported(endpoint, req.requestContext.transportName)
+      assertInversionCacheKeySupported(endpoint)
     }
 
     // Custom input validation defined in the EA

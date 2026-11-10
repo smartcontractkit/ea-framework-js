@@ -2,6 +2,8 @@ import test from 'ava'
 import {
   calculateProviderParamsKey,
   getInversionConfig,
+  getRawInversionConfig,
+  hasInversionEnabled,
   QuoteInversionPolicy,
   SingleValueInversionPolicy,
   stripInversionConfig,
@@ -17,6 +19,7 @@ import {
   TimestampedProviderResult,
 } from '../../src/util'
 import { AdapterInputError } from '../../src/validation/error'
+import { makeStub } from '../../src/util/testing-utils'
 import { LoggerFactoryProvider } from '../../src/util/logger'
 
 test.before(() => {
@@ -280,4 +283,172 @@ test('inversion params are stripped for provider grouping', (t) => {
   t.is(calculateProviderParamsKey(raw), calculateProviderParamsKey(inverse))
   t.deepEqual(getInversionConfig(inverse), inverse.inversion)
   t.is(getInversionConfig(raw), undefined)
+})
+
+test('inversion config detection is safe for Proxy-based test doubles', (t) => {
+  const params = makeStub('params', { base: 'BTC', quote: 'USD' })
+
+  t.notThrows(() => getInversionConfig(params))
+  t.notThrows(() => hasInversionEnabled(params))
+  t.is(getRawInversionConfig(params), undefined)
+  t.is(getInversionConfig(params), undefined)
+  t.false(hasInversionEnabled(params))
+  t.is(stripInversionConfig(params as Record<string, unknown>), params)
+})
+
+test('raw config presence is distinct from resolved policy metadata', (t) => {
+  const malformed = {
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true },
+  }
+
+  t.true(hasInversionEnabled(malformed))
+  t.deepEqual(getRawInversionConfig(malformed), {
+    enabled: true,
+    policyId: undefined,
+    policyVersion: undefined,
+  })
+  t.is(getInversionConfig(malformed), undefined)
+  t.false(hasInversionEnabled({ ...malformed, inversion: { enabled: false } }))
+  t.is(getInversionConfig({ ...malformed, inversion: { enabled: false } }), undefined)
+})
+
+test('policies reject malformed or missing policy metadata with 502', (t) => {
+  const singleValue = {
+    ...singleValueAttempt(4),
+    params: {
+      base: 'BTC',
+      quote: 'USD',
+      inversion: { enabled: true },
+    } as unknown as TimestampedProviderResult<SingleValueGenerics>['params'],
+  }
+  const singleOutput = singleValuePolicy.transform(singleValue)
+  t.true(isError(singleOutput))
+  if (isError(singleOutput)) {
+    t.is(singleOutput.response.statusCode, 502)
+    t.true(singleOutput.response.errorMessage.includes('missing or invalid'))
+  }
+
+  const quote = {
+    ...quoteAttempt(1, 1.2, 1.1),
+    params: {
+      base: 'BTC',
+      quote: 'USD',
+      inversion: { enabled: true, policyId: 'lwba' },
+    } as unknown as TimestampedProviderResult<QuoteGenerics>['params'],
+  }
+  const quoteOutput = quotePolicy.transform(quote)
+  t.true(isError(quoteOutput))
+  if (isError(quoteOutput)) {
+    t.is(quoteOutput.response.statusCode, 502)
+    t.true(quoteOutput.response.errorMessage.includes('missing or invalid'))
+  }
+})
+
+test('quote policy round-trips on double inversion, including sizes', (t) => {
+  const first = quotePolicy.transform(quoteAttempt(1, 1.2, 1.1, { bidSize: 10, askSize: 20 }))
+  t.is(isError(first), false)
+  if (isError(first)) {
+    return
+  }
+
+  const second = quotePolicy.transform(first)
+  t.is(isError(second), false)
+  if (isError(second)) {
+    return
+  }
+
+  const data = (second.response as { data: Record<string, number> }).data
+  t.true(Math.abs(data['bid'] - 1) < 1e-12)
+  t.true(Math.abs(data['ask'] - 1.2) < 1e-12)
+  t.true(Math.abs(data['mid'] - 1.1) < 1e-12)
+  t.is(data['bidSize'], 10)
+  t.is(data['askSize'], 20)
+})
+
+test('quote policy handles null/string mid, missing ask and boundary quotes', (t) => {
+  const nullMid = quotePolicy.transform(quoteAttempt(1, 1.2, null as unknown as number))
+  t.is(isError(nullMid), false)
+  if (!isError(nullMid)) {
+    const data = (nullMid.response as { data: LwbaResponseDataFields['Data'] }).data
+    t.true(Math.abs(data.mid - (1 / 1.2 + 1) / 2) < 1e-12)
+  }
+
+  const stringMid = quotePolicy.transform(quoteAttempt(1, 1.2, '1.1' as unknown as number))
+  t.true(isError(stringMid))
+
+  const missingAsk = quoteAttempt(1, 1.2, 1.1)
+  delete (missingAsk.response as { data: Record<string, unknown> }).data['ask']
+  t.true(isError(quotePolicy.transform(missingAsk)))
+
+  const equalBidAsk = quotePolicy.transform(quoteAttempt(2, 2, 2))
+  t.is(isError(equalBidAsk), false)
+  if (!isError(equalBidAsk)) {
+    const data = (equalBidAsk.response as { data: LwbaResponseDataFields['Data'] }).data
+    t.is(data.bid, 0.5)
+    t.is(data.ask, 0.5)
+    t.is(data.mid, 0.5)
+  }
+
+  for (const mid of [1, 1.2]) {
+    const output = quotePolicy.transform(quoteAttempt(1, 1.2, mid))
+    t.is(isError(output), false)
+  }
+})
+
+test('single-value policy tolerates a missing top-level result and extreme values', (t) => {
+  const missingTopLevel = singleValueAttempt(4)
+  delete (missingTopLevel.response as { result?: number }).result
+  const output = singleValuePolicy.transform(missingTopLevel)
+  t.is(isError(output), false)
+  if (!isError(output)) {
+    t.is((output.response as { result: number }).result, 0.25)
+    t.is((output.response as { data: { result: number } }).data.result, 0.25)
+  }
+
+  const huge = singleValuePolicy.transform(singleValueAttempt(Number.MAX_VALUE))
+  t.is(isError(huge), false)
+  if (!isError(huge)) {
+    t.true((huge.response as { result: number }).result > 0)
+  }
+
+  t.true(isError(singleValuePolicy.transform(singleValueAttempt(Number.MIN_VALUE))))
+})
+
+test('single-value policy rejects missing or malformed data', (t) => {
+  for (const makeAttempt of [
+    () => {
+      const attempt = singleValueAttempt(4)
+      delete (attempt.response as { data?: unknown }).data
+      return attempt
+    },
+    () => {
+      const attempt = singleValueAttempt(4)
+      ;(attempt.response as { data: unknown }).data = [4]
+      return attempt
+    },
+    () => {
+      const attempt = singleValueAttempt(4)
+      ;(attempt.response as { data: unknown }).data = '4'
+      return attempt
+    },
+    () => {
+      const attempt = singleValueAttempt(4)
+      ;(attempt.response as { data: Record<string, unknown> }).data['result'] = null
+      return attempt
+    },
+    () => {
+      const attempt = singleValueAttempt(4)
+      delete (attempt.response as { data: Record<string, unknown> }).data['result']
+      return attempt
+    },
+    () => {
+      const attempt = singleValueAttempt(4)
+      ;(attempt.response as { data: Record<string, unknown> }).data['result'] = '4'
+      return attempt
+    },
+  ]) {
+    t.true(isError(singleValuePolicy.transform(makeAttempt())))
+  }
 })

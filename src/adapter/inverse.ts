@@ -18,6 +18,12 @@ export type InversionRequestConfig = {
   enabled: boolean
 }
 
+/** Config as received in request params, before the policy metadata is trusted. */
+export type RawInversionConfig = InversionRequestConfig & {
+  policyId?: unknown
+  policyVersion?: unknown
+}
+
 /** Config after the endpoint policy has been resolved and persisted in request params. */
 export type ResolvedInversionConfig = InversionRequestConfig & {
   policyId: string
@@ -78,14 +84,18 @@ const assertPolicyMatchesConfig = <T extends ProviderResultGenerics>(
   id: string,
   version: number,
 ): TimestampedProviderResult<T> | undefined => {
-  const config = getInversionConfig(result.params)
+  const config = getRawInversionConfig(result.params)
   if (!config?.enabled) {
     return result
   }
   if (config.policyId !== id || config.policyVersion !== version) {
+    const configuredPolicy =
+      typeof config.policyId === 'string' && typeof config.policyVersion === 'number'
+        ? `${config.policyId} v${config.policyVersion}`
+        : 'missing or invalid policy metadata'
     return errorResult(
       result,
-      `Inversion failed: config policy ${config.policyId} v${config.policyVersion} does not match ${id} v${version}`,
+      `Inversion failed: config policy ${configuredPolicy} does not match ${id} v${version}`,
     )
   }
   return undefined
@@ -145,20 +155,22 @@ export const sortObjectKeys = (value: unknown): unknown => {
 
 export const stableStringify = (value: unknown): string => JSON.stringify(sortObjectKeys(value))
 
-/** Read and validate a resolved inversion config from request/result params. */
-export const getInversionConfig = (params: unknown): ResolvedInversionConfig | undefined => {
+/**
+ * Read the raw inversion config from request/result params.
+ *
+ * This intentionally checks for the property before reading it so it stays
+ * safe for Proxy-based test doubles (e.g. `makeStub`) that throw on unknown
+ * property access.
+ */
+export const getRawInversionConfig = (params: unknown): RawInversionConfig | undefined => {
   if (!isRecord(params)) {
     return undefined
   }
-  const config = params[INVERSION_PARAM]
-  if (!isRecord(config)) {
+  if (!Object.prototype.hasOwnProperty.call(params, INVERSION_PARAM)) {
     return undefined
   }
-  if (
-    typeof config['enabled'] !== 'boolean' ||
-    typeof config['policyId'] !== 'string' ||
-    typeof config['policyVersion'] !== 'number'
-  ) {
+  const config = params[INVERSION_PARAM]
+  if (!isRecord(config) || typeof config['enabled'] !== 'boolean') {
     return undefined
   }
   return {
@@ -168,9 +180,31 @@ export const getInversionConfig = (params: unknown): ResolvedInversionConfig | u
   }
 }
 
+/** Whether this request/result params explicitly enable inversion. */
+export const hasInversionEnabled = (params: unknown): boolean =>
+  getRawInversionConfig(params)?.enabled === true
+
+/** Read and validate a fully resolved inversion config from request/result params. */
+export const getInversionConfig = (params: unknown): ResolvedInversionConfig | undefined => {
+  const config = getRawInversionConfig(params)
+  if (
+    !config ||
+    typeof config.policyId !== 'string' ||
+    typeof config.policyVersion !== 'number' ||
+    !Number.isFinite(config.policyVersion)
+  ) {
+    return undefined
+  }
+  return {
+    enabled: config.enabled,
+    policyId: config.policyId,
+    policyVersion: config.policyVersion,
+  }
+}
+
 /** Remove the framework-only inversion config before provider calls. */
 export const stripInversionConfig = <T extends Record<string, unknown>>(params: T): T => {
-  if (!(INVERSION_PARAM in params)) {
+  if (!Object.prototype.hasOwnProperty.call(params, INVERSION_PARAM)) {
     return params
   }
   const copy = { ...params }
