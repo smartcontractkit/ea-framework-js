@@ -32,7 +32,7 @@ export class SubscriptionSetFactory {
     this.cachePrefix = adapterSettings.CACHE_PREFIX
   }
 
-  buildSet<T>(endpointName: string, transportName: string): SubscriptionSet<T> {
+  buildSet<T>(endpointName: string, transportName: string, keySuffix?: string): SubscriptionSet<T> {
     switch (this.cacheType) {
       case 'local':
         return new ExpiringSortedSet<T>(this.capacity)
@@ -42,7 +42,8 @@ export class SubscriptionSetFactory {
         }
         // Identifier key used for the subscription set in redis
         const cachePrefix = this.cachePrefix ? `${this.cachePrefix}-` : ''
-        const subscriptionSetKey = `${cachePrefix}${this.adapterName}-${endpointName}-${transportName}-subscriptionSet`
+        const suffix = keySuffix ? `-${keySuffix}` : ''
+        const subscriptionSetKey = `${cachePrefix}${this.adapterName}-${endpointName}-${transportName}${suffix}-subscriptionSet`
         return new RedisSubscriptionSet<T>(this.redisClient, subscriptionSetKey)
       }
     }

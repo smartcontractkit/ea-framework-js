@@ -101,7 +101,7 @@ const assertPolicyMatchesConfig = <T extends ProviderResultGenerics>(
   return undefined
 }
 
-const validateRequestConfig = (config: unknown): InversionRequestConfig => {
+export const validateInversionRequestConfig = (config: unknown): InversionRequestConfig => {
   if (!isRecord(config)) {
     throw new AdapterInputError({
       statusCode: 400,
@@ -201,7 +201,7 @@ export class SingleValueInversionPolicy<
   readonly version = 1
 
   validateRequestConfig(config: unknown): InversionRequestConfig {
-    return validateRequestConfig(config)
+    return validateInversionRequestConfig(config)
   }
 
   resolveConfig(config: InversionRequestConfig): ResolvedInversionConfig {
@@ -283,7 +283,7 @@ export class QuoteInversionPolicy<
   readonly version = 1
 
   validateRequestConfig(config: unknown): InversionRequestConfig {
-    return validateRequestConfig(config)
+    return validateInversionRequestConfig(config)
   }
 
   resolveConfig(config: InversionRequestConfig): ResolvedInversionConfig {

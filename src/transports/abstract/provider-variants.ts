@@ -9,21 +9,24 @@ const logger = makeLogger('ProviderVariantResolver')
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const sortObjectKeys = (value: unknown): unknown => {
+const normalizeParams = (value: unknown): unknown => {
+  if (typeof value === 'string') {
+    return value.toLowerCase()
+  }
   if (Array.isArray(value)) {
-    return value.map(sortObjectKeys)
+    return value.map(normalizeParams)
   }
   if (isRecord(value)) {
     return Object.fromEntries(
       Object.keys(value)
         .sort()
-        .map((key) => [key, sortObjectKeys(value[key])]),
+        .map((key) => [key, normalizeParams(value[key])]),
     )
   }
   return value
 }
 
-const stableStringify = (value: unknown): string => JSON.stringify(sortObjectKeys(value))
+const stableStringify = (value: unknown): string => JSON.stringify(normalizeParams(value))
 
 /** Stable key for grouping subscriptions that share the same provider-facing params. */
 export const calculateProviderParamsKey = (params: Record<string, unknown>): string =>
@@ -95,7 +98,7 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       const variants = this.variants.get(key)
 
       if (!variants?.length) {
-        if (!this.knownKeys.has(key) && !this.missedKeys.has(key)) {
+        if (!this.knownKeys.has(key) && !this.missedKeys.has(key) && this.missedKeys.size < 1000) {
           this.missedKeys.add(key)
           censorLogs(() =>
             logger.warn(
@@ -103,10 +106,6 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
             ),
           )
         }
-        return [result]
-      }
-
-      if (hasInversionEnabled(params)) {
         return [result]
       }
 
@@ -130,6 +129,5 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
   private reset(): void {
     this.variants.clear()
     this.knownKeys.clear()
-    this.missedKeys.clear()
   }
 }

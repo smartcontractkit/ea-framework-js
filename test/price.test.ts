@@ -354,7 +354,7 @@ test('inverting request does not affect cached response', async (t) => {
   t.is(response.json().data.result, 1234)
 })
 
-test('explicit inversion with includes does not double invert', async (t) => {
+test('explicit inversion with includes composes with the includes inversion', async (t) => {
   const includes = [
     {
       from: 'ETH',
@@ -407,8 +407,8 @@ test('explicit inversion with includes does not double invert', async (t) => {
   })
 
   t.is(response.statusCode, 200)
-  t.is(response.json().result, 0.5)
-  t.is(response.json().data.result, 0.5)
+  t.is(response.json().result, 2)
+  t.is(response.json().data.result, 2)
 })
 
 test('explicitly disabled inversion is a no-op and preserves includes behavior', async (t) => {

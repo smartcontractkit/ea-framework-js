@@ -23,6 +23,10 @@ import { metrics } from '../../metrics'
 
 const logger = makeLogger('ResponseCache')
 
+export interface ResultVariantResolver<R> {
+  resolve(results: R[]): R[]
+}
+
 export abstract class ResponseCache<
   T extends { Parameters: InputParametersDefinition; Response: ResponseGenerics },
 > {
@@ -34,6 +38,7 @@ export abstract class ResponseCache<
   dependencies: AdapterDependencies
   resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
   inversionPolicy?: InversionPolicy<T>
+  private variantResolvers = new Map<string, ResultVariantResolver<TimestampedProviderResult<T>>>()
 
   constructor({
     inputParameters,
@@ -64,15 +69,49 @@ export abstract class ResponseCache<
    * @param transportName - transport name
    * @param results - the entries to write to the cache
    */
+  registerVariantResolver(
+    transportName: string,
+    resolver: ResultVariantResolver<TimestampedProviderResult<T>>,
+  ): void {
+    this.variantResolvers.set(transportName, resolver)
+  }
+
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+    const resolver = this.variantResolvers.get(transportName)
+    const resolvedResults = resolver ? resolver.resolve(results) : results
     const inversionPolicy = this.inversionPolicy
-    const hasInversion = inversionPolicy
-      ? results.some((result) => hasInversionEnabled(result.params))
-      : false
+    const hasInversion = resolvedResults.some((result) => hasInversionEnabled(result.params))
+
+    if (hasInversion && !inversionPolicy) {
+      const failed = resolvedResults.map((result) => {
+        if (!hasInversionEnabled(result.params) || 'errorMessage' in result.response) {
+          return result
+        }
+        metrics
+          .get('inversionTotal')
+          .labels({
+            adapter_endpoint: this.endpointName,
+            policy: 'none',
+            status: 'rejected',
+          })
+          .inc()
+        return {
+          params: result.params,
+          response: {
+            statusCode: 502,
+            errorMessage: 'Inversion failed: endpoint has no inversion policy',
+            timestamps: result.response.timestamps,
+          },
+        }
+      })
+      const resultValidator = this.resultValidator
+      const validated = resultValidator ? failed.map((r) => resultValidator(r)) : failed
+      return this._write(transportName, validated)
+    }
 
     const transformed =
       inversionPolicy && hasInversion
-        ? results.map((result) => {
+        ? resolvedResults.map((result) => {
             if (!hasInversionEnabled(result.params) || 'errorMessage' in result.response) {
               return result
             }
@@ -106,7 +145,7 @@ export abstract class ResponseCache<
               .inc()
             return inverted
           })
-        : results
+        : resolvedResults
 
     const resultValidator = this.resultValidator
     const validated = resultValidator ? transformed.map((r) => resultValidator(r)) : transformed

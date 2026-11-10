@@ -5,9 +5,11 @@ import {
   Adapter,
   AdapterEndpoint,
   EndpointContext,
+  InversionPolicy,
   LwbaEndpoint,
   LwbaResponseDataFields,
   PriceEndpoint,
+  SingleValueInversionPolicy,
   lwbaEndpointInputParametersDefinition,
   priceEndpointInputParametersDefinition,
 } from '../../src/adapter'
@@ -169,6 +171,42 @@ class CacheTestTransport extends SubscriptionTransport<TestGenerics> {
 
   async produce(result: TimestampedProviderResult<TestGenerics>): Promise<void> {
     await this.writeResults([result])
+  }
+
+  async produceDirect(result: TimestampedProviderResult<TestGenerics>): Promise<void> {
+    await this.responseCache.write(this.name, [result])
+  }
+
+  resolveVariants(
+    results: TimestampedProviderResult<TestGenerics>[],
+  ): TimestampedProviderResult<TestGenerics>[] {
+    return this.variantResolver.resolve(results)
+  }
+}
+
+class CacheBackedTransport extends SubscriptionTransport<TestGenerics> {
+  supportsInversion = true
+
+  getSubscriptionTtlFromConfig(): number {
+    return 1000
+  }
+
+  async backgroundHandler(
+    _context: EndpointContext<TestGenerics>,
+    entries: TestParams[],
+  ): Promise<void> {
+    for (const entry of entries) {
+      await this.writeResults([
+        {
+          params: entry,
+          response: {
+            data: { result: 4 },
+            result: 4,
+            timestamps,
+          },
+        },
+      ])
+    }
   }
 }
 
@@ -602,15 +640,14 @@ test.serial('provider variants are cleared when inversion subscriptions expire',
   t.is(transport.providerEntries, entries)
 })
 
-test.serial('inversion appends a suffix to custom cache keys', async (t) => {
-  const transport = new ForegroundPriceTransport()
+test.serial('inversion is rejected with a custom cacheKeyGenerator', async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
     endpoints: [
       new PriceEndpoint<TestGenerics>({
         name: 'test',
         inputParameters,
-        transport,
+        transport: new ForegroundPriceTransport(),
         cacheKeyGenerator: () => 'custom-key',
       }),
     ],
@@ -625,7 +662,15 @@ test.serial('inversion appends a suffix to custom cache keys', async (t) => {
     quote: 'USD',
   })
   t.is(rawResponse.statusCode, 200)
-  t.is(rawResponse.json().result, 4)
+
+  const disabledResponse = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: false },
+  })
+  t.is(disabledResponse.statusCode, 200)
+  t.is(disabledResponse.json().result, 4)
 
   const inverseResponse = await context.testAdapter.request({
     endpoint: 'test',
@@ -633,10 +678,8 @@ test.serial('inversion appends a suffix to custom cache keys', async (t) => {
     quote: 'USD',
     inversion: { enabled: true },
   })
-  t.is(inverseResponse.statusCode, 200)
-  t.is(inverseResponse.json().result, 0.25)
-
-  t.deepEqual(transport.receivedCacheKeys, ['custom-key', 'custom-key-inversion-single-value-v1'])
+  t.is(inverseResponse.statusCode, 400)
+  t.true(inverseResponse.body.includes('custom cacheKeyGenerator'))
 })
 
 test.serial('HTTP raw and inverse variants share one provider request', async (t) => {
@@ -964,8 +1007,200 @@ test.serial('LWBA cache writes validate the inverted quote', async (t) => {
   t.is(invalidCached?.statusCode, 502)
 })
 
-test.serial('custom cache keys with inversion are hashed when too long', async (t) => {
-  const transport = new ForegroundPriceTransport()
+test.serial('inversion subscriptions use a policy-versioned set', async (t) => {
+  const dependencies = buildDependencies()
+  const adapterSettings = buildAdapterSettings({})
+  const transport = new CacheTestTransport()
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport,
+  })
+
+  await endpoint.initialize('TEST', dependencies, adapterSettings)
+
+  t.truthy(transport.inversionSubscriptionSet)
+  t.not(transport.subscriptionSet, transport.inversionSubscriptionSet)
+
+  const raw = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverse = {
+    ...raw,
+    inversion: resolvedInversion,
+  } as unknown as TestParams
+
+  const request = (data: TestParams, cacheKey: string) =>
+    ({ requestContext: { data, cacheKey } }) as unknown as AdapterRequest<TestParams>
+
+  await transport.registerRequest(request(raw, 'raw'), adapterSettings)
+  await transport.registerRequest(request(inverse, 'inverse'), adapterSettings)
+
+  t.deepEqual(await transport.subscriptionSet.getAll(), [raw])
+  t.deepEqual(await transport.inversionSubscriptionSet?.getAll(), [inverse])
+})
+
+test.serial('custom transports that write directly still fan out variants', async (t) => {
+  const dependencies = buildDependencies()
+  const adapterSettings = buildAdapterSettings({})
+  const transport = new CacheTestTransport()
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport,
+  })
+
+  await endpoint.initialize('TEST', dependencies, adapterSettings)
+
+  const raw = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverse = {
+    ...raw,
+    inversion: resolvedInversion,
+  } as unknown as TestParams
+
+  transport.subscriptionSet = {
+    add: async () => {},
+    getAll: () => [raw, inverse],
+    get: () => undefined,
+  }
+
+  await transport.backgroundExecute({
+    endpointName: 'test',
+    inputParameters,
+    adapterSettings,
+  })
+
+  await transport.produceDirect({
+    params: raw,
+    response: {
+      data: { result: 4 },
+      result: 4,
+      timestamps,
+    },
+  })
+
+  const inverseCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, inverse),
+  )
+  t.is((inverseCached as AdapterResponse<TestGenerics['Response']>).result, 0.25)
+})
+
+test.serial('case-normalized provider results match inversion variants', async (t) => {
+  const dependencies = buildDependencies()
+  const adapterSettings = buildAdapterSettings({})
+  const transport = new CacheTestTransport()
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport,
+  })
+
+  await endpoint.initialize('TEST', dependencies, adapterSettings)
+
+  const raw = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverse = {
+    ...raw,
+    inversion: resolvedInversion,
+  } as unknown as TestParams
+
+  transport.subscriptionSet = {
+    add: async () => {},
+    getAll: () => [raw, inverse],
+    get: () => undefined,
+  }
+
+  await transport.backgroundExecute({
+    endpointName: 'test',
+    inputParameters,
+    adapterSettings,
+  })
+
+  await transport.produce({
+    params: { base: 'btc', quote: 'usd' } as TestParams,
+    response: {
+      data: { result: 4 },
+      result: 4,
+      timestamps,
+    },
+  })
+
+  const rawCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, raw),
+  )
+  const inverseCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, inverse),
+  )
+
+  t.is((rawCached as AdapterResponse<TestGenerics['Response']>).result, 4)
+  t.is((inverseCached as AdapterResponse<TestGenerics['Response']>).result, 0.25)
+})
+
+test.serial('inverse-first and duplicate variants resolve once per output', async (t) => {
+  const dependencies = buildDependencies()
+  const adapterSettings = buildAdapterSettings({})
+  const transport = new CacheTestTransport()
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport,
+  })
+
+  await endpoint.initialize('TEST', dependencies, adapterSettings)
+
+  const raw = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverse = {
+    ...raw,
+    inversion: resolvedInversion,
+  } as unknown as TestParams
+
+  transport.subscriptionSet = {
+    add: async () => {},
+    getAll: () => [inverse, raw, inverse],
+    get: () => undefined,
+  }
+
+  await transport.backgroundExecute({
+    endpointName: 'test',
+    inputParameters,
+    adapterSettings,
+  })
+
+  t.deepEqual(transport.providerEntries, [raw])
+  t.is(transport.variantsCount, 1)
+
+  const resolved = transport.resolveVariants([
+    {
+      params: raw,
+      response: {
+        data: { result: 4 },
+        result: 4,
+        timestamps,
+      },
+    },
+  ])
+  t.is(resolved.length, 2)
+  t.true(resolved.some((result) => result.params === raw))
+  t.true(resolved.some((result) => result.params === inverse))
+
+  await transport.produce({
+    params: inverse,
+    response: {
+      data: { result: 4 },
+      result: 4,
+      timestamps,
+    },
+  })
+
+  const rawCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, raw),
+  )
+  const inverseCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, inverse),
+  )
+  t.is((rawCached as AdapterResponse<TestGenerics['Response']>).result, 4)
+  t.is((inverseCached as AdapterResponse<TestGenerics['Response']>).result, 0.25)
+})
+
+test.serial('request-level inversion works through the full cache path', async (t) => {
+  const transport = new CacheBackedTransport()
   const adapter = new Adapter({
     name: 'TEST',
     endpoints: [
@@ -973,21 +1208,21 @@ test.serial('custom cache keys with inversion are hashed when too long', async (
         name: 'test',
         inputParameters,
         transport,
-        cacheKeyGenerator: () => `custom-${'a'.repeat(200)}`,
       }),
     ],
-    config: new AdapterConfig({}, { envDefaultOverrides: { MAX_COMMON_KEY_SIZE: 150 } }),
+    config: new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          CACHE_POLLING_MAX_RETRIES: 20,
+          CACHE_POLLING_SLEEP_MS: 10,
+        },
+      },
+    ),
   })
 
   const context = t.context as TestContext
   context.testAdapter = await TestAdapter.start(adapter, context)
-
-  const rawResponse = await context.testAdapter.request({
-    endpoint: 'test',
-    base: 'BTC',
-    quote: 'USD',
-  })
-  t.is(rawResponse.statusCode, 200)
 
   const inverseResponse = await context.testAdapter.request({
     endpoint: 'test',
@@ -996,14 +1231,19 @@ test.serial('custom cache keys with inversion are hashed when too long', async (
     inversion: { enabled: true },
   })
   t.is(inverseResponse.statusCode, 200)
+  t.is(inverseResponse.json().result, 0.25)
+  t.is(inverseResponse.json().data.result, 0.25)
 
-  const [rawKey, inverseKey] = transport.receivedCacheKeys
-  t.not(rawKey, inverseKey)
-  t.true(rawKey.length <= 150)
-  t.true(inverseKey.length <= 150)
+  const rawResponse = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+  })
+  t.is(rawResponse.statusCode, 200)
+  t.is(rawResponse.json().result, 4)
 })
 
-test.serial('null inversion config is treated as absent', async (t) => {
+test.serial('resolved inversion is attached after request transforms', async (t) => {
   const transport = new ForegroundPriceTransport()
   const adapter = new Adapter({
     name: 'TEST',
@@ -1012,6 +1252,77 @@ test.serial('null inversion config is treated as absent', async (t) => {
         name: 'test',
         inputParameters,
         transport,
+        requestTransforms: [
+          (req) => {
+            const data = req.requestContext.data as Record<string, unknown>
+            data['inversion'] = { enabled: false }
+          },
+        ],
+      }),
+    ],
+  })
+
+  const context = t.context as TestContext
+  context.testAdapter = await TestAdapter.start(adapter, context)
+
+  const response = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true },
+  })
+
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, 0.25)
+  t.deepEqual(transport.receivedData[0]['inversion'], resolvedInversion)
+})
+
+test.serial('foreground policy throws are converted to 502', async (t) => {
+  const basePolicy = new SingleValueInversionPolicy<TestGenerics>()
+  const throwingPolicy: InversionPolicy<TestGenerics> = {
+    id: basePolicy.id,
+    version: basePolicy.version,
+    validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
+    resolveConfig: (config) => basePolicy.resolveConfig(config),
+    transform: () => {
+      throw new Error('boom')
+    },
+  }
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new PriceEndpoint<TestGenerics>({
+        name: 'test',
+        inputParameters,
+        transport: new ForegroundPriceTransport(),
+        inversionPolicy: throwingPolicy,
+      }),
+    ],
+  })
+
+  const context = t.context as TestContext
+  context.testAdapter = await TestAdapter.start(adapter, context)
+
+  const response = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true },
+  })
+
+  t.is(response.statusCode, 502)
+  t.true(response.body.includes('policy transform threw'))
+  t.true(response.body.includes('boom'))
+})
+
+test.serial('null inversion config is rejected', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new PriceEndpoint<TestGenerics>({
+        name: 'test',
+        inputParameters,
+        transport: new ForegroundPriceTransport(),
       }),
     ],
   })
@@ -1026,7 +1337,32 @@ test.serial('null inversion config is treated as absent', async (t) => {
     inversion: null,
   })
 
+  t.is(response.statusCode, 400)
+  t.true(response.body.includes('must be an object'))
+})
+
+test.serial('disabled inversion is a no-op on a policy-less endpoint', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new AdapterEndpoint<TestGenerics>({
+        name: 'test',
+        inputParameters,
+        transport: new ForegroundPriceTransport(),
+      }),
+    ],
+  })
+
+  const context = t.context as TestContext
+  context.testAdapter = await TestAdapter.start(adapter, context)
+
+  const response = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: false },
+  })
+
   t.is(response.statusCode, 200)
   t.is(response.json().result, 4)
-  t.is(transport.receivedData[0]['inversion'], undefined)
 })

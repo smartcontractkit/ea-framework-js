@@ -13,7 +13,7 @@ import {
 } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams } from './index'
-import { hasInversionEnabled, SingleValueInversionPolicy } from './inverse'
+import { SingleValueInversionPolicy } from './inverse'
 
 /**
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
@@ -179,11 +179,7 @@ export class PriceAdapter<
   ): Promise<AdapterResponse> {
     const response = await super.handleRequest(req, replySent)
 
-    if (
-      this.includesMap &&
-      req.requestContext.priceMeta?.inverse &&
-      !hasInversionEnabled(req.requestContext.data)
-    ) {
+    if (this.includesMap && req.requestContext.priceMeta?.inverse) {
       // We need to search in the reverse order (quote -> base) because the request transform will have inverted the pair
 
       // Deep clone the response, as it may contain objects which won't be cloned by simply destructuring

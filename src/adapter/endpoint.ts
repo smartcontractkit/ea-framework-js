@@ -9,10 +9,14 @@ import {
   Overrides,
   TimestampedAdapterResponse,
   TimestampedProviderResult,
+  censor,
+  censorLogs,
   makeLogger,
   getCanonicalAdapterName,
   canonicalizeAdapterNameKeys,
 } from '../util'
+import { metrics } from '../metrics'
+import CensorList from '../util/censor/censor-list'
 import { hasInversionEnabled, InversionPolicy } from './inverse'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
@@ -174,14 +178,43 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     data: TypeFromDefinition<T['Parameters']>,
   ): AdapterResponse<T['Response']> {
     const policy = this.inversionPolicy
-    if (!policy || !hasInversionEnabled(data)) {
+    if (!policy || !hasInversionEnabled(data) || 'errorMessage' in response) {
       return response
     }
 
-    const result = policy.transform({
-      params: data,
-      response: response as TimestampedAdapterResponse<T['Response']>,
-    })
+    let result: TimestampedProviderResult<T>
+    try {
+      result = policy.transform({
+        params: data,
+        response: response as TimestampedAdapterResponse<T['Response']>,
+      })
+    } catch (error) {
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      const safeDetail = censor(detail, CensorList.getAll()) ?? detail
+      censorLogs(() => logger.warn(`Inversion policy threw: ${detail}`))
+      result = {
+        params: data,
+        response: {
+          statusCode: 502,
+          errorMessage: `Inversion failed: policy transform threw: ${safeDetail}`,
+          timestamps: (response as TimestampedAdapterResponse<T['Response']>).timestamps,
+        },
+      }
+    }
+
+    const failed = 'errorMessage' in result.response
+    metrics
+      .get('inversionTotal')
+      .labels({
+        adapter_endpoint: this.name,
+        policy: policy.id,
+        status: failed ? 'rejected' : 'applied',
+      })
+      .inc()
+
+    if (!failed && this.resultValidator) {
+      return this.resultValidator(result).response as AdapterResponse<T['Response']>
+    }
     return result.response as AdapterResponse<T['Response']>
   }
 

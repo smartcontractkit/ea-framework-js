@@ -340,7 +340,14 @@ test('inversion params are stripped for provider grouping', (t) => {
     inversion: { enabled: true, policyId: 'single-value', policyVersion: 1 },
   }
 
-  t.deepEqual(stripInversionConfig(inverse), raw)
+  const stripped = stripInversionConfig(inverse)
+  t.not(stripped, inverse)
+  t.deepEqual(stripped, raw)
+  t.deepEqual(inverse.inversion, {
+    enabled: true,
+    policyId: 'single-value',
+    policyVersion: 1,
+  })
   t.is(calculateProviderParamsKey(raw), calculateProviderParamsKey(inverse))
   t.deepEqual(getInversionConfig(inverse), inverse.inversion)
   t.is(getInversionConfig(raw), undefined)
@@ -733,11 +740,33 @@ test.serial('writeTTL extends distinct raw and inverse cache keys', async (t) =>
   t.not(ttlCalls[0].key, ttlCalls[1].key)
 })
 
+test.serial('writes fail closed when inversion is requested but no policy exists', async (t) => {
+  const { responseCache } = buildCache()
+  responseCache.inversionPolicy = undefined
+
+  await responseCache.write('test', [providerResult(inverseParams, 4)])
+
+  const response = responseCache.captured?.[0].response
+  t.true(response !== undefined && 'errorMessage' in response)
+  if (response && 'errorMessage' in response) {
+    const errorResponse = response as TimestampedProviderErrorResponse
+    t.is(errorResponse.statusCode, 502)
+    t.true(errorResponse.errorMessage.includes('no inversion policy'))
+  }
+})
+
 test.serial('proxy-based result params do not throw when inversion is absent', async (t) => {
   const { responseCache } = buildCache()
   const stubParams = makeStub('params', { base: 'BTC', quote: 'USD' }) as CacheParams
 
   await t.notThrowsAsync(() => responseCache.write('test', [providerResult(stubParams, 4)]))
+})
+
+test('provider param keys are case-insensitive like cache keys', (t) => {
+  t.is(
+    calculateProviderParamsKey({ base: 'BTC', quote: 'USD' }),
+    calculateProviderParamsKey({ base: 'btc', quote: 'usd' }),
+  )
 })
 
 test('provider param keys sort arrays and nested objects deterministically', (t) => {
@@ -879,8 +908,11 @@ test.serial('inversionTotal counts applied and rejected results', async (t) => {
     inversion: { enabled: true },
   } as unknown as CacheParams
 
-  await responseCache.write('test', [providerResult(inverseParams, 4)])
-  await responseCache.write('test', [providerResult(malformedParams, 4)])
+  await responseCache.write('test', [
+    providerResult(rawParams, 4),
+    providerResult(inverseParams, 4),
+    providerResult(malformedParams, 4),
+  ])
 
   const values = (await counter.get()).values
   const applied = values.find((value) => value.labels['status'] === 'applied')?.value
@@ -888,4 +920,10 @@ test.serial('inversionTotal counts applied and rejected results', async (t) => {
 
   t.is(applied, 1)
   t.is(rejected, 1)
+  t.true(
+    values.every(
+      (value) =>
+        value.labels['adapter_endpoint'] === 'test' && value.labels['policy'] === 'single-value',
+    ),
+  )
 })

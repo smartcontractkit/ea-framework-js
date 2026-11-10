@@ -1,5 +1,6 @@
 import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
+import { hasInversionEnabled } from '../../adapter/inverse'
 import { ResponseCache } from '../../cache/response'
 import { metrics } from '../../metrics'
 import { SubscriptionSet, censorLogs, makeLogger } from '../../util'
@@ -18,6 +19,7 @@ const logger = makeLogger('SubscriptionTransport')
 export abstract class SubscriptionTransport<T extends TransportGenerics> implements Transport<T> {
   responseCache!: ResponseCache<T>
   subscriptionSet!: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
+  inversionSubscriptionSet?: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
   subscriptionTtl!: number
   name!: string
   initialized = false
@@ -36,6 +38,18 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     this.initialized = true
     this.responseCache = dependencies.responseCache
     this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName, name)
+    const inversionPolicy =
+      'inversionPolicy' in this.responseCache ? this.responseCache.inversionPolicy : undefined
+    if (inversionPolicy) {
+      this.inversionSubscriptionSet = dependencies.subscriptionSetFactory.buildSet(
+        endpointName,
+        name,
+        `inversion-${inversionPolicy.id}-v${inversionPolicy.version}`,
+      )
+    }
+    if ('registerVariantResolver' in this.responseCache) {
+      this.responseCache.registerVariantResolver(name, this.variantResolver)
+    }
     this.subscriptionTtl = this.getSubscriptionTtlFromConfig(adapterSettings) // Will be implemented by subclasses
     this.name = name
   }
@@ -50,8 +64,13 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
       ),
     )
 
+    const subscriptionSet =
+      this.inversionSubscriptionSet && hasInversionEnabled(req.requestContext.data)
+        ? this.inversionSubscriptionSet
+        : this.subscriptionSet
+
     // This might need coalescing to avoid too frequent ttl updates
-    await this.subscriptionSet.add(
+    await subscriptionSet.add(
       req.requestContext.data,
       this.subscriptionTtl,
       req.requestContext.cacheKey,
@@ -61,7 +80,12 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
     logger.debug('Starting background execute')
 
-    const entries = await this.subscriptionSet.getAll()
+    const legacyEntries = await this.subscriptionSet.getAll()
+    const inversionEntries = this.inversionSubscriptionSet
+      ? await this.inversionSubscriptionSet.getAll()
+      : []
+    const entries =
+      inversionEntries.length > 0 ? [...legacyEntries, ...inversionEntries] : legacyEntries
 
     // Keep track of active subscriptions for background execute
     // Note: for those coming from reasonable OOP languages, don't fret; this is JS:
@@ -84,7 +108,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
    * subscriptions receive the same provider value.
    */
   protected async writeResults(results: TimestampedProviderResult<T>[]): Promise<void> {
-    await this.responseCache.write(this.name, this.variantResolver.resolve(results))
+    await this.responseCache.write(this.name, results)
   }
 
   /**
