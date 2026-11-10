@@ -445,6 +445,16 @@ test('quote policy round-trips on double inversion, including sizes', (t) => {
   t.is(data['askSize'], 20)
 })
 
+test('quote policy rejects outputs that overflow to infinity', (t) => {
+  const output = quotePolicy.transform(
+    quoteAttempt(Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE),
+  )
+  t.true(isError(output))
+  if (isError(output)) {
+    t.is(output.response.statusCode, 502)
+  }
+})
+
 test('quote policy handles null/string mid, missing ask and boundary quotes', (t) => {
   const nullMid = quotePolicy.transform(quoteAttempt(1, 1.2, null as unknown as number))
   t.is(isError(nullMid), false)

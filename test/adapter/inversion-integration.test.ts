@@ -978,8 +978,17 @@ test.serial('inversion subscriptions use a policy-versioned set', async (t) => {
     transport,
   })
 
+  const factory = dependencies.subscriptionSetFactory
+  const buildSet = factory.buildSet.bind(factory)
+  const suffixes: (string | undefined)[] = []
+  factory.buildSet = ((endpointName: string, transportName: string, keySuffix?: string) => {
+    suffixes.push(keySuffix)
+    return buildSet(endpointName, transportName, keySuffix)
+  }) as typeof factory.buildSet
+
   await endpoint.initialize('TEST', dependencies, adapterSettings)
 
+  t.true(suffixes.includes('inversion-single-value-v1'))
   t.truthy(transport.inversionSet)
   t.not(transport.subscriptionSet, transport.inversionSet)
 
