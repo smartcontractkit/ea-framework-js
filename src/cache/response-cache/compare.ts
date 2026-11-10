@@ -34,7 +34,6 @@ export class CompareResponseCache<
       endpointName: responseCache.endpointName,
       adapterSettings: responseCache.adapterSettings,
       dependencies: responseCache.dependencies,
-      cacheKeyGenerator: responseCache.cacheKeyGenerator,
     })
     this.transportName = transportName
     this.responseCache = responseCache

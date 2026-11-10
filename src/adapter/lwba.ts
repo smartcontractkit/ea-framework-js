@@ -34,8 +34,6 @@ export type LwbaResponseDataFields = {
     mid: number
     bid: number
     ask: number
-    bidSize?: number | string
-    askSize?: number | string
   }
 }
 

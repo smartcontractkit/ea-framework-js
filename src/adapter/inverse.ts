@@ -39,9 +39,6 @@ export interface InversionPolicy<T extends ProviderResultGenerics> {
   /** Resolve the request config against this policy. */
   resolveConfig(config: InversionRequestConfig): ResolvedInversionConfig
 
-  /** Stable key part used by custom cache key generators. */
-  cacheKeyPart(config: ResolvedInversionConfig): string
-
   /**
    * Validate the raw result, apply inversion, and validate the output.
    * Returns a 502 error result instead of throwing when inversion cannot be applied.
@@ -130,9 +127,6 @@ const resolveConfig = (
   policyVersion: version,
 })
 
-const cacheKeyPart = (id: string, version: number, config: ResolvedInversionConfig): string =>
-  stableStringify({ enabled: config.enabled, policyId: id, policyVersion: version })
-
 /** Sort object keys recursively so cache keys/subscription keys are deterministic. */
 export const sortObjectKeys = (value: unknown): unknown => {
   if (Array.isArray(value)) {
@@ -150,11 +144,6 @@ export const sortObjectKeys = (value: unknown): unknown => {
 }
 
 export const stableStringify = (value: unknown): string => JSON.stringify(sortObjectKeys(value))
-
-/** Stable cache-key discriminator for inversion-enabled requests. */
-export const calculateInversionKeySuffix = (
-  config: ResolvedInversionConfig | undefined,
-): string | undefined => (config?.enabled ? stableStringify(config) : undefined)
 
 /** Read and validate a resolved inversion config from request/result params. */
 export const getInversionConfig = (params: unknown): ResolvedInversionConfig | undefined => {
@@ -207,10 +196,6 @@ export class SingleValueInversionPolicy<
     return resolveConfig(this.id, this.version, config)
   }
 
-  cacheKeyPart(config: ResolvedInversionConfig): string {
-    return cacheKeyPart(this.id, this.version, config)
-  }
-
   transform(result: TimestampedProviderResult<T>): TimestampedProviderResult<T> {
     if (isErrorResponse(result.response)) {
       return result
@@ -259,7 +244,6 @@ type LwbaData = {
   bid?: unknown
   ask?: unknown
   mid?: unknown
-  midSource?: 'provider' | 'computed'
   bidSize?: unknown
   askSize?: unknown
 }
@@ -292,10 +276,6 @@ export class QuoteInversionPolicy<
 
   resolveConfig(config: InversionRequestConfig): ResolvedInversionConfig {
     return resolveConfig(this.id, this.version, config)
-  }
-
-  cacheKeyPart(config: ResolvedInversionConfig): string {
-    return cacheKeyPart(this.id, this.version, config)
   }
 
   transform(result: TimestampedProviderResult<T>): TimestampedProviderResult<T> {
@@ -355,9 +335,6 @@ export class QuoteInversionPolicy<
     quote.bid = newBid
     quote.ask = newAsk
     quote.mid = newMid
-    if ('midSource' in quote) {
-      quote.midSource = providerMidPresent ? 'provider' : 'computed'
-    }
 
     return {
       params: result.params,

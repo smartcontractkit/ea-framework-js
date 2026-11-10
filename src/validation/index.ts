@@ -1,13 +1,9 @@
+import { createHash } from 'crypto'
 import { FastifyError, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { ReplyError as RedisError } from 'ioredis'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../adapter'
-import {
-  calculateInversionKeySuffix,
-  getInversionConfig,
-  INVERSION_PARAM,
-  InversionRequestConfig,
-} from '../adapter/inverse'
-import { calculateCacheKey, finalizeCustomCacheKey } from '../cache'
+import { INVERSION_PARAM, InversionRequestConfig } from '../adapter/inverse'
+import { calculateCacheKey } from '../cache'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { getMetricsMeta } from '../metrics/util'
 import { censorLogs, makeLogger } from '../util'
@@ -172,14 +168,22 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {
-      let cacheKey = endpoint.cacheKeyGenerator(req.requestContext.data)
-      const inversionSuffix = calculateInversionKeySuffix(
-        getInversionConfig(req.requestContext.data),
-      )
-      if (inversionSuffix) {
-        cacheKey = `${cacheKey}-${inversionSuffix}`
+      let cacheKey
+      cacheKey = endpoint.cacheKeyGenerator(req.requestContext.data)
+      if (cacheKey.length > adapter.config.settings.MAX_COMMON_KEY_SIZE) {
+        errorCatcherLogger.warn(
+          `Generated custom cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be truncated`,
+        )
+        const shasum = createHash('sha1')
+        shasum.update(cacheKey)
+        cacheKey = shasum.digest('base64')
       }
-      req.requestContext.cacheKey = finalizeCustomCacheKey(cacheKey, adapter.config.settings)
+
+      const cachePrefix = adapter.config.settings.CACHE_PREFIX
+        ? `${adapter.config.settings.CACHE_PREFIX}-`
+        : ''
+
+      req.requestContext.cacheKey = `${cachePrefix}${cacheKey}`
     } else {
       const transportName = req.requestContext.transportName
       req.requestContext.cacheKey = calculateCacheKey({

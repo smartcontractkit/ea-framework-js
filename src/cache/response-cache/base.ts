@@ -1,9 +1,5 @@
 import { AdapterDependencies } from '../../adapter'
-import {
-  calculateInversionKeySuffix,
-  getInversionConfig,
-  InversionPolicy,
-} from '../../adapter/inverse'
+import { getInversionConfig, InversionPolicy } from '../../adapter/inverse'
 import { AdapterSettings } from '../../config'
 import {
   AdapterResponse,
@@ -20,13 +16,7 @@ import {
   InputParametersDefinition,
   TypeFromDefinition,
 } from '../../validation/input-params'
-import {
-  Cache,
-  calculateAdapterName,
-  calculateCacheKey,
-  calculateFeedId,
-  finalizeCustomCacheKey,
-} from '../'
+import { Cache, calculateAdapterName, calculateCacheKey, calculateFeedId } from '../'
 import CensorList from '../../util/censor/censor-list'
 import { validator } from '../../validation/utils'
 import { metrics } from '../../metrics'
@@ -44,7 +34,6 @@ export abstract class ResponseCache<
   dependencies: AdapterDependencies
   resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
   inversionPolicy?: InversionPolicy<T>
-  cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
 
   constructor({
     inputParameters,
@@ -52,14 +41,12 @@ export abstract class ResponseCache<
     endpointName,
     adapterSettings,
     dependencies,
-    cacheKeyGenerator,
   }: {
     dependencies: AdapterDependencies
     adapterSettings: AdapterSettings
     adapterName: string
     endpointName: string
     inputParameters: InputParameters<T['Parameters']>
-    cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   }) {
     this.dependencies = dependencies
     this.cache = dependencies.cache as Cache<AdapterResponse<T['Response']>>
@@ -67,7 +54,6 @@ export abstract class ResponseCache<
     this.adapterName = adapterName
     this.endpointName = endpointName
     this.adapterSettings = adapterSettings
-    this.cacheKeyGenerator = cacheKeyGenerator
   }
 
   /**
@@ -213,15 +199,6 @@ export abstract class ResponseCache<
   }
 
   getCacheKey(transportName: string, params: TypeFromDefinition<T['Parameters']>) {
-    if (this.cacheKeyGenerator) {
-      let key = this.cacheKeyGenerator(params)
-      const inversionSuffix = calculateInversionKeySuffix(getInversionConfig(params))
-      if (inversionSuffix) {
-        key = `${key}-${inversionSuffix}`
-      }
-      return finalizeCustomCacheKey(key, this.adapterSettings)
-    }
-
     return calculateCacheKey({
       transportName,
       data: params,

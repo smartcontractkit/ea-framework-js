@@ -112,7 +112,6 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       adapterName,
       endpointName: this.name,
       inputParameters: this.inputParameters,
-      cacheKeyGenerator: this.cacheKeyGenerator,
     })
 
     if (this.resultValidator) {

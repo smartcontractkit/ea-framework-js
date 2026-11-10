@@ -202,21 +202,6 @@ test('quote policy computes mid when provider mid is absent', (t) => {
   t.false('midSource' in data)
 })
 
-test('quote policy preserves and updates midSource only when present', (t) => {
-  const attempt = quoteAttempt(1, 1.2, 1.1)
-  const inputData = (attempt.response as { data: Record<string, unknown> }).data
-  inputData['midSource'] = 'computed'
-
-  const output = quotePolicy.transform(attempt)
-  t.is(isError(output), false)
-  if (isError(output)) {
-    return
-  }
-
-  const data = (output.response as { data: Record<string, unknown> }).data
-  t.is(data['midSource'], 'provider')
-})
-
 test('quote policy swaps auxiliary sizes verbatim without rejecting missing values', (t) => {
   const output = quotePolicy.transform(quoteAttempt(1, 1.2, 1.1, { bidSize: 10, askSize: 20 }))
   t.is(isError(output), false)
@@ -224,9 +209,9 @@ test('quote policy swaps auxiliary sizes verbatim without rejecting missing valu
     return
   }
 
-  const data = (output.response as { data: LwbaResponseDataFields['Data'] }).data
-  t.is(data.bidSize, 20)
-  t.is(data.askSize, 10)
+  const data = (output.response as { data: Record<string, unknown> }).data
+  t.is(data['bidSize'], 20)
+  t.is(data['askSize'], 10)
 
   const partial = quotePolicy.transform(
     quoteAttempt(1, 1.2, 1.1, { bidSize: 10, askSize: undefined }),
@@ -236,9 +221,9 @@ test('quote policy swaps auxiliary sizes verbatim without rejecting missing valu
     return
   }
 
-  const partialData = (partial.response as { data: LwbaResponseDataFields['Data'] }).data
-  t.is(partialData.bidSize, undefined)
-  t.is(partialData.askSize, 10)
+  const partialData = (partial.response as { data: Record<string, unknown> }).data
+  t.is(partialData['bidSize'], undefined)
+  t.is(partialData['askSize'], 10)
 
   const strings = quotePolicy.transform(quoteAttempt(1, 1.2, 1.1, { bidSize: '10', askSize: '20' }))
   t.is(isError(strings), false)
@@ -246,9 +231,9 @@ test('quote policy swaps auxiliary sizes verbatim without rejecting missing valu
     return
   }
 
-  const stringData = (strings.response as { data: LwbaResponseDataFields['Data'] }).data
-  t.is(stringData.bidSize, '20')
-  t.is(stringData.askSize, '10')
+  const stringData = (strings.response as { data: Record<string, unknown> }).data
+  t.is(stringData['bidSize'], '20')
+  t.is(stringData['askSize'], '10')
 })
 
 test('quote policy rejects missing, zero, negative, crossed and out-of-range quotes', (t) => {
@@ -278,8 +263,10 @@ test('quote policy leaves input unchanged', (t) => {
   t.is(data.bid, 1)
   t.is(data.ask, 1.2)
   t.is(data.mid, 1.1)
-  t.is(data.bidSize, 10)
-  t.is(data.askSize, 20)
+
+  const rawData = data as unknown as Record<string, unknown>
+  t.is(rawData['bidSize'], 10)
+  t.is(rawData['askSize'], 20)
 })
 
 test('inversion params are stripped for provider grouping', (t) => {

@@ -182,8 +182,7 @@ export class PriceAdapter<
     if (
       this.includesMap &&
       req.requestContext.priceMeta?.inverse &&
-      !getInversionConfig(req.requestContext.data) &&
-      !('errorMessage' in response)
+      !getInversionConfig(req.requestContext.data)
     ) {
       // We need to search in the reverse order (quote -> base) because the request transform will have inverted the pair
 
