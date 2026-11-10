@@ -12,6 +12,7 @@ const logger = makeLogger('CompositeTransport')
 export class CompositeTransport<T extends TransportGenerics> implements Transport<T> {
   name!: string
   responseCache!: ResponseCache<T>
+  supportsInversion = false
 
   constructor(private readonly transports: Record<string, Transport<T>>) {}
 
@@ -36,6 +37,7 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
     // Propagate the endpoint's validator to the compare cache so results are validated
     // before being compared and written to the outer cache.
     compareCache.resultValidator = this.responseCache.resultValidator
+    compareCache.inversionPolicy = this.responseCache.inversionPolicy
 
     await Promise.all(
       Object.entries(this.transports).map(([name, transport]) =>
@@ -46,6 +48,10 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
           name,
         ),
       ),
+    )
+
+    this.supportsInversion = Object.values(this.transports).every(
+      (transport) => transport.supportsInversion === true,
     )
   }
 

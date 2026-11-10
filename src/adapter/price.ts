@@ -13,6 +13,7 @@ import {
 } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams } from './index'
+import { getInversionConfig, SingleValueInversionPolicy } from './inverse'
 
 /**
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
@@ -80,7 +81,12 @@ export type PriceEndpointGenerics = TransportGenerics & {
  * A PriceEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its InputParameters must extend the basic ones (base/quote).
  */
-export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {}
+export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {
+  constructor(params: AdapterEndpointParams<T>) {
+    super(params)
+    this.inversionPolicy ??= new SingleValueInversionPolicy<T>()
+  }
+}
 
 const buildIncludesMap = (includesFile: IncludesFile) => {
   const includesMap: IncludesMap = {}
@@ -173,7 +179,12 @@ export class PriceAdapter<
   ): Promise<AdapterResponse> {
     const response = await super.handleRequest(req, replySent)
 
-    if (this.includesMap && req.requestContext.priceMeta?.inverse) {
+    if (
+      this.includesMap &&
+      req.requestContext.priceMeta?.inverse &&
+      !getInversionConfig(req.requestContext.data) &&
+      !('errorMessage' in response)
+    ) {
       // We need to search in the reverse order (quote -> base) because the request transform will have inverted the pair
 
       // Deep clone the response, as it may contain objects which won't be cloned by simply destructuring

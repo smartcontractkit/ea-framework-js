@@ -1,8 +1,13 @@
-import { createHash } from 'crypto'
 import { FastifyError, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { ReplyError as RedisError } from 'ioredis'
-import { Adapter } from '../adapter'
-import { calculateCacheKey } from '../cache'
+import { Adapter, AdapterEndpoint, EndpointGenerics } from '../adapter'
+import {
+  calculateInversionKeySuffix,
+  getInversionConfig,
+  INVERSION_PARAM,
+  InversionRequestConfig,
+} from '../adapter/inverse'
+import { calculateCacheKey, finalizeCustomCacheKey } from '../cache'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { getMetricsMeta } from '../metrics/util'
 import { censorLogs, makeLogger } from '../util'
@@ -22,6 +27,47 @@ import {
 export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
+
+const getRequestInversionConfig = (
+  endpoint: AdapterEndpoint<EndpointGenerics>,
+  data: Record<string, unknown>,
+): InversionRequestConfig | undefined => {
+  const rawInversion = data[INVERSION_PARAM]
+  if (rawInversion === undefined || rawInversion === null) {
+    return undefined
+  }
+  if (!endpoint.inversionPolicy) {
+    throw new AdapterInputError({
+      statusCode: 400,
+      message: `Endpoint "${endpoint.name}" does not support inversion`,
+    })
+  }
+  return endpoint.inversionPolicy.validateRequestConfig(rawInversion)
+}
+
+const assertInversionTransportSupported = (
+  endpoint: AdapterEndpoint<EndpointGenerics>,
+  transportName: string,
+): void => {
+  const transport = endpoint.transportRoutes.get(transportName)
+  if (!transport?.supportsInversion) {
+    throw new AdapterInputError({
+      statusCode: 400,
+      message: `Transport "${transportName}" does not support inversion`,
+    })
+  }
+}
+
+const attachResolvedInversion = (
+  endpoint: AdapterEndpoint<EndpointGenerics>,
+  data: Record<string, unknown>,
+  config: InversionRequestConfig | undefined,
+): void => {
+  if (!config?.enabled || !endpoint.inversionPolicy) {
+    return
+  }
+  data[INVERSION_PARAM] = endpoint.inversionPolicy.resolveConfig(config)
+}
 
 export const validatorMiddleware: AdapterMiddlewareBuilder =
   (adapter: Adapter) =>
@@ -62,6 +108,11 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       })
     }
 
+    const inversionConfig = getRequestInversionConfig(
+      endpoint,
+      requestBody.data as Record<string, unknown>,
+    )
+
     // Validate the incoming data and normalize
     validateOverrides(requestBody.data)
     const validatedData = endpoint.inputParameters.validateInput(requestBody.data)
@@ -79,6 +130,10 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       adapter.config.settings,
     )
 
+    if (inversionConfig?.enabled) {
+      assertInversionTransportSupported(endpoint, req.requestContext.transportName)
+    }
+
     // Custom input validation defined in the EA
     const error =
       endpoint.customInputValidation && endpoint.customInputValidation(req, adapter.config.settings)
@@ -90,6 +145,14 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     // Run any request transforms that might have been defined in the adapter.
     // This is the last time modifications are supposed to happen to the request.
     endpoint.runRequestTransforms(req, adapter.config.settings)
+
+    // Attach inversion after transforms so it cannot be dropped or accidentally
+    // forwarded to the provider by adapter-level transforms.
+    attachResolvedInversion(
+      endpoint,
+      req.requestContext.data as Record<string, unknown>,
+      inversionConfig,
+    )
 
     if (
       adapter.config.settings.METRICS_ENABLED &&
@@ -109,22 +172,14 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
 
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {
-      let cacheKey
-      cacheKey = endpoint.cacheKeyGenerator(req.requestContext.data)
-      if (cacheKey.length > adapter.config.settings.MAX_COMMON_KEY_SIZE) {
-        errorCatcherLogger.warn(
-          `Generated custom cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be truncated`,
-        )
-        const shasum = createHash('sha1')
-        shasum.update(cacheKey)
-        cacheKey = shasum.digest('base64')
+      let cacheKey = endpoint.cacheKeyGenerator(req.requestContext.data)
+      const inversionSuffix = calculateInversionKeySuffix(
+        getInversionConfig(req.requestContext.data),
+      )
+      if (inversionSuffix) {
+        cacheKey = `${cacheKey}-${inversionSuffix}`
       }
-
-      const cachePrefix = adapter.config.settings.CACHE_PREFIX
-        ? `${adapter.config.settings.CACHE_PREFIX}-`
-        : ''
-
-      req.requestContext.cacheKey = `${cachePrefix}${cacheKey}`
+      req.requestContext.cacheKey = finalizeCustomCacheKey(cacheKey, adapter.config.settings)
     } else {
       const transportName = req.requestContext.transportName
       req.requestContext.cacheKey = calculateCacheKey({

@@ -3,6 +3,7 @@ import { TimestampedProviderResult } from '../util'
 import { AdapterLWBAError } from '../validation/error'
 import { AdapterEndpoint } from './endpoint'
 import { AdapterEndpointParams, PriceEndpointInputParametersDefinition } from './index'
+import { QuoteInversionPolicy } from './inverse'
 
 /**
  * Type for the base input parameter config that any [[LwbaEndpoint]] must extend
@@ -33,6 +34,9 @@ export type LwbaResponseDataFields = {
     mid: number
     bid: number
     ask: number
+    midSource?: 'provider' | 'computed'
+    bidSize?: number | string
+    askSize?: number | string
   }
 }
 
@@ -96,6 +100,7 @@ export class LwbaEndpoint<T extends LwbaEndpointGenerics> extends AdapterEndpoin
     }
 
     super(params)
+    this.inversionPolicy ??= new QuoteInversionPolicy<T>()
   }
 
   protected override resultValidator(

@@ -496,7 +496,7 @@ export class Adapter<
       transport.foregroundExecute && (await transport.foregroundExecute(req, this.config.settings))
     if (immediateResponse) {
       logger.debug('Got immediate response from transport, sending as response')
-      return immediateResponse
+      return endpoint.applyInversionToResponse(immediateResponse, req.requestContext.data)
     }
 
     // Finally, either because there was no synchronous execute or because it returned an empty response,

@@ -5,12 +5,15 @@ import { CompositeTransport } from '../transports/composite'
 import {
   AdapterRequest,
   AdapterRequestData,
+  AdapterResponse,
   Overrides,
+  TimestampedAdapterResponse,
   TimestampedProviderResult,
   makeLogger,
   getCanonicalAdapterName,
   canonicalizeAdapterNameKeys,
 } from '../util'
+import { getInversionConfig, InversionPolicy } from './inverse'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -41,6 +44,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
   customOutputValidation?: CustomOutputValidator | undefined
+  inversionPolicy?: InversionPolicy<T>
 
   /**
    * Optional validator that can be overridden by endpoint subclasses to validate or transform
@@ -86,6 +90,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.customInputValidation = params.customInputValidation
     this.customOutputValidation = params.customOutputValidation
     this.overrides = params.overrides
+    this.inversionPolicy = params.inversionPolicy
     this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
   }
 
@@ -107,10 +112,14 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       adapterName,
       endpointName: this.name,
       inputParameters: this.inputParameters,
+      cacheKeyGenerator: this.cacheKeyGenerator,
     })
 
     if (this.resultValidator) {
       responseCache.resultValidator = this.resultValidator.bind(this)
+    }
+    if (this.inversionPolicy) {
+      responseCache.inversionPolicy = this.inversionPolicy
     }
 
     const transportDependencies = {
@@ -151,6 +160,31 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     for (const transform of this.requestTransforms) {
       transform(req, settings)
     }
+  }
+
+  /**
+   * Applies the endpoint inversion policy to an immediate (foreground) response.
+   * Cache responses are inverted by ResponseCache before being written.
+   *
+   * @param response - the immediate response returned by a transport
+   * @param data - the validated request params
+   * @returns the response with inversion applied when requested
+   */
+  applyInversionToResponse(
+    response: AdapterResponse<T['Response']>,
+    data: TypeFromDefinition<T['Parameters']>,
+  ): AdapterResponse<T['Response']> {
+    const policy = this.inversionPolicy
+    const config = getInversionConfig(data)
+    if (!policy || !config?.enabled) {
+      return response
+    }
+
+    const result = policy.transform({
+      params: data,
+      response: response as TimestampedAdapterResponse<T['Response']>,
+    })
+    return result.response as AdapterResponse<T['Response']>
   }
 
   getRequestOverrides(data: Record<string, string>, overrides?: Overrides) {

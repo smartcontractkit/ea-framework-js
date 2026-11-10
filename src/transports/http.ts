@@ -106,6 +106,7 @@ export interface HttpTransportConfig<T extends HttpTransportGenerics> {
  * @typeParam T - all types related to the [[Transport]]
  */
 export class HttpTransport<T extends HttpTransportGenerics> extends SubscriptionTransport<T> {
+  supportsInversion = true
   // Flag used to track whether the warmer has moved from having no entries to having some and vice versa
   // Used for recording the cache warmer active metrics accurately
   WARMER_ACTIVE = false
@@ -204,7 +205,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     }
 
     logger.debug('Setting adapter responses in cache')
-    await this.responseCache.write(this.name, results)
+    await this.responseCache.write(this.name, this.resolveResultVariants(results))
 
     if (msUntilNextExecution) {
       // If we got this, it means that the queue was unable to accomomdate this request.

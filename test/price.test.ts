@@ -34,6 +34,7 @@ type PriceTestTypes = {
 class PriceTestTransport implements Transport<PriceTestTypes> {
   name!: string
   responseCache!: ResponseCache<PriceTestTypes>
+  supportsInversion = true
 
   constructor(
     private mockResponse: (
@@ -351,6 +352,63 @@ test('inverting request does not affect cached response', async (t) => {
   t.is(response.statusCode, 200)
   t.is(response.json().result, 1234)
   t.is(response.json().data.result, 1234)
+})
+
+test('explicit inversion with includes does not double invert', async (t) => {
+  const includes = [
+    {
+      from: 'ETH',
+      to: 'BTC',
+      includes: [
+        {
+          from: 'BTC',
+          to: 'ETH',
+          inverse: true,
+        },
+      ],
+    },
+  ]
+
+  const mockResponse: AdapterResponse<PriceTestTypes['Response']> = {
+    result: 2,
+    data: {
+      result: 2,
+    },
+    statusCode: 200,
+    timestamps: {
+      providerDataRequestedUnixMs: 0,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
+    },
+  }
+
+  const testAdapter = await buildAdapter(
+    t.context,
+    (req) => {
+      t.deepEqual(req.requestContext.data, {
+        base: 'BTC',
+        quote: 'ETH',
+        inversion: {
+          enabled: true,
+          policyId: 'single-value',
+          policyVersion: 1,
+        },
+      })
+      return mockResponse
+    },
+    includes,
+  )
+
+  const response = await testAdapter.request({
+    base: 'ETH',
+    quote: 'BTC',
+    endpoint: 'test',
+    inversion: { enabled: true },
+  })
+
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, 0.5)
+  t.is(response.json().data.result, 0.5)
 })
 
 test('basic adapter endpoints bypass includes logic successfully', async (t) => {

@@ -11,6 +11,7 @@ import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
 import { Adapter } from './basic'
 import { AdapterEndpoint } from './endpoint'
+import type { InversionPolicy } from './inverse'
 
 export type CustomAdapterSettings = SettingsDefinitionMap & NegatedAdapterSettings
 type NegatedAdapterSettings = {
@@ -164,6 +165,12 @@ export interface BaseAdapterEndpointParams<T extends EndpointGenerics> {
   /** Overrides for converting the 'base' parameter that are hardcoded into the adapter. */
   // This must be included in the middleware in order to generate deterministing cache keys for hardcoded overrides
   overrides?: Record<string, string>
+
+  /**
+   * Policy that owns how response fields are inverted for this endpoint.
+   * Endpoints without a policy reject requests that request inversion.
+   */
+  inversionPolicy?: InversionPolicy<T>
 }
 
 type SingleTransportAdapterEndpointParams<T extends EndpointGenerics> = {

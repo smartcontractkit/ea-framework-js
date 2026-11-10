@@ -218,6 +218,7 @@ const defaultSubscriptionMessageBuilder =
 export class WebSocketTransport<
   T extends WebsocketTransportGenerics,
 > extends StreamingTransport<T> {
+  supportsInversion = true
   wsConnection?: WebSocket
   currentUrl = ''
   lastMessageReceivedAt = 0
@@ -349,7 +350,7 @@ export class WebSocketTransport<
         if (Array.isArray(results) && results.length > 0) {
           // Updating the last message received time here, to only care about messages we use
           this.lastMessageReceivedAt = Date.now()
-          await this.responseCache.write(this.name, results)
+          await this.responseCache.write(this.name, this.resolveResultVariants(results))
         }
 
         // Do this after writing so we get the values to the cache ASAP

@@ -1,4 +1,9 @@
 import { AdapterDependencies } from '../../adapter'
+import {
+  calculateInversionKeySuffix,
+  getInversionConfig,
+  InversionPolicy,
+} from '../../adapter/inverse'
 import { AdapterSettings } from '../../config'
 import {
   AdapterResponse,
@@ -15,9 +20,16 @@ import {
   InputParametersDefinition,
   TypeFromDefinition,
 } from '../../validation/input-params'
-import { Cache, calculateAdapterName, calculateCacheKey, calculateFeedId } from '../'
+import {
+  Cache,
+  calculateAdapterName,
+  calculateCacheKey,
+  calculateFeedId,
+  finalizeCustomCacheKey,
+} from '../'
 import CensorList from '../../util/censor/censor-list'
 import { validator } from '../../validation/utils'
+import { metrics } from '../../metrics'
 
 const logger = makeLogger('ResponseCache')
 
@@ -31,6 +43,8 @@ export abstract class ResponseCache<
   adapterSettings: AdapterSettings
   dependencies: AdapterDependencies
   resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
+  inversionPolicy?: InversionPolicy<T>
+  cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
 
   constructor({
     inputParameters,
@@ -38,12 +52,14 @@ export abstract class ResponseCache<
     endpointName,
     adapterSettings,
     dependencies,
+    cacheKeyGenerator,
   }: {
     dependencies: AdapterDependencies
     adapterSettings: AdapterSettings
     adapterName: string
     endpointName: string
     inputParameters: InputParameters<T['Parameters']>
+    cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   }) {
     this.dependencies = dependencies
     this.cache = dependencies.cache as Cache<AdapterResponse<T['Response']>>
@@ -51,6 +67,7 @@ export abstract class ResponseCache<
     this.adapterName = adapterName
     this.endpointName = endpointName
     this.adapterSettings = adapterSettings
+    this.cacheKeyGenerator = cacheKeyGenerator
   }
 
   /**
@@ -62,8 +79,26 @@ export abstract class ResponseCache<
    * @param results - the entries to write to the cache
    */
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+    const inversionPolicy = this.inversionPolicy
+    const transformed = inversionPolicy
+      ? results.map((result) => {
+          const config = getInversionConfig(result.params)
+          if (!config?.enabled || 'errorMessage' in result.response) {
+            return result
+          }
+
+          const inverted = inversionPolicy.transform(result)
+          const failed = !('errorMessage' in result.response) && 'errorMessage' in inverted.response
+          metrics
+            .get(failed ? 'inversionRejected' : 'inversionApplied')
+            .labels({ adapter_endpoint: this.endpointName, policy: inversionPolicy.id })
+            .inc()
+          return inverted
+        })
+      : results
+
     const resultValidator = this.resultValidator
-    const validated = resultValidator ? results.map((r) => resultValidator(r)) : results
+    const validated = resultValidator ? transformed.map((r) => resultValidator(r)) : transformed
     return this._write(transportName, validated)
   }
 
@@ -178,6 +213,15 @@ export abstract class ResponseCache<
   }
 
   getCacheKey(transportName: string, params: TypeFromDefinition<T['Parameters']>) {
+    if (this.cacheKeyGenerator) {
+      let key = this.cacheKeyGenerator(params)
+      const inversionSuffix = calculateInversionKeySuffix(getInversionConfig(params))
+      if (inversionSuffix) {
+        key = `${key}-${inversionSuffix}`
+      }
+      return finalizeCustomCacheKey(key, this.adapterSettings)
+    }
+
     return calculateCacheKey({
       transportName,
       data: params,

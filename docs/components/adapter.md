@@ -81,6 +81,46 @@ The most common example of this is for foreign exchange rates. Some data provide
 
 To understand where the inverses are applied, please refer to the [Request Validation & Transformation Diagram](#request-validation--transformation)
 
+## Request-driven inversion
+
+New feeds can request the inverse of a provider-supported pair without adding an entry to `includes.json`. Inversion is opt-in per request and is applied on the cache-write path:
+
+```json
+{
+  "endpoint": "forex",
+  "data": {
+    "base": "USD",
+    "quote": "JPY",
+    "inversion": {
+      "enabled": true
+    }
+  }
+}
+```
+
+The request only enables inversion. The endpoint chooses the fields and validity rules:
+
+- `PriceEndpoint` / single-value responses:
+  - `data.result` is the canonical value
+  - `data.result` is replaced with `1 / value`
+  - top-level `result` is mirrored to the same value
+- `LwbaEndpoint` / quote responses:
+  - `bid' = 1 / ask`
+  - `ask' = 1 / bid`
+  - mid uses the provider mid when present and records `midSource: "provider"`
+  - otherwise mid is computed from the inverted bid/ask midpoint and records `midSource: "computed"`
+  - optional `bidSize`/`askSize` are swapped as auxiliary fields
+
+Inversion rejects with a 502 when the raw or inverted value is missing, non-finite, zero, negative, or violates the quote invariants. Error responses from the provider are never inverted.
+
+Backward compatibility:
+
+- Requests without `inversion` follow the existing code path, cache keys, and response shapes.
+- Existing `includes.json` behavior is unchanged.
+- If both `includes.json` and an explicit `inversion` config apply, the explicit config wins and the legacy read-path inversion is skipped.
+- Inversion config is stripped before provider requests and subscriptions; raw and inverse variants share a single provider subscription.
+- The config must only be sent to EA versions that support request-driven inversion.
+
 ## Request Transforms
 
 **Only use if absolutely necessary**

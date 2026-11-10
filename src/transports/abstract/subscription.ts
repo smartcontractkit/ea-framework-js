@@ -1,9 +1,15 @@
 import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
+import {
+  calculateProviderParamsKey,
+  getInversionConfig,
+  stableStringify,
+  stripInversionConfig,
+} from '../../adapter/inverse'
 import { ResponseCache } from '../../cache/response'
 import { metrics } from '../../metrics'
 import { SubscriptionSet, censorLogs, makeLogger } from '../../util'
-import { AdapterRequest } from '../../util/types'
+import { AdapterRequest, TimestampedProviderResult } from '../../util/types'
 import { TypeFromDefinition } from '../../validation/input-params'
 
 const logger = makeLogger('SubscriptionTransport')
@@ -20,6 +26,13 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   subscriptionTtl!: number
   name!: string
   initialized = false
+
+  /**
+   * Full subscription variants grouped by provider-facing parameters.
+   * Only populated when at least one subscription for that provider key has
+   * an inversion config.
+   */
+  protected providerVariants = new Map<string, TypeFromDefinition<T['Parameters']>[]>()
 
   async initialize(
     dependencies: TransportDependencies<T>,
@@ -72,7 +85,91 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
       })
       .set(entries.length)
 
-    await this.backgroundHandler(context, entries)
+    const providerEntries = this.groupProviderEntries(entries)
+    await this.backgroundHandler(context, providerEntries)
+  }
+
+  /**
+   * Groups subscription entries by provider-facing params so raw and inverted
+   * output variants share a single provider subscription/request.
+   *
+   * Existing behavior is preserved for provider keys that do not contain any
+   * inversion-enabled variant.
+   */
+  private groupProviderEntries(
+    entries: TypeFromDefinition<T['Parameters']>[],
+  ): TypeFromDefinition<T['Parameters']>[] {
+    const groups = new Map<string, TypeFromDefinition<T['Parameters']>[]>()
+
+    for (const entry of entries) {
+      const key = calculateProviderParamsKey(entry as Record<string, unknown>)
+      const group = groups.get(key)
+      if (group) {
+        group.push(entry)
+      } else {
+        groups.set(key, [entry])
+      }
+    }
+
+    this.providerVariants.clear()
+
+    const providerEntries: TypeFromDefinition<T['Parameters']>[] = []
+    for (const [key, group] of groups) {
+      const hasInversionVariant = group.some(
+        (entry) => getInversionConfig(entry as Record<string, unknown>)?.enabled,
+      )
+
+      if (!hasInversionVariant) {
+        // Preserve exact previous behavior for groups without inversion.
+        providerEntries.push(...group)
+        continue
+      }
+
+      const providerParams = stripInversionConfig(
+        group[0] as Record<string, unknown>,
+      ) as TypeFromDefinition<T['Parameters']>
+      providerEntries.push(providerParams)
+      this.providerVariants.set(key, group)
+    }
+
+    return providerEntries
+  }
+
+  /**
+   * Expands provider results into all active output variants for their provider key.
+   * Shape-agnostic: inversion policy handles response fields.
+   */
+  protected resolveResultVariants(
+    results: TimestampedProviderResult<T>[],
+  ): TimestampedProviderResult<T>[] {
+    if (!this.providerVariants.size) {
+      return results
+    }
+
+    return results.flatMap((result) => {
+      const params = result.params as Record<string, unknown>
+      const key = calculateProviderParamsKey(params)
+      const variants = this.providerVariants.get(key)
+
+      if (!variants?.length || getInversionConfig(params)?.enabled) {
+        return [result]
+      }
+
+      const seen = new Set<string>()
+      return variants
+        .filter((variant) => {
+          const variantKey = stableStringify(variant)
+          if (seen.has(variantKey)) {
+            return false
+          }
+          seen.add(variantKey)
+          return true
+        })
+        .map((variant) => ({
+          params: variant,
+          response: result.response,
+        }))
+    })
   }
 
   /**
