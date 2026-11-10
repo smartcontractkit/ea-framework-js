@@ -76,6 +76,24 @@ const errorResult = <T extends ProviderResultGenerics>(
 
 const cloneResponse = <T>(response: T): T => JSON.parse(JSON.stringify(response)) as T
 
+const assertPolicyMatchesConfig = <T extends ProviderResultGenerics>(
+  result: TimestampedProviderResult<T>,
+  id: string,
+  version: number,
+): TimestampedProviderResult<T> | undefined => {
+  const config = getInversionConfig(result.params)
+  if (!config?.enabled) {
+    return result
+  }
+  if (config.policyId !== id || config.policyVersion !== version) {
+    return errorResult(
+      result,
+      `Inversion failed: config policy ${config.policyId} v${config.policyVersion} does not match ${id} v${version}`,
+    )
+  }
+  return undefined
+}
+
 const validateRequestConfig = (config: unknown): InversionRequestConfig => {
   if (!isRecord(config)) {
     throw new AdapterInputError({
@@ -179,7 +197,8 @@ const numericString = /^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/
 
 const normalizeAuxSize = (value: unknown): number | string | undefined => {
   if (typeof value === 'string') {
-    return numericString.test(value.trim()) ? value : undefined
+    const trimmed = value.trim()
+    return numericString.test(trimmed) ? trimmed : undefined
   }
   if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
     return value
@@ -208,6 +227,11 @@ export class SingleValueInversionPolicy<
   transform(result: TimestampedProviderResult<T>): TimestampedProviderResult<T> {
     if (isErrorResponse(result.response)) {
       return result
+    }
+
+    const mismatch = assertPolicyMatchesConfig(result, this.id, this.version)
+    if (mismatch) {
+      return mismatch
     }
 
     let response: TimestampedAdapterResponse<T['Response']>
@@ -290,6 +314,11 @@ export class QuoteInversionPolicy<
   transform(result: TimestampedProviderResult<T>): TimestampedProviderResult<T> {
     if (isErrorResponse(result.response)) {
       return result
+    }
+
+    const mismatch = assertPolicyMatchesConfig(result, this.id, this.version)
+    if (mismatch) {
+      return mismatch
     }
 
     let response: TimestampedAdapterResponse<T['Response']>

@@ -148,6 +148,17 @@ test('single-value policy leaves provider errors unchanged', (t) => {
   t.is(output, input)
 })
 
+test('policies reject configs resolved for another policy', (t) => {
+  const mismatch = singleValueAttempt(4)
+  ;(mismatch.params as unknown as { inversion: { policyId: string } }).inversion.policyId = 'lwba'
+
+  const output = singleValuePolicy.transform(mismatch)
+  t.true(isError(output))
+  if (isError(output)) {
+    t.true(output.response.errorMessage.includes('does not match'))
+  }
+})
+
 test('single-value policy round-trips on double inversion', (t) => {
   const first = singleValuePolicy.transform(singleValueAttempt(3))
   t.is(isError(first), false)
