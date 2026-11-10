@@ -652,7 +652,7 @@ test.serial('mixed batches only invert configured results', async (t) => {
 })
 
 test.serial('malformed or mismatched policy metadata is written as a 502', async (t) => {
-  const { responseCache } = buildCache()
+  const { cache, responseCache } = buildCache()
 
   for (const params of [
     { ...rawParams, inversion: { enabled: true } },
@@ -668,6 +668,9 @@ test.serial('malformed or mismatched policy metadata is written as a 502', async
       t.is(errorResponse.statusCode, 502)
       t.true(errorResponse.errorMessage.includes('Inversion failed'))
     }
+
+    const cached = await cache.get(responseCache.getCacheKey('test', params))
+    t.is((cached as { statusCode: number }).statusCode, 502)
   }
 })
 

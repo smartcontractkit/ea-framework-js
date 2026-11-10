@@ -27,13 +27,7 @@ import {
   TimestampedProviderResult,
 } from '../../src/util'
 import { LoggerFactoryProvider } from '../../src/util/logger'
-import {
-  makeStub,
-  MockCache,
-  NopTransport,
-  RedisMock,
-  TestAdapter,
-} from '../../src/util/testing-utils'
+import { makeStub, MockCache, RedisMock, TestAdapter } from '../../src/util/testing-utils'
 import { InputParameters } from '../../src/validation'
 import { AdapterRateLimitError } from '../../src/validation/error'
 import { TypeFromDefinition } from '../../src/validation/input-params'
@@ -342,7 +336,7 @@ test.serial('inversion config is rejected on an endpoint without a policy', asyn
       new AdapterEndpoint<TestGenerics>({
         name: 'test',
         inputParameters,
-        transport: new NopTransport<TestGenerics>(),
+        transport: new ForegroundPriceTransport(),
       }),
     ],
   })
