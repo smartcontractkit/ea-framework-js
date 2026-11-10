@@ -193,19 +193,6 @@ export const stripInversionConfig = <T extends Record<string, unknown>>(params: 
 export const calculateProviderParamsKey = (params: Record<string, unknown>): string =>
   stableStringify(stripInversionConfig(params))
 
-const numericString = /^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/
-
-const normalizeAuxSize = (value: unknown): number | string | undefined => {
-  if (typeof value === 'string') {
-    const trimmed = value.trim()
-    return numericString.test(trimmed) ? trimmed : undefined
-  }
-  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
-    return value
-  }
-  return undefined
-}
-
 export class SingleValueInversionPolicy<
   T extends ProviderResultGenerics = ProviderResultGenerics,
 > implements InversionPolicy<T> {
@@ -361,10 +348,9 @@ export class QuoteInversionPolicy<
     }
 
     if (quote.bidSize !== undefined || quote.askSize !== undefined) {
-      const normalizedBidSize = normalizeAuxSize(quote.bidSize)
-      const normalizedAskSize = normalizeAuxSize(quote.askSize)
-      quote.bidSize = normalizedAskSize
-      quote.askSize = normalizedBidSize
+      const bidSize = quote.bidSize
+      quote.bidSize = quote.askSize
+      quote.askSize = bidSize
     }
     quote.bid = newBid
     quote.ask = newAsk

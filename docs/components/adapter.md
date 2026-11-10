@@ -110,7 +110,7 @@ The request only enables inversion. The endpoint chooses the fields and validity
   - mid uses the provider mid when present
   - otherwise mid is computed from the inverted bid/ask midpoint
   - `midSource` is owned by the asset-class policy; inversion only updates it when it is already present
-  - optional `bidSize`/`askSize` are swapped as auxiliary fields
+  - optional `bidSize`/`askSize` are swapped as auxiliary fields; their validity and null handling remain owned by the asset-class policy
 
 Inversion rejects with a 502 when the raw or inverted value is missing, non-finite, zero, negative, or violates the quote invariants. Error responses from the provider are never inverted.
 

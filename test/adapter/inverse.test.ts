@@ -217,7 +217,7 @@ test('quote policy preserves and updates midSource only when present', (t) => {
   t.is(data['midSource'], 'provider')
 })
 
-test('quote policy swaps auxiliary sizes without rejecting missing values', (t) => {
+test('quote policy swaps auxiliary sizes verbatim without rejecting missing values', (t) => {
   const output = quotePolicy.transform(quoteAttempt(1, 1.2, 1.1, { bidSize: 10, askSize: 20 }))
   t.is(isError(output), false)
   if (isError(output)) {
@@ -240,17 +240,15 @@ test('quote policy swaps auxiliary sizes without rejecting missing values', (t) 
   t.is(partialData.bidSize, undefined)
   t.is(partialData.askSize, 10)
 
-  const invalid = quotePolicy.transform(
-    quoteAttempt(1, 1.2, 1.1, { bidSize: 'abc', askSize: '20' }),
-  )
-  t.is(isError(invalid), false)
-  if (isError(invalid)) {
+  const strings = quotePolicy.transform(quoteAttempt(1, 1.2, 1.1, { bidSize: '10', askSize: '20' }))
+  t.is(isError(strings), false)
+  if (isError(strings)) {
     return
   }
 
-  const invalidData = (invalid.response as { data: LwbaResponseDataFields['Data'] }).data
-  t.is(invalidData.bidSize, '20')
-  t.is(invalidData.askSize, undefined)
+  const stringData = (strings.response as { data: LwbaResponseDataFields['Data'] }).data
+  t.is(stringData.bidSize, '20')
+  t.is(stringData.askSize, '10')
 })
 
 test('quote policy rejects missing, zero, negative, crossed and out-of-range quotes', (t) => {
