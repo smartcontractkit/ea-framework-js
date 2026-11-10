@@ -1,6 +1,6 @@
 import EventEmitter from 'events'
 import { default as Redis } from 'ioredis'
-import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
+import { Cache, CacheFactory, calculateCacheKey, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
 import {
   AdapterConfig,
@@ -493,22 +493,28 @@ export class Adapter<
     }
 
     // If there was no cached response, execute the foregroundExecute if defined.
-    // Foreground transports receive provider-facing data without framework inversion config.
-    const foregroundRequest = hasInversionEnabled(req.requestContext.data)
-      ? {
-          ...req,
-          requestContext: {
-            ...req.requestContext,
-            data: stripInversionConfig(req.requestContext.data as Record<string, unknown>),
-          },
-        }
-      : req
+    // Foreground transports receive provider-facing data and cache keys without inversion config.
+    let foregroundRequest = req
+    if (hasInversionEnabled(req.requestContext.data)) {
+      const data = stripInversionConfig(req.requestContext.data as Record<string, unknown>)
+      foregroundRequest = {
+        ...req,
+        requestContext: {
+          ...req.requestContext,
+          data,
+          cacheKey: calculateCacheKey({
+            data,
+            adapterName: this.name,
+            endpointName: endpoint.name,
+            transportName: req.requestContext.transportName,
+            adapterSettings: this.config.settings,
+          }),
+        },
+      } as AdapterRequest<EmptyInputParameters>
+    }
     const immediateResponse =
       transport.foregroundExecute &&
-      (await transport.foregroundExecute(
-        foregroundRequest as AdapterRequest<EmptyInputParameters>,
-        this.config.settings,
-      ))
+      (await transport.foregroundExecute(foregroundRequest, this.config.settings))
     if (immediateResponse) {
       logger.debug('Got immediate response from transport, sending as response')
       return endpoint.applyInversionToResponse(immediateResponse, req.requestContext.data)

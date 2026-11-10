@@ -121,6 +121,7 @@ Inversion is atomic per response: all fields are validated and inverted together
 - `foregroundExecute` receives provider-facing data without inversion config and must return the raw provider response.
 - With `includes.json`, explicit inversion composes with the includes transform. For an includes-inverse pair the two inversions cancel and the provider-direction value is returned.
 - Inversion subscriptions use a policy-versioned set. Upgrade all writers, then readers, drain the legacy set, and only then enable inversion. Do not enable inversion on existing feeds; it creates a new feed identity. A policy bump requires a fresh drain.
+- `writeTTL` updates only the params passed; callers refreshing raw and inverse entries must pass both variants.
 - `inversion` is reserved. Audit adapters and jobspecs before upgrading.
 - Metrics: `inversionTotal{adapter_endpoint, policy, status}` — see the metrics reference table. Inversion-capable endpoints also read the versioned subscription set each cycle; plan Redis command capacity.
 

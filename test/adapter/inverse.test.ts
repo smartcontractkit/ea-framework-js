@@ -718,6 +718,26 @@ test.serial('resultValidator runs after inversion', async (t) => {
   t.deepEqual(seen, [0.25])
 })
 
+test.serial('custom policy cannot change the cache key', async (t) => {
+  const basePolicy = new SingleValueInversionPolicy<SingleValueGenerics>()
+  const policy: InversionPolicy<SingleValueGenerics> = {
+    id: basePolicy.id,
+    version: basePolicy.version,
+    transform: (result) => {
+      const inverted = basePolicy.transform(result)
+      return { params: rawParams, response: inverted.response }
+    },
+  }
+  const { cache, responseCache } = buildCache({ policy })
+
+  await responseCache.write('test', [providerResult(inverseParams, 4)])
+
+  const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
+  const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
+  t.is(rawCached, undefined)
+  t.is((inverseCached as { result: number }).result, 0.25)
+})
+
 test.serial('resultValidator cannot change the cache key', async (t) => {
   const { cache, responseCache } = buildCache({
     resultValidator: (result) => ({

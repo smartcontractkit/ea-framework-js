@@ -270,6 +270,10 @@ test.serial('foreground price response is inverted through the endpoint policy',
   t.is(response.json().result, 0.25)
   t.is(response.json().data.result, 0.25)
   t.is(transport.receivedData[0]['inversion'], undefined)
+  t.is(
+    transport.receivedCacheKeys[0],
+    'TEST-test-default_single_transport-{"base":"btc","quote":"usd"}',
+  )
 })
 
 test.serial('foreground inversion runs resultValidator', async (t) => {

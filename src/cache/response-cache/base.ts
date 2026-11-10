@@ -127,7 +127,7 @@ export abstract class ResponseCache<
                 status: failed ? 'rejected' : 'applied',
               })
               .inc()
-            return inverted
+            return { params: result.params, response: inverted.response }
           })
         : results
 
