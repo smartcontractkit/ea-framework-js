@@ -144,6 +144,12 @@ class ValidatingPriceEndpoint extends PriceEndpoint<TestGenerics> {
   }
 }
 
+class ThrowingValidatorPriceEndpoint extends PriceEndpoint<TestGenerics> {
+  protected override resultValidator(): TimestampedProviderResult<TestGenerics> {
+    throw new Error('validator boom')
+  }
+}
+
 class CacheTestTransport extends SubscriptionTransport<TestGenerics> {
   supportsInversion = true
   providerEntries: Record<string, unknown>[] = []
@@ -294,6 +300,33 @@ test.serial('foreground inversion runs resultValidator', async (t) => {
   t.is(response.statusCode, 200)
   t.is(response.json().result, 0.25)
   t.deepEqual(endpoint.seen, [0.25])
+})
+
+test.serial('foreground validator throws are converted to 502', async (t) => {
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new ThrowingValidatorPriceEndpoint({
+        name: 'test',
+        inputParameters,
+        transport: new ForegroundPriceTransport(),
+      }),
+    ],
+  })
+
+  const context = t.context as TestContext
+  context.testAdapter = await TestAdapter.start(adapter, context)
+
+  const response = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true },
+  })
+
+  t.is(response.statusCode, 502)
+  t.true(response.body.includes('result validator threw'))
+  t.true(response.body.includes('validator boom'))
 })
 
 test.serial('foreground LWBA response is inverted through the quote policy', async (t) => {

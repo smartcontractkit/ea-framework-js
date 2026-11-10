@@ -112,7 +112,12 @@ export abstract class ResponseCache<
         }
       })
       const resultValidator = this.resultValidator
-      const validated = resultValidator ? failed.map((r) => resultValidator(r)) : failed
+      const validated = resultValidator
+        ? failed.map((result) => ({
+            params: result.params,
+            response: resultValidator(result).response,
+          }))
+        : failed
       return this._write(transportName, validated)
     }
 
@@ -155,7 +160,12 @@ export abstract class ResponseCache<
         : resolvedResults
 
     const resultValidator = this.resultValidator
-    const validated = resultValidator ? transformed.map((r) => resultValidator(r)) : transformed
+    const validated = resultValidator
+      ? transformed.map((result) => ({
+          params: result.params,
+          response: resultValidator(result).response,
+        }))
+      : transformed
     return this._write(transportName, validated)
   }
 

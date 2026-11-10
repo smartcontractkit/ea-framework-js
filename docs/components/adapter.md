@@ -127,14 +127,15 @@ Inversion is atomic per response: all fields are validated and inverted together
 ### Transports and rollout
 
 - Background transports strip inversion config before provider requests and subscriptions. Raw and inverse variants share one provider subscription.
-- Built-in HTTP, WS, and SSE transports support inversion. Custom background transports must extend `SubscriptionTransport` (which registers its variant resolver on the response cache) or implement equivalent fan-out; otherwise inversion requests should be rejected with a 400.
+- Built-in HTTP, WS, and SSE transports support inversion. Custom background transports must set `supportsInversion = true` and either extend `SubscriptionTransport` (which registers its variant resolver on the response cache) or implement equivalent fan-out; otherwise inversion requests are rejected with a 400.
 - `foregroundExecute` implementations must return the raw provider response and must not forward `inversion` to the provider. The framework applies inversion to the immediate response; pre-inverted values would be inverted twice.
 - If both `includes.json` and an enabled explicit `inversion` config apply, the inversions compose. Explicit inversion inverts the final requested pair, so an includes-inverse feed changes direction rather than returning the same value.
 - Unmatched provider-result variants are logged once per key; the inverse cache entry is not written.
 - Inversion subscriptions are stored in a policy-versioned subscription set. Pre-inversion pods only read the legacy set, so they do not consume inversion entries.
 - The framework cannot enforce EA-version support. Upgrade all writers first, then readers, wait for the legacy subscription set to drain, and only then enable inversion. A policy version bump requires a fresh drain. Do not add inversion to existing feeds; it creates a new feed identity.
 - `inversion` is a reserved request parameter. Audit adapters, input-param aliases, and jobspecs before upgrading; it cannot be used as an existing input field.
-- Raw and inverse feeds double cache and subscription-set cardinality. Plan `CACHE_MAX_ITEMS` and `SUBSCRIPTION_SET_MAX_ITEMS` headroom before enabling.
+- Raw and inverse feeds double cache and subscription-set cardinality. For local caches, `SUBSCRIPTION_SET_MAX_ITEMS` applies per subscription set; Redis subscription sets are unbounded, so monitor Redis memory and keyspace. `CACHE_MAX_ITEMS` covers the Redis local read cache and is consumed by both variants.
+- Inversion-capable endpoints read both the legacy and policy-versioned subscription sets each background cycle. Plan Redis command capacity for the extra reads.
 
 ## Request Transforms
 

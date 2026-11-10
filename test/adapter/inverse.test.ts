@@ -766,6 +766,22 @@ test('resolveParams fans out provider params for TTL updates', async (t) => {
   ])
 })
 
+test.serial('resultValidator cannot change the cache key', async (t) => {
+  const { cache, responseCache } = buildCache({
+    resultValidator: (result) => ({
+      params: rawParams,
+      response: result.response,
+    }),
+  })
+
+  await responseCache.write('test', [providerResult(inverseParams, 4)])
+
+  const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
+  const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
+  t.is(rawCached, undefined)
+  t.is((inverseCached as { result: number }).result, 0.25)
+})
+
 test.serial('writeTTL extends distinct raw and inverse cache keys', async (t) => {
   const ttlCalls: { key: string; ttl: number }[] = []
   const cache = {

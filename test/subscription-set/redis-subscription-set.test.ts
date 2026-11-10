@@ -19,6 +19,10 @@ export const test = untypedTest as TestFn<{
 class RedisMock {
   store = new Map<string, Map<string, string>>()
 
+  async pexpire(): Promise<void> {
+    return
+  }
+
   async zadd(subscritpionSetKey: string, ttl: number, value: string): Promise<void> {
     if (this.store.get(subscritpionSetKey)) {
       this.store.get(subscritpionSetKey)?.set(value, String(ttl))

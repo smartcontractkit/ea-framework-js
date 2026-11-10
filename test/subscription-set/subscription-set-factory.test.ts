@@ -46,9 +46,13 @@ test('inversion subscription sets use distinct Redis keys', async (t) => {
   process.env['CACHE_TYPE'] = 'redis'
   const config = buildAdapterSettings({})
   const keys: string[] = []
+  const expirations: { key: string; ttl: number }[] = []
   const redis = {
     zadd: async (key: string) => {
       keys.push(key)
+    },
+    pexpire: async (key: string, ttl: number) => {
+      expirations.push({ key, ttl })
     },
   } as unknown as Redis
   const factory = new SubscriptionSetFactory(config, 'TEST', redis)
@@ -65,6 +69,11 @@ test('inversion subscription sets use distinct Redis keys', async (t) => {
   t.true(keys[1].endsWith('TEST-endpoint-transport-inversion-single-value-v1-subscriptionSet'))
   t.true(keys[2].endsWith('TEST-endpoint-transport-inversion-single-value-v2-subscriptionSet'))
   t.not(keys[1], keys[2])
+  t.deepEqual(expirations, [
+    { key: keys[0], ttl: 1000 },
+    { key: keys[1], ttl: 1000 },
+    { key: keys[2], ttl: 1000 },
+  ])
 })
 
 test('subscription set factory (local cache) max capacity', async (t) => {

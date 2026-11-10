@@ -222,7 +222,18 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       .inc()
 
     if (!failed && this.resultValidator) {
-      return this.resultValidator(result).response as AdapterResponse<T['Response']>
+      try {
+        return this.resultValidator(result).response as AdapterResponse<T['Response']>
+      } catch (error) {
+        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+        const safeDetail = censor(detail, CensorList.getAll()) ?? detail
+        censorLogs(() => logger.warn(`Inversion result validator threw: ${detail}`))
+        return {
+          statusCode: 502,
+          errorMessage: `Inversion failed: result validator threw: ${safeDetail}`,
+          timestamps: (response as TimestampedAdapterResponse<T['Response']>).timestamps,
+        }
+      }
     }
     return result.response as AdapterResponse<T['Response']>
   }

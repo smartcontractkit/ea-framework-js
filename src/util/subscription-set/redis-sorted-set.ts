@@ -16,6 +16,8 @@ export class RedisSubscriptionSet<T> implements SubscriptionSet<T> {
     const storedValue = JSON.stringify(value)
     await this.redisClient.zadd(this.subscriptionSetKey, Date.now() + ttl, storedValue)
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'zadd')
+    await this.redisClient.pexpire(this.subscriptionSetKey, ttl)
+    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'pexpire')
     return
   }
 
