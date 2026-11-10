@@ -1,4 +1,9 @@
-import { Overrides, ReservedInputParameterNames, hasRepeatedValues } from '../util'
+import {
+  Overrides,
+  RESERVED_INPUT_PARAMETER_NAMES,
+  ReservedInputParameterNames,
+  hasRepeatedValues,
+} from '../util'
 import { AdapterError } from './error'
 
 /**
@@ -399,6 +404,16 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
    */
   private validateDefinition() {
     const paramNames = new Set(this.params.map((p) => p.name))
+
+    for (const param of this.params) {
+      for (const alias of param.aliases) {
+        if ((RESERVED_INPUT_PARAMETER_NAMES as readonly string[]).includes(alias)) {
+          throw new InputParametersDefinitionError(
+            `Param "${param.name}" uses reserved name or alias "${alias}"`,
+          )
+        }
+      }
+    }
 
     // Check that aliases don't clash with other properties
     if (hasRepeatedValues(this.params.map((p) => p.aliases).flat())) {

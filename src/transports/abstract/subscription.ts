@@ -80,10 +80,12 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
     logger.debug('Starting background execute')
 
-    const legacyEntries = await this.subscriptionSet.getAll()
-    const inversionEntries = this.inversionSubscriptionSet
-      ? await this.inversionSubscriptionSet.getAll()
-      : []
+    const [legacyEntries, inversionEntries] = await Promise.all([
+      this.subscriptionSet.getAll(),
+      this.inversionSubscriptionSet
+        ? this.inversionSubscriptionSet.getAll()
+        : ([] as TypeFromDefinition<T['Parameters']>[]),
+    ])
     const entries =
       inversionEntries.length > 0 ? [...legacyEntries, ...inversionEntries] : legacyEntries
 

@@ -23,8 +23,9 @@ import { metrics } from '../../metrics'
 
 const logger = makeLogger('ResponseCache')
 
-export interface ResultVariantResolver<R> {
+export interface ResultVariantResolver<R, P> {
   resolve(results: R[]): R[]
+  resolveParams(params: P[]): P[]
 }
 
 export abstract class ResponseCache<
@@ -38,7 +39,10 @@ export abstract class ResponseCache<
   dependencies: AdapterDependencies
   resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
   inversionPolicy?: InversionPolicy<T>
-  private variantResolvers = new Map<string, ResultVariantResolver<TimestampedProviderResult<T>>>()
+  private variantResolvers = new Map<
+    string,
+    ResultVariantResolver<TimestampedProviderResult<T>, TypeFromDefinition<T['Parameters']>>
+  >()
 
   constructor({
     inputParameters,
@@ -71,7 +75,10 @@ export abstract class ResponseCache<
    */
   registerVariantResolver(
     transportName: string,
-    resolver: ResultVariantResolver<TimestampedProviderResult<T>>,
+    resolver: ResultVariantResolver<
+      TimestampedProviderResult<T>,
+      TypeFromDefinition<T['Parameters']>
+    >,
   ): void {
     this.variantResolvers.set(transportName, resolver)
   }
@@ -84,7 +91,7 @@ export abstract class ResponseCache<
 
     if (hasInversion && !inversionPolicy) {
       const failed = resolvedResults.map((result) => {
-        if (!hasInversionEnabled(result.params) || 'errorMessage' in result.response) {
+        if (!hasInversionEnabled(result.params) || Boolean(result.response.errorMessage)) {
           return result
         }
         metrics
@@ -112,7 +119,7 @@ export abstract class ResponseCache<
     const transformed =
       inversionPolicy && hasInversion
         ? resolvedResults.map((result) => {
-            if (!hasInversionEnabled(result.params) || 'errorMessage' in result.response) {
+            if (!hasInversionEnabled(result.params) || Boolean(result.response.errorMessage)) {
               return result
             }
 
@@ -134,7 +141,7 @@ export abstract class ResponseCache<
               }
             }
 
-            const failed = 'errorMessage' in inverted.response
+            const failed = Boolean(inverted.response.errorMessage)
             metrics
               .get('inversionTotal')
               .labels({
@@ -188,7 +195,9 @@ export abstract class ResponseCache<
     params: TypeFromDefinition<T['Parameters']>[],
     ttl: number,
   ): Promise<void> {
-    for (const param of params) {
+    const resolver = this.variantResolvers.get(transportName)
+    const resolvedParams = resolver ? resolver.resolveParams(params) : params
+    for (const param of resolvedParams) {
       const key = this.getCacheKey(transportName, param)
       this.cache.setTTL(key, ttl)
     }

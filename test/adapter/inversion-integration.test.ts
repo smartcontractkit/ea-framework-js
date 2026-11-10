@@ -29,7 +29,7 @@ import {
 import { LoggerFactoryProvider } from '../../src/util/logger'
 import { makeStub, MockCache, RedisMock, TestAdapter } from '../../src/util/testing-utils'
 import { InputParameters } from '../../src/validation'
-import { AdapterRateLimitError } from '../../src/validation/error'
+import { AdapterInputError, AdapterRateLimitError } from '../../src/validation/error'
 import { TypeFromDefinition } from '../../src/validation/input-params'
 
 type TestContext = {
@@ -268,6 +268,32 @@ test.serial('foreground price response is inverted through the endpoint policy',
   t.is(response.json().result, 0.25)
   t.is(response.json().data.result, 0.25)
   t.deepEqual(transport.receivedData[0]['inversion'], resolvedInversion)
+})
+
+test.serial('foreground inversion runs resultValidator', async (t) => {
+  const endpoint = new ValidatingPriceEndpoint({
+    name: 'test',
+    inputParameters,
+    transport: new ForegroundPriceTransport(),
+  })
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [endpoint],
+  })
+
+  const context = t.context as TestContext
+  context.testAdapter = await TestAdapter.start(adapter, context)
+
+  const response = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true },
+  })
+
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, 0.25)
+  t.deepEqual(endpoint.seen, [0.25])
 })
 
 test.serial('foreground LWBA response is inverted through the quote policy', async (t) => {
@@ -1193,6 +1219,71 @@ test.serial('inverse-first and duplicate variants resolve once per output', asyn
   t.is((inverseCached as AdapterResponse<TestGenerics['Response']>).result, 0.25)
 })
 
+test.serial('custom mutating policy cannot corrupt the raw variant', async (t) => {
+  const dependencies = buildDependencies()
+  const adapterSettings = buildAdapterSettings({})
+  const basePolicy = new SingleValueInversionPolicy<TestGenerics>()
+  const mutatingPolicy: InversionPolicy<TestGenerics> = {
+    id: basePolicy.id,
+    version: basePolicy.version,
+    validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
+    resolveConfig: (config) => basePolicy.resolveConfig(config),
+    transform: (result) => {
+      if (!result.response.errorMessage) {
+        const data = result.response.data as { result: number }
+        data.result = 1 / data.result
+        ;(result.response as { result: number }).result = data.result
+      }
+      return result
+    },
+  }
+  const transport = new CacheTestTransport()
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport,
+    inversionPolicy: mutatingPolicy,
+  })
+
+  await endpoint.initialize('TEST', dependencies, adapterSettings)
+
+  const raw = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverse = {
+    ...raw,
+    inversion: resolvedInversion,
+  } as unknown as TestParams
+
+  transport.subscriptionSet = {
+    add: async () => {},
+    getAll: () => [raw, inverse],
+    get: () => undefined,
+  }
+
+  await transport.backgroundExecute({
+    endpointName: 'test',
+    inputParameters,
+    adapterSettings,
+  })
+
+  await transport.produce({
+    params: raw,
+    response: {
+      data: { result: 4 },
+      result: 4,
+      timestamps,
+    },
+  })
+
+  const rawCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, raw),
+  )
+  const inverseCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, inverse),
+  )
+  t.is((rawCached as AdapterResponse<TestGenerics['Response']>).result, 4)
+  t.is((inverseCached as AdapterResponse<TestGenerics['Response']>).result, 0.25)
+})
+
 test.serial('request-level inversion works through the full cache path', async (t) => {
   const transport = new CacheBackedTransport()
   const adapter = new Adapter({
@@ -1307,6 +1398,75 @@ test.serial('foreground policy throws are converted to 502', async (t) => {
   t.is(response.statusCode, 502)
   t.true(response.body.includes('policy transform threw'))
   t.true(response.body.includes('boom'))
+})
+
+test.serial('endpoint rejects invalid inversion policy metadata', async (t) => {
+  const basePolicy = new SingleValueInversionPolicy<TestGenerics>()
+  const invalidPolicy: InversionPolicy<TestGenerics> = {
+    id: 'invalid',
+    version: Number.NaN,
+    validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
+    resolveConfig: () => ({ enabled: true, policyId: 'invalid', policyVersion: 1 }),
+    transform: (result) => basePolicy.transform(result),
+  }
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport: new ForegroundPriceTransport(),
+    inversionPolicy: invalidPolicy,
+  })
+
+  await t.throwsAsync(
+    () => endpoint.initialize('TEST', buildDependencies(), buildAdapterSettings({})),
+    { message: 'Endpoint "test" has an invalid inversion policy id/version' },
+  )
+})
+
+test.serial('custom policy request validation is honored', async (t) => {
+  const basePolicy = new SingleValueInversionPolicy<TestGenerics>()
+  const policy: InversionPolicy<TestGenerics> = {
+    id: 'custom',
+    version: 1,
+    validateRequestConfig: (config) => {
+      if ((config as { reject?: boolean })?.reject) {
+        throw new AdapterInputError({
+          statusCode: 400,
+          message: 'custom policy rejected',
+        })
+      }
+      return basePolicy.validateRequestConfig(config)
+    },
+    resolveConfig: () => ({
+      enabled: true,
+      policyId: 'custom',
+      policyVersion: 1,
+    }),
+    transform: (result) => basePolicy.transform(result),
+  }
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new PriceEndpoint<TestGenerics>({
+        name: 'test',
+        inputParameters,
+        transport: new ForegroundPriceTransport(),
+        inversionPolicy: policy,
+      }),
+    ],
+  })
+
+  const context = t.context as TestContext
+  context.testAdapter = await TestAdapter.start(adapter, context)
+
+  const response = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true, reject: true },
+  })
+
+  t.is(response.statusCode, 400)
+  t.true(response.body.includes('custom policy rejected'))
 })
 
 test.serial('null inversion config is rejected', async (t) => {

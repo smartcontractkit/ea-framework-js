@@ -28,6 +28,14 @@ const normalizeParams = (value: unknown): unknown => {
 
 const stableStringify = (value: unknown): string => JSON.stringify(normalizeParams(value))
 
+const cloneResponse = <T>(response: T): T => {
+  try {
+    return JSON.parse(JSON.stringify(response)) as T
+  } catch {
+    return response
+  }
+}
+
 /** Stable key for grouping subscriptions that share the same provider-facing params. */
 export const calculateProviderParamsKey = (params: Record<string, unknown>): string =>
   stableStringify(stripInversionConfig(params))
@@ -87,6 +95,30 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
     return providerEntries
   }
 
+  resolveParams(
+    params: TypeFromDefinition<T['Parameters']>[],
+  ): TypeFromDefinition<T['Parameters']>[] {
+    if (!this.variants.size) {
+      return params
+    }
+
+    const seen = new Set<string>()
+    const resolved: TypeFromDefinition<T['Parameters']>[] = []
+    for (const param of params) {
+      const key = calculateProviderParamsKey(param as Record<string, unknown>)
+      const variants = this.variants.get(key) ?? [param]
+      for (const variant of variants) {
+        const variantKey = stableStringify(variant)
+        if (seen.has(variantKey)) {
+          continue
+        }
+        seen.add(variantKey)
+        resolved.push(variant)
+      }
+    }
+    return resolved
+  }
+
   resolve(results: TimestampedProviderResult<T>[]): TimestampedProviderResult<T>[] {
     if (!this.variants.size) {
       return results
@@ -110,6 +142,7 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       }
 
       const seen = new Set<string>()
+      let usedOriginalResponse = false
       return variants
         .filter((variant) => {
           const variantKey = stableStringify(variant)
@@ -119,10 +152,18 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
           seen.add(variantKey)
           return true
         })
-        .map((variant) => ({
-          params: variant,
-          response: result.response,
-        }))
+        .map((variant) => {
+          if (!hasInversionEnabled(variant) && !usedOriginalResponse) {
+            usedOriginalResponse = true
+            return { params: variant, response: result.response }
+          }
+          return {
+            params: variant,
+            response: hasInversionEnabled(variant)
+              ? cloneResponse(result.response)
+              : result.response,
+          }
+        })
     })
   }
 

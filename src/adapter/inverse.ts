@@ -60,7 +60,7 @@ const isPositiveFinite = (value: unknown): value is number =>
 
 const isErrorResponse = (
   response: TimestampedAdapterResponse<ResponseGenerics>,
-): response is TimestampedProviderErrorResponse => 'errorMessage' in response
+): response is TimestampedProviderErrorResponse => Boolean(response.errorMessage)
 
 const errorResult = <T extends ProviderResultGenerics>(
   result: TimestampedProviderResult<T>,

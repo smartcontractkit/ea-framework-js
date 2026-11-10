@@ -118,6 +118,13 @@ export type Overrides = {
 /**
  * Input params that can always be present in an incoming request
  */
+export const RESERVED_INPUT_PARAMETER_NAMES = [
+  'endpoint',
+  'transport',
+  'overrides',
+  'inversion',
+] as const
+
 type CommonAdapterRequestParams = {
   endpoint?: string
   transport?: string
@@ -128,7 +135,7 @@ type CommonAdapterRequestParams = {
    */
   inversion?: InversionRequestConfig
 }
-export type ReservedInputParameterNames = keyof CommonAdapterRequestParams
+export type ReservedInputParameterNames = (typeof RESERVED_INPUT_PARAMETER_NAMES)[number]
 
 /**
  * Basic shape for the data within the request body

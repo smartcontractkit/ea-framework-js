@@ -109,6 +109,15 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     dependencies: AdapterDependencies,
     adapterSettings: T['Settings'],
   ): Promise<void> {
+    if (this.inversionPolicy) {
+      const { id, version } = this.inversionPolicy
+      if (typeof id !== 'string' || id.length === 0 || !Number.isInteger(version) || version <= 0) {
+        throw new AdapterError({
+          statusCode: 500,
+          message: `Endpoint "${this.name}" has an invalid inversion policy id/version`,
+        })
+      }
+    }
     this.adapterName = adapterName
     const responseCache = new SimpleResponseCache({
       dependencies,
@@ -178,7 +187,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     data: TypeFromDefinition<T['Parameters']>,
   ): AdapterResponse<T['Response']> {
     const policy = this.inversionPolicy
-    if (!policy || !hasInversionEnabled(data) || 'errorMessage' in response) {
+    if (!policy || !hasInversionEnabled(data) || Boolean(response.errorMessage)) {
       return response
     }
 
@@ -202,7 +211,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       }
     }
 
-    const failed = 'errorMessage' in result.response
+    const failed = Boolean(result.response.errorMessage)
     metrics
       .get('inversionTotal')
       .labels({

@@ -601,6 +601,27 @@ test.serial('exclusion of required param fails validation', async (t) => {
   t.is(error?.message, 'Param "base" excludes required (i.e. always present) param "quote"')
 })
 
+test.serial('reserved input parameter names and aliases are rejected', (t) => {
+  t.throws(
+    () =>
+      // @ts-expect-error reserved name
+      new InputParameters({ inversion: { type: 'string', description: 'inversion' } }),
+    { message: 'Param "inversion" uses reserved name or alias "inversion"' },
+  )
+
+  t.throws(
+    () =>
+      new InputParameters({
+        base: {
+          type: 'string',
+          description: 'base',
+          aliases: ['inversion'],
+        },
+      }),
+    { message: 'Param "base" uses reserved name or alias "inversion"' },
+  )
+})
+
 test.serial('aliases of different properties with common values fail validation', async (t) => {
   const error = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({

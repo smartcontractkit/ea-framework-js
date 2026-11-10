@@ -1,6 +1,7 @@
 import test from 'ava'
 import Redis from 'ioredis'
 import { buildAdapterSettings } from '../../src/config'
+import { metrics } from '../../src/metrics'
 import { LoggerFactoryProvider, SubscriptionSetFactory } from '../../src/util'
 import { ExpiringSortedSet } from '../../src/util/subscription-set/expiring-sorted-set'
 import { RedisSubscriptionSet } from '../../src/util/subscription-set/redis-sorted-set'
@@ -8,6 +9,7 @@ import { RedisMock } from '../../src/util/testing-utils'
 
 test.before(() => {
   LoggerFactoryProvider.set()
+  metrics.initialize()
 })
 
 test('subscription set factory (local cache)', async (t) => {
@@ -38,6 +40,31 @@ test('subscription set factory (redis cache missing client)', async (t) => {
   } catch (_) {
     t.pass()
   }
+})
+
+test('inversion subscription sets use distinct Redis keys', async (t) => {
+  process.env['CACHE_TYPE'] = 'redis'
+  const config = buildAdapterSettings({})
+  const keys: string[] = []
+  const redis = {
+    zadd: async (key: string) => {
+      keys.push(key)
+    },
+  } as unknown as Redis
+  const factory = new SubscriptionSetFactory(config, 'TEST', redis)
+
+  await factory.buildSet('endpoint', 'transport').add('raw', 1000, 'raw')
+  await factory
+    .buildSet('endpoint', 'transport', 'inversion-single-value-v1')
+    .add('inverse', 1000, 'inverse')
+  await factory
+    .buildSet('endpoint', 'transport', 'inversion-single-value-v2')
+    .add('inverse-v2', 1000, 'inverse-v2')
+
+  t.true(keys[0].endsWith('TEST-endpoint-transport-subscriptionSet'))
+  t.true(keys[1].endsWith('TEST-endpoint-transport-inversion-single-value-v1-subscriptionSet'))
+  t.true(keys[2].endsWith('TEST-endpoint-transport-inversion-single-value-v2-subscriptionSet'))
+  t.not(keys[1], keys[2])
 })
 
 test('subscription set factory (local cache) max capacity', async (t) => {

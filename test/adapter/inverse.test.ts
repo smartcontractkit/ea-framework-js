@@ -8,7 +8,10 @@ import {
   SingleValueInversionPolicy,
   stripInversionConfig,
 } from '../../src/adapter/inverse'
-import { calculateProviderParamsKey } from '../../src/transports/abstract/provider-variants'
+import {
+  calculateProviderParamsKey,
+  ProviderVariantResolver,
+} from '../../src/transports/abstract/provider-variants'
 import {
   LwbaEndpointInputParametersDefinition,
   LwbaResponseDataFields,
@@ -18,7 +21,7 @@ import {
 import { AdapterDependencies } from '../../src/adapter/types'
 import { Cache, calculateFeedId } from '../../src/cache'
 import { SimpleResponseCache } from '../../src/cache/response-cache/simple'
-import { buildAdapterSettings } from '../../src/config'
+import { buildAdapterSettings, EmptyCustomSettings } from '../../src/config'
 import { metrics } from '../../src/metrics'
 import {
   SingleNumberResultResponse,
@@ -96,7 +99,7 @@ const isError = (
   result: TimestampedProviderResult<SingleValueGenerics> | TimestampedProviderResult<QuoteGenerics>,
 ): result is TimestampedProviderResult<SingleValueGenerics> & {
   response: TimestampedProviderErrorResponse
-} => 'errorMessage' in result.response
+} => Boolean(result.response.errorMessage)
 
 test('rejects invalid inversion request configs', (t) => {
   for (const config of [
@@ -144,6 +147,18 @@ test('single-value policy rejects invalid raw values', (t) => {
     t.true(isError(output))
     if (isError(output)) {
       t.is(output.response.statusCode, 502)
+    }
+  }
+})
+
+test('policies treat falsy errorMessage as a successful response', (t) => {
+  for (const errorMessage of [undefined, '']) {
+    const attempt = singleValueAttempt(4)
+    ;(attempt.response as Record<string, unknown>)['errorMessage'] = errorMessage
+    const output = singleValuePolicy.transform(attempt)
+    t.is(isError(output), false)
+    if (!isError(output)) {
+      t.is((output.response as { result: number }).result, 0.25)
     }
   }
 })
@@ -526,6 +541,10 @@ const adapterSettings = buildAdapterSettings({})
 
 type CacheParams = TypeFromDefinition<SingleValueGenerics['Parameters']>
 
+type ResolverGenerics = SingleValueGenerics & {
+  Settings: EmptyCustomSettings
+}
+
 const resolvedConfig = {
   enabled: true,
   policyId: 'single-value',
@@ -718,6 +737,35 @@ test.serial('resultValidator runs after inversion', async (t) => {
   t.deepEqual(seen, [0.25])
 })
 
+test('resolveParams fans out provider params for TTL updates', async (t) => {
+  const resolver = new ProviderVariantResolver<ResolverGenerics>()
+  resolver.group([rawParams, inverseParams])
+
+  t.deepEqual(resolver.resolveParams([rawParams]), [rawParams, inverseParams])
+
+  const ttlCalls: { key: string; ttl: number }[] = []
+  const cache = {
+    setTTL: async (key: string, ttl: number) => {
+      ttlCalls.push({ key, ttl })
+    },
+  } as unknown as Cache
+  const responseCache = new CapturingSimpleResponseCache({
+    dependencies: { cache } as unknown as AdapterDependencies,
+    adapterSettings,
+    adapterName: 'TEST',
+    endpointName: 'test',
+    inputParameters,
+  })
+  responseCache.registerVariantResolver('test', resolver)
+
+  await responseCache.writeTTL('test', [rawParams], 123)
+
+  t.deepEqual(ttlCalls, [
+    { key: responseCache.getCacheKey('test', rawParams), ttl: 123 },
+    { key: responseCache.getCacheKey('test', inverseParams), ttl: 123 },
+  ])
+})
+
 test.serial('writeTTL extends distinct raw and inverse cache keys', async (t) => {
   const ttlCalls: { key: string; ttl: number }[] = []
   const cache = {
@@ -741,6 +789,17 @@ test.serial('writeTTL extends distinct raw and inverse cache keys', async (t) =>
     { key: responseCache.getCacheKey('test', rawParams), ttl: 123 },
   ])
   t.not(ttlCalls[0].key, ttlCalls[1].key)
+})
+
+test.serial('cache inversion treats falsy errorMessage as success', async (t) => {
+  const { responseCache } = buildCache()
+  const result = providerResult(inverseParams, 4)
+  ;(result.response as Record<string, unknown>)['errorMessage'] = undefined
+
+  await responseCache.write('test', [result])
+
+  const response = responseCache.captured?.[0].response
+  t.is((response as { result: number }).result, 0.25)
 })
 
 test.serial('writes fail closed when inversion is requested but no policy exists', async (t) => {
