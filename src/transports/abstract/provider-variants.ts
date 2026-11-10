@@ -1,7 +1,10 @@
 import type { TransportGenerics } from '..'
 import { hasInversionEnabled, stripInversionConfig } from '../../adapter/inverse'
-import type { TimestampedProviderResult } from '../../util'
+import { censorLogs, makeLogger } from '../../util'
+import type { TimestampedProviderResult } from '../../util/types'
 import type { TypeFromDefinition } from '../../validation/input-params'
+
+const logger = makeLogger('ProviderVariantResolver')
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -11,12 +14,11 @@ const sortObjectKeys = (value: unknown): unknown => {
     return value.map(sortObjectKeys)
   }
   if (isRecord(value)) {
-    return Object.keys(value)
-      .sort()
-      .reduce<Record<string, unknown>>((acc, key) => {
-        acc[key] = sortObjectKeys(value[key])
-        return acc
-      }, {})
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, sortObjectKeys(value[key])]),
+    )
   }
   return value
 }
@@ -33,6 +35,8 @@ export const calculateProviderParamsKey = (params: Record<string, unknown>): str
  */
 export class ProviderVariantResolver<T extends TransportGenerics> {
   private variants = new Map<string, TypeFromDefinition<T['Parameters']>[]>()
+  private knownKeys = new Set<string>()
+  private missedKeys = new Set<string>()
 
   get size(): number {
     return this.variants.size
@@ -42,7 +46,7 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
     const hasInversion = entries.some((entry) => hasInversionEnabled(entry))
 
     if (!hasInversion) {
-      this.variants.clear()
+      this.reset()
       return entries
     }
 
@@ -58,10 +62,11 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       }
     }
 
-    this.variants.clear()
+    this.reset()
 
     const providerEntries: TypeFromDefinition<T['Parameters']>[] = []
     for (const [key, group] of groups) {
+      this.knownKeys.add(key)
       const hasInversionVariant = group.some((entry) => hasInversionEnabled(entry))
 
       if (!hasInversionVariant) {
@@ -89,7 +94,19 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       const key = calculateProviderParamsKey(params)
       const variants = this.variants.get(key)
 
-      if (!variants?.length || hasInversionEnabled(params)) {
+      if (!variants?.length) {
+        if (!this.knownKeys.has(key) && !this.missedKeys.has(key)) {
+          this.missedKeys.add(key)
+          censorLogs(() =>
+            logger.warn(
+              `No inversion variant matched provider result params: ${key}. The inverse cache entry was not written.`,
+            ),
+          )
+        }
+        return [result]
+      }
+
+      if (hasInversionEnabled(params)) {
         return [result]
       }
 
@@ -108,5 +125,11 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
           response: result.response,
         }))
     })
+  }
+
+  private reset(): void {
+    this.variants.clear()
+    this.knownKeys.clear()
+    this.missedKeys.clear()
   }
 }

@@ -28,6 +28,7 @@ import {
 import { AdapterInputError } from '../../src/validation/error'
 import { makeStub, MockCache } from '../../src/util/testing-utils'
 import { LoggerFactoryProvider } from '../../src/util/logger'
+import CensorList from '../../src/util/censor/censor-list'
 import { InputParameters } from '../../src/validation'
 import { TypeFromDefinition } from '../../src/validation/input-params'
 
@@ -161,6 +162,26 @@ test('single-value policy leaves provider errors unchanged', (t) => {
   t.is(output, input)
 })
 
+test('policies leave results unchanged when inversion is not enabled', (t) => {
+  const singleValue = {
+    ...singleValueAttempt(4),
+    params: {
+      base: 'BTC',
+      quote: 'USD',
+    } as unknown as TimestampedProviderResult<SingleValueGenerics>['params'],
+  }
+  t.is(singleValuePolicy.transform(singleValue), singleValue)
+
+  const quote = {
+    ...quoteAttempt(1, 1.2, 1.1),
+    params: {
+      base: 'BTC',
+      quote: 'USD',
+    } as unknown as TimestampedProviderResult<QuoteGenerics>['params'],
+  }
+  t.is(quotePolicy.transform(quote), quote)
+})
+
 test('policies reject configs resolved for another policy', (t) => {
   const mismatch = singleValueAttempt(4)
   ;(mismatch.params as unknown as { inversion: { policyId: string } }).inversion.policyId = 'lwba'
@@ -266,6 +287,12 @@ test('quote policy rejects missing, zero, negative, crossed and out-of-range quo
   const missingBid = quoteAttempt(1, 1.2, 1.1)
   delete (missingBid.response as { data: Record<string, unknown> }).data['bid']
   t.true(isError(quotePolicy.transform(missingBid)))
+
+  for (const data of [undefined, null, [], 'quote']) {
+    const attempt = quoteAttempt(1, 1.2, 1.1)
+    ;(attempt.response as { data: unknown }).data = data
+    t.true(isError(quotePolicy.transform(attempt)))
+  }
 })
 
 test('quote policy is atomic across bid, mid and ask', (t) => {
@@ -639,26 +666,29 @@ test.serial('malformed or mismatched policy metadata is written as a 502', async
 
 test.serial('a throwing policy is converted to a 502 and does not reject the write', async (t) => {
   const basePolicy = new SingleValueInversionPolicy<SingleValueGenerics>()
-  const throwingPolicy: InversionPolicy<SingleValueGenerics> = {
-    id: basePolicy.id,
-    version: basePolicy.version,
-    validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
-    resolveConfig: (config) => basePolicy.resolveConfig(config),
-    transform: () => {
-      throw new Error('boom')
-    },
-  }
-  const { responseCache } = buildCache({ policy: throwingPolicy })
 
-  await t.notThrowsAsync(() => responseCache.write('test', [providerResult(inverseParams, 4)]))
+  for (const thrown of [new Error('boom'), 'boom-string']) {
+    const throwingPolicy: InversionPolicy<SingleValueGenerics> = {
+      id: basePolicy.id,
+      version: basePolicy.version,
+      validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
+      resolveConfig: (config) => basePolicy.resolveConfig(config),
+      transform: () => {
+        throw thrown
+      },
+    }
+    const { responseCache } = buildCache({ policy: throwingPolicy })
 
-  const response = responseCache.captured?.[0].response
-  t.true(response !== undefined && 'errorMessage' in response)
-  if (response && 'errorMessage' in response) {
-    const errorResponse = response as TimestampedProviderErrorResponse
-    t.is(errorResponse.statusCode, 502)
-    t.true(errorResponse.errorMessage.includes('policy transform threw'))
-    t.true(errorResponse.errorMessage.includes('boom'))
+    await t.notThrowsAsync(() => responseCache.write('test', [providerResult(inverseParams, 4)]))
+
+    const response = responseCache.captured?.[0].response
+    t.true(response !== undefined && 'errorMessage' in response)
+    if (response && 'errorMessage' in response) {
+      const errorResponse = response as TimestampedProviderErrorResponse
+      t.is(errorResponse.statusCode, 502)
+      t.true(errorResponse.errorMessage.includes('policy transform threw'))
+      t.true(errorResponse.errorMessage.includes('boom'))
+    }
   }
 })
 
@@ -708,4 +738,154 @@ test.serial('proxy-based result params do not throw when inversion is absent', a
   const stubParams = makeStub('params', { base: 'BTC', quote: 'USD' }) as CacheParams
 
   await t.notThrowsAsync(() => responseCache.write('test', [providerResult(stubParams, 4)]))
+})
+
+test('provider param keys sort arrays and nested objects deterministically', (t) => {
+  const first = {
+    base: 'BTC',
+    quote: 'USD',
+    filters: [1, 2, 3],
+    nested: { b: 2, a: 1 },
+  }
+  const second = {
+    nested: { a: 1, b: 2 },
+    filters: [1, 2, 3],
+    quote: 'USD',
+    base: 'BTC',
+  }
+
+  t.is(calculateProviderParamsKey(first), calculateProviderParamsKey(second))
+})
+
+test('provider param keys handle __proto__ without prototype pollution', (t) => {
+  const params = JSON.parse('{"base":"BTC","__proto__":{"polluted":true}}') as Record<
+    string,
+    unknown
+  >
+
+  const key = calculateProviderParamsKey(params)
+  t.true(key.includes('__proto__'))
+  t.is(({} as { polluted?: boolean }).polluted, undefined)
+})
+
+test('policies return 502 when the response cannot be cloned', (t) => {
+  const single = singleValueAttempt(4)
+  ;(single.response as { data: Record<string, unknown> }).data['self'] = single.response.data
+  const singleOutput = singleValuePolicy.transform(single)
+  t.true(isError(singleOutput))
+  if (isError(singleOutput)) {
+    t.is(singleOutput.response.statusCode, 502)
+    t.true(singleOutput.response.errorMessage.includes('could not be cloned'))
+  }
+
+  const quote = quoteAttempt(1, 1.2, 1.1)
+  ;(quote.response as { data: Record<string, unknown> }).data['self'] = quote.response.data
+  const quoteOutput = quotePolicy.transform(quote)
+  t.true(isError(quoteOutput))
+  if (isError(quoteOutput)) {
+    t.is(quoteOutput.response.statusCode, 502)
+    t.true(quoteOutput.response.errorMessage.includes('could not be cloned'))
+  }
+})
+
+test('quote policy leaves provider errors unchanged', (t) => {
+  const input: TimestampedProviderResult<QuoteGenerics> = {
+    params: quoteAttempt(1, 1.2, 1.1).params,
+    response: {
+      statusCode: 502,
+      errorMessage: 'provider error',
+      timestamps,
+    },
+  }
+
+  t.is(quotePolicy.transform(input), input)
+})
+
+test('quote policy rejects invalid quotes when provider mid is absent', (t) => {
+  for (const attempt of [
+    quoteAttempt(0, 1.2),
+    quoteAttempt(1, -1.2),
+    quoteAttempt(1.2, 1),
+    quoteAttempt(Number.NaN, 1.2),
+    quoteAttempt(1, Number.POSITIVE_INFINITY),
+  ]) {
+    t.true(isError(quotePolicy.transform(attempt)))
+  }
+})
+
+test('raw inversion config rejects non-object and malformed values', (t) => {
+  for (const params of [
+    null,
+    'inversion',
+    [],
+    { inversion: 'enabled' },
+    { inversion: {} },
+    { inversion: { enabled: 'true' } },
+  ]) {
+    t.is(getRawInversionConfig(params), undefined)
+  }
+
+  const infiniteVersion = {
+    inversion: { enabled: true, policyId: 'single-value', policyVersion: Number.POSITIVE_INFINITY },
+  }
+  t.truthy(getRawInversionConfig(infiniteVersion))
+  t.is(getInversionConfig(infiniteVersion), undefined)
+})
+
+test.serial('thrown policy errors are redacted with the censor list', async (t) => {
+  const previous = CensorList.getAll()
+  CensorList.set([{ key: 'SECRET', value: /super-secret/g }])
+
+  try {
+    const basePolicy = new SingleValueInversionPolicy<SingleValueGenerics>()
+    const policy: InversionPolicy<SingleValueGenerics> = {
+      id: basePolicy.id,
+      version: basePolicy.version,
+      validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
+      resolveConfig: (config) => basePolicy.resolveConfig(config),
+      transform: () => {
+        throw new Error('boom super-secret')
+      },
+    }
+    const { responseCache } = buildCache({ policy })
+
+    await responseCache.write('test', [providerResult(inverseParams, 4)])
+
+    const response = responseCache.captured?.[0].response
+    t.true(response !== undefined && 'errorMessage' in response)
+    if (response && 'errorMessage' in response) {
+      const errorResponse = response as TimestampedProviderErrorResponse
+      t.true(errorResponse.errorMessage.includes('boom'))
+      t.true(errorResponse.errorMessage.includes('[SECRET REDACTED]'))
+      t.false(errorResponse.errorMessage.includes('super-secret'))
+    }
+  } finally {
+    CensorList.set(previous)
+  }
+})
+
+test.serial('inversionTotal counts applied and rejected results', async (t) => {
+  const counter = metrics.get('inversionTotal') as unknown as {
+    reset: () => void
+    get: () => Promise<{
+      values: { labels: Record<string, string>; value: number }[]
+    }>
+  }
+  counter.reset()
+
+  const { responseCache } = buildCache()
+  const malformedParams = {
+    ...rawParams,
+    inversion: { enabled: true },
+  } as unknown as CacheParams
+
+  await responseCache.write('test', [providerResult(inverseParams, 4)])
+  await responseCache.write('test', [providerResult(malformedParams, 4)])
+
+  const values = (await counter.get()).values
+  const applied = values.find((value) => value.labels['status'] === 'applied')?.value
+  const rejected = values.find((value) => value.labels['status'] === 'rejected')?.value
+
+  t.is(applied, 1)
+  t.is(rejected, 1)
 })

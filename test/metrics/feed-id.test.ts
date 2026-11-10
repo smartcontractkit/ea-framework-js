@@ -66,8 +66,13 @@ test.serial('resolved inversion config creates a distinct feed ID', async (t) =>
       policyVersion: 1,
     },
   }
+  const nextPolicyVersion = {
+    ...inverse,
+    inversion: { ...inverse.inversion, policyVersion: 2 },
+  }
 
   t.is(calculateFeedId(t.context, raw), '{"base":"eth","quote":"btc"}')
   t.not(calculateFeedId(t.context, inverse), calculateFeedId(t.context, raw))
+  t.not(calculateFeedId(t.context, nextPolicyVersion), calculateFeedId(t.context, inverse))
   t.true(calculateFeedId(t.context, inverse).includes('"inversion"'))
 })

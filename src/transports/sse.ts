@@ -2,7 +2,7 @@ import { AxiosRequestConfig } from 'axios'
 import { EventSource, EventSourceInit } from 'eventsource'
 import { EndpointContext } from '../adapter'
 import { calculateHttpRequestKey } from '../cache'
-import { makeLogger, sleep } from '../util'
+import { censorLogs, makeLogger, sleep } from '../util'
 import { Requester } from '../util/requester'
 import { PartialSuccessfulResponse, ProviderResult, TimestampedProviderResult } from '../util/types'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -119,7 +119,9 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
             }
             return result
           })
-          this.writeResults(results)
+          this.writeResults(results).catch((error) => {
+            censorLogs(() => logger.error(`Error writing SSE results to cache: ${error}`))
+          })
         }
       }
 
