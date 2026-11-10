@@ -354,6 +354,36 @@ test('inverting request does not affect cached response', async (t) => {
   t.is(response.json().data.result, 1234)
 })
 
+test('includes inversion preserves provider error responses', async (t) => {
+  const includes = [
+    {
+      from: 'ETH',
+      to: 'BTC',
+      includes: [{ from: 'BTC', to: 'ETH', inverse: true }],
+    },
+  ]
+  const mockResponse = {
+    statusCode: 429,
+    errorMessage: 'rate limited',
+    timestamps: {
+      providerDataRequestedUnixMs: 0,
+      providerDataReceivedUnixMs: 0,
+      providerIndicatedTimeUnixMs: undefined,
+    },
+  } as unknown as AdapterResponse<PriceTestTypes['Response']>
+  const testAdapter = await buildAdapter(t.context, () => mockResponse, includes)
+
+  const response = await testAdapter.request({
+    base: 'ETH',
+    quote: 'BTC',
+    endpoint: 'test',
+  })
+
+  t.is(response.statusCode, 429)
+  t.is(response.json().errorMessage, 'rate limited')
+  t.is(response.json().result, undefined)
+})
+
 test('explicit inversion with includes composes with the includes inversion', async (t) => {
   const includes = [
     {

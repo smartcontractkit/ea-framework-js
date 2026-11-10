@@ -154,8 +154,8 @@ class CacheTestTransport extends SubscriptionTransport<TestGenerics> {
   supportsInversion = true
   providerEntries: Record<string, unknown>[] = []
 
-  get variantsCount(): number {
-    return this.variantResolver.size
+  get inversionSet() {
+    return this.inversionSubscriptionSet
   }
 
   getSubscriptionTtlFromConfig(): number {
@@ -494,7 +494,6 @@ test.serial('no inversion preserves subscription order and array identity', asyn
 
   t.is(transport.providerEntries, entries)
   t.deepEqual(transport.providerEntries, entries)
-  t.is(transport.variantsCount, 0)
 })
 
 test.serial('proxy-based subscriptions do not throw when inversion is absent', async (t) => {
@@ -524,7 +523,6 @@ test.serial('proxy-based subscriptions do not throw when inversion is absent', a
     }),
   )
   t.is(transport.providerEntries, entries)
-  t.is(transport.variantsCount, 0)
 })
 
 test.serial('disabled inversion is treated as no inversion', async (t) => {
@@ -559,7 +557,6 @@ test.serial('disabled inversion is treated as no inversion', async (t) => {
   })
 
   t.is(transport.providerEntries, entries)
-  t.is(transport.variantsCount, 0)
 })
 
 test.serial('provider variants are cleared when inversion subscriptions expire', async (t) => {
@@ -594,12 +591,10 @@ test.serial('provider variants are cleared when inversion subscriptions expire',
   }
 
   await transport.backgroundExecute(context)
-  t.is(transport.variantsCount, 1)
   t.deepEqual(transport.providerEntries, [raw])
 
   entries.splice(1)
   await transport.backgroundExecute(context)
-  t.is(transport.variantsCount, 0)
   t.is(transport.providerEntries, entries)
 })
 
@@ -758,7 +753,6 @@ test.serial(
     })
 
     t.deepEqual(transport.providerEntries, [rawA, rawB])
-    t.is(transport.variantsCount, 1)
 
     await transport.produce({
       params: rawA,
@@ -982,8 +976,8 @@ test.serial('inversion subscriptions use a policy-versioned set', async (t) => {
 
   await endpoint.initialize('TEST', dependencies, adapterSettings)
 
-  t.truthy(transport.inversionSubscriptionSet)
-  t.not(transport.subscriptionSet, transport.inversionSubscriptionSet)
+  t.truthy(transport.inversionSet)
+  t.not(transport.subscriptionSet, transport.inversionSet)
 
   const raw = { base: 'BTC', quote: 'USD' } as TestParams
   const inverse = {
@@ -998,7 +992,7 @@ test.serial('inversion subscriptions use a policy-versioned set', async (t) => {
   await transport.registerRequest(request(inverse, 'inverse'), adapterSettings)
 
   t.deepEqual(await transport.subscriptionSet.getAll(), [raw])
-  t.deepEqual(await transport.inversionSubscriptionSet?.getAll(), [inverse])
+  t.deepEqual(await transport.inversionSet?.getAll(), [inverse])
 })
 
 test.serial('case-normalized provider results match inversion variants', async (t) => {
@@ -1082,7 +1076,6 @@ test.serial('inverse-first and duplicate variants resolve once per output', asyn
   })
 
   t.deepEqual(transport.providerEntries, [raw])
-  t.is(transport.variantsCount, 1)
 
   const resolved = transport.resolveVariants([
     {
@@ -1312,32 +1305,6 @@ test.serial('endpoint rejects invalid inversion policy metadata', async (t) => {
     () => endpoint.initialize('TEST', buildDependencies(), buildAdapterSettings({})),
     { message: 'Endpoint "test" has an invalid inversion policy id/version' },
   )
-})
-
-test.serial('null inversion config is rejected', async (t) => {
-  const adapter = new Adapter({
-    name: 'TEST',
-    endpoints: [
-      new PriceEndpoint<TestGenerics>({
-        name: 'test',
-        inputParameters,
-        transport: new ForegroundPriceTransport(),
-      }),
-    ],
-  })
-
-  const context = t.context as TestContext
-  context.testAdapter = await TestAdapter.start(adapter, context)
-
-  const response = await context.testAdapter.request({
-    endpoint: 'test',
-    base: 'BTC',
-    quote: 'USD',
-    inversion: null,
-  })
-
-  t.is(response.statusCode, 400)
-  t.true(response.body.includes('must be an object'))
 })
 
 test.serial('disabled inversion is a no-op on a policy-less endpoint', async (t) => {

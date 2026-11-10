@@ -19,7 +19,7 @@ const logger = makeLogger('SubscriptionTransport')
 export abstract class SubscriptionTransport<T extends TransportGenerics> implements Transport<T> {
   responseCache!: ResponseCache<T>
   subscriptionSet!: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
-  inversionSubscriptionSet?: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
+  protected inversionSubscriptionSet?: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
   subscriptionTtl!: number
   name!: string
   initialized = false

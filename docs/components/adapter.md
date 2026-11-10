@@ -119,10 +119,10 @@ Inversion is atomic per response: all fields are validated and inverted together
 - Background transports strip inversion config before provider requests; raw and inverse variants share one provider subscription.
 - Built-in HTTP, WS, and SSE transports support inversion. Custom background transports must set `supportsInversion = true` and fan out results (normally by extending `SubscriptionTransport` and using `writeResults`), otherwise inversion requests are rejected with a 400.
 - `foregroundExecute` receives provider-facing data without inversion config and must return the raw provider response.
-- With `includes.json`, explicit inversion cancels the includes inverse for an includes-inverse pair. Use both only if the provider-direction value is intended.
+- With `includes.json`, explicit inversion composes with the includes transform. For an includes-inverse pair the two inversions cancel and the provider-direction value is returned.
 - Inversion subscriptions use a policy-versioned set. Upgrade all writers, then readers, drain the legacy set, and only then enable inversion. Do not enable inversion on existing feeds; it creates a new feed identity. A policy bump requires a fresh drain.
 - `inversion` is reserved. Audit adapters and jobspecs before upgrading.
-- Metrics: `inversionTotal{adapter_endpoint, policy, status}` — see the metrics reference table.
+- Metrics: `inversionTotal{adapter_endpoint, policy, status}` — see the metrics reference table. Inversion-capable endpoints also read the versioned subscription set each cycle; plan Redis command capacity.
 
 ## Request Transforms
 

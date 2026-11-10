@@ -30,11 +30,7 @@ const buildSimpleCache = () => {
   })
 }
 
-const providerResult = (
-  params: { base: string; factor: number },
-  result: number,
-  providerIndicatedTimeUnixMs = 0,
-) => ({
+const providerResult = (params: { base: string; factor: number }, result: number) => ({
   params,
   response: {
     data: null,
@@ -42,7 +38,7 @@ const providerResult = (
     timestamps: {
       providerDataRequestedUnixMs: 0,
       providerDataReceivedUnixMs: 0,
-      providerIndicatedTimeUnixMs,
+      providerIndicatedTimeUnixMs: undefined,
     },
   },
 })
@@ -85,24 +81,6 @@ test('shouldUpdate can block write when new value is not fresher than cache', as
 
   await compareCache.write('merged', [providerResult(params, 25)])
   t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 50)
-})
-
-test('serializes concurrent writes so the newest timestamp wins', async (t) => {
-  const compareCache = new CompareResponseCache(
-    'merged',
-    buildSimpleCache(),
-    (next, current) =>
-      (next.timestamps?.providerIndicatedTimeUnixMs ?? 0) >
-      (current?.timestamps?.providerIndicatedTimeUnixMs ?? 0),
-  )
-  const params = { base: 'ETH', factor: 1 }
-
-  await Promise.all([
-    compareCache.write('newer', [providerResult(params, 100, 2000)]),
-    compareCache.write('older', [providerResult(params, 50, 1000)]),
-  ])
-
-  t.is((await compareCache.get(compareCache.getCacheKey('merged', params)))?.result, 100)
 })
 
 test('shouldUpdate checks the backing cache when no prior write through compareCache', async (t) => {

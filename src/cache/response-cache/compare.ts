@@ -14,8 +14,6 @@ export class CompareResponseCache<
   readonly transportName: string
   // The actual cache where responses are written to
   responseCache: ResponseCache<T>
-  // Serializes compare-and-write operations per cache key
-  private writeQueues = new Map<string, Promise<void>>()
   // True if next should replace current in cache
   shouldUpdate: (
     next: AdapterResponse<T['Response']>,
@@ -57,27 +55,21 @@ export class CompareResponseCache<
       value: AdapterResponse<T['Response']>
     }[],
   ) {
-    await Promise.all(entries.map(({ key, value }) => this.enqueueWrite(key, value)))
-  }
+    const filteredEntries = (
+      await Promise.all(
+        entries.flatMap(async ({ key, value }) => {
+          const current = await this.get(key)
+          if (!this.shouldUpdate(value, current)) {
+            return []
+          }
+          return [{ key, value }]
+        }),
+      )
+    ).flat()
 
-  private enqueueWrite(key: string, value: AdapterResponse<T['Response']>): Promise<void> {
-    const previous = this.writeQueues.get(key) ?? Promise.resolve()
-    const next = previous
-      .catch(() => undefined)
-      .then(async () => {
-        const current = await this.get(key)
-        if (!this.shouldUpdate(value, current)) {
-          return
-        }
-        await this.responseCache.writeEntries([{ key, value }])
-      })
-
-    this.writeQueues.set(key, next)
-    return next.finally(() => {
-      if (this.writeQueues.get(key) === next) {
-        this.writeQueues.delete(key)
-      }
-    })
+    if (filteredEntries.length > 0) {
+      await this.responseCache.writeEntries(filteredEntries)
+    }
   }
 
   override async writeTTL(

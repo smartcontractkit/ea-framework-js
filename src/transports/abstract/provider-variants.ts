@@ -49,10 +49,6 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
   private knownKeys = new Set<string>()
   private missedKeys = new Set<string>()
 
-  get size(): number {
-    return this.variants.size
-  }
-
   group(entries: TypeFromDefinition<T['Parameters']>[]): TypeFromDefinition<T['Parameters']>[] {
     const hasInversion = entries.some((entry) => hasInversionEnabled(entry))
 
@@ -118,7 +114,6 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       }
 
       const seen = new Set<string>()
-      let usedOriginalResponse = false
       return variants
         .filter((variant) => {
           const variantKey = stableStringify(variant)
@@ -128,18 +123,10 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
           seen.add(variantKey)
           return true
         })
-        .map((variant) => {
-          if (!hasInversionEnabled(variant) && !usedOriginalResponse) {
-            usedOriginalResponse = true
-            return { params: variant, response: result.response }
-          }
-          return {
-            params: variant,
-            response: hasInversionEnabled(variant)
-              ? cloneResponse(result.response)
-              : result.response,
-          }
-        })
+        .map((variant) => ({
+          params: variant,
+          response: hasInversionEnabled(variant) ? cloneResponse(result.response) : result.response,
+        }))
     })
   }
 
