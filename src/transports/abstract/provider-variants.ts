@@ -28,14 +28,6 @@ const normalizeParams = (value: unknown): unknown => {
 
 const stableStringify = (value: unknown): string => JSON.stringify(normalizeParams(value))
 
-const cloneResponse = <T>(response: T): T => {
-  try {
-    return JSON.parse(JSON.stringify(response)) as T
-  } catch {
-    return response
-  }
-}
-
 /** Stable key for grouping subscriptions that share the same provider-facing params. */
 export const calculateProviderParamsKey = (params: Record<string, unknown>): string =>
   stableStringify(stripInversionConfig(params))
@@ -125,7 +117,7 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
         })
         .map((variant) => ({
           params: variant,
-          response: hasInversionEnabled(variant) ? cloneResponse(result.response) : result.response,
+          response: result.response,
         }))
     })
   }

@@ -1,5 +1,4 @@
 import { AdapterInputError } from '../validation/error'
-import { makeLogger } from '../util/logger'
 import type {
   ProviderResultGenerics,
   ResponseGenerics,
@@ -7,8 +6,6 @@ import type {
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
 } from '../util/types'
-
-const logger = makeLogger('Inversion')
 
 /** Name of the reserved request parameter that enables inversion. */
 export const INVERSION_PARAM = 'inversion'
@@ -54,7 +51,6 @@ const errorResult = <T extends ProviderResultGenerics>(
   result: TimestampedProviderResult<T>,
   message: string,
 ): TimestampedProviderResult<T> => {
-  logger.warn(message)
   return {
     params: result.params,
     response: {
@@ -66,6 +62,15 @@ const errorResult = <T extends ProviderResultGenerics>(
 }
 
 const cloneResponse = <T>(response: T): T => JSON.parse(JSON.stringify(response)) as T
+
+/** Clone a response, returning undefined when it cannot be serialized. */
+export const tryCloneResponse = <T>(response: T): T | undefined => {
+  try {
+    return cloneResponse(response)
+  } catch {
+    return undefined
+  }
+}
 
 const assertPolicyMatchesConfig = <T extends ProviderResultGenerics>(
   result: TimestampedProviderResult<T>,

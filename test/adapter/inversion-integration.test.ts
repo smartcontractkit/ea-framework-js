@@ -388,6 +388,53 @@ test.serial(
   },
 )
 
+test.serial('foreground inversion fails closed without a policy', (t) => {
+  const endpoint = new AdapterEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport: new ForegroundPriceTransport(),
+  })
+  const response: AdapterResponse<TestGenerics['Response']> = {
+    data: { result: 4 },
+    result: 4,
+    statusCode: 200,
+    timestamps,
+  }
+
+  const inverted = endpoint.applyInversionToResponse(response, {
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true },
+  } as unknown as TestParams)
+
+  t.is(inverted.statusCode, 502)
+  t.true(inverted.errorMessage?.includes('no inversion policy') === true)
+})
+
+test.serial('foreground inversion fails closed when the response cannot be cloned', (t) => {
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport: new ForegroundPriceTransport(),
+  })
+  const response = {
+    data: { result: 4 },
+    result: 4,
+    statusCode: 200,
+    timestamps,
+  } as AdapterResponse<TestGenerics['Response']> & { self?: unknown }
+  response.self = response
+
+  const inverted = endpoint.applyInversionToResponse(response, {
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true },
+  } as unknown as TestParams)
+
+  t.is(inverted.statusCode, 502)
+  t.true(inverted.errorMessage?.includes('could not be cloned') === true)
+})
+
 test.serial('inversion config is rejected on an endpoint without a policy', async (t) => {
   const adapter = new Adapter({
     name: 'TEST',
@@ -1184,59 +1231,6 @@ test.serial('custom mutating policy cannot corrupt the raw variant', async (t) =
   )
   t.is((rawCached as AdapterResponse<TestGenerics['Response']>).result, 4)
   t.is((inverseCached as AdapterResponse<TestGenerics['Response']>).result, 0.25)
-})
-
-test.serial('first inverse request backfills from a warm raw cache entry', async (t) => {
-  const transport = new CacheTestTransport()
-  const adapter = new Adapter({
-    name: 'TEST',
-    endpoints: [
-      new PriceEndpoint<TestGenerics>({
-        name: 'test',
-        inputParameters,
-        transport,
-      }),
-    ],
-    config: new AdapterConfig(
-      {},
-      {
-        envDefaultOverrides: {
-          CACHE_POLLING_MAX_RETRIES: 10,
-          CACHE_POLLING_SLEEP_MS: 10,
-        },
-      },
-    ),
-  })
-
-  const context = t.context as TestContext
-  context.testAdapter = await TestAdapter.start(adapter, context)
-
-  const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
-  await transport.responseCache.write(transport.name, [
-    {
-      params: rawParams,
-      response: {
-        data: { result: 4 },
-        result: 4,
-        timestamps,
-      },
-    },
-  ])
-
-  const response = await context.testAdapter.request({
-    endpoint: 'test',
-    base: 'BTC',
-    quote: 'USD',
-    inversion: { enabled: true },
-  })
-
-  t.is(response.statusCode, 200)
-  t.is(response.json().result, 0.25)
-
-  const rawCached = await transport.responseCache.get(
-    transport.responseCache.getCacheKey(transport.name, rawParams),
-  )
-  t.is((rawCached as AdapterResponse<TestGenerics['Response']>).result, 4)
 })
 
 test.serial('request-level inversion works through the full cache path', async (t) => {

@@ -1,5 +1,5 @@
 import { AdapterDependencies } from '../../adapter'
-import { hasInversionEnabled, InversionPolicy } from '../../adapter/inverse'
+import { hasInversionEnabled, InversionPolicy, tryCloneResponse } from '../../adapter/inverse'
 import { AdapterSettings } from '../../config'
 import {
   AdapterResponse,
@@ -109,24 +109,36 @@ export abstract class ResponseCache<
             }
 
             const params = cloneParams(result.params)
+            const response = tryCloneResponse(result.response)
             let inverted: TimestampedProviderResult<T>
-            try {
-              inverted = inversionPolicy.transform({
-                params: cloneParams(params),
-                response: result.response,
-              })
-            } catch (error) {
-              const detail =
-                error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-              const safeDetail = censor(detail, CensorList.getAll()) ?? detail
-              censorLogs(() => logger.warn(`Inversion policy threw: ${detail}`))
+            if (!response) {
               inverted = {
-                params: result.params,
+                params,
                 response: {
                   statusCode: 502,
-                  errorMessage: `Inversion failed: policy transform threw: ${safeDetail}`,
+                  errorMessage: 'Inversion failed: response could not be cloned',
                   timestamps: result.response.timestamps,
                 },
+              }
+            } else {
+              try {
+                inverted = inversionPolicy.transform({
+                  params: cloneParams(params),
+                  response,
+                })
+              } catch (error) {
+                const detail =
+                  error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+                const safeDetail = censor(detail, CensorList.getAll()) ?? detail
+                censorLogs(() => logger.warn(`Inversion policy threw: ${detail}`))
+                inverted = {
+                  params,
+                  response: {
+                    statusCode: 502,
+                    errorMessage: `Inversion failed: policy transform threw: ${safeDetail}`,
+                    timestamps: result.response.timestamps,
+                  },
+                }
               }
             }
 

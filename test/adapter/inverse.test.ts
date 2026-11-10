@@ -759,6 +759,40 @@ test.serial('custom policy cannot mutate params to change the cache key', async 
   t.is((inverseCached as { result: number }).result, 0.25)
 })
 
+test.serial('custom policy cannot mutate the provider result response', async (t) => {
+  const basePolicy = new SingleValueInversionPolicy<SingleValueGenerics>()
+  const policy: InversionPolicy<SingleValueGenerics> = {
+    id: basePolicy.id,
+    version: basePolicy.version,
+    transform: (result) => {
+      const data = result.response.data as { result: number }
+      data.result = 1 / data.result
+      ;(result.response as { result: number }).result = data.result
+      return result
+    },
+  }
+  const { responseCache } = buildCache({ policy })
+  const result = providerResult(inverseParams, 4)
+
+  await responseCache.write('test', [result])
+
+  t.is((result.response as { result: number }).result, 4)
+  t.is((result.response as { data: { result: number } }).data.result, 4)
+  t.is((responseCache.captured?.[0].response as { result: number }).result, 0.25)
+})
+
+test.serial('cache writes fail closed when the response cannot be cloned', async (t) => {
+  const { responseCache } = buildCache()
+  const result = providerResult(inverseParams, 4)
+  ;(result.response as Record<string, unknown>)['self'] = result.response
+
+  await responseCache.write('test', [result])
+
+  const response = responseCache.captured?.[0].response
+  t.is((response as { statusCode: number }).statusCode, 502)
+  t.true((response as { errorMessage: string }).errorMessage.includes('could not be cloned'))
+})
+
 test.serial('resultValidator cannot mutate params to change the cache key', async (t) => {
   const { cache, responseCache } = buildCache({
     resultValidator: (result) => {

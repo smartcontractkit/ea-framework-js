@@ -17,7 +17,7 @@ import {
 } from '../util'
 import { metrics } from '../metrics'
 import CensorList from '../util/censor/censor-list'
-import { hasInversionEnabled, InversionPolicy } from './inverse'
+import { hasInversionEnabled, InversionPolicy, tryCloneResponse } from './inverse'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -193,27 +193,55 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     data: TypeFromDefinition<T['Parameters']>,
   ): AdapterResponse<T['Response']> {
     const policy = this.inversionPolicy
-    if (!policy || !hasInversionEnabled(data) || Boolean(response.errorMessage)) {
+    if (!hasInversionEnabled(data) || Boolean(response.errorMessage)) {
       return response
     }
 
+    if (!policy) {
+      metrics
+        .get('inversionTotal')
+        .labels({
+          adapter_endpoint: this.name,
+          policy: 'none',
+          status: 'rejected',
+        })
+        .inc()
+      return {
+        statusCode: 502,
+        errorMessage: 'Inversion failed: endpoint has no inversion policy',
+        timestamps: (response as TimestampedAdapterResponse<T['Response']>).timestamps,
+      }
+    }
+
+    const clonedResponse = tryCloneResponse(response)
     let result: TimestampedProviderResult<T>
-    try {
-      result = policy.transform({
-        params: data,
-        response: response as TimestampedAdapterResponse<T['Response']>,
-      })
-    } catch (error) {
-      const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-      const safeDetail = censor(detail, CensorList.getAll()) ?? detail
-      censorLogs(() => logger.warn(`Inversion policy threw: ${detail}`))
+    if (!clonedResponse) {
       result = {
         params: data,
         response: {
           statusCode: 502,
-          errorMessage: `Inversion failed: policy transform threw: ${safeDetail}`,
+          errorMessage: 'Inversion failed: response could not be cloned',
           timestamps: (response as TimestampedAdapterResponse<T['Response']>).timestamps,
         },
+      }
+    } else {
+      try {
+        result = policy.transform({
+          params: data,
+          response: clonedResponse as TimestampedAdapterResponse<T['Response']>,
+        })
+      } catch (error) {
+        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+        const safeDetail = censor(detail, CensorList.getAll()) ?? detail
+        censorLogs(() => logger.warn(`Inversion policy threw: ${detail}`))
+        result = {
+          params: data,
+          response: {
+            statusCode: 502,
+            errorMessage: `Inversion failed: policy transform threw: ${safeDetail}`,
+            timestamps: (response as TimestampedAdapterResponse<T['Response']>).timestamps,
+          },
+        }
       }
     }
 

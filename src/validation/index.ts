@@ -186,7 +186,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
           inputParameters: endpoint.inputParameters,
           adapterSettings: adapter.config.settings,
         },
-        validatedData,
+        req.requestContext.data,
       )
       req.requestContext = { ...req.requestContext, meta: { metrics } }
     }

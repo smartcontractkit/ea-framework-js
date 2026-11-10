@@ -1,6 +1,6 @@
 import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
-import { hasInversionEnabled, stripInversionConfig } from '../../adapter/inverse'
+import { hasInversionEnabled } from '../../adapter/inverse'
 import { ResponseCache } from '../../cache/response'
 import { metrics } from '../../metrics'
 import { SubscriptionSet, censorLogs, makeLogger } from '../../util'
@@ -72,35 +72,6 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
       this.subscriptionTtl,
       req.requestContext.cacheKey,
     )
-
-    if (this.inversionSubscriptionSet && hasInversionEnabled(req.requestContext.data)) {
-      await this.backfillInverseFromRaw(req)
-    }
-  }
-
-  private async backfillInverseFromRaw(
-    req: AdapterRequest<TypeFromDefinition<T['Parameters']>>,
-  ): Promise<void> {
-    if (await this.responseCache.get(req.requestContext.cacheKey)) {
-      return
-    }
-
-    const rawParams = stripInversionConfig(
-      req.requestContext.data as Record<string, unknown>,
-    ) as TypeFromDefinition<T['Parameters']>
-    const rawResponse = await this.responseCache.get(
-      this.responseCache.getCacheKey(this.name, rawParams),
-    )
-    if (!rawResponse) {
-      return
-    }
-
-    await this.responseCache.write(this.name, [
-      {
-        params: req.requestContext.data,
-        response: rawResponse as TimestampedProviderResult<T>['response'],
-      },
-    ])
   }
 
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
