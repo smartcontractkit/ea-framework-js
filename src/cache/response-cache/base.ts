@@ -80,12 +80,16 @@ export abstract class ResponseCache<
             let inverted: TimestampedProviderResult<T>
             try {
               inverted = inversionPolicy.transform(result)
-            } catch {
+            } catch (error) {
+              const detail =
+                error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+              const safeDetail = censor(detail, CensorList.getAll()) ?? detail
+              censorLogs(() => logger.warn(`Inversion policy threw: ${detail}`))
               inverted = {
                 params: result.params,
                 response: {
                   statusCode: 502,
-                  errorMessage: 'Inversion failed: policy transform threw an unexpected error',
+                  errorMessage: `Inversion failed: policy transform threw: ${safeDetail}`,
                   timestamps: result.response.timestamps,
                 },
               }
@@ -93,8 +97,12 @@ export abstract class ResponseCache<
 
             const failed = 'errorMessage' in inverted.response
             metrics
-              .get(failed ? 'inversionRejected' : 'inversionApplied')
-              .labels({ adapter_endpoint: this.endpointName, policy: inversionPolicy.id })
+              .get('inversionTotal')
+              .labels({
+                adapter_endpoint: this.endpointName,
+                policy: inversionPolicy.id,
+                status: failed ? 'rejected' : 'applied',
+              })
               .inc()
             return inverted
           })

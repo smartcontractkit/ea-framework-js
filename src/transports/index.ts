@@ -57,11 +57,7 @@ export interface Transport<T extends TransportGenerics> {
   name: string
   responseCache: ResponseCache<T>
 
-  /**
-   * Whether this transport supports inversion-enabled requests.
-   * Built-in transports set this to true. Custom transports must opt in
-   * explicitly after wiring `resolveResultVariants` into their cache writes.
-   */
+  /** Whether this transport supports inversion-enabled requests. */
   supportsInversion?: boolean
 
   /**

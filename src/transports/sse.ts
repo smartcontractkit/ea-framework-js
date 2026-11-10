@@ -119,7 +119,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
             }
             return result
           })
-          this.responseCache.write(this.name, this.resolveResultVariants(results))
+          this.writeResults(results)
         }
       }
 

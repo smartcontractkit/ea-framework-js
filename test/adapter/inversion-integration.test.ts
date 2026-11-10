@@ -70,6 +70,7 @@ const resolvedInversion = {
 class ForegroundPriceTransport extends SubscriptionTransport<TestGenerics> {
   supportsInversion = true
   receivedData: Record<string, unknown>[] = []
+  receivedCacheKeys: string[] = []
 
   getSubscriptionTtlFromConfig(): number {
     return 1000
@@ -83,6 +84,7 @@ class ForegroundPriceTransport extends SubscriptionTransport<TestGenerics> {
     req: AdapterRequest<TestParams>,
   ): Promise<AdapterResponse<TestGenerics['Response']>> {
     this.receivedData.push(req.requestContext.data as Record<string, unknown>)
+    this.receivedCacheKeys.push(req.requestContext.cacheKey)
     return {
       data: { result: 4 },
       result: 4,
@@ -143,7 +145,7 @@ class CacheTestTransport extends SubscriptionTransport<TestGenerics> {
   providerEntries: Record<string, unknown>[] = []
 
   get variantsCount(): number {
-    return this.providerVariants.size
+    return this.variantResolver.size
   }
 
   getSubscriptionTtlFromConfig(): number {
@@ -158,7 +160,7 @@ class CacheTestTransport extends SubscriptionTransport<TestGenerics> {
   }
 
   async produce(result: TimestampedProviderResult<TestGenerics>): Promise<void> {
-    await this.responseCache.write(this.name, this.resolveResultVariants([result]))
+    await this.writeResults([result])
   }
 }
 
@@ -575,14 +577,15 @@ test.serial('provider variants are cleared when inversion subscriptions expire',
   t.is(transport.providerEntries, entries)
 })
 
-test.serial('inversion is rejected with a custom cacheKeyGenerator', async (t) => {
+test.serial('inversion appends a suffix to custom cache keys', async (t) => {
+  const transport = new ForegroundPriceTransport()
   const adapter = new Adapter({
     name: 'TEST',
     endpoints: [
       new PriceEndpoint<TestGenerics>({
         name: 'test',
         inputParameters,
-        transport: new ForegroundPriceTransport(),
+        transport,
         cacheKeyGenerator: () => 'custom-key',
       }),
     ],
@@ -597,6 +600,7 @@ test.serial('inversion is rejected with a custom cacheKeyGenerator', async (t) =
     quote: 'USD',
   })
   t.is(rawResponse.statusCode, 200)
+  t.is(rawResponse.json().result, 4)
 
   const inverseResponse = await context.testAdapter.request({
     endpoint: 'test',
@@ -604,8 +608,10 @@ test.serial('inversion is rejected with a custom cacheKeyGenerator', async (t) =
     quote: 'USD',
     inversion: { enabled: true },
   })
-  t.is(inverseResponse.statusCode, 400)
-  t.true(inverseResponse.body.includes('custom cacheKeyGenerator'))
+  t.is(inverseResponse.statusCode, 200)
+  t.is(inverseResponse.json().result, 0.25)
+
+  t.deepEqual(transport.receivedCacheKeys, ['custom-key', 'custom-key-inversion-single-value-v1'])
 })
 
 test.serial('HTTP raw and inverse variants share one provider request', async (t) => {

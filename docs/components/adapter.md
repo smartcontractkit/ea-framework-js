@@ -98,33 +98,31 @@ New feeds can request the inverse of a provider-supported pair without adding an
 }
 ```
 
-The request only enables inversion. The endpoint chooses the fields and validity rules:
+The request only enables inversion. The endpoint policy owns the fields and validity rules:
 
-- `PriceEndpoint` / single-value responses:
-  - `data.result` is the canonical value
-  - `data.result` is replaced with `1 / value`
-  - top-level `result` is mirrored to the same value
-- `LwbaEndpoint` / quote responses:
-  - `bid' = 1 / ask`
-  - `ask' = 1 / bid`
-  - mid uses the provider mid when present
-  - otherwise mid is computed from the inverted bid/ask midpoint
-  - optional `bidSize`/`askSize` are swapped as auxiliary fields; their validity and null handling remain owned by the asset-class policy
+| Endpoint                       | Fields inverted                                                | Notes                                                                          |
+| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `PriceEndpoint` / single-value | `data.result` → `1 / data.result`; top-level `result` mirrored | `data.result` is the canonical value                                           |
+| `LwbaEndpoint` / quote         | `bid' = 1 / ask`, `ask' = 1 / bid`                             | `mid'` uses the provider mid when present; otherwise `(1 / ask + 1 / bid) / 2` |
 
-Inversion rejects with a 502 when the raw or inverted value is missing, non-finite, zero, negative, or violates the quote invariants. Error responses from the provider are never inverted.
+For LWBA responses, optional `bidSize`/`askSize` values are swapped when present. Size validity and null handling remain owned by the asset-class policy (OPDATA-9200).
 
-Backward compatibility:
+Inversion is atomic per response: all fields are validated and inverted together. If any field is missing, non-finite, zero, negative, or violates the quote invariants, the whole response becomes a 502 and no partial fields are written. Provider error responses are never inverted.
 
-- Requests without `inversion` follow the existing code path, cache keys, and response shapes.
-- `inversion: { "enabled": false }` is a no-op. It is not persisted in the request params, so the cache key, feed ID, and legacy `includes.json` behavior are identical to a request that omits `inversion`.
-- Existing `includes.json` behavior is unchanged.
-- If both `includes.json` and an enabled explicit `inversion` config apply, the explicit config wins and the legacy read-path inversion is skipped.
-- Inversion config is stripped before provider requests and subscriptions; raw and inverse variants share a single provider subscription.
-- The resolved policy id/version are part of the request params, so they are included in cache keys and feed IDs. A policy version bump therefore changes the inverse cache key and feed ID; coordinate that change across all readers and writers.
-- The config must only be sent to EA versions that support request-driven inversion. Older EAs silently ignore unknown request params, so RDD/jobspec changes must be version-gated.
-- Inversion is rejected with a 400 on endpoints with a custom `cacheKeyGenerator`, because the framework cannot guarantee that the generated key distinguishes raw and inverse variants.
-- Custom transports must set `supportsInversion = true` and pass every result through `resolveResultVariants` before writing to the response cache. Otherwise inversion requests are rejected with a 400.
+### Cache keys and feed IDs
+
+- Requests without `inversion`, and requests with `inversion: { "enabled": false }`, keep the existing cache key, feed ID, and `includes.json` behavior.
+- Enabled requests include the resolved policy id/version in request params, so raw and inverse variants use distinct cache keys and feed IDs.
+- If the endpoint has a custom `cacheKeyGenerator`, inversion appends `-inversion-<policyId>-v<policyVersion>` to the generated key before `MAX_COMMON_KEY_SIZE` truncation.
+- A policy version bump changes the inverse cache key and feed ID. Coordinate that migration across all readers and writers.
+
+### Transports and rollout
+
+- Inversion config is stripped before provider requests and subscriptions; raw and inverse variants share one provider subscription.
+- Built-in HTTP, WS, and SSE transports support inversion. Custom transports must set `supportsInversion = true` and write results through `writeResults`; otherwise inversion requests are rejected with a 400.
 - `foregroundExecute` implementations must return the raw provider response. The framework applies inversion to the immediate response; pre-inverted values would be inverted twice.
+- If both `includes.json` and an enabled explicit `inversion` config apply, the explicit config wins and the legacy read-path inversion is skipped.
+- The framework cannot enforce EA-version support. Older EAs silently ignore unknown request params, so RDD/CLO must gate jobspec changes on the deployed EA version. Do not add inversion to existing feeds; it creates a new feed identity.
 
 ## Request Transforms
 

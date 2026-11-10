@@ -350,7 +350,7 @@ export class WebSocketTransport<
         if (Array.isArray(results) && results.length > 0) {
           // Updating the last message received time here, to only care about messages we use
           this.lastMessageReceivedAt = Date.now()
-          await this.responseCache.write(this.name, this.resolveResultVariants(results))
+          await this.writeResults(results)
         }
 
         // Do this after writing so we get the values to the cache ASAP

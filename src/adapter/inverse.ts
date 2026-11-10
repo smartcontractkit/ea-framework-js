@@ -137,24 +137,6 @@ const resolveConfig = (
   policyVersion: version,
 })
 
-/** Sort object keys recursively so cache keys/subscription keys are deterministic. */
-export const sortObjectKeys = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map(sortObjectKeys)
-  }
-  if (isRecord(value)) {
-    return Object.keys(value)
-      .sort()
-      .reduce<Record<string, unknown>>((acc, key) => {
-        acc[key] = sortObjectKeys(value[key])
-        return acc
-      }, {})
-  }
-  return value
-}
-
-export const stableStringify = (value: unknown): string => JSON.stringify(sortObjectKeys(value))
-
 /**
  * Read the raw inversion config from request/result params.
  *
@@ -211,10 +193,6 @@ export const stripInversionConfig = <T extends Record<string, unknown>>(params: 
   delete copy[INVERSION_PARAM]
   return copy
 }
-
-/** Stable key for grouping subscriptions that share the same provider-facing params. */
-export const calculateProviderParamsKey = (params: Record<string, unknown>): string =>
-  stableStringify(stripInversionConfig(params))
 
 export class SingleValueInversionPolicy<
   T extends ProviderResultGenerics = ProviderResultGenerics,

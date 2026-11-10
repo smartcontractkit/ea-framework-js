@@ -205,7 +205,7 @@ export class HttpTransport<T extends HttpTransportGenerics> extends Subscription
     }
 
     logger.debug('Setting adapter responses in cache')
-    await this.responseCache.write(this.name, this.resolveResultVariants(results))
+    await this.writeResults(results)
 
     if (msUntilNextExecution) {
       // If we got this, it means that the queue was unable to accomomdate this request.

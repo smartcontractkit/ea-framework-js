@@ -1,29 +1,39 @@
 import test from 'ava'
 import {
-  calculateProviderParamsKey,
   getInversionConfig,
   getRawInversionConfig,
   hasInversionEnabled,
+  InversionPolicy,
   QuoteInversionPolicy,
   SingleValueInversionPolicy,
   stripInversionConfig,
 } from '../../src/adapter/inverse'
+import { calculateProviderParamsKey } from '../../src/transports/abstract/provider-variants'
 import {
   LwbaEndpointInputParametersDefinition,
   LwbaResponseDataFields,
   PriceEndpointInputParametersDefinition,
+  priceEndpointInputParametersDefinition,
 } from '../../src/adapter'
+import { AdapterDependencies } from '../../src/adapter/types'
+import { Cache, calculateFeedId } from '../../src/cache'
+import { SimpleResponseCache } from '../../src/cache/response-cache/simple'
+import { buildAdapterSettings } from '../../src/config'
+import { metrics } from '../../src/metrics'
 import {
   SingleNumberResultResponse,
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
 } from '../../src/util'
 import { AdapterInputError } from '../../src/validation/error'
-import { makeStub } from '../../src/util/testing-utils'
+import { makeStub, MockCache } from '../../src/util/testing-utils'
 import { LoggerFactoryProvider } from '../../src/util/logger'
+import { InputParameters } from '../../src/validation'
+import { TypeFromDefinition } from '../../src/validation/input-params'
 
 test.before(() => {
   LoggerFactoryProvider.set()
+  metrics.initialize()
 })
 
 type SingleValueGenerics = {
@@ -258,6 +268,30 @@ test('quote policy rejects missing, zero, negative, crossed and out-of-range quo
   t.true(isError(quotePolicy.transform(missingBid)))
 })
 
+test('quote policy is atomic across bid, mid and ask', (t) => {
+  const valid = quotePolicy.transform(quoteAttempt(1, 1.2, 1.1))
+  t.is(isError(valid), false)
+  if (!isError(valid)) {
+    const data = (valid.response as { data: LwbaResponseDataFields['Data'] }).data
+    t.true(Math.abs(data.bid - 1 / 1.2) < 1e-12)
+    t.true(Math.abs(data.ask - 1 / 1) < 1e-12)
+    t.true(Math.abs(data.mid - 1 / 1.1) < 1e-12)
+  }
+
+  const input = quoteAttempt(1, 1.2, 1.3)
+  const invalid = quotePolicy.transform(input)
+  t.true(isError(invalid))
+  if (isError(invalid)) {
+    t.false('data' in invalid.response)
+    t.false('result' in invalid.response)
+  }
+
+  const originalData = (input.response as { data: LwbaResponseDataFields['Data'] }).data
+  t.is(originalData.bid, 1)
+  t.is(originalData.ask, 1.2)
+  t.is(originalData.mid, 1.3)
+})
+
 test('quote policy leaves input unchanged', (t) => {
   const input = quoteAttempt(1, 1.2, 1.1, { bidSize: 10, askSize: 20 })
   quotePolicy.transform(input)
@@ -451,4 +485,227 @@ test('single-value policy rejects missing or malformed data', (t) => {
   ]) {
     t.true(isError(singleValuePolicy.transform(makeAttempt())))
   }
+})
+
+const inputParameters = new InputParameters(priceEndpointInputParametersDefinition)
+const adapterSettings = buildAdapterSettings({})
+
+type CacheParams = TypeFromDefinition<SingleValueGenerics['Parameters']>
+
+const resolvedConfig = {
+  enabled: true,
+  policyId: 'single-value',
+  policyVersion: 1,
+}
+
+const rawParams = { base: 'BTC', quote: 'USD' } as CacheParams
+const inverseParams = {
+  ...rawParams,
+  inversion: resolvedConfig,
+} as unknown as CacheParams
+
+const providerResult = (
+  params: CacheParams,
+  value: number,
+): TimestampedProviderResult<SingleValueGenerics> => ({
+  params,
+  response: {
+    data: { result: value },
+    result: value,
+    timestamps,
+  },
+})
+
+class CapturingSimpleResponseCache extends SimpleResponseCache<SingleValueGenerics> {
+  captured?: TimestampedProviderResult<SingleValueGenerics>[]
+
+  protected override async _write(
+    transportName: string,
+    results: TimestampedProviderResult<SingleValueGenerics>[],
+  ): Promise<void> {
+    this.captured = results
+    return super._write(transportName, results)
+  }
+}
+
+const buildCache = ({
+  policy,
+  resultValidator,
+}: {
+  policy?: InversionPolicy<SingleValueGenerics>
+  resultValidator?: (
+    result: TimestampedProviderResult<SingleValueGenerics>,
+  ) => TimestampedProviderResult<SingleValueGenerics>
+} = {}) => {
+  const cache = new MockCache(adapterSettings.CACHE_MAX_ITEMS)
+  const responseCache = new CapturingSimpleResponseCache({
+    dependencies: { cache } as unknown as AdapterDependencies,
+    adapterSettings,
+    adapterName: 'TEST',
+    endpointName: 'test',
+    inputParameters,
+  })
+  responseCache.inversionPolicy = policy ?? new SingleValueInversionPolicy<SingleValueGenerics>()
+  if (resultValidator) {
+    responseCache.resultValidator = resultValidator
+  }
+  return { cache, responseCache }
+}
+
+test.serial(
+  'no inversion keeps the raw cache key, feed ID, array and objects unchanged',
+  async (t) => {
+    const { responseCache } = buildCache()
+    const results = [providerResult(rawParams, 4)]
+
+    t.is(
+      responseCache.getCacheKey('test', rawParams),
+      'TEST-test-test-{"base":"btc","quote":"usd"}',
+    )
+    t.is(calculateFeedId({ adapterSettings }, rawParams), '{"base":"btc","quote":"usd"}')
+    t.not(
+      responseCache.getCacheKey('test', inverseParams),
+      responseCache.getCacheKey('test', rawParams),
+    )
+    t.not(
+      calculateFeedId({ adapterSettings }, inverseParams),
+      calculateFeedId({ adapterSettings }, rawParams),
+    )
+
+    await responseCache.write('test', results)
+
+    t.is(responseCache.captured, results)
+    t.is(responseCache.captured?.[0], results[0])
+  },
+)
+
+test.serial('no inversion does not call the inversion policy', async (t) => {
+  let calls = 0
+  const basePolicy = new SingleValueInversionPolicy<SingleValueGenerics>()
+  const policy: InversionPolicy<SingleValueGenerics> = {
+    id: basePolicy.id,
+    version: basePolicy.version,
+    validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
+    resolveConfig: (config) => basePolicy.resolveConfig(config),
+    transform: (result) => {
+      calls += 1
+      return basePolicy.transform(result)
+    },
+  }
+  const { responseCache } = buildCache({ policy })
+
+  await responseCache.write('test', [providerResult(rawParams, 4)])
+
+  t.is(calls, 0)
+})
+
+test.serial('mixed batches only invert configured results', async (t) => {
+  const { cache, responseCache } = buildCache()
+
+  await responseCache.write('test', [
+    providerResult(rawParams, 4),
+    providerResult(inverseParams, 4),
+  ])
+
+  t.is(responseCache.captured?.length, 2)
+  t.is((responseCache.captured?.[0].response as { result: number }).result, 4)
+  t.is((responseCache.captured?.[1].response as { result: number }).result, 0.25)
+
+  const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
+  const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
+  t.is((rawCached as { result: number }).result, 4)
+  t.is((inverseCached as { result: number }).result, 0.25)
+})
+
+test.serial('malformed or mismatched policy metadata is written as a 502', async (t) => {
+  const { responseCache } = buildCache()
+
+  for (const params of [
+    { ...rawParams, inversion: { enabled: true } },
+    { ...rawParams, inversion: { ...resolvedConfig, policyVersion: 2 } },
+    { ...rawParams, inversion: { ...resolvedConfig, policyId: 'other' } },
+  ] as unknown as CacheParams[]) {
+    await responseCache.write('test', [providerResult(params, 4)])
+
+    const response = responseCache.captured?.[0].response
+    t.true(response !== undefined && 'errorMessage' in response)
+    if (response && 'errorMessage' in response) {
+      const errorResponse = response as TimestampedProviderErrorResponse
+      t.is(errorResponse.statusCode, 502)
+      t.true(errorResponse.errorMessage.includes('Inversion failed'))
+    }
+  }
+})
+
+test.serial('a throwing policy is converted to a 502 and does not reject the write', async (t) => {
+  const basePolicy = new SingleValueInversionPolicy<SingleValueGenerics>()
+  const throwingPolicy: InversionPolicy<SingleValueGenerics> = {
+    id: basePolicy.id,
+    version: basePolicy.version,
+    validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
+    resolveConfig: (config) => basePolicy.resolveConfig(config),
+    transform: () => {
+      throw new Error('boom')
+    },
+  }
+  const { responseCache } = buildCache({ policy: throwingPolicy })
+
+  await t.notThrowsAsync(() => responseCache.write('test', [providerResult(inverseParams, 4)]))
+
+  const response = responseCache.captured?.[0].response
+  t.true(response !== undefined && 'errorMessage' in response)
+  if (response && 'errorMessage' in response) {
+    const errorResponse = response as TimestampedProviderErrorResponse
+    t.is(errorResponse.statusCode, 502)
+    t.true(errorResponse.errorMessage.includes('policy transform threw'))
+    t.true(errorResponse.errorMessage.includes('boom'))
+  }
+})
+
+test.serial('resultValidator runs after inversion', async (t) => {
+  const seen: number[] = []
+  const { responseCache } = buildCache({
+    resultValidator: (result) => {
+      if (!('errorMessage' in result.response)) {
+        seen.push(result.response.result as number)
+      }
+      return result
+    },
+  })
+
+  await responseCache.write('test', [providerResult(inverseParams, 4)])
+
+  t.deepEqual(seen, [0.25])
+})
+
+test.serial('writeTTL extends distinct raw and inverse cache keys', async (t) => {
+  const ttlCalls: { key: string; ttl: number }[] = []
+  const cache = {
+    setTTL: async (key: string, ttl: number) => {
+      ttlCalls.push({ key, ttl })
+    },
+  } as unknown as Cache
+  const responseCache = new CapturingSimpleResponseCache({
+    dependencies: { cache } as unknown as AdapterDependencies,
+    adapterSettings,
+    adapterName: 'TEST',
+    endpointName: 'test',
+    inputParameters,
+  })
+
+  await responseCache.writeTTL('test', [rawParams, inverseParams, rawParams], 123)
+
+  t.deepEqual(ttlCalls, [
+    { key: responseCache.getCacheKey('test', rawParams), ttl: 123 },
+    { key: responseCache.getCacheKey('test', inverseParams), ttl: 123 },
+    { key: responseCache.getCacheKey('test', rawParams), ttl: 123 },
+  ])
+  t.not(ttlCalls[0].key, ttlCalls[1].key)
+})
+
+test.serial('proxy-based result params do not throw when inversion is absent', async (t) => {
+  const { responseCache } = buildCache()
+  const stubParams = makeStub('params', { base: 'BTC', quote: 'USD' }) as CacheParams
+
+  await t.notThrowsAsync(() => responseCache.write('test', [providerResult(stubParams, 4)]))
 })
