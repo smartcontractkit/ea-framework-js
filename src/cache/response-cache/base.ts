@@ -23,6 +23,14 @@ import { metrics } from '../../metrics'
 
 const logger = makeLogger('ResponseCache')
 
+const cloneParams = <P>(params: P): P => {
+  try {
+    return JSON.parse(JSON.stringify(params)) as P
+  } catch {
+    return { ...params }
+  }
+}
+
 export abstract class ResponseCache<
   T extends { Parameters: InputParametersDefinition; Response: ResponseGenerics },
 > {
@@ -100,9 +108,13 @@ export abstract class ResponseCache<
               return result
             }
 
+            const params = cloneParams(result.params)
             let inverted: TimestampedProviderResult<T>
             try {
-              inverted = inversionPolicy.transform(result)
+              inverted = inversionPolicy.transform({
+                params: cloneParams(params),
+                response: result.response,
+              })
             } catch (error) {
               const detail =
                 error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -127,7 +139,7 @@ export abstract class ResponseCache<
                 status: failed ? 'rejected' : 'applied',
               })
               .inc()
-            return { params: result.params, response: inverted.response }
+            return { params, response: inverted.response }
           })
         : results
 
@@ -141,10 +153,28 @@ export abstract class ResponseCache<
     }
 
     return results.map((result) => {
-      const validated = resultValidator(result)
-      return hasInversionEnabled(result.params)
-        ? { params: result.params, response: validated.response }
-        : validated
+      const isInversion = hasInversionEnabled(result.params)
+      if (!isInversion) {
+        return resultValidator(result)
+      }
+
+      const params = cloneParams(result.params)
+      try {
+        const validated = resultValidator({ ...result, params: cloneParams(params) })
+        return { params, response: validated.response }
+      } catch (error) {
+        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+        const safeDetail = censor(detail, CensorList.getAll()) ?? detail
+        censorLogs(() => logger.warn(`Result validator threw: ${detail}`))
+        return {
+          params,
+          response: {
+            statusCode: 502,
+            errorMessage: `Result validation failed: ${safeDetail}`,
+            timestamps: result.response.timestamps,
+          },
+        }
+      }
     })
   }
 

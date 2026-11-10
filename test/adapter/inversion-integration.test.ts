@@ -1177,6 +1177,59 @@ test.serial('custom mutating policy cannot corrupt the raw variant', async (t) =
   t.is((inverseCached as AdapterResponse<TestGenerics['Response']>).result, 0.25)
 })
 
+test.serial('first inverse request backfills from a warm raw cache entry', async (t) => {
+  const transport = new CacheTestTransport()
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new PriceEndpoint<TestGenerics>({
+        name: 'test',
+        inputParameters,
+        transport,
+      }),
+    ],
+    config: new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          CACHE_POLLING_MAX_RETRIES: 10,
+          CACHE_POLLING_SLEEP_MS: 10,
+        },
+      },
+    ),
+  })
+
+  const context = t.context as TestContext
+  context.testAdapter = await TestAdapter.start(adapter, context)
+
+  const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
+  await transport.responseCache.write(transport.name, [
+    {
+      params: rawParams,
+      response: {
+        data: { result: 4 },
+        result: 4,
+        timestamps,
+      },
+    },
+  ])
+
+  const response = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true },
+  })
+
+  t.is(response.statusCode, 200)
+  t.is(response.json().result, 0.25)
+
+  const rawCached = await transport.responseCache.get(
+    transport.responseCache.getCacheKey(transport.name, rawParams),
+  )
+  t.is((rawCached as AdapterResponse<TestGenerics['Response']>).result, 4)
+})
+
 test.serial('request-level inversion works through the full cache path', async (t) => {
   const transport = new CacheBackedTransport()
   const adapter = new Adapter({

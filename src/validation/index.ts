@@ -32,6 +32,9 @@ const getRequestInversionConfig = (
   endpoint: AdapterEndpoint<EndpointGenerics>,
   data: Record<string, unknown>,
 ): InversionRequestConfig | undefined => {
+  if (!Object.prototype.hasOwnProperty.call(data, INVERSION_PARAM)) {
+    return undefined
+  }
   const rawInversion = data[INVERSION_PARAM]
   if (rawInversion === undefined) {
     return undefined

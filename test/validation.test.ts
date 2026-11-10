@@ -622,6 +622,23 @@ test.serial('reserved input parameter names and aliases are rejected', (t) => {
   )
 })
 
+test.serial('nested inversion parameters are allowed', (t) => {
+  t.notThrows(
+    () =>
+      new InputParameters({
+        filter: {
+          type: {
+            inversion: {
+              type: 'boolean',
+              description: 'nested provider option',
+            },
+          },
+          description: 'filter',
+        },
+      } as const),
+  )
+})
+
 test.serial('aliases of different properties with common values fail validation', async (t) => {
   const error = t.throws(() => {
     t.context.adapterEndpoint.inputParameters = new InputParameters({

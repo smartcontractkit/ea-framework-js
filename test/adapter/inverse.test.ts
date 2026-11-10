@@ -370,6 +370,12 @@ test('inversion config detection is safe for Proxy-based test doubles', (t) => {
   t.is(stripInversionConfig(params as Record<string, unknown>), params)
 })
 
+test('inherited inversion config is ignored', (t) => {
+  const params = Object.create({ inversion: { enabled: true } }) as Record<string, unknown>
+  t.false(hasInversionEnabled(params))
+  t.is(getRawInversionConfig(params), undefined)
+})
+
 test('raw config presence is distinct from resolved policy metadata', (t) => {
   const malformed = {
     base: 'BTC',
@@ -716,6 +722,68 @@ test.serial('resultValidator runs after inversion', async (t) => {
   await responseCache.write('test', [providerResult(inverseParams, 4)])
 
   t.deepEqual(seen, [0.25])
+})
+
+test.serial('custom policy cannot mutate params to change the cache key', async (t) => {
+  const basePolicy = new SingleValueInversionPolicy<SingleValueGenerics>()
+  const policy: InversionPolicy<SingleValueGenerics> = {
+    id: basePolicy.id,
+    version: basePolicy.version,
+    transform: (result) => {
+      if (!result.response.errorMessage) {
+        const data = result.response.data as { result: number }
+        data.result = 1 / data.result
+        ;(result.response as { result: number }).result = data.result
+      }
+      delete (result.params as unknown as Record<string, unknown>)['inversion']
+      return result
+    },
+  }
+  const { cache, responseCache } = buildCache({ policy })
+
+  await responseCache.write('test', [providerResult(inverseParams, 4)])
+
+  const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
+  const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
+  t.is(rawCached, undefined)
+  t.is((inverseCached as { result: number }).result, 0.25)
+})
+
+test.serial('resultValidator cannot mutate params to change the cache key', async (t) => {
+  const { cache, responseCache } = buildCache({
+    resultValidator: (result) => {
+      delete (result.params as unknown as Record<string, unknown>)['inversion']
+      return { params: rawParams, response: result.response }
+    },
+  })
+
+  await responseCache.write('test', [providerResult(inverseParams, 4)])
+
+  const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
+  const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
+  t.is(rawCached, undefined)
+  t.is((inverseCached as { result: number }).result, 0.25)
+})
+
+test.serial('inverted validator throws only reject the inverted result', async (t) => {
+  const { cache, responseCache } = buildCache({
+    resultValidator: (result) => {
+      if (hasInversionEnabled(result.params)) {
+        throw new Error('validator boom')
+      }
+      return result
+    },
+  })
+
+  await responseCache.write('test', [
+    providerResult(rawParams, 4),
+    providerResult(inverseParams, 4),
+  ])
+
+  const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
+  const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
+  t.is((rawCached as { result: number }).result, 4)
+  t.is((inverseCached as { statusCode: number }).statusCode, 502)
 })
 
 test.serial('custom policy cannot change the cache key', async (t) => {

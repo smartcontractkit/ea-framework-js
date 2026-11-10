@@ -38,6 +38,8 @@ export class CompareResponseCache<
     this.transportName = transportName
     this.responseCache = responseCache
     this.shouldUpdate = shouldUpdate
+    this.inversionPolicy = responseCache.inversionPolicy
+    this.resultValidator = responseCache.resultValidator
   }
 
   protected async _write(

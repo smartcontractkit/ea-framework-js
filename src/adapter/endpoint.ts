@@ -111,7 +111,13 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   ): Promise<void> {
     if (this.inversionPolicy) {
       const { id, version } = this.inversionPolicy
-      if (typeof id !== 'string' || id.length === 0 || !Number.isInteger(version) || version <= 0) {
+      if (
+        typeof id !== 'string' ||
+        id.length === 0 ||
+        !Number.isInteger(version) ||
+        version <= 0 ||
+        typeof this.inversionPolicy.transform !== 'function'
+      ) {
         throw new AdapterError({
           statusCode: 500,
           message: `Endpoint "${this.name}" has an invalid inversion policy id/version`,

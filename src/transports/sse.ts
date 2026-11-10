@@ -86,7 +86,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
     endpointName: string,
     transportName: string,
   ): Promise<void> {
-    super.initialize(dependencies, adapterSettings, endpointName, transportName)
+    await super.initialize(dependencies, adapterSettings, endpointName, transportName)
     this.requester = dependencies.requester
     if (dependencies.eventSource) {
       this.EventSource = dependencies.eventSource

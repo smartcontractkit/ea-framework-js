@@ -267,7 +267,9 @@ class ProcessedParam<const T extends InputParameter = InputParameter> {
   ) {
     this.aliases = [this.name, ...(this.definition.aliases || [])]
     this.type =
-      typeof definition.type === 'object' ? new InputParameters(definition.type) : definition.type
+      typeof definition.type === 'object'
+        ? new InputParameters(definition.type, undefined, false)
+        : definition.type
 
     if (definition.options) {
       this.options = new Set(definition.options as TypeFromParameter<T>[])
@@ -384,6 +386,7 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
   constructor(
     public definition: T,
     public examples?: TypeFromDefinition<T>[],
+    private readonly isTopLevel = true,
   ) {
     this.params = Object.entries(this.definition).map(
       ([name, param]) => new ProcessedParam(name, param),
@@ -400,11 +403,13 @@ export class InputParameters<const T extends ProperInputParametersDefinition> {
   private validateDefinition() {
     const paramNames = new Set(this.params.map((p) => p.name))
 
-    for (const param of this.params) {
-      if (param.aliases.includes('inversion')) {
-        throw new InputParametersDefinitionError(
-          `Param "${param.name}" uses reserved name or alias "inversion"`,
-        )
+    if (this.isTopLevel) {
+      for (const param of this.params) {
+        if (param.aliases.includes('inversion')) {
+          throw new InputParametersDefinitionError(
+            `Param "${param.name}" uses reserved name or alias "inversion"`,
+          )
+        }
       }
     }
 
