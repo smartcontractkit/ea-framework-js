@@ -47,9 +47,6 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
         `inversion-${inversionPolicy.id}-v${inversionPolicy.version}`,
       )
     }
-    if ('registerVariantResolver' in this.responseCache) {
-      this.responseCache.registerVariantResolver(name, this.variantResolver)
-    }
     this.subscriptionTtl = this.getSubscriptionTtlFromConfig(adapterSettings) // Will be implemented by subclasses
     this.name = name
   }
@@ -110,7 +107,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
    * subscriptions receive the same provider value.
    */
   protected async writeResults(results: TimestampedProviderResult<T>[]): Promise<void> {
-    await this.responseCache.write(this.name, results)
+    await this.responseCache.write(this.name, this.variantResolver.resolve(results))
   }
 
   /**

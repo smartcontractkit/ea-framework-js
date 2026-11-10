@@ -44,7 +44,7 @@ export class SubscriptionSetFactory {
         const cachePrefix = this.cachePrefix ? `${this.cachePrefix}-` : ''
         const suffix = keySuffix ? `-${keySuffix}` : ''
         const subscriptionSetKey = `${cachePrefix}${this.adapterName}-${endpointName}-${transportName}${suffix}-subscriptionSet`
-        return new RedisSubscriptionSet<T>(this.redisClient, subscriptionSetKey)
+        return new RedisSubscriptionSet<T>(this.redisClient, subscriptionSetKey, Boolean(keySuffix))
       }
     }
   }

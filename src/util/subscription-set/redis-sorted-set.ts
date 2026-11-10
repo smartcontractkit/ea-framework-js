@@ -7,7 +7,11 @@ export class RedisSubscriptionSet<T> implements SubscriptionSet<T> {
   // Key for Redis sorted set containing all subscriptions
   private subscriptionSetKey: string
 
-  constructor(redisClient: Redis, subscriptionSetKey: string) {
+  constructor(
+    redisClient: Redis,
+    subscriptionSetKey: string,
+    private readonly expireKey = false,
+  ) {
     this.redisClient = redisClient
     this.subscriptionSetKey = subscriptionSetKey
   }
@@ -16,8 +20,10 @@ export class RedisSubscriptionSet<T> implements SubscriptionSet<T> {
     const storedValue = JSON.stringify(value)
     await this.redisClient.zadd(this.subscriptionSetKey, Date.now() + ttl, storedValue)
     recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'zadd')
-    await this.redisClient.pexpire(this.subscriptionSetKey, ttl)
-    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'pexpire')
+    if (this.expireKey) {
+      await this.redisClient.pexpire(this.subscriptionSetKey, ttl)
+      recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'pexpire')
+    }
     return
   }
 

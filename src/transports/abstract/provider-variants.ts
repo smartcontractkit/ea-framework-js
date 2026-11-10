@@ -95,30 +95,6 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
     return providerEntries
   }
 
-  resolveParams(
-    params: TypeFromDefinition<T['Parameters']>[],
-  ): TypeFromDefinition<T['Parameters']>[] {
-    if (!this.variants.size) {
-      return params
-    }
-
-    const seen = new Set<string>()
-    const resolved: TypeFromDefinition<T['Parameters']>[] = []
-    for (const param of params) {
-      const key = calculateProviderParamsKey(param as Record<string, unknown>)
-      const variants = this.variants.get(key) ?? [param]
-      for (const variant of variants) {
-        const variantKey = stableStringify(variant)
-        if (seen.has(variantKey)) {
-          continue
-        }
-        seen.add(variantKey)
-        resolved.push(variant)
-      }
-    }
-    return resolved
-  }
-
   resolve(results: TimestampedProviderResult<T>[]): TimestampedProviderResult<T>[] {
     if (!this.variants.size) {
       return results

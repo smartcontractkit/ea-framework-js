@@ -28,6 +28,7 @@ import { Requester } from '../util/requester'
 import { AdapterError, AdapterTimeoutError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
+import { hasInversionEnabled, stripInversionConfig } from './inverse'
 import {
   AdapterDependencies,
   AdapterParams,
@@ -491,9 +492,23 @@ export class Adapter<
       return cachedResponse
     }
 
-    // If there was no cached response, execute the foregroundExecute if defined
+    // If there was no cached response, execute the foregroundExecute if defined.
+    // Foreground transports receive provider-facing data without framework inversion config.
+    const foregroundRequest = hasInversionEnabled(req.requestContext.data)
+      ? {
+          ...req,
+          requestContext: {
+            ...req.requestContext,
+            data: stripInversionConfig(req.requestContext.data as Record<string, unknown>),
+          },
+        }
+      : req
     const immediateResponse =
-      transport.foregroundExecute && (await transport.foregroundExecute(req, this.config.settings))
+      transport.foregroundExecute &&
+      (await transport.foregroundExecute(
+        foregroundRequest as AdapterRequest<EmptyInputParameters>,
+        this.config.settings,
+      ))
     if (immediateResponse) {
       logger.debug('Got immediate response from transport, sending as response')
       return endpoint.applyInversionToResponse(immediateResponse, req.requestContext.data)

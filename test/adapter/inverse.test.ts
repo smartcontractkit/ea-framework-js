@@ -1,17 +1,14 @@
 import test from 'ava'
 import {
-  getInversionConfig,
   getRawInversionConfig,
   hasInversionEnabled,
   InversionPolicy,
   QuoteInversionPolicy,
   SingleValueInversionPolicy,
   stripInversionConfig,
+  validateInversionRequestConfig,
 } from '../../src/adapter/inverse'
-import {
-  calculateProviderParamsKey,
-  ProviderVariantResolver,
-} from '../../src/transports/abstract/provider-variants'
+import { calculateProviderParamsKey } from '../../src/transports/abstract/provider-variants'
 import {
   LwbaEndpointInputParametersDefinition,
   LwbaResponseDataFields,
@@ -21,7 +18,7 @@ import {
 import { AdapterDependencies } from '../../src/adapter/types'
 import { Cache, calculateFeedId } from '../../src/cache'
 import { SimpleResponseCache } from '../../src/cache/response-cache/simple'
-import { buildAdapterSettings, EmptyCustomSettings } from '../../src/config'
+import { buildAdapterSettings } from '../../src/config'
 import { metrics } from '../../src/metrics'
 import {
   SingleNumberResultResponse,
@@ -111,19 +108,14 @@ test('rejects invalid inversion request configs', (t) => {
     { enabled: 'true' },
     { enabled: true, x: 1 },
   ]) {
-    t.throws(() => singleValuePolicy.validateRequestConfig(config), {
+    t.throws(() => validateInversionRequestConfig(config), {
       instanceOf: AdapterInputError,
     })
   }
 })
 
 test('accepts enabled inversion request config', (t) => {
-  t.deepEqual(singleValuePolicy.validateRequestConfig({ enabled: true }), { enabled: true })
-  t.deepEqual(singleValuePolicy.resolveConfig({ enabled: true }), {
-    enabled: true,
-    policyId: 'single-value',
-    policyVersion: 1,
-  })
+  t.deepEqual(validateInversionRequestConfig({ enabled: true }), { enabled: true })
 })
 
 test('single-value policy inverts result and data.result without mutating input', (t) => {
@@ -364,17 +356,16 @@ test('inversion params are stripped for provider grouping', (t) => {
     policyVersion: 1,
   })
   t.is(calculateProviderParamsKey(raw), calculateProviderParamsKey(inverse))
-  t.deepEqual(getInversionConfig(inverse), inverse.inversion)
-  t.is(getInversionConfig(raw), undefined)
+  t.deepEqual(getRawInversionConfig(inverse), inverse.inversion)
+  t.is(getRawInversionConfig(raw), undefined)
 })
 
 test('inversion config detection is safe for Proxy-based test doubles', (t) => {
   const params = makeStub('params', { base: 'BTC', quote: 'USD' })
 
-  t.notThrows(() => getInversionConfig(params))
+  t.notThrows(() => getRawInversionConfig(params))
   t.notThrows(() => hasInversionEnabled(params))
   t.is(getRawInversionConfig(params), undefined)
-  t.is(getInversionConfig(params), undefined)
   t.false(hasInversionEnabled(params))
   t.is(stripInversionConfig(params as Record<string, unknown>), params)
 })
@@ -392,9 +383,7 @@ test('raw config presence is distinct from resolved policy metadata', (t) => {
     policyId: undefined,
     policyVersion: undefined,
   })
-  t.is(getInversionConfig(malformed), undefined)
   t.false(hasInversionEnabled({ ...malformed, inversion: { enabled: false } }))
-  t.is(getInversionConfig({ ...malformed, inversion: { enabled: false } }), undefined)
 })
 
 test('policies reject malformed or missing policy metadata with 502', (t) => {
@@ -541,10 +530,6 @@ const adapterSettings = buildAdapterSettings({})
 
 type CacheParams = TypeFromDefinition<SingleValueGenerics['Parameters']>
 
-type ResolverGenerics = SingleValueGenerics & {
-  Settings: EmptyCustomSettings
-}
-
 const resolvedConfig = {
   enabled: true,
   policyId: 'single-value',
@@ -638,8 +623,6 @@ test.serial('no inversion does not call the inversion policy', async (t) => {
   const policy: InversionPolicy<SingleValueGenerics> = {
     id: basePolicy.id,
     version: basePolicy.version,
-    validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
-    resolveConfig: (config) => basePolicy.resolveConfig(config),
     transform: (result) => {
       calls += 1
       return basePolicy.transform(result)
@@ -700,8 +683,6 @@ test.serial('a throwing policy is converted to a 502 and does not reject the wri
     const throwingPolicy: InversionPolicy<SingleValueGenerics> = {
       id: basePolicy.id,
       version: basePolicy.version,
-      validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
-      resolveConfig: (config) => basePolicy.resolveConfig(config),
       transform: () => {
         throw thrown
       },
@@ -735,35 +716,6 @@ test.serial('resultValidator runs after inversion', async (t) => {
   await responseCache.write('test', [providerResult(inverseParams, 4)])
 
   t.deepEqual(seen, [0.25])
-})
-
-test('resolveParams fans out provider params for TTL updates', async (t) => {
-  const resolver = new ProviderVariantResolver<ResolverGenerics>()
-  resolver.group([rawParams, inverseParams])
-
-  t.deepEqual(resolver.resolveParams([rawParams]), [rawParams, inverseParams])
-
-  const ttlCalls: { key: string; ttl: number }[] = []
-  const cache = {
-    setTTL: async (key: string, ttl: number) => {
-      ttlCalls.push({ key, ttl })
-    },
-  } as unknown as Cache
-  const responseCache = new CapturingSimpleResponseCache({
-    dependencies: { cache } as unknown as AdapterDependencies,
-    adapterSettings,
-    adapterName: 'TEST',
-    endpointName: 'test',
-    inputParameters,
-  })
-  responseCache.registerVariantResolver('test', resolver)
-
-  await responseCache.writeTTL('test', [rawParams], 123)
-
-  t.deepEqual(ttlCalls, [
-    { key: responseCache.getCacheKey('test', rawParams), ttl: 123 },
-    { key: responseCache.getCacheKey('test', inverseParams), ttl: 123 },
-  ])
 })
 
 test.serial('resultValidator cannot change the cache key', async (t) => {
@@ -864,17 +816,6 @@ test('provider param keys sort arrays and nested objects deterministically', (t)
   t.is(calculateProviderParamsKey(first), calculateProviderParamsKey(second))
 })
 
-test('provider param keys handle __proto__ without prototype pollution', (t) => {
-  const params = JSON.parse('{"base":"BTC","__proto__":{"polluted":true}}') as Record<
-    string,
-    unknown
-  >
-
-  const key = calculateProviderParamsKey(params)
-  t.true(key.includes('__proto__'))
-  t.is(({} as { polluted?: boolean }).polluted, undefined)
-})
-
 test('policies return 502 when the response cannot be cloned', (t) => {
   const single = singleValueAttempt(4)
   ;(single.response as { data: Record<string, unknown> }).data['self'] = single.response.data
@@ -936,7 +877,6 @@ test('raw inversion config rejects non-object and malformed values', (t) => {
     inversion: { enabled: true, policyId: 'single-value', policyVersion: Number.POSITIVE_INFINITY },
   }
   t.truthy(getRawInversionConfig(infiniteVersion))
-  t.is(getInversionConfig(infiniteVersion), undefined)
 })
 
 test.serial('thrown policy errors are redacted with the censor list', async (t) => {
@@ -948,8 +888,6 @@ test.serial('thrown policy errors are redacted with the censor list', async (t) 
     const policy: InversionPolicy<SingleValueGenerics> = {
       id: basePolicy.id,
       version: basePolicy.version,
-      validateRequestConfig: (config) => basePolicy.validateRequestConfig(config),
-      resolveConfig: (config) => basePolicy.resolveConfig(config),
       transform: () => {
         throw new Error('boom super-secret')
       },

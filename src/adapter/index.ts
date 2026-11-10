@@ -1,6 +1,7 @@
 export * from './basic'
 export * from './endpoint'
-export * from './inverse'
+export type { InversionPolicy, InversionRequestConfig } from './inverse'
+export { QuoteInversionPolicy, SingleValueInversionPolicy } from './inverse'
 export * from './lwba'
 export * from './market-status'
 export * from './numeric-result'

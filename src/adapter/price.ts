@@ -184,9 +184,6 @@ export class PriceAdapter<
 
       // Deep clone the response, as it may contain objects which won't be cloned by simply destructuring
       const cloneResponse = JSON.parse(JSON.stringify(response))
-      if (cloneResponse.errorMessage) {
-        return cloneResponse
-      }
 
       const inverseResult = 1 / (cloneResponse.result as number)
       cloneResponse.result = inverseResult

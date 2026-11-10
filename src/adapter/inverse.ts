@@ -24,12 +24,6 @@ export type RawInversionConfig = InversionRequestConfig & {
   policyVersion?: unknown
 }
 
-/** Config after the endpoint policy has been resolved and persisted in request params. */
-export type ResolvedInversionConfig = InversionRequestConfig & {
-  policyId: string
-  policyVersion: number
-}
-
 /**
  * Endpoint-level policy that owns the response-shape-specific inversion behavior.
  * Cache and transport layers must not know whether the payload contains
@@ -38,12 +32,6 @@ export type ResolvedInversionConfig = InversionRequestConfig & {
 export interface InversionPolicy<T extends ProviderResultGenerics> {
   readonly id: string
   readonly version: number
-
-  /** Validate and normalise the request config. Throws AdapterInputError on invalid input. */
-  validateRequestConfig(config: unknown): InversionRequestConfig
-
-  /** Resolve the request config against this policy. */
-  resolveConfig(config: InversionRequestConfig): ResolvedInversionConfig
 
   /**
    * Validate the raw result, apply inversion, and validate the output.
@@ -127,16 +115,6 @@ export const validateInversionRequestConfig = (config: unknown): InversionReques
   return { enabled: config['enabled'] as boolean }
 }
 
-const resolveConfig = (
-  id: string,
-  version: number,
-  config: InversionRequestConfig,
-): ResolvedInversionConfig => ({
-  enabled: config.enabled,
-  policyId: id,
-  policyVersion: version,
-})
-
 /**
  * Read the raw inversion config from request/result params.
  *
@@ -166,24 +144,6 @@ export const getRawInversionConfig = (params: unknown): RawInversionConfig | und
 export const hasInversionEnabled = (params: unknown): boolean =>
   getRawInversionConfig(params)?.enabled === true
 
-/** Read and validate a fully resolved inversion config from request/result params. */
-export const getInversionConfig = (params: unknown): ResolvedInversionConfig | undefined => {
-  const config = getRawInversionConfig(params)
-  if (
-    !config ||
-    typeof config.policyId !== 'string' ||
-    typeof config.policyVersion !== 'number' ||
-    !Number.isFinite(config.policyVersion)
-  ) {
-    return undefined
-  }
-  return {
-    enabled: config.enabled,
-    policyId: config.policyId,
-    policyVersion: config.policyVersion,
-  }
-}
-
 /** Remove the framework-only inversion config before provider calls. */
 export const stripInversionConfig = <T extends Record<string, unknown>>(params: T): T => {
   if (!Object.prototype.hasOwnProperty.call(params, INVERSION_PARAM)) {
@@ -199,14 +159,6 @@ export class SingleValueInversionPolicy<
 > implements InversionPolicy<T> {
   readonly id = 'single-value'
   readonly version = 1
-
-  validateRequestConfig(config: unknown): InversionRequestConfig {
-    return validateInversionRequestConfig(config)
-  }
-
-  resolveConfig(config: InversionRequestConfig): ResolvedInversionConfig {
-    return resolveConfig(this.id, this.version, config)
-  }
 
   transform(result: TimestampedProviderResult<T>): TimestampedProviderResult<T> {
     if (isErrorResponse(result.response)) {
@@ -281,14 +233,6 @@ export class QuoteInversionPolicy<
 > implements InversionPolicy<T> {
   readonly id = 'lwba'
   readonly version = 1
-
-  validateRequestConfig(config: unknown): InversionRequestConfig {
-    return validateInversionRequestConfig(config)
-  }
-
-  resolveConfig(config: InversionRequestConfig): ResolvedInversionConfig {
-    return resolveConfig(this.id, this.version, config)
-  }
 
   transform(result: TimestampedProviderResult<T>): TimestampedProviderResult<T> {
     if (isErrorResponse(result.response)) {

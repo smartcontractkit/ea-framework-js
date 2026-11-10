@@ -36,17 +36,17 @@ const getRequestInversionConfig = (
   if (rawInversion === undefined) {
     return undefined
   }
-  if (endpoint.inversionPolicy) {
-    return endpoint.inversionPolicy.validateRequestConfig(rawInversion)
-  }
   const config = validateInversionRequestConfig(rawInversion)
   if (!config.enabled) {
     return config
   }
-  throw new AdapterInputError({
-    statusCode: 400,
-    message: `Endpoint "${endpoint.name}" does not support inversion`,
-  })
+  if (!endpoint.inversionPolicy) {
+    throw new AdapterInputError({
+      statusCode: 400,
+      message: `Endpoint "${endpoint.name}" does not support inversion`,
+    })
+  }
+  return config
 }
 
 const assertInversionTransportSupported = (
@@ -79,7 +79,11 @@ const attachResolvedInversion = (
   if (!config?.enabled || !endpoint.inversionPolicy) {
     return
   }
-  data[INVERSION_PARAM] = endpoint.inversionPolicy.resolveConfig(config)
+  data[INVERSION_PARAM] = {
+    enabled: true,
+    policyId: endpoint.inversionPolicy.id,
+    policyVersion: endpoint.inversionPolicy.version,
+  }
 }
 
 export const validatorMiddleware: AdapterMiddlewareBuilder =

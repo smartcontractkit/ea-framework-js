@@ -70,7 +70,6 @@ test('inversion subscription sets use distinct Redis keys', async (t) => {
   t.true(keys[2].endsWith('TEST-endpoint-transport-inversion-single-value-v2-subscriptionSet'))
   t.not(keys[1], keys[2])
   t.deepEqual(expirations, [
-    { key: keys[0], ttl: 1000 },
     { key: keys[1], ttl: 1000 },
     { key: keys[2], ttl: 1000 },
   ])

@@ -23,11 +23,6 @@ import { metrics } from '../../metrics'
 
 const logger = makeLogger('ResponseCache')
 
-export interface ResultVariantResolver<R, P> {
-  resolve(results: R[]): R[]
-  resolveParams(params: P[]): P[]
-}
-
 export abstract class ResponseCache<
   T extends { Parameters: InputParametersDefinition; Response: ResponseGenerics },
 > {
@@ -39,10 +34,6 @@ export abstract class ResponseCache<
   dependencies: AdapterDependencies
   resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
   inversionPolicy?: InversionPolicy<T>
-  private variantResolvers = new Map<
-    string,
-    ResultVariantResolver<TimestampedProviderResult<T>, TypeFromDefinition<T['Parameters']>>
-  >()
 
   constructor({
     inputParameters,
@@ -73,24 +64,12 @@ export abstract class ResponseCache<
    * @param transportName - transport name
    * @param results - the entries to write to the cache
    */
-  registerVariantResolver(
-    transportName: string,
-    resolver: ResultVariantResolver<
-      TimestampedProviderResult<T>,
-      TypeFromDefinition<T['Parameters']>
-    >,
-  ): void {
-    this.variantResolvers.set(transportName, resolver)
-  }
-
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
-    const resolver = this.variantResolvers.get(transportName)
-    const resolvedResults = resolver ? resolver.resolve(results) : results
     const inversionPolicy = this.inversionPolicy
-    const hasInversion = resolvedResults.some((result) => hasInversionEnabled(result.params))
+    const hasInversion = results.some((result) => hasInversionEnabled(result.params))
 
     if (hasInversion && !inversionPolicy) {
-      const failed = resolvedResults.map((result) => {
+      const failed = results.map((result) => {
         if (!hasInversionEnabled(result.params) || Boolean(result.response.errorMessage)) {
           return result
         }
@@ -111,19 +90,12 @@ export abstract class ResponseCache<
           },
         }
       })
-      const resultValidator = this.resultValidator
-      const validated = resultValidator
-        ? failed.map((result) => ({
-            params: result.params,
-            response: resultValidator(result).response,
-          }))
-        : failed
-      return this._write(transportName, validated)
+      return this._write(transportName, this.validateResults(failed))
     }
 
     const transformed =
       inversionPolicy && hasInversion
-        ? resolvedResults.map((result) => {
+        ? results.map((result) => {
             if (!hasInversionEnabled(result.params) || Boolean(result.response.errorMessage)) {
               return result
             }
@@ -157,16 +129,23 @@ export abstract class ResponseCache<
               .inc()
             return inverted
           })
-        : resolvedResults
+        : results
 
+    return this._write(transportName, this.validateResults(transformed))
+  }
+
+  private validateResults(results: TimestampedProviderResult<T>[]): TimestampedProviderResult<T>[] {
     const resultValidator = this.resultValidator
-    const validated = resultValidator
-      ? transformed.map((result) => ({
-          params: result.params,
-          response: resultValidator(result).response,
-        }))
-      : transformed
-    return this._write(transportName, validated)
+    if (!resultValidator) {
+      return results
+    }
+
+    return results.map((result) => {
+      const validated = resultValidator(result)
+      return hasInversionEnabled(result.params)
+        ? { params: result.params, response: validated.response }
+        : validated
+    })
   }
 
   /**
@@ -205,9 +184,7 @@ export abstract class ResponseCache<
     params: TypeFromDefinition<T['Parameters']>[],
     ttl: number,
   ): Promise<void> {
-    const resolver = this.variantResolvers.get(transportName)
-    const resolvedParams = resolver ? resolver.resolveParams(params) : params
-    for (const param of resolvedParams) {
+    for (const param of params) {
       const key = this.getCacheKey(transportName, param)
       this.cache.setTTL(key, ttl)
     }

@@ -433,8 +433,6 @@ test.serial('composite transport propagates inversion policy to child caches', a
   const policy: InversionPolicy<CacheTestTransportTypes> = {
     id: 'test-policy',
     version: 1,
-    validateRequestConfig: () => ({ enabled: true }),
-    resolveConfig: () => ({ enabled: true, policyId: 'test-policy', policyVersion: 1 }),
     transform: (result) => result,
   }
   const resultValidator = (result: TimestampedProviderResult<CacheTestTransportTypes>) => result
