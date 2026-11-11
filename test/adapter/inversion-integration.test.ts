@@ -1535,6 +1535,71 @@ test.serial('request-level inversion works through the full cache path', async (
   t.is(rawResponse.json().result, 4)
 })
 
+test.serial('inversion request metrics use the inverse feed ID', async (t) => {
+  const previousMetricsEnabled = process.env['METRICS_ENABLED']
+  const previousExperimentalMetricsEnabled = process.env['EXPERIMENTAL_METRICS_ENABLED']
+  process.env['METRICS_ENABLED'] = 'true'
+  process.env['EXPERIMENTAL_METRICS_ENABLED'] = 'true'
+  t.teardown(() => {
+    if (previousMetricsEnabled === undefined) {
+      delete process.env['METRICS_ENABLED']
+    } else {
+      process.env['METRICS_ENABLED'] = previousMetricsEnabled
+    }
+    if (previousExperimentalMetricsEnabled === undefined) {
+      delete process.env['EXPERIMENTAL_METRICS_ENABLED']
+    } else {
+      process.env['EXPERIMENTAL_METRICS_ENABLED'] = previousExperimentalMetricsEnabled
+    }
+  })
+
+  const transport = new CacheBackedTransport()
+  const adapter = new Adapter({
+    name: 'TEST',
+    endpoints: [
+      new PriceEndpoint<TestGenerics>({
+        name: 'test',
+        inputParameters,
+        transport,
+      }),
+    ],
+    config: new AdapterConfig(
+      {},
+      {
+        envDefaultOverrides: {
+          METRICS_ENABLED: true,
+          EXPERIMENTAL_METRICS_ENABLED: true,
+          CACHE_POLLING_MAX_RETRIES: 20,
+          CACHE_POLLING_SLEEP_MS: 10,
+        },
+      },
+    ),
+  })
+
+  const context = t.context as TestContext
+  context.testAdapter = await TestAdapter.start(adapter, context)
+
+  const inverseResponse = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true },
+  })
+  t.is(inverseResponse.statusCode, 200)
+  const inverseFeedId = inverseResponse.json().meta?.metrics?.feedId as string
+  t.true(inverseFeedId.includes('"inversion"'))
+  t.true(inverseFeedId.includes('"policyId":"single-value"'))
+
+  const rawResponse = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+  })
+  t.is(rawResponse.statusCode, 200)
+  const rawFeedId = rawResponse.json().meta?.metrics?.feedId as string
+  t.false(rawFeedId.includes('inversion'))
+})
+
 test.serial('resolved inversion is attached after request transforms', async (t) => {
   const transport = new ForegroundPriceTransport()
   const adapter = new Adapter({
