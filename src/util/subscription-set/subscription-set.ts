@@ -14,6 +14,9 @@ export interface SubscriptionSet<T> {
   /** Get all subscriptions from the set as a list */
   getAll(): PromiseOrValue<T[]>
 
+  /** Whether the set currently contains any entries, without loading them when possible. */
+  hasEntries?(): PromiseOrValue<boolean>
+
   get: (key: string) => T | undefined
 }
 

@@ -240,7 +240,7 @@ export const metrics = new Metrics(() => ({
   inversionTotal: new client.Counter({
     name: 'inversion_total',
     help: 'The number of provider results processed for inversion, by status',
-    labelNames: ['adapter_endpoint', 'policy', 'status'] as const,
+    labelNames: ['adapter_endpoint', 'policy', 'status', 'transport'] as const,
   }),
   bgExecuteDurationSeconds: new client.Gauge({
     name: 'bg_execute_duration_seconds',

@@ -17,8 +17,9 @@ import { AdapterDependencies } from '../../src/adapter/types'
 import { AdapterConfig, buildAdapterSettings, EmptyCustomSettings } from '../../src/config'
 import { metrics } from '../../src/metrics'
 import { RateLimiterFactory, RateLimitingStrategy } from '../../src/rate-limiting/factory'
-import { HttpTransport } from '../../src/transports'
+import { HttpTransport, TransportRoutes } from '../../src/transports'
 import { SubscriptionTransport } from '../../src/transports/abstract/subscription'
+import { CompositeTransport } from '../../src/transports/composite'
 import { SubscriptionSetFactory } from '../../src/util/subscription-set/subscription-set'
 import {
   AdapterRequest,
@@ -387,6 +388,75 @@ test.serial(
     )
   },
 )
+
+test.serial('foreground inversion isolates live request params from policy mutation', (t) => {
+  const policy: InversionPolicy<TestGenerics> = {
+    id: 'mutating',
+    version: 1,
+    transform: (result) => {
+      const data = result.response.data as { result: number }
+      data.result = 1 / data.result
+      ;(result.response as { result: number }).result = data.result
+      delete (result.params as unknown as Record<string, unknown>)['inversion']
+      ;(result.params as unknown as Record<string, unknown>)['base'] = 'MUTATED'
+      return result
+    },
+  }
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport: new ForegroundPriceTransport(),
+    inversionPolicy: policy,
+  })
+  const data = {
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true, policyId: 'mutating', policyVersion: 1 },
+  } as unknown as TestParams
+  const response: AdapterResponse<TestGenerics['Response']> = {
+    data: { result: 4 },
+    result: 4,
+    statusCode: 200,
+    timestamps,
+  }
+
+  const inverted = endpoint.applyInversionToResponse(response, data)
+
+  t.is(inverted.statusCode, 200)
+  t.is((inverted as { result: number }).result, 0.25)
+  t.is((response as { result: number }).result, 4)
+  t.is(data.base, 'BTC')
+  t.truthy((data as unknown as Record<string, unknown>)['inversion'])
+})
+
+test.serial('foreground inversion rejects malformed policy results', (t) => {
+  const policy: InversionPolicy<TestGenerics> = {
+    id: 'invalid',
+    version: 1,
+    transform: () => undefined as unknown as TimestampedProviderResult<TestGenerics>,
+  }
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport: new ForegroundPriceTransport(),
+    inversionPolicy: policy,
+  })
+  const response: AdapterResponse<TestGenerics['Response']> = {
+    data: { result: 4 },
+    result: 4,
+    statusCode: 200,
+    timestamps,
+  }
+
+  const inverted = endpoint.applyInversionToResponse(response, {
+    base: 'BTC',
+    quote: 'USD',
+    inversion: { enabled: true, policyId: 'invalid', policyVersion: 1 },
+  } as unknown as TestParams)
+
+  t.is(inverted.statusCode, 502)
+  t.true(inverted.errorMessage?.includes('invalid result') === true)
+})
 
 test.serial('foreground inversion fails closed without a policy', (t) => {
   const endpoint = new AdapterEndpoint<TestGenerics>({
@@ -1053,6 +1123,194 @@ test.serial('inversion subscriptions use a policy-versioned set', async (t) => {
 
   t.deepEqual(await transport.subscriptionSet.getAll(), [raw])
   t.deepEqual(await transport.inversionSet?.getAll(), [inverse])
+})
+
+test.serial(
+  'inversion subscription set is not read until an inverse request registers',
+  async (t) => {
+    const dependencies = buildDependencies()
+    const adapterSettings = buildAdapterSettings({})
+    const transport = new CacheTestTransport()
+    const endpoint = new PriceEndpoint<TestGenerics>({
+      name: 'test',
+      inputParameters,
+      transport,
+    })
+
+    await endpoint.initialize('TEST', dependencies, adapterSettings)
+
+    const inversionSet = transport.inversionSet
+    t.truthy(inversionSet)
+    if (!inversionSet) {
+      return
+    }
+
+    let reads = 0
+    const getAll = inversionSet.getAll.bind(inversionSet)
+    inversionSet.getAll = async () => {
+      reads += 1
+      return getAll()
+    }
+
+    await transport.backgroundExecute({
+      endpointName: 'test',
+      inputParameters,
+      adapterSettings,
+    })
+    t.is(reads, 0)
+
+    const inverse = {
+      base: 'BTC',
+      quote: 'USD',
+      inversion: resolvedInversion,
+    } as unknown as TestParams
+    await transport.registerRequest(
+      {
+        requestContext: { data: inverse, cacheKey: 'inverse' },
+      } as unknown as AdapterRequest<TestParams>,
+      adapterSettings,
+    )
+
+    await transport.backgroundExecute({
+      endpointName: 'test',
+      inputParameters,
+      adapterSettings,
+    })
+    t.is(reads, 1)
+  },
+)
+
+test.serial('custom policy identity drives cache keys and subscription set', async (t) => {
+  const dependencies = buildDependencies()
+  const adapterSettings = buildAdapterSettings({})
+  const transport = new CacheTestTransport()
+  const policy: InversionPolicy<TestGenerics> = {
+    id: 'custom',
+    version: 2,
+    transform: (result) => ({
+      params: result.params,
+      response: {
+        data: { result: 0.5 },
+        result: 0.5,
+        timestamps: result.response.timestamps,
+      } as TimestampedProviderResult<TestGenerics>['response'],
+    }),
+  }
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport,
+    inversionPolicy: policy,
+  })
+
+  const factory = dependencies.subscriptionSetFactory
+  const buildSet = factory.buildSet.bind(factory)
+  const suffixes: (string | undefined)[] = []
+  factory.buildSet = ((endpointName: string, transportName: string, keySuffix?: string) => {
+    suffixes.push(keySuffix)
+    return buildSet(endpointName, transportName, keySuffix)
+  }) as typeof factory.buildSet
+
+  await endpoint.initialize('TEST', dependencies, adapterSettings)
+
+  t.true(suffixes.includes('inversion-custom-v2'))
+
+  const raw = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverse = {
+    ...raw,
+    inversion: { enabled: true, policyId: 'custom', policyVersion: 2 },
+  } as unknown as TestParams
+
+  transport.subscriptionSet = {
+    add: async () => {},
+    getAll: () => [raw, inverse],
+    get: () => undefined,
+  }
+  await transport.backgroundExecute({
+    endpointName: 'test',
+    inputParameters,
+    adapterSettings,
+  })
+
+  t.deepEqual(transport.providerEntries, [raw])
+
+  await transport.produce({
+    params: raw,
+    response: {
+      data: { result: 4 },
+      result: 4,
+      timestamps,
+    },
+  })
+
+  const rawCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, raw),
+  )
+  const inverseCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, inverse),
+  )
+  t.is((rawCached as AdapterResponse<TestGenerics['Response']>).result, 4)
+  t.is((inverseCached as AdapterResponse<TestGenerics['Response']>).result, 0.5)
+})
+
+test.serial('composite transports fan out inversion through the compare cache', async (t) => {
+  const dependencies = buildDependencies()
+  const adapterSettings = buildAdapterSettings({
+    overrides: { COMPOSITE_TRANSPORT: true },
+  })
+  const transportA = new CacheTestTransport()
+  const transportB = new CacheTestTransport()
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    enableCompositeTransport: true,
+    transportRoutes: new TransportRoutes<TestGenerics>()
+      .register('a', transportA)
+      .register('b', transportB),
+  })
+
+  await endpoint.initialize('TEST', dependencies, adapterSettings)
+
+  const composite = endpoint.transportRoutes.get(
+    'default_single_transport',
+  ) as CompositeTransport<TestGenerics>
+  t.truthy(composite)
+  t.true(composite.supportsInversion)
+  t.is(transportA.responseCache.inversionPolicy?.id, 'single-value')
+
+  const raw = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverse = {
+    ...raw,
+    inversion: resolvedInversion,
+  } as unknown as TestParams
+  const request = (data: TestParams, cacheKey: string) =>
+    ({ requestContext: { data, cacheKey } }) as unknown as AdapterRequest<TestParams>
+
+  await composite.registerRequest(request(raw, 'raw'), adapterSettings)
+  await composite.registerRequest(request(inverse, 'inverse'), adapterSettings)
+  await composite.backgroundExecute({
+    endpointName: 'test',
+    inputParameters,
+    adapterSettings,
+  })
+
+  await transportA.produce({
+    params: raw,
+    response: {
+      data: { result: 4 },
+      result: 4,
+      timestamps: { ...timestamps, providerIndicatedTimeUnixMs: 1 },
+    },
+  })
+
+  const rawCached = await dependencies.cache.get(
+    composite.responseCache.getCacheKey(composite.name, raw),
+  )
+  const inverseCached = await dependencies.cache.get(
+    composite.responseCache.getCacheKey(composite.name, inverse),
+  )
+  t.is((rawCached as AdapterResponse<TestGenerics['Response']>)?.result, 4)
+  t.is((inverseCached as AdapterResponse<TestGenerics['Response']>)?.result, 0.25)
 })
 
 test.serial('case-normalized provider results match inversion variants', async (t) => {

@@ -1,3 +1,4 @@
+import { clone } from '../util/clone'
 import { AdapterInputError } from '../validation/error'
 import type {
   ProviderResultGenerics,
@@ -61,15 +62,25 @@ const errorResult = <T extends ProviderResultGenerics>(
   }
 }
 
-const cloneResponse = <T>(response: T): T => JSON.parse(JSON.stringify(response)) as T
-
-/** Clone a response, returning undefined when it cannot be serialized. */
-export const tryCloneResponse = <T>(response: T): T | undefined => {
-  try {
-    return cloneResponse(response)
-  } catch {
+/**
+ * Validate a custom policy return value and supply the original timestamps when omitted.
+ * Returns undefined when the policy returned something that cannot be written.
+ */
+export const ensureProviderResult = <T extends ProviderResultGenerics>(
+  result: unknown,
+  fallback: TimestampedProviderResult<T>,
+): TimestampedProviderResult<T> | undefined => {
+  if (!isRecord(result)) {
     return undefined
   }
+  const response = (result as { response?: unknown }).response
+  if (!isRecord(response)) {
+    return undefined
+  }
+  if (!isRecord(response['timestamps'])) {
+    response['timestamps'] = fallback.response.timestamps
+  }
+  return result as TimestampedProviderResult<T>
 }
 
 const assertPolicyMatchesConfig = <T extends ProviderResultGenerics>(
@@ -177,7 +188,7 @@ export class SingleValueInversionPolicy<
 
     let response: TimestampedAdapterResponse<T['Response']>
     try {
-      response = cloneResponse(result.response)
+      response = clone(result.response)
     } catch {
       return errorResult(result, 'Inversion failed: response could not be cloned')
     }
@@ -251,7 +262,7 @@ export class QuoteInversionPolicy<
 
     let response: TimestampedAdapterResponse<T['Response']>
     try {
-      response = cloneResponse(result.response)
+      response = clone(result.response)
     } catch {
       return errorResult(result, 'Inversion failed: response could not be cloned')
     }

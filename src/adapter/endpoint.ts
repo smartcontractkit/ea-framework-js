@@ -17,7 +17,13 @@ import {
 } from '../util'
 import { metrics } from '../metrics'
 import CensorList from '../util/censor/censor-list'
-import { hasInversionEnabled, InversionPolicy, tryCloneResponse } from './inverse'
+import {
+  ensureProviderResult,
+  hasInversionEnabled,
+  INVERSION_PARAM,
+  InversionPolicy,
+} from './inverse'
+import { tryClone } from '../util/clone'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -109,6 +115,14 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     dependencies: AdapterDependencies,
     adapterSettings: T['Settings'],
   ): Promise<void> {
+    for (const param of this.inputParameters.params) {
+      if (param.aliases.includes(INVERSION_PARAM)) {
+        logger.warn(
+          `Endpoint "${this.name}" defines input param "${param.name}" with the reserved name or alias "${INVERSION_PARAM}". Inversion requests bypass normal input validation; rename the param before enabling inversion.`,
+        )
+      }
+    }
+
     if (this.inversionPolicy) {
       const { id, version } = this.inversionPolicy
       if (
@@ -191,85 +205,131 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   applyInversionToResponse(
     response: AdapterResponse<T['Response']>,
     data: TypeFromDefinition<T['Parameters']>,
+    transportName = DEFAULT_TRANSPORT_NAME,
   ): AdapterResponse<T['Response']> {
     const policy = this.inversionPolicy
-    if (!hasInversionEnabled(data) || Boolean(response.errorMessage)) {
+    if (!hasInversionEnabled(data)) {
+      return response
+    }
+
+    const timestamps = (response as TimestampedAdapterResponse<T['Response']>).timestamps
+    if (response.errorMessage) {
+      this.recordInversionMetric('skipped', policy?.id ?? 'none', transportName)
       return response
     }
 
     if (!policy) {
-      metrics
-        .get('inversionTotal')
-        .labels({
-          adapter_endpoint: this.name,
-          policy: 'none',
-          status: 'rejected',
-        })
-        .inc()
+      this.recordInversionMetric('rejected', 'none', transportName)
       return {
         statusCode: 502,
         errorMessage: 'Inversion failed: endpoint has no inversion policy',
-        timestamps: (response as TimestampedAdapterResponse<T['Response']>).timestamps,
+        timestamps,
       }
     }
 
-    const clonedResponse = tryCloneResponse(response)
+    const params = tryClone(data) ?? { ...data }
+    const clonedResponse = tryClone(response)
     let result: TimestampedProviderResult<T>
     if (!clonedResponse) {
-      result = {
-        params: data,
-        response: {
-          statusCode: 502,
-          errorMessage: 'Inversion failed: response could not be cloned',
-          timestamps: (response as TimestampedAdapterResponse<T['Response']>).timestamps,
-        },
-      }
+      result = this.inversionFailure(
+        params,
+        timestamps,
+        'Inversion failed: response could not be cloned',
+      )
     } else {
       try {
-        result = policy.transform({
-          params: data,
-          response: clonedResponse as TimestampedAdapterResponse<T['Response']>,
-        })
+        result =
+          ensureProviderResult(
+            policy.transform({
+              params: tryClone(params) ?? { ...params },
+              response: clonedResponse as TimestampedAdapterResponse<T['Response']>,
+            }),
+            { params, response: response as TimestampedAdapterResponse<T['Response']> },
+          ) ??
+          this.inversionFailure(
+            params,
+            timestamps,
+            'Inversion failed: policy returned an invalid result',
+          )
       } catch (error) {
         const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
         const safeDetail = censor(detail, CensorList.getAll()) ?? detail
-        censorLogs(() => logger.warn(`Inversion policy threw: ${detail}`))
-        result = {
-          params: data,
-          response: {
-            statusCode: 502,
-            errorMessage: `Inversion failed: policy transform threw: ${safeDetail}`,
-            timestamps: (response as TimestampedAdapterResponse<T['Response']>).timestamps,
-          },
-        }
+        censorLogs(() => logger.warn(`Inversion policy threw: ${safeDetail}`))
+        result = this.inversionFailure(
+          params,
+          timestamps,
+          `Inversion failed: policy transform threw: ${safeDetail}`,
+        )
       }
     }
 
-    const failed = Boolean(result.response.errorMessage)
+    let finalResponse = result.response as AdapterResponse<T['Response']>
+    let status: 'applied' | 'rejected' = result.response.errorMessage ? 'rejected' : 'applied'
+    if (status === 'applied' && this.resultValidator) {
+      try {
+        const validated = ensureProviderResult(
+          this.resultValidator({
+            ...result,
+            params: tryClone(result.params) ?? { ...result.params },
+          }),
+          result,
+        )
+        if (!validated) {
+          finalResponse = {
+            statusCode: 502,
+            errorMessage: 'Inversion failed: result validator returned an invalid result',
+            timestamps,
+          }
+          status = 'rejected'
+        } else {
+          finalResponse = validated.response as AdapterResponse<T['Response']>
+        }
+      } catch (error) {
+        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+        const safeDetail = censor(detail, CensorList.getAll()) ?? detail
+        censorLogs(() => logger.warn(`Inversion result validator threw: ${safeDetail}`))
+        finalResponse = {
+          statusCode: 502,
+          errorMessage: `Inversion failed: result validator threw: ${safeDetail}`,
+          timestamps,
+        }
+        status = 'rejected'
+      }
+    }
+
+    this.recordInversionMetric(status, policy.id, transportName)
+    return finalResponse
+  }
+
+  private inversionFailure(
+    params: TypeFromDefinition<T['Parameters']>,
+    timestamps: TimestampedProviderResult<T>['response']['timestamps'],
+    message: string,
+  ): TimestampedProviderResult<T> {
+    return {
+      params,
+      response: {
+        statusCode: 502,
+        errorMessage: message,
+        timestamps,
+      },
+    }
+  }
+
+  private recordInversionMetric(
+    status: 'applied' | 'rejected' | 'skipped',
+    policyId: string,
+    transportName: string,
+  ): void {
     metrics
       .get('inversionTotal')
       .labels({
         adapter_endpoint: this.name,
-        policy: policy.id,
-        status: failed ? 'rejected' : 'applied',
+        policy: policyId,
+        status,
+        transport: transportName,
       })
       .inc()
-
-    if (!failed && this.resultValidator) {
-      try {
-        return this.resultValidator(result).response as AdapterResponse<T['Response']>
-      } catch (error) {
-        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-        const safeDetail = censor(detail, CensorList.getAll()) ?? detail
-        censorLogs(() => logger.warn(`Inversion result validator threw: ${detail}`))
-        return {
-          statusCode: 502,
-          errorMessage: `Inversion failed: result validator threw: ${safeDetail}`,
-          timestamps: (response as TimestampedAdapterResponse<T['Response']>).timestamps,
-        }
-      }
-    }
-    return result.response as AdapterResponse<T['Response']>
   }
 
   getRequestOverrides(data: Record<string, string>, overrides?: Overrides) {

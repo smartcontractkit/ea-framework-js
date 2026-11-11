@@ -69,7 +69,8 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       const hasInversionVariant = group.some((entry) => hasInversionEnabled(entry))
 
       if (!hasInversionVariant) {
-        providerEntries.push(...group)
+        // Every entry in this group maps to the same provider request.
+        providerEntries.push(group[0])
         continue
       }
 

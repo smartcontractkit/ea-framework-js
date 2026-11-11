@@ -27,6 +27,12 @@ export class RedisSubscriptionSet<T> implements SubscriptionSet<T> {
     return
   }
 
+  async hasEntries(): Promise<boolean> {
+    const result = await this.redisClient.exists(this.subscriptionSetKey)
+    recordRedisCommandMetric(CMD_SENT_STATUS.SUCCESS, 'exists')
+    return result === 1
+  }
+
   async getAll(): Promise<T[]> {
     // Remove expired keys from sorted set
     await this.redisClient.zremrangebyscore(this.subscriptionSetKey, '-inf', Date.now())

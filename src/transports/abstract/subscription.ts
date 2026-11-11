@@ -10,6 +10,9 @@ import { ProviderVariantResolver } from './provider-variants'
 
 const logger = makeLogger('SubscriptionTransport')
 
+// Avoid polling an empty versioned inversion set on every background cycle.
+const INACTIVE_INVERSION_SET_CHECK_MS = 1000
+
 /**
  * Abstract Transport that will take incoming requests and add them to a subscription set as part
  * of the registration. Then it will provide those entries to the (abstract) backgroundHandler method.
@@ -25,6 +28,8 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   initialized = false
 
   protected variantResolver = new ProviderVariantResolver<T>()
+  private inversionSetActive = false
+  private lastInversionSetCheck = 0
 
   async initialize(
     dependencies: TransportDependencies<T>,
@@ -61,13 +66,16 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
       ),
     )
 
-    const subscriptionSet =
+    const inversionSet =
       this.inversionSubscriptionSet && hasInversionEnabled(req.requestContext.data)
         ? this.inversionSubscriptionSet
-        : this.subscriptionSet
+        : undefined
+    if (inversionSet) {
+      this.inversionSetActive = true
+    }
 
     // This might need coalescing to avoid too frequent ttl updates
-    await subscriptionSet.add(
+    await (inversionSet ?? this.subscriptionSet).add(
       req.requestContext.data,
       this.subscriptionTtl,
       req.requestContext.cacheKey,
@@ -79,9 +87,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
 
     const [legacyEntries, inversionEntries] = await Promise.all([
       this.subscriptionSet.getAll(),
-      this.inversionSubscriptionSet
-        ? this.inversionSubscriptionSet.getAll()
-        : ([] as TypeFromDefinition<T['Parameters']>[]),
+      this.getInversionEntries(),
     ])
     const entries =
       inversionEntries.length > 0 ? [...legacyEntries, ...inversionEntries] : legacyEntries
@@ -100,6 +106,31 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
 
     const providerEntries = this.variantResolver.group(entries)
     await this.backgroundHandler(context, providerEntries)
+  }
+
+  private async getInversionEntries(): Promise<TypeFromDefinition<T['Parameters']>[]> {
+    const inversionSet = this.inversionSubscriptionSet
+    if (!inversionSet) {
+      return []
+    }
+
+    if (!this.inversionSetActive) {
+      const now = Date.now()
+      if (
+        this.lastInversionSetCheck !== 0 &&
+        now - this.lastInversionSetCheck < INACTIVE_INVERSION_SET_CHECK_MS
+      ) {
+        return []
+      }
+      this.lastInversionSetCheck = now
+      if (inversionSet.hasEntries && !(await inversionSet.hasEntries())) {
+        return []
+      }
+    }
+
+    const entries = await inversionSet.getAll()
+    this.inversionSetActive = entries.length > 0
+    return entries
   }
 
   /**
