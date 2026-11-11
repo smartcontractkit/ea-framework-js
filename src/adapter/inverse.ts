@@ -77,6 +77,19 @@ export const ensureProviderResult = <T extends ProviderResultGenerics>(
   if (!isRecord(response)) {
     return undefined
   }
+
+  const errorMessage = response['errorMessage']
+  if (errorMessage !== undefined && errorMessage !== '') {
+    if (typeof errorMessage !== 'string') {
+      return undefined
+    }
+    if (typeof response['statusCode'] !== 'number') {
+      response['statusCode'] = 502
+    }
+  } else if (response['data'] === undefined && response['result'] === undefined) {
+    return undefined
+  }
+
   if (!isRecord(response['timestamps'])) {
     response['timestamps'] = fallback.response.timestamps
   }

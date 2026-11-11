@@ -158,6 +158,21 @@ class ThrowingValidatorPriceEndpoint extends PriceEndpoint<TestGenerics> {
   }
 }
 
+class RejectingValidatorPriceEndpoint extends PriceEndpoint<TestGenerics> {
+  protected override resultValidator(
+    result: TimestampedProviderResult<TestGenerics>,
+  ): TimestampedProviderResult<TestGenerics> {
+    return {
+      params: result.params,
+      response: {
+        statusCode: 502,
+        errorMessage: 'validator says no',
+        timestamps: result.response.timestamps,
+      },
+    }
+  }
+}
+
 class CacheTestTransport extends SubscriptionTransport<TestGenerics> {
   supportsInversion = true
   providerEntries: Record<string, unknown>[] = []
@@ -474,6 +489,50 @@ test.serial('foreground inversion failure modes return 502', (t) => {
   }
 })
 
+test.serial('foreground inversion metrics distinguish errors from rejections', async (t) => {
+  const counter = metrics.get('inversionTotal') as unknown as {
+    reset: () => void
+    get: () => Promise<{
+      values: { labels: Record<string, string>; value: number }[]
+    }>
+  }
+  counter.reset()
+
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport: new ForegroundPriceTransport(),
+  })
+  const providerError = endpoint.applyInversionToResponse(
+    {
+      statusCode: 429,
+      errorMessage: 'rate limited',
+      timestamps,
+    },
+    inversionRequestData,
+  )
+  t.is(providerError.statusCode, 429)
+
+  const rejectingEndpoint = new RejectingValidatorPriceEndpoint({
+    name: 'test',
+    inputParameters,
+    transport: new ForegroundPriceTransport(),
+  })
+  const rejected = rejectingEndpoint.applyInversionToResponse(
+    foregroundResponse(),
+    inversionRequestData,
+  )
+  t.is(rejected.statusCode, 502)
+  t.true(rejected.errorMessage?.includes('validator says no') === true)
+
+  const { values } = await counter.get()
+  const byStatus = (status: string) =>
+    values.find((value) => value.labels['status'] === status)?.value
+  t.is(byStatus('skipped'), 1)
+  t.is(byStatus('rejected'), 1)
+  t.is(byStatus('applied'), undefined)
+})
+
 test.serial('inversion config is rejected with 400 when unsupported', async (t) => {
   const scenarios: {
     name: string
@@ -543,6 +602,34 @@ test.serial('inversion config is rejected with 400 when unsupported', async (t) 
       await testAdapter.api.close()
     }
   }
+})
+
+test.serial('existing inversion input parameters keep their prior behavior', async (t) => {
+  const domainInputParameters = new InputParameters({
+    base: { type: 'string', description: 'base', required: true },
+    quote: { type: 'string', description: 'quote', required: true },
+    inversion: { type: 'string', description: 'domain inversion mode' },
+  } as unknown as typeof inputParameters.definition)
+  const transport = new ForegroundPriceTransport()
+  const endpoint = new AdapterEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters: domainInputParameters as unknown as typeof inputParameters,
+    transport,
+  })
+  const adapter = new Adapter({ name: 'TEST', endpoints: [endpoint] })
+
+  const context = t.context as TestContext
+  context.testAdapter = await TestAdapter.start(adapter, context)
+
+  const response = await context.testAdapter.request({
+    endpoint: 'test',
+    base: 'BTC',
+    quote: 'USD',
+    inversion: 'provider-specific-mode',
+  })
+
+  t.is(response.statusCode, 200)
+  t.is(transport.receivedData[0]['inversion'], 'provider-specific-mode')
 })
 
 test.serial('absent or disabled inversion keeps the raw response and cache key', async (t) => {
@@ -877,6 +964,49 @@ test.serial(
   },
 )
 
+test.serial('unmatched provider results do not write an inverse cache entry', async (t) => {
+  const dependencies = buildDependencies()
+  const adapterSettings = buildAdapterSettings({})
+  const transport = new CacheTestTransport()
+  const endpoint = new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport,
+  })
+
+  await endpoint.initialize('TEST', dependencies, adapterSettings)
+
+  const raw = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverse = {
+    ...raw,
+    inversion: resolvedInversion,
+  } as unknown as TestParams
+  transport.subscriptionSet = {
+    add: async () => {},
+    getAll: () => [raw, inverse],
+    get: () => undefined,
+  }
+
+  await transport.backgroundExecute({
+    endpointName: 'test',
+    inputParameters,
+    adapterSettings,
+  })
+  await transport.produce({
+    params: { ...raw, source: 'ws' } as unknown as TestParams,
+    response: {
+      data: { result: 4 },
+      result: 4,
+      timestamps,
+    },
+  })
+
+  const inverseCached = await dependencies.cache.get(
+    transport.responseCache.getCacheKey(transport.name, inverse),
+  )
+  t.is(inverseCached, undefined)
+})
+
 test.serial('provider errors fan out unchanged to raw and inverse cache keys', async (t) => {
   const dependencies = buildDependencies()
   const adapterSettings = buildAdapterSettings({})
@@ -1174,6 +1304,15 @@ test.serial('request-level inversion writes both the raw and inverse cache entri
   t.is(rawResponse.statusCode, 200)
   t.is(rawResponse.json().result, 4)
 
+  const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverseParams = {
+    ...rawParams,
+    inversion: resolvedInversion,
+  } as unknown as TestParams
+  await testAdapter.mockCache?.delete(
+    transport.responseCache.getCacheKey(transport.name, rawParams),
+  )
+
   const inverseResponse = await testAdapter.request({
     endpoint: 'test',
     base: 'BTC',
@@ -1182,12 +1321,6 @@ test.serial('request-level inversion writes both the raw and inverse cache entri
   })
   t.is(inverseResponse.statusCode, 200)
   t.is(inverseResponse.json().result, 0.25)
-
-  const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
-  const inverseParams = {
-    ...rawParams,
-    inversion: resolvedInversion,
-  } as unknown as TestParams
 
   const rawCached = (await testAdapter.mockCache?.get(
     transport.responseCache.getCacheKey(transport.name, rawParams),
@@ -1295,6 +1428,18 @@ test.serial(
     })
     t.is(rawResponse.statusCode, 200)
 
+    const rawParams = {
+      base: 'BTC',
+      quote: 'USD',
+    } as unknown as TypeFromDefinition<QuoteGenerics['Parameters']>
+    const inverseParams = {
+      ...rawParams,
+      inversion: resolvedQuoteInversion,
+    } as unknown as TypeFromDefinition<QuoteGenerics['Parameters']>
+    await testAdapter.mockCache?.delete(
+      transport.responseCache.getCacheKey(transport.name, rawParams),
+    )
+
     const inverseResponse = await testAdapter.request({
       endpoint: 'test',
       base: 'BTC',
@@ -1308,15 +1453,6 @@ test.serial(
     t.true(Math.abs(inverse.mid - 1 / 1.1) < 1e-12)
     t.is(inverse.bidSize, 20)
     t.is(inverse.askSize, 10)
-
-    const rawParams = {
-      base: 'BTC',
-      quote: 'USD',
-    } as unknown as TypeFromDefinition<QuoteGenerics['Parameters']>
-    const inverseParams = {
-      ...rawParams,
-      inversion: resolvedQuoteInversion,
-    } as unknown as TypeFromDefinition<QuoteGenerics['Parameters']>
 
     const rawCached = (await testAdapter.mockCache?.get(
       transport.responseCache.getCacheKey(transport.name, rawParams),

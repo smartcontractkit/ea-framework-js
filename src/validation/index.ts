@@ -32,6 +32,11 @@ const getRequestInversionConfig = (
   endpoint: AdapterEndpoint<EndpointGenerics>,
   data: Record<string, unknown>,
 ): InversionRequestConfig | undefined => {
+  // Preserve adapters that already use `inversion` as a domain input parameter.
+  // Endpoint initialization warns about the reserved-name collision.
+  if (endpoint.inputParameters.params.some((param) => param.aliases.includes(INVERSION_PARAM))) {
+    return undefined
+  }
   if (!Object.prototype.hasOwnProperty.call(data, INVERSION_PARAM)) {
     return undefined
   }

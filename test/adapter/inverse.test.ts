@@ -358,6 +358,14 @@ test.serial('inversion failures reject only the inverse variant', async (t) => {
       expectedMessage: 'does not match',
     },
     {
+      name: 'resolved policy version mismatch',
+      params: {
+        ...rawParams,
+        inversion: { ...resolvedConfig, policyVersion: 2 },
+      } as CacheParams,
+      expectedMessage: 'does not match',
+    },
+    {
       name: 'malformed policy return',
       configure: (responseCache) => {
         responseCache.inversionPolicy = {
@@ -367,6 +375,51 @@ test.serial('inversion failures reject only the inverse variant', async (t) => {
         }
       },
       expectedMessage: 'invalid result',
+    },
+    {
+      name: 'malformed policy success',
+      configure: (responseCache) => {
+        responseCache.inversionPolicy = {
+          id: 'single-value',
+          version: 1,
+          transform: (result) =>
+            ({
+              params: result.params,
+              response: { timestamps: result.response.timestamps },
+            }) as unknown as TimestampedProviderResult<SingleValueGenerics>,
+        }
+      },
+      expectedMessage: 'invalid result',
+    },
+    {
+      name: 'error result without statusCode',
+      configure: (responseCache) => {
+        responseCache.inversionPolicy = {
+          id: 'single-value',
+          version: 1,
+          transform: (result) =>
+            ({
+              params: result.params,
+              response: {
+                errorMessage: 'custom failure',
+                timestamps: result.response.timestamps,
+              },
+            }) as unknown as TimestampedProviderResult<SingleValueGenerics>,
+        }
+      },
+      expectedMessage: 'custom failure',
+    },
+    {
+      name: 'validator invalid return',
+      configure: (responseCache) => {
+        responseCache.resultValidator = (result) => {
+          if (hasInversionEnabled(result.params)) {
+            return undefined as unknown as TimestampedProviderResult<SingleValueGenerics>
+          }
+          return result
+        }
+      },
+      expectedMessage: 'Result validation failed: invalid result',
     },
     {
       name: 'clone failure',

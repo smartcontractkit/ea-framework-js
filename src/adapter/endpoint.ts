@@ -283,6 +283,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
           status = 'rejected'
         } else {
           finalResponse = validated.response as AdapterResponse<T['Response']>
+          status = finalResponse.errorMessage ? 'rejected' : 'applied'
         }
       } catch (error) {
         const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)

@@ -20,6 +20,15 @@ test('subscription set factory (local cache)', async (t) => {
   t.is(subscriptionSet instanceof ExpiringSortedSet, true)
 })
 
+test('redis subscription set reports whether it has entries', async (t) => {
+  const redis = {
+    exists: async (key: string) => (key === 'present' ? 1 : 0),
+  } as unknown as Redis
+
+  t.true(await new RedisSubscriptionSet<number>(redis, 'present', true).hasEntries())
+  t.false(await new RedisSubscriptionSet<number>(redis, 'missing', true).hasEntries())
+})
+
 test('subscription set factory (redis cache)', async (t) => {
   process.env['CACHE_TYPE'] = 'redis'
   const config = buildAdapterSettings({})
