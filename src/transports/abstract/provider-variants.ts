@@ -25,14 +25,11 @@ const normalizeParams = (value: unknown): unknown => {
 
 const stableStringify = (value: unknown): string => JSON.stringify(normalizeParams(value))
 
-/** Stable key for grouping subscriptions that share the same provider-facing params. */
+/** Key for subscriptions sharing provider-facing params. */
 export const calculateProviderParamsKey = (params: Record<string, unknown>): string =>
   stableStringify(stripInversionConfig(params))
 
-/**
- * Groups raw and inverted subscriptions by provider-facing params and fans
- * provider results back out to every active output variant.
- */
+/** Groups raw and inverse subscriptions by provider params and fans results back out. */
 export class ProviderVariantResolver<T extends TransportGenerics> {
   private variants = new Map<string, TypeFromDefinition<T['Parameters']>[]>()
 
@@ -63,7 +60,7 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       const hasInversionVariant = group.some((entry) => hasInversionEnabled(entry))
 
       if (!hasInversionVariant) {
-        // Every entry in this group maps to the same provider request.
+        // No inverse variant; one provider request covers the group.
         providerEntries.push(group[0])
         continue
       }

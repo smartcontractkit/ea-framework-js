@@ -7,19 +7,12 @@ import type {
 } from '../../util/types'
 import { getRawInversionConfig } from './config'
 
-/**
- * Endpoint-level policy that owns the response-shape-specific inversion behavior.
- * Cache and transport layers must not know whether the payload contains
- * `result`, `bid`, `ask` or any other response field.
- */
+/** Endpoint policy for response-shape-specific inversion. */
 export interface InversionPolicy<T extends ProviderResultGenerics> {
   readonly id: string
   readonly version: number
 
-  /**
-   * Validate the raw result, apply inversion, and validate the output.
-   * Returns a 502 error result instead of throwing when inversion cannot be applied.
-   */
+  /** Invert a result. Returns a 502 result instead of throwing on invalid data. */
   transform(result: TimestampedProviderResult<T>): TimestampedProviderResult<T>
 }
 

@@ -98,32 +98,32 @@ Inversion is opt-in per request and applied on the cache-write path:
 }
 ```
 
-| Endpoint                       | Fields inverted                                                | Notes                                                                                |
-| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `PriceEndpoint` / single-value | `data.result` → `1 / data.result`; top-level `result` mirrored | `data.result` is the canonical value                                                 |
-| `LwbaEndpoint` / quote         | `bid' = 1 / ask`, `ask' = 1 / bid`                             | `mid' = 1 / mid` from the provider when present; otherwise `(1 / ask + 1 / bid) / 2` |
+| Endpoint                       | Fields inverted                                                | Notes                                                               |
+| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `PriceEndpoint` / single-value | `data.result` → `1 / data.result`; top-level `result` mirrored | `data.result` is canonical                                          |
+| `LwbaEndpoint` / quote         | `bid' = 1 / ask`, `ask' = 1 / bid`                             | `mid' = 1 / mid` when provided; otherwise `(1 / ask + 1 / bid) / 2` |
 
-The endpoint's response type selects the policy; a request can only enable or disable inversion. A `PriceEndpoint` has no quote fields to invert, while an `LwbaEndpoint` inverts the full quote.
+The endpoint response type selects the policy; requests only enable or disable it. `PriceEndpoint` inverts only `data.result`; `LwbaEndpoint` inverts the full quote.
 
-Inversion is atomic per response: all fields are validated and inverted together. A missing or invalid `bid`/`ask` makes the whole response 502; a missing or null `mid` is synthesized. Provider errors are never inverted. Optional `bidSize`/`askSize` values are swapped; size validity remains owned by the asset-class policy (OPDATA-9200).
+Inversion is atomic: invalid `bid`/`ask` makes the whole response 502. Provider errors are never inverted. `bidSize`/`askSize` are swapped; size validity belongs to the asset-class policy (OPDATA-9200).
 
-`resultValidator` runs after successful inversion and must accept inverted values. It is skipped for provider and inversion errors. A thrown validator on an inverted result becomes a 502; non-inversion writes keep their existing behavior.
+`resultValidator` runs after inversion and must accept inverted values. A thrown validator on an inverse result becomes a 502; non-inverse writes are unchanged.
 
 ### Cache keys and feed IDs
 
-- Requests without `inversion`, and requests with `inversion: { "enabled": false }`, keep the existing cache key, feed ID, and `includes.json` behavior. `inversion: null` is rejected.
-- Enabled requests include the resolved policy id/version in request params, so raw and inverse variants use distinct cache keys and feed IDs.
-- Endpoints with a custom `cacheKeyGenerator` reject enabled inversion with a 400 because the custom key may not include the resolved policy metadata, so raw and inverse requests could share an entry.
-- A policy version bump changes the inverse feed identity. Disable inversion and drain old inverse entries during the bump.
+- No `inversion`, or `enabled: false`: existing key, feed ID, and `includes.json` behavior. `inversion: null` is rejected.
+- Enabled: resolved policy id/version is part of params, so raw and inverse variants have distinct keys and feed IDs.
+- Custom `cacheKeyGenerator`: 400, because the custom key may not distinguish variants.
+- A policy version bump changes the inverse feed identity; disable inversion and drain old entries first.
 
 ### Transports and rollout
 
-- Background transports strip inversion config before provider requests; raw and inverse variants share one provider subscription.
-- Built-in HTTP, WS, and SSE transports support inversion. Custom background transports must set `supportsInversion = true` and write provider results through `SubscriptionTransport.writeResults` (not `responseCache.write`) so all active variants are populated; otherwise inversion requests are rejected with a 400 or time out with an empty inverse cache. Provider results must round-trip the params they were subscribed with so the resolver can match them to variants.
-- Inversion is supported on background subscription transports only. Transports with `foregroundExecute` reject inversion requests with a 400.
-- With `includes.json`, explicit inversion composes with the includes transform. For an includes-inverse pair the two inversions cancel and the provider-direction value is returned.
-- Inversion creates a new feed identity. Upgrade writers, then readers, and only then enable inversion. The framework cannot detect an older EA build because unknown request params are dropped during input validation, so gate jobspec/RDD changes on the deployed EA version.
-- `inversion` is reserved as an input param name and alias. Existing adapters that already declare it keep using it as a domain param; inversion is disabled for that endpoint and startup warns.
+- Subscription transports strip inversion config before provider calls, so raw and inverse variants share one provider subscription.
+- HTTP, WS, and SSE support inversion. Custom transports must set `supportsInversion = true` and write through `SubscriptionTransport.writeResults`; direct `responseCache.write` calls leave inverse requests timing out.
+- Transports with `foregroundExecute` return 400.
+- With `includes.json`, explicit inversion composes with the includes transform; includes-inverse pairs cancel.
+- Inversion creates a new feed identity. Upgrade writers, then readers, then enable inversion. Older EA builds drop unknown params, so gate jobspec/RDD changes on the deployed version.
+- `inversion` is a reserved input param name/alias. Existing adapters keep it as a domain param; inversion is disabled and startup warns.
 
 ## Request Transforms
 

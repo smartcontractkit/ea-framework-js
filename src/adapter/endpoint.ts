@@ -105,7 +105,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     for (const param of this.inputParameters.params) {
       if (param.aliases.includes(INVERSION_PARAM)) {
         logger.warn(
-          `Endpoint "${this.name}" defines input param "${param.name}" with the reserved name or alias "${INVERSION_PARAM}". Inversion requests bypass normal input validation; rename the param before enabling inversion.`,
+          `Endpoint "${this.name}" input param "${param.name}" uses reserved name/alias "${INVERSION_PARAM}". Inversion is disabled; rename the param to enable it.`,
         )
       }
     }

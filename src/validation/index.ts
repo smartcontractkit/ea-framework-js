@@ -32,8 +32,7 @@ const getRequestInversionConfig = (
   endpoint: AdapterEndpoint<EndpointGenerics>,
   data: Record<string, unknown>,
 ): InversionRequestConfig | undefined => {
-  // Preserve adapters that already use `inversion` as a domain input parameter.
-  // Endpoint initialization warns about the reserved-name collision.
+  // Keep adapters that already use `inversion` as a domain param; startup warns.
   if (endpoint.inputParameters.params.some((param) => param.aliases.includes(INVERSION_PARAM))) {
     return undefined
   }
@@ -70,16 +69,12 @@ const assertInversionTransportSupported = (
   }
 }
 
-/**
- * A custom generator can return the same key for raw and inverse requests, which
- * would make an inverse request read raw cached data. Fail closed until custom
- * keys are guaranteed to include the resolved inversion metadata.
- */
+/** Custom keys may not distinguish raw and inverse requests. Fail closed. */
 const assertInversionCacheKeySupported = (endpoint: AdapterEndpoint<EndpointGenerics>): void => {
   if (endpoint.cacheKeyGenerator) {
     throw new AdapterInputError({
       statusCode: 400,
-      message: `Endpoint "${endpoint.name}" cannot use inversion with a custom cacheKeyGenerator because the generated key may not distinguish raw and inverse requests`,
+      message: `Endpoint "${endpoint.name}" cannot use inversion with a custom cacheKeyGenerator: keys may not distinguish variants`,
     })
   }
 }
@@ -177,8 +172,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     // This is the last time modifications are supposed to happen to the request.
     endpoint.runRequestTransforms(req, adapter.config.settings)
 
-    // Attach inversion after transforms so it cannot be dropped or accidentally
-    // forwarded to the provider by adapter-level transforms.
+    // Attach after transforms so adapter transforms cannot drop or forward it to the provider.
     attachResolvedInversion(
       endpoint,
       req.requestContext.data as Record<string, unknown>,
@@ -191,8 +185,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     ) {
       // Add metrics meta which includes feedId to the request
       // Perform after overrides to maintain consistent Feed IDs across the same adapter
-      // Only use the live request data when resolved inversion was attached; otherwise keep the
-      // historical feed-ID source for request transforms that replace requestContext.data.
+      // Use resolved data only when inversion was attached; otherwise keep the legacy source.
       const metrics = getMetricsMeta(
         {
           inputParameters: endpoint.inputParameters,

@@ -1,6 +1,6 @@
 import { AdapterInputError } from '../../validation/error'
 
-/** Name of the reserved request parameter that enables inversion. */
+/** Reserved request parameter that enables inversion. */
 export const INVERSION_PARAM = 'inversion'
 
 /** Config accepted from the request/jobspec. */
@@ -8,7 +8,7 @@ export type InversionRequestConfig = {
   enabled: boolean
 }
 
-/** Config as received in request params, before the policy metadata is trusted. */
+/** Inversion config before policy metadata is trusted. */
 export type RawInversionConfig = InversionRequestConfig & {
   policyId?: unknown
   policyVersion?: unknown
@@ -44,11 +44,8 @@ export const validateInversionRequestConfig = (config: unknown): InversionReques
 }
 
 /**
- * Read the raw inversion config from request/result params.
- *
- * This intentionally checks for the property before reading it so it stays
- * safe for Proxy-based test doubles (e.g. `makeStub`) that throw on unknown
- * property access.
+ * Read inversion config from params. Checks the property first so Proxy-based
+ * test doubles that throw on unknown access stay safe.
  */
 export const getRawInversionConfig = (params: unknown): RawInversionConfig | undefined => {
   if (!isRecord(params)) {
@@ -68,7 +65,7 @@ export const getRawInversionConfig = (params: unknown): RawInversionConfig | und
   }
 }
 
-/** Whether this request/result params explicitly enable inversion. */
+/** Whether params explicitly enable inversion. */
 export const hasInversionEnabled = (params: unknown): boolean =>
   getRawInversionConfig(params)?.enabled === true
 

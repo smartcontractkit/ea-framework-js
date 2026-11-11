@@ -78,10 +78,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     await this.backgroundHandler(context, this.variantResolver.group(entries))
   }
 
-  /**
-   * Writes provider results through the variant resolver so raw and inverted
-   * subscriptions receive the same provider value.
-   */
+  /** Writes provider results to all raw and inverse cache variants. */
   protected async writeResults(results: TimestampedProviderResult<T>[]): Promise<void> {
     await this.responseCache.write(this.name, this.variantResolver.resolve(results))
   }
