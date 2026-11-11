@@ -1,5 +1,5 @@
 import { AdapterDependencies } from '../../adapter'
-import { hasInversionEnabled, InversionTransform } from '../../adapter/inverse'
+import { hasInversionEnabled, inversionError, InversionTransform } from '../../adapter/inverse'
 import { AdapterSettings } from '../../config'
 import {
   AdapterResponse,
@@ -75,7 +75,7 @@ export abstract class ResponseCache<
         return result
       }
       if (!transform) {
-        return this.inversionFailure(
+        return inversionError(
           result.params,
           result.response.timestamps,
           `Inversion failed: endpoint "${this.endpointName}" transport "${transportName}" has no inversion transform`,
@@ -85,21 +85,6 @@ export abstract class ResponseCache<
     })
 
     return this._write(transportName, this.validateResults(transformed))
-  }
-
-  private inversionFailure(
-    params: TypeFromDefinition<T['Parameters']>,
-    timestamps: TimestampedProviderResult<T>['response']['timestamps'],
-    message: string,
-  ): TimestampedProviderResult<T> {
-    return {
-      params,
-      response: {
-        statusCode: 502,
-        errorMessage: message,
-        timestamps,
-      },
-    }
   }
 
   private validateResults(results: TimestampedProviderResult<T>[]): TimestampedProviderResult<T>[] {
@@ -125,7 +110,7 @@ export abstract class ResponseCache<
         const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
         const safeDetail = censor(detail, CensorList.getAll()) ?? detail
         censorLogs(() => logger.warn(`Result validator threw: ${safeDetail}`))
-        return this.inversionFailure(
+        return inversionError(
           params,
           result.response.timestamps,
           `Result validation failed: ${safeDetail}`,

@@ -80,7 +80,7 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       const key = calculateProviderParamsKey(params)
       const variants = this.variants.get(key)
 
-      if (!variants?.length) {
+      if (!variants) {
         return [result]
       }
 

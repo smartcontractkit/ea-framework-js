@@ -47,15 +47,11 @@ const timestamps = {
   providerIndicatedTimeUnixMs: undefined,
 }
 
-const singleValueAttempt = (
-  value: number,
-  params?: Record<string, unknown>,
-): TimestampedProviderResult<SingleValueGenerics> => ({
-  params: (params ?? {
+const singleValueAttempt = (value: number): TimestampedProviderResult<SingleValueGenerics> => ({
+  params: {
     base: 'BTC',
     quote: 'USD',
-    inversion: { enabled: true },
-  }) as unknown as TimestampedProviderResult<SingleValueGenerics>['params'],
+  } as unknown as TimestampedProviderResult<SingleValueGenerics>['params'],
   response: {
     data: { result: value },
     result: value,
@@ -72,7 +68,6 @@ const quoteAttempt = (
   params: {
     base: 'BTC',
     quote: 'USD',
-    inversion: { enabled: true },
   } as unknown as TimestampedProviderResult<QuoteGenerics>['params'],
   response: {
     result: null,

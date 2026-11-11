@@ -216,13 +216,13 @@ const buildCacheBackedAdapter = (
   })
 
 const btcUsd = { base: 'BTC', quote: 'USD' } as TestParams
-const inversionRequest = { ...btcUsd, inversion: inverseConfig }
+const inverseOf = (params: TestParams): TestParams =>
+  ({ ...params, inversion: inverseConfig }) as TestParams
+const inversionRequest = inverseOf(btcUsd)
 const cachePollingConfig = {
   CACHE_POLLING_MAX_RETRIES: 20,
   CACHE_POLLING_SLEEP_MS: 10,
 }
-const inverseOf = (params: TestParams): TestParams =>
-  ({ ...params, inversion: inverseConfig }) as TestParams
 
 const buildPriceEndpoint = async <T extends TestGenerics>(
   transport: SubscriptionTransport<T>,

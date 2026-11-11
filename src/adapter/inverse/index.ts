@@ -7,4 +7,5 @@ export {
 export type { InversionRequestConfig } from './config'
 export { invertQuote } from './quote'
 export type { InversionTransform } from './transform'
+export { inversionError } from './transform'
 export { invertSingleValue } from './single-value'
