@@ -521,6 +521,49 @@ test.serial('thrown policy errors are redacted with the censor list', async (t) 
 })
 
 test.serial(
+  'validator-rejected inverse results are counted as rejected, not applied',
+  async (t) => {
+    const counter = metrics.get('inversionTotal') as unknown as {
+      reset: () => void
+      get: () => Promise<{
+        values: { labels: Record<string, string>; value: number }[]
+      }>
+    }
+    counter.reset()
+
+    const { cache, responseCache } = buildCache({
+      resultValidator: (result) => {
+        if (!hasInversionEnabled(result.params)) {
+          return result
+        }
+        return {
+          params: result.params,
+          response: {
+            statusCode: 502,
+            errorMessage: 'validator rejected inverse',
+            timestamps: result.response.timestamps,
+          },
+        }
+      },
+    })
+
+    await responseCache.write('test', [providerResult(inverseParams, 4)])
+
+    const cached = (await cache.get(
+      responseCache.getCacheKey('test', inverseParams),
+    )) as TimestampedProviderErrorResponse
+    t.is(cached.statusCode, 502)
+    t.true(cached.errorMessage.includes('validator rejected inverse'))
+
+    const values = (await counter.get()).values
+    const byStatus = (status: string) =>
+      values.find((value) => value.labels['status'] === status)?.value
+    t.is(byStatus('rejected'), 1)
+    t.is(byStatus('applied'), undefined)
+  },
+)
+
+test.serial(
   'inversionTotal counts applied, rejected and skipped results with transport',
   async (t) => {
     const counter = metrics.get('inversionTotal') as unknown as {

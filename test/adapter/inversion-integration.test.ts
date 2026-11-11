@@ -1,6 +1,7 @@
 import test from 'ava'
 import { EventSource } from 'eventsource'
 import Redis from 'ioredis'
+import { installTimers } from '../helper'
 import {
   Adapter,
   AdapterEndpoint,
@@ -184,6 +185,12 @@ class CacheTestTransport extends SubscriptionTransport<TestGenerics> {
 class CacheBackedTransport extends SubscriptionTransport<TestGenerics> {
   supportsInversion = true
   providerEntries: Record<string, unknown>[] = []
+  backgroundCalls = 0
+  providerResponse: TimestampedProviderResult<TestGenerics>['response'] = {
+    data: { result: 4 },
+    result: 4,
+    timestamps,
+  }
 
   getSubscriptionTtlFromConfig(): number {
     return 1000
@@ -193,18 +200,10 @@ class CacheBackedTransport extends SubscriptionTransport<TestGenerics> {
     _context: EndpointContext<TestGenerics>,
     entries: TestParams[],
   ): Promise<void> {
+    this.backgroundCalls += 1
     this.providerEntries = entries as Record<string, unknown>[]
     for (const entry of entries) {
-      await this.writeResults([
-        {
-          params: entry,
-          response: {
-            data: { result: 4 },
-            result: 4,
-            timestamps,
-          },
-        },
-      ])
+      await this.writeResults([{ params: entry, response: this.providerResponse }])
     }
   }
 }
@@ -292,6 +291,26 @@ const foregroundResponse = (): AdapterResponse<TestGenerics['Response']> => ({
   statusCode: 200,
   timestamps,
 })
+
+const buildCacheBackedAdapter = (
+  transport: CacheBackedTransport,
+  options: {
+    includes?: ConstructorParameters<typeof PriceAdapter>[0]['includes']
+    envDefaultOverrides?: Record<string, number>
+  } = {},
+): Adapter =>
+  new PriceAdapter({
+    name: 'TEST',
+    endpoints: [
+      new PriceEndpoint<TestGenerics>({
+        name: 'test',
+        inputParameters,
+        transport,
+      }),
+    ],
+    ...(options.includes ? { includes: options.includes } : {}),
+    config: new AdapterConfig({}, { envDefaultOverrides: options.envDefaultOverrides ?? {} }),
+  })
 
 const inversionPolicy = (
   transform: InversionPolicy<TestGenerics>['transform'],
@@ -1068,6 +1087,60 @@ test.serial(
   },
 )
 
+test.serial('expired inverse subscriptions stop inverse writes until re-registered', async (t) => {
+  const clock = installTimers()
+  t.teardown(() => clock.uninstall())
+
+  const dependencies = buildDependencies()
+  const adapterSettings = buildAdapterSettings({})
+  const transport = new CacheTestTransport()
+  await new PriceEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport,
+  }).initialize('TEST', dependencies, adapterSettings)
+
+  const raw = { base: 'BTC', quote: 'USD' } as TestParams
+  const inverse = {
+    ...raw,
+    inversion: resolvedInversion,
+  } as unknown as TestParams
+  const rawKey = () => transport.responseCache.getCacheKey(transport.name, raw)
+  const inverseKey = () => transport.responseCache.getCacheKey(transport.name, inverse)
+  const runBackground = () =>
+    transport.backgroundExecute({ endpointName: 'test', inputParameters, adapterSettings })
+  const produce = (value: number) =>
+    transport.produce({
+      params: raw,
+      response: { data: { result: value }, result: value, timestamps },
+    })
+  const cachedResult = async (key: string) =>
+    ((await dependencies.cache.get(key)) as AdapterResponse<TestGenerics['Response']>).result
+
+  await transport.registerRequest(requestFor(inverse, 'inverse'), adapterSettings)
+  await runBackground()
+  await produce(4)
+  t.is(await cachedResult(inverseKey()), 0.25)
+
+  // The inverse subscription expires; keep the raw subscription alive so the
+  // provider keeps producing values for the raw feed only.
+  await clock.tickAsync(1001)
+  await dependencies.cache.delete(inverseKey())
+  await transport.registerRequest(requestFor(raw, 'raw'), adapterSettings)
+  await runBackground()
+  t.deepEqual(transport.providerEntries, [raw])
+
+  await produce(8)
+  t.is(await cachedResult(rawKey()), 8)
+  t.is(await dependencies.cache.get(inverseKey()), undefined)
+
+  // A new inverse request re-registers the variant and inversion resumes.
+  await transport.registerRequest(requestFor(inverse, 'inverse'), adapterSettings)
+  await runBackground()
+  await produce(8)
+  t.is(await cachedResult(inverseKey()), 0.125)
+})
+
 test.serial('request-level inversion writes both the raw and inverse cache entries', async (t) => {
   const transport = new CacheBackedTransport()
   const adapter = new Adapter({
@@ -1126,6 +1199,67 @@ test.serial('request-level inversion writes both the raw and inverse cache entri
   t.is(rawCached?.result, 4)
   t.is(inverseCached?.result, 0.25)
 })
+
+test.serial(
+  'repeated inverse cache hits reuse the inverse value without more provider work',
+  async (t) => {
+    const clock = installTimers()
+    t.teardown(() => clock.uninstall())
+
+    const transport = new CacheBackedTransport()
+    const adapter = buildCacheBackedAdapter(transport, {
+      envDefaultOverrides: { CACHE_POLLING_MAX_RETRIES: 0 },
+    })
+
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, {
+      clock,
+      testAdapter: undefined as unknown as TestAdapter,
+    })
+
+    const requestData = {
+      endpoint: 'test',
+      base: 'BTC',
+      quote: 'USD',
+      inversion: { enabled: true },
+    }
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData,
+      expectedResponse: {
+        data: { result: 0.25 },
+        result: 0.25,
+        statusCode: 200,
+      },
+    })
+
+    const providerCalls = transport.backgroundCalls
+
+    const inverseParams = {
+      base: 'BTC',
+      quote: 'USD',
+      inversion: resolvedInversion,
+    } as unknown as TestParams
+    const cachedRequest = {
+      body: {},
+      requestContext: {
+        endpointName: 'test',
+        requestEndpointName: 'test',
+        transportName: transport.name,
+        cacheKey: transport.responseCache.getCacheKey(transport.name, inverseParams),
+        data: inverseParams,
+      },
+    } as unknown as AdapterRequest<TestParams>
+
+    // Cache hits do not advance the clock, so the background loop (the only
+    // writer of provider values) makes no extra provider calls or writes.
+    for (let i = 0; i < 2; i++) {
+      const response = await adapter.handleRequest(cachedRequest, Promise.resolve())
+      t.is((response as AdapterResponse<TestGenerics['Response']>).result, 0.25)
+      t.is((response.data as { result: number }).result, 0.25)
+    }
+
+    t.is(transport.backgroundCalls, providerCalls)
+  },
+)
 
 test.serial(
   'request-level LWBA inversion writes inverted and raw cache entries with swapped sizes',
@@ -1281,6 +1415,57 @@ test.serial(
 
     t.is(providerCached?.result, 4)
     t.is(inverseCached?.result, 0.25)
+  },
+)
+
+test.serial(
+  'includes inversion returns provider errors unchanged through the cache path',
+  async (t) => {
+    const transport = new CacheBackedTransport()
+    transport.providerResponse = {
+      statusCode: 429,
+      errorMessage: 'provider error',
+      timestamps,
+    }
+    const adapter = buildCacheBackedAdapter(transport, {
+      includes: [
+        {
+          from: 'ETH',
+          to: 'BTC',
+          includes: [{ from: 'BTC', to: 'ETH', inverse: true }],
+        },
+      ],
+    })
+
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context as TestContext)
+
+    await testAdapter.request({
+      endpoint: 'test',
+      base: 'ETH',
+      quote: 'BTC',
+    })
+
+    const inverseResponse = await testAdapter.request({
+      endpoint: 'test',
+      base: 'ETH',
+      quote: 'BTC',
+      inversion: { enabled: true },
+    })
+    t.is(inverseResponse.statusCode, 429)
+    t.is(inverseResponse.json().errorMessage, 'provider error')
+    t.is(inverseResponse.json().result, undefined)
+
+    const inverseParams = {
+      base: 'BTC',
+      quote: 'ETH',
+      inversion: resolvedInversion,
+    } as unknown as TestParams
+    const inverseCached = (await testAdapter.mockCache.get(
+      transport.responseCache.getCacheKey(transport.name, inverseParams),
+    )) as AdapterResponse<TestGenerics['Response']> | undefined
+
+    t.is(inverseCached?.statusCode, 429)
+    t.is(inverseCached?.result, undefined)
   },
 )
 
