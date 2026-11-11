@@ -2,6 +2,8 @@
 
 A [Transport](../transports.md) defines the way in which an AdapterEndpoint will process incoming requests to fetch data from a Provider. The framework provides built-in transports to fetch data from a Provider using several protocols, including `HTTP`, `WebSocket`, and `SSE`. In rare cases, such as when a Provider uses a different protocol, or when you need custom functionality that is not provided by the built-in transports, you may need to define custom transport. This guide will walk you through the process of creating and using your own transport.
 
+If you set `supportsInversion = true`, write results with `SubscriptionTransport.writeResults` instead of the direct `responseCache.write` examples below. Direct writes only fill the raw variant, so inverse requests time out.
+
 We'll use a simple use case for a custom transport: fetching from a Provider where data is not ordinarily paginated. Imagine a Data Provider that returns the following response for an arbitrary API endpoint:
 
 ```json

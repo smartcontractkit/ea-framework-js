@@ -3,7 +3,7 @@ import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
 import WebSocket from 'ws'
-import { Adapter, AdapterEndpoint, EndpointContext } from '../../src/adapter'
+import { Adapter, AdapterEndpoint, EndpointContext, invertSingleValue } from '../../src/adapter'
 import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import {
@@ -72,6 +72,10 @@ const createAdapter = (
   ) => Promise<void> | void,
   pongHandler?: (connection: WebSocket, data: Buffer) => void,
   buildersOverride?: WebSocketTransportConfig<WebSocketTypes>['builders'],
+  endpointFactory?: (
+    transport: WebSocketTransport<WebSocketTypes>,
+  ) => AdapterEndpoint<WebSocketTypes>,
+  // eslint-disable-next-line max-params
 ): Adapter => {
   const websocketTransport = new WebSocketTransport<WebSocketTypes>({
     url: () => ENDPOINT_URL,
@@ -115,11 +119,13 @@ const createAdapter = (
     },
   })
 
-  const webSocketEndpoint = new AdapterEndpoint({
-    name: 'TEST',
-    transport: websocketTransport,
-    inputParameters,
-  })
+  const webSocketEndpoint =
+    endpointFactory?.(websocketTransport) ??
+    new AdapterEndpoint({
+      name: 'TEST',
+      transport: websocketTransport,
+      inputParameters,
+    })
 
   const config = new AdapterConfig(
     {},
@@ -2199,5 +2205,75 @@ test.serial(
 
     t.is(unsubscribeMessages.length, 1)
     t.deepEqual(unsubscribeMessages[0].pairs, ['ETH/USD'])
+  },
+)
+
+test.serial(
+  'websocket inversion writes raw and inverse cache entries from one provider push',
+  async (t) => {
+    const base = 'BTC'
+    const quote = 'USD'
+
+    mockWebSocketProvider(WebSocketClassProvider)
+    const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
+    mockWsServer.on('connection', (socket) => {
+      const sendPrice = () =>
+        socket.send(JSON.stringify({ pair: `${base}/${quote}`, value: price }))
+      socket.on('message', sendPrice)
+      const keepAliveInterval = setInterval(sendPrice, 1000)
+      socket.on('close', () => clearInterval(keepAliveInterval))
+    })
+
+    const adapter = createAdapter(
+      {
+        WS_SUBSCRIPTION_TTL: 60_000,
+        WS_SUBSCRIPTION_UNRESPONSIVE_TTL: 180_000,
+      },
+      undefined,
+      undefined,
+      undefined,
+      (transport) => {
+        const endpoint = new AdapterEndpoint<WebSocketTypes>({
+          name: 'test',
+          inputParameters,
+          transport,
+        })
+        endpoint.inversionTransform = invertSingleValue<WebSocketTypes>
+        return endpoint
+      },
+    )
+    const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
+
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base, quote },
+      expectedResponse: {
+        data: { result: price },
+        result: price,
+        statusCode: 200,
+      },
+    })
+
+    await testAdapter.startBackgroundExecuteThenGetResponse(t, {
+      requestData: { base, quote, inversion: { enabled: true } },
+      expectedCacheSize: 2,
+      expectedResponse: {
+        data: { result: 1 / price },
+        result: 1 / price,
+        statusCode: 200,
+      },
+    })
+
+    const cachePrefix = 'TEST-test-default_single_transport-'
+    const rawCached = await testAdapter.mockCache.get(`${cachePrefix}{"base":"btc","quote":"usd"}`)
+    const inverseCached = await testAdapter.mockCache.get(
+      `${cachePrefix}{"base":"btc","inversion":{"enabled":true},"quote":"usd"}`,
+    )
+
+    t.is((rawCached as { result: number }).result, price)
+    t.is((inverseCached as { result: number }).result, 1 / price)
+
+    testAdapter.api.close()
+    mockWsServer.close()
+    await t.context.clock.runToLastAsync()
   },
 )

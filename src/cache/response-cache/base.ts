@@ -1,4 +1,5 @@
 import { AdapterDependencies } from '../../adapter'
+import { hasInversionEnabled, inversionError, InversionTransform } from '../../adapter/inverse'
 import { AdapterSettings } from '../../config'
 import {
   AdapterResponse,
@@ -31,6 +32,7 @@ export abstract class ResponseCache<
   adapterSettings: AdapterSettings
   dependencies: AdapterDependencies
   resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
+  inversionTransform?: InversionTransform<T>
 
   constructor({
     inputParameters,
@@ -62,9 +64,59 @@ export abstract class ResponseCache<
    * @param results - the entries to write to the cache
    */
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
+    const hasInversion = results.some((result) => hasInversionEnabled(result.params))
+    if (!hasInversion) {
+      return this._write(transportName, this.validateResults(results))
+    }
+
+    const transform = this.inversionTransform
+    const transformed = results.map((result) => {
+      if (!hasInversionEnabled(result.params) || result.response.errorMessage) {
+        return result
+      }
+      if (!transform) {
+        return inversionError(
+          result.params,
+          result.response.timestamps,
+          `Inversion failed: endpoint "${this.endpointName}" transport "${transportName}" has no inversion transform`,
+        )
+      }
+      return transform(result)
+    })
+
+    return this._write(transportName, this.validateResults(transformed))
+  }
+
+  private validateResults(results: TimestampedProviderResult<T>[]): TimestampedProviderResult<T>[] {
     const resultValidator = this.resultValidator
-    const validated = resultValidator ? results.map((r) => resultValidator(r)) : results
-    return this._write(transportName, validated)
+    if (!resultValidator) {
+      return results
+    }
+
+    return results.map((result) => {
+      if (!hasInversionEnabled(result.params)) {
+        return resultValidator(result)
+      }
+      if (result.response.errorMessage) {
+        return result
+      }
+
+      // Keep cache identity stable if the validator mutates params.
+      const params = structuredClone(result.params)
+      try {
+        const validated = resultValidator({ ...result, params: structuredClone(params) })
+        return { params, response: validated.response }
+      } catch (error) {
+        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+        const safeDetail = censor(detail, CensorList.getAll()) ?? detail
+        censorLogs(() => logger.warn(`Result validator threw: ${safeDetail}`))
+        return inversionError(
+          params,
+          result.response.timestamps,
+          `Result validation failed: ${safeDetail}`,
+        )
+      }
+    })
   }
 
   /**

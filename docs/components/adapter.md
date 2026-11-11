@@ -81,6 +81,49 @@ The most common example of this is for foreign exchange rates. Some data provide
 
 To understand where the inverses are applied, please refer to the [Request Validation & Transformation Diagram](#request-validation--transformation)
 
+## Request-driven inversion
+
+Inversion is opt-in per request and applied on the cache-write path:
+
+```json
+{
+  "endpoint": "forex",
+  "data": {
+    "base": "USD",
+    "quote": "JPY",
+    "inversion": {
+      "enabled": true
+    }
+  }
+}
+```
+
+| Endpoint                       | Fields inverted                                                | Notes                                                               |
+| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `PriceEndpoint` / single-value | `data.result` → `1 / data.result`; top-level `result` mirrored | `data.result` is canonical                                          |
+| `LwbaEndpoint` / quote         | `bid' = 1 / ask`, `ask' = 1 / bid`                             | `mid' = 1 / mid` when provided; otherwise `(1 / ask + 1 / bid) / 2` |
+
+The endpoint response type selects the inversion behavior; requests only enable or disable it. `PriceEndpoint` inverts only `data.result`; `LwbaEndpoint` inverts the full quote.
+
+Inversion is atomic: invalid `bid`/`ask` makes the whole response 502. Provider errors are never inverted. `bidSize`/`askSize` are swapped; size validity belongs to the asset-class policy (OPDATA-9200).
+
+`resultValidator` runs after inversion and must accept inverted values. A thrown validator on an inverse result becomes a 502; non-inverse writes are unchanged.
+
+### Cache keys and feed IDs
+
+- No `inversion`, or `enabled: false`: existing key, feed ID, and `includes.json` behavior. `inversion: null` is rejected.
+- Enabled: `inversion.enabled` is part of params, so raw and inverse variants have distinct keys and feed IDs.
+- Custom `cacheKeyGenerator`: 400, because the custom key may not distinguish variants.
+
+### Transports and rollout
+
+- Subscription transports strip inversion config before provider calls, so raw and inverse variants share one provider subscription.
+- HTTP, WS, and SSE support inversion. Custom transports must set `supportsInversion = true` and write through `SubscriptionTransport.writeResults`; direct `responseCache.write` calls leave inverse requests timing out.
+- Transports with `foregroundExecute` return 400.
+- With `includes.json`, explicit inversion composes with the includes transform; includes-inverse pairs cancel.
+- Inversion creates a new feed identity. Upgrade writers, then readers, then enable inversion. Older EA builds drop unknown params, so gate jobspec/RDD changes on the deployed version.
+- `inversion` is a reserved input param name/alias. Existing adapters keep it as a domain param; inversion is disabled and startup warns.
+
 ## Request Transforms
 
 **Only use if absolutely necessary**

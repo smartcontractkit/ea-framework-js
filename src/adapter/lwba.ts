@@ -3,6 +3,7 @@ import { TimestampedProviderResult } from '../util'
 import { AdapterLWBAError } from '../validation/error'
 import { AdapterEndpoint } from './endpoint'
 import { AdapterEndpointParams, PriceEndpointInputParametersDefinition } from './index'
+import { invertQuote } from './inverse'
 
 /**
  * Type for the base input parameter config that any [[LwbaEndpoint]] must extend
@@ -96,6 +97,7 @@ export class LwbaEndpoint<T extends LwbaEndpointGenerics> extends AdapterEndpoin
     }
 
     super(params)
+    this.inversionTransform ??= invertQuote<T>
   }
 
   protected override resultValidator(

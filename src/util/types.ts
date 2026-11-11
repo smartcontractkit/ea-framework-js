@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify'
 import { Adapter } from '../adapter'
+import type { InversionRequestConfig } from '../adapter/inverse'
 import { AdapterError } from '../validation/error'
 import { InputParametersDefinition, TypeFromDefinition } from '../validation/input-params'
 declare module 'fastify' {
@@ -121,6 +122,7 @@ type CommonAdapterRequestParams = {
   endpoint?: string
   transport?: string
   overrides?: Overrides
+  inversion?: InversionRequestConfig
 }
 export type ReservedInputParameterNames = keyof CommonAdapterRequestParams
 

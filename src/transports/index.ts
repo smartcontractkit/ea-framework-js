@@ -57,6 +57,8 @@ export interface Transport<T extends TransportGenerics> {
   name: string
   responseCache: ResponseCache<T>
 
+  supportsInversion?: boolean
+
   /**
    * Initializes the transport in the Adapter context.
    *

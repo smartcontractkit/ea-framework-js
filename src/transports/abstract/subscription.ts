@@ -3,8 +3,9 @@ import { EndpointContext } from '../../adapter'
 import { ResponseCache } from '../../cache/response'
 import { metrics } from '../../metrics'
 import { SubscriptionSet, censorLogs, makeLogger } from '../../util'
-import { AdapterRequest } from '../../util/types'
+import { AdapterRequest, TimestampedProviderResult } from '../../util/types'
 import { TypeFromDefinition } from '../../validation/input-params'
+import { ProviderVariantResolver } from './provider-variants'
 
 const logger = makeLogger('SubscriptionTransport')
 
@@ -20,6 +21,8 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   subscriptionTtl!: number
   name!: string
   initialized = false
+
+  protected variantResolver = new ProviderVariantResolver<T>()
 
   async initialize(
     dependencies: TransportDependencies<T>,
@@ -72,7 +75,12 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
       })
       .set(entries.length)
 
-    await this.backgroundHandler(context, entries)
+    await this.backgroundHandler(context, this.variantResolver.group(entries))
+  }
+
+  /** Writes provider results to all raw and inverse cache variants. */
+  protected async writeResults(results: TimestampedProviderResult<T>[]): Promise<void> {
+    await this.responseCache.write(this.name, this.variantResolver.resolve(results))
   }
 
   /**

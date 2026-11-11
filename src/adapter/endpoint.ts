@@ -11,6 +11,7 @@ import {
   getCanonicalAdapterName,
   canonicalizeAdapterNameKeys,
 } from '../util'
+import { INVERSION_PARAM, InversionTransform } from './inverse'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -41,6 +42,7 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
   customOutputValidation?: CustomOutputValidator | undefined
+  inversionTransform?: InversionTransform<T>
 
   /**
    * Optional validator that can be overridden by endpoint subclasses to validate or transform
@@ -100,6 +102,15 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     dependencies: AdapterDependencies,
     adapterSettings: T['Settings'],
   ): Promise<void> {
+    const reservedParam = this.inputParameters.params.find((param) =>
+      param.aliases.includes(INVERSION_PARAM),
+    )
+    if (reservedParam) {
+      logger.warn(
+        `Endpoint "${this.name}" input param "${reservedParam.name}" uses reserved name/alias "${INVERSION_PARAM}". Inversion is disabled; rename the param to enable it.`,
+      )
+    }
+
     this.adapterName = adapterName
     const responseCache = new SimpleResponseCache({
       dependencies,
@@ -111,6 +122,9 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
 
     if (this.resultValidator) {
       responseCache.resultValidator = this.resultValidator.bind(this)
+    }
+    if (this.inversionTransform) {
+      responseCache.inversionTransform = this.inversionTransform
     }
 
     const transportDependencies = {

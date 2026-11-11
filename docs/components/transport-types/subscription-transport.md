@@ -10,6 +10,8 @@ Periodically, the background execute loop of the adapter will read the entire su
 1. `backgroundHandler` is called on each background execution iteration. It receives endpoint context as first argument and an array of all the entries in the subscription set as second argument. Sub-transport logic should be defined in this method.
 2. `getSubscriptionTtlFromConfig` receives adapter settings and should return time-to-live (TTL) value for subscription set.
 
+If the transport sets `supportsInversion = true`, write results with `await this.writeResults([...])`, not `responseCache.write`. `writeResults` fans each result out to all raw and inverse variants; direct writes leave inverse requests timing out.
+
 ## Example implementation of SubscriptionTransport
 
 ```typescript
