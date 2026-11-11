@@ -12,7 +12,6 @@ const logger = makeLogger('CompositeTransport')
 export class CompositeTransport<T extends TransportGenerics> implements Transport<T> {
   name!: string
   responseCache!: ResponseCache<T>
-  supportsInversion = false
 
   constructor(private readonly transports: Record<string, Transport<T>>) {}
 
@@ -47,10 +46,6 @@ export class CompositeTransport<T extends TransportGenerics> implements Transpor
           name,
         ),
       ),
-    )
-
-    this.supportsInversion = Object.values(this.transports).every(
-      (transport) => transport.supportsInversion === true,
     )
   }
 

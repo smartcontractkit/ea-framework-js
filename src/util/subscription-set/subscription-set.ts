@@ -14,9 +14,6 @@ export interface SubscriptionSet<T> {
   /** Get all subscriptions from the set as a list */
   getAll(): PromiseOrValue<T[]>
 
-  /** Whether the set currently contains any entries, without loading them when possible. */
-  hasEntries?(): PromiseOrValue<boolean>
-
   get: (key: string) => T | undefined
 }
 
@@ -35,7 +32,7 @@ export class SubscriptionSetFactory {
     this.cachePrefix = adapterSettings.CACHE_PREFIX
   }
 
-  buildSet<T>(endpointName: string, transportName: string, keySuffix?: string): SubscriptionSet<T> {
+  buildSet<T>(endpointName: string, transportName: string): SubscriptionSet<T> {
     switch (this.cacheType) {
       case 'local':
         return new ExpiringSortedSet<T>(this.capacity)
@@ -45,9 +42,8 @@ export class SubscriptionSetFactory {
         }
         // Identifier key used for the subscription set in redis
         const cachePrefix = this.cachePrefix ? `${this.cachePrefix}-` : ''
-        const suffix = keySuffix ? `-${keySuffix}` : ''
-        const subscriptionSetKey = `${cachePrefix}${this.adapterName}-${endpointName}-${transportName}${suffix}-subscriptionSet`
-        return new RedisSubscriptionSet<T>(this.redisClient, subscriptionSetKey, Boolean(keySuffix))
+        const subscriptionSetKey = `${cachePrefix}${this.adapterName}-${endpointName}-${transportName}-subscriptionSet`
+        return new RedisSubscriptionSet<T>(this.redisClient, subscriptionSetKey)
       }
     }
   }

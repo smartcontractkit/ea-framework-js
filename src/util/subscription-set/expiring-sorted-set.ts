@@ -60,10 +60,6 @@ export class ExpiringSortedSet<T> implements SubscriptionSet<T> {
     return results
   }
 
-  hasEntries(): boolean {
-    return this.map.size > 0
-  }
-
   get(key: string): T | undefined {
     const node = this.map.get(key)
     if (node) {

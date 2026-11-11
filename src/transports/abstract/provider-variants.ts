@@ -1,10 +1,7 @@
 import type { TransportGenerics } from '..'
 import { hasInversionEnabled, stripInversionConfig } from '../../adapter/inverse'
-import { censorLogs, makeLogger } from '../../util'
 import type { TimestampedProviderResult } from '../../util/types'
 import type { TypeFromDefinition } from '../../validation/input-params'
-
-const logger = makeLogger('ProviderVariantResolver')
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -38,8 +35,6 @@ export const calculateProviderParamsKey = (params: Record<string, unknown>): str
  */
 export class ProviderVariantResolver<T extends TransportGenerics> {
   private variants = new Map<string, TypeFromDefinition<T['Parameters']>[]>()
-  private knownKeys = new Set<string>()
-  private missedKeys = new Set<string>()
 
   group(entries: TypeFromDefinition<T['Parameters']>[]): TypeFromDefinition<T['Parameters']>[] {
     const hasInversion = entries.some((entry) => hasInversionEnabled(entry))
@@ -65,7 +60,6 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
 
     const providerEntries: TypeFromDefinition<T['Parameters']>[] = []
     for (const [key, group] of groups) {
-      this.knownKeys.add(key)
       const hasInversionVariant = group.some((entry) => hasInversionEnabled(entry))
 
       if (!hasInversionVariant) {
@@ -95,14 +89,6 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       const variants = this.variants.get(key)
 
       if (!variants?.length) {
-        if (!this.knownKeys.has(key) && !this.missedKeys.has(key) && this.missedKeys.size < 1000) {
-          this.missedKeys.add(key)
-          censorLogs(() =>
-            logger.warn(
-              `No inversion variant matched provider result params: ${key}. The inverse cache entry was not written.`,
-            ),
-          )
-        }
         return [result]
       }
 
@@ -125,6 +111,5 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
 
   private reset(): void {
     this.variants.clear()
-    this.knownKeys.clear()
   }
 }

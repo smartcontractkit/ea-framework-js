@@ -1,6 +1,6 @@
 import EventEmitter from 'events'
 import { default as Redis } from 'ioredis'
-import { Cache, CacheFactory, calculateCacheKey, pollResponseFromCache } from '../cache'
+import { Cache, CacheFactory, pollResponseFromCache } from '../cache'
 import { cacheGet, cacheMetricsLabel } from '../cache/metrics'
 import {
   AdapterConfig,
@@ -28,7 +28,6 @@ import { Requester } from '../util/requester'
 import { AdapterError, AdapterTimeoutError } from '../validation/error'
 import { EmptyInputParameters } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
-import { hasInversionEnabled, stripInversionConfig } from './inverse'
 import {
   AdapterDependencies,
   AdapterParams,
@@ -492,36 +491,12 @@ export class Adapter<
       return cachedResponse
     }
 
-    // If there was no cached response, execute the foregroundExecute if defined.
-    // Foreground transports receive provider-facing data and cache keys without inversion config.
-    let foregroundRequest = req
-    if (hasInversionEnabled(req.requestContext.data)) {
-      const data = stripInversionConfig(req.requestContext.data as Record<string, unknown>)
-      foregroundRequest = {
-        ...req,
-        requestContext: {
-          ...req.requestContext,
-          data,
-          cacheKey: calculateCacheKey({
-            data,
-            adapterName: this.name,
-            endpointName: endpoint.name,
-            transportName: req.requestContext.transportName,
-            adapterSettings: this.config.settings,
-          }),
-        },
-      } as AdapterRequest<EmptyInputParameters>
-    }
+    // If there was no cached response, execute the foregroundExecute if defined
     const immediateResponse =
-      transport.foregroundExecute &&
-      (await transport.foregroundExecute(foregroundRequest, this.config.settings))
+      transport.foregroundExecute && (await transport.foregroundExecute(req, this.config.settings))
     if (immediateResponse) {
       logger.debug('Got immediate response from transport, sending as response')
-      return endpoint.applyInversionToResponse(
-        immediateResponse,
-        req.requestContext.data,
-        req.requestContext.transportName,
-      )
+      return immediateResponse
     }
 
     // Finally, either because there was no synchronous execute or because it returned an empty response,

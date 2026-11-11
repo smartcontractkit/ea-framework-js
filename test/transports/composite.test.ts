@@ -13,14 +13,9 @@ import {
   TransportGenerics,
   TransportRoutes,
 } from '../../src/transports'
-import { CompositeTransport } from '../../src/transports/composite'
-import { AdapterDependencies } from '../../src/adapter/types'
-import { LocalCache } from '../../src/cache/local'
 import { ResponseCache } from '../../src/cache/response'
-import { SimpleResponseCache } from '../../src/cache/response-cache/simple'
 import { AdapterRequest, TimestampedProviderResult } from '../../src/util/types'
 import { TestAdapter } from '../../src/util/testing-utils'
-import { InputParameters } from '../../src/validation'
 import { TypeFromDefinition } from '../../src/validation/input-params'
 import { cacheTestInputParameters, CacheTestTransportTypes } from '../cache/helper'
 
@@ -389,54 +384,5 @@ test.serial(
 
     t.is(error?.message, 'Composite transport requires at least 2 transports')
     t.is(error?.statusCode, 400)
-  },
-)
-
-class CompositeRecordingTransport implements Transport<CacheTestTransportTypes> {
-  name!: string
-  responseCache!: ResponseCache<CacheTestTransportTypes>
-
-  constructor(public supportsInversion: boolean) {}
-
-  async initialize(
-    dependencies: TransportDependencies<CacheTestTransportTypes>,
-    _adapterSettings: CacheTestTransportTypes['Settings'],
-    _endpointName: string,
-    transportName: string,
-  ): Promise<void> {
-    this.name = transportName
-    this.responseCache = dependencies.responseCache
-  }
-}
-
-test.serial(
-  'composite transport advertises inversion only when every child supports it',
-  async (t) => {
-    const config = new AdapterConfig({})
-    config.initialize()
-    config.validate()
-    const responseCache = new SimpleResponseCache<CacheTestTransportTypes>({
-      dependencies: { cache: new LocalCache(100) } as unknown as AdapterDependencies,
-      adapterSettings: config.settings,
-      adapterName: 'TEST',
-      endpointName: 'test',
-      inputParameters: new InputParameters(cacheTestInputParameters.definition),
-    })
-    const dependencies = {
-      responseCache,
-    } as unknown as TransportDependencies<CacheTestTransportTypes>
-
-    for (const { wsSupports, restSupports, expected } of [
-      { wsSupports: true, restSupports: true, expected: true },
-      { wsSupports: true, restSupports: false, expected: false },
-    ]) {
-      const ws = new CompositeRecordingTransport(wsSupports)
-      const rest = new CompositeRecordingTransport(restSupports)
-      const composite = new CompositeTransport<CacheTestTransportTypes>({ ws, rest })
-
-      await composite.initialize(dependencies, config.settings, 'test', 'composite')
-
-      t.is(composite.supportsInversion, expected)
-    }
   },
 )

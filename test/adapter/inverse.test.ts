@@ -13,10 +13,9 @@ import {
   priceEndpointInputParametersDefinition,
 } from '../../src/adapter'
 import { AdapterDependencies } from '../../src/adapter/types'
-import { Cache, calculateFeedId } from '../../src/cache'
+import { calculateFeedId } from '../../src/cache'
 import { SimpleResponseCache } from '../../src/cache/response-cache/simple'
 import { buildAdapterSettings } from '../../src/config'
-import { metrics } from '../../src/metrics'
 import {
   SingleNumberResultResponse,
   TimestampedProviderErrorResponse,
@@ -25,13 +24,11 @@ import {
 import { AdapterInputError } from '../../src/validation/error'
 import { MockCache } from '../../src/util/testing-utils'
 import { LoggerFactoryProvider } from '../../src/util/logger'
-import CensorList from '../../src/util/censor/censor-list'
 import { InputParameters } from '../../src/validation'
 import { TypeFromDefinition } from '../../src/validation/input-params'
 
 test.before(() => {
   LoggerFactoryProvider.set()
-  metrics.initialize()
 })
 
 type SingleValueGenerics = {
@@ -216,6 +213,16 @@ test('quote policy inverts provider mid, synthesizes missing mid and swaps sizes
     t.is(equalData.ask, 0.5)
     t.is(equalData.mid, 0.5)
   }
+
+  // TP example: invert the quote, not just the mid.
+  const tp = quotePolicy.transform(quoteAttempt(1.36, 1.37, 1.365))
+  t.is(isError(tp), false)
+  if (!isError(tp)) {
+    const tpData = (tp.response as { data: LwbaResponseDataFields['Data'] }).data
+    t.true(Math.abs(tpData.bid - 1 / 1.37) < 1e-12)
+    t.true(Math.abs(tpData.ask - 1 / 1.36) < 1e-12)
+    t.true(Math.abs(tpData.mid - 1 / 1.365) < 1e-12)
+  }
 })
 
 test('quote policy rejects invalid quotes and overflow with 502', (t) => {
@@ -366,62 +373,6 @@ test.serial('inversion failures reject only the inverse variant', async (t) => {
       expectedMessage: 'does not match',
     },
     {
-      name: 'malformed policy return',
-      configure: (responseCache) => {
-        responseCache.inversionPolicy = {
-          id: 'single-value',
-          version: 1,
-          transform: () => undefined as unknown as TimestampedProviderResult<SingleValueGenerics>,
-        }
-      },
-      expectedMessage: 'invalid result',
-    },
-    {
-      name: 'malformed policy success',
-      configure: (responseCache) => {
-        responseCache.inversionPolicy = {
-          id: 'single-value',
-          version: 1,
-          transform: (result) =>
-            ({
-              params: result.params,
-              response: { timestamps: result.response.timestamps },
-            }) as unknown as TimestampedProviderResult<SingleValueGenerics>,
-        }
-      },
-      expectedMessage: 'invalid result',
-    },
-    {
-      name: 'error result without statusCode',
-      configure: (responseCache) => {
-        responseCache.inversionPolicy = {
-          id: 'single-value',
-          version: 1,
-          transform: (result) =>
-            ({
-              params: result.params,
-              response: {
-                errorMessage: 'custom failure',
-                timestamps: result.response.timestamps,
-              },
-            }) as unknown as TimestampedProviderResult<SingleValueGenerics>,
-        }
-      },
-      expectedMessage: 'custom failure',
-    },
-    {
-      name: 'validator invalid return',
-      configure: (responseCache) => {
-        responseCache.resultValidator = (result) => {
-          if (hasInversionEnabled(result.params)) {
-            return undefined as unknown as TimestampedProviderResult<SingleValueGenerics>
-          }
-          return result
-        }
-      },
-      expectedMessage: 'Result validation failed: invalid result',
-    },
-    {
       name: 'clone failure',
       makeInverse: () => {
         const result = providerResult(inverseParams, 4)
@@ -429,19 +380,6 @@ test.serial('inversion failures reject only the inverse variant', async (t) => {
         return result
       },
       expectedMessage: 'could not be cloned',
-    },
-    {
-      name: 'policy throw',
-      configure: (responseCache) => {
-        responseCache.inversionPolicy = {
-          id: 'single-value',
-          version: 1,
-          transform: () => {
-            throw new Error('boom')
-          },
-        }
-      },
-      expectedMessage: 'policy transform threw',
     },
     {
       name: 'validator throw',
@@ -478,185 +416,3 @@ test.serial('inversion failures reject only the inverse variant', async (t) => {
     )
   }
 })
-
-test.serial(
-  'policy and validator mutation cannot change cache identity or corrupt raw data',
-  async (t) => {
-    const seen: number[] = []
-    const { cache, responseCache } = buildCache({
-      policy: {
-        id: 'single-value',
-        version: 1,
-        transform: (result) => {
-          if (!result.response.errorMessage) {
-            const data = result.response.data as { result: number }
-            data.result = 1 / data.result
-            ;(result.response as { result: number }).result = data.result
-          }
-          delete (result.params as unknown as Record<string, unknown>)['inversion']
-          ;(result.params as unknown as Record<string, unknown>)['base'] = 'MUTATED'
-          return result
-        },
-      },
-      resultValidator: (result) => {
-        if (!result.response.errorMessage) {
-          seen.push(result.response.result as number)
-        }
-        return { params: rawParams, response: result.response }
-      },
-    })
-    const inverseResult = providerResult(inverseParams, 4)
-
-    await responseCache.write('test', [providerResult(rawParams, 4), inverseResult])
-
-    t.is((inverseResult.response as { result: number }).result, 4)
-    t.is((inverseResult.response as { data: { result: number } }).data.result, 4)
-
-    const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
-    const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
-    t.is((rawCached as { result: number }).result, 4)
-    t.is((inverseCached as { result: number }).result, 0.25)
-    t.deepEqual(seen, [4, 0.25])
-  },
-)
-
-test.serial('writeTTL extends distinct raw and inverse cache keys', async (t) => {
-  const ttlCalls: { key: string; ttl: number }[] = []
-  const cache = {
-    setTTL: async (key: string, ttl: number) => {
-      ttlCalls.push({ key, ttl })
-    },
-  } as unknown as Cache
-  const responseCache = new SimpleResponseCache<SingleValueGenerics>({
-    dependencies: { cache } as unknown as AdapterDependencies,
-    adapterSettings,
-    adapterName: 'TEST',
-    endpointName: 'test',
-    inputParameters,
-  })
-
-  await responseCache.writeTTL('test', [rawParams, inverseParams, rawParams], 123)
-
-  t.deepEqual(ttlCalls, [
-    { key: responseCache.getCacheKey('test', rawParams), ttl: 123 },
-    { key: responseCache.getCacheKey('test', inverseParams), ttl: 123 },
-    { key: responseCache.getCacheKey('test', rawParams), ttl: 123 },
-  ])
-  t.not(ttlCalls[0].key, ttlCalls[1].key)
-})
-
-test.serial('thrown policy errors are redacted with the censor list', async (t) => {
-  const previous = CensorList.getAll()
-  CensorList.set([{ key: 'SECRET', value: /super-secret/g }])
-
-  try {
-    const { responseCache, cache } = buildCache({
-      policy: {
-        id: 'single-value',
-        version: 1,
-        transform: () => {
-          throw new Error('boom super-secret')
-        },
-      },
-    })
-
-    await responseCache.write('test', [providerResult(inverseParams, 4)])
-
-    const cached = (await cache.get(
-      responseCache.getCacheKey('test', inverseParams),
-    )) as TimestampedProviderErrorResponse
-    t.true(cached.errorMessage.includes('boom'))
-    t.true(cached.errorMessage.includes('[SECRET REDACTED]'))
-    t.false(cached.errorMessage.includes('super-secret'))
-  } finally {
-    CensorList.set(previous)
-  }
-})
-
-test.serial(
-  'validator-rejected inverse results are counted as rejected, not applied',
-  async (t) => {
-    const counter = metrics.get('inversionTotal') as unknown as {
-      reset: () => void
-      get: () => Promise<{
-        values: { labels: Record<string, string>; value: number }[]
-      }>
-    }
-    counter.reset()
-
-    const { cache, responseCache } = buildCache({
-      resultValidator: (result) => {
-        if (!hasInversionEnabled(result.params)) {
-          return result
-        }
-        return {
-          params: result.params,
-          response: {
-            statusCode: 502,
-            errorMessage: 'validator rejected inverse',
-            timestamps: result.response.timestamps,
-          },
-        }
-      },
-    })
-
-    await responseCache.write('test', [providerResult(inverseParams, 4)])
-
-    const cached = (await cache.get(
-      responseCache.getCacheKey('test', inverseParams),
-    )) as TimestampedProviderErrorResponse
-    t.is(cached.statusCode, 502)
-    t.true(cached.errorMessage.includes('validator rejected inverse'))
-
-    const values = (await counter.get()).values
-    const byStatus = (status: string) =>
-      values.find((value) => value.labels['status'] === status)?.value
-    t.is(byStatus('rejected'), 1)
-    t.is(byStatus('applied'), undefined)
-  },
-)
-
-test.serial(
-  'inversionTotal counts applied, rejected and skipped results with transport',
-  async (t) => {
-    const counter = metrics.get('inversionTotal') as unknown as {
-      reset: () => void
-      get: () => Promise<{
-        values: { labels: Record<string, string>; value: number }[]
-      }>
-    }
-    counter.reset()
-
-    const { responseCache } = buildCache()
-    const providerError = {
-      params: inverseParams,
-      response: {
-        statusCode: 502,
-        errorMessage: 'provider error',
-        timestamps,
-      },
-    } as TimestampedProviderResult<SingleValueGenerics>
-
-    await responseCache.write('test', [
-      providerResult(rawParams, 4),
-      providerResult(inverseParams, 4),
-      providerResult(unresolvedParams, 4),
-      providerError,
-    ])
-
-    const values = (await counter.get()).values
-    const byStatus = (status: string) =>
-      values.find((value) => value.labels['status'] === status)?.value
-    t.is(byStatus('applied'), 1)
-    t.is(byStatus('rejected'), 1)
-    t.is(byStatus('skipped'), 1)
-    t.true(
-      values.every(
-        (value) =>
-          value.labels['adapter_endpoint'] === 'test' &&
-          value.labels['policy'] === 'single-value' &&
-          value.labels['transport'] === 'test',
-      ),
-    )
-  },
-)

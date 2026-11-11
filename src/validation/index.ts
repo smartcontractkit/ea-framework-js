@@ -62,7 +62,7 @@ const assertInversionTransportSupported = (
   transportName: string,
 ): void => {
   const transport = endpoint.transportRoutes.get(transportName)
-  if (!transport?.supportsInversion) {
+  if (!transport?.supportsInversion || transport.foregroundExecute) {
     throw new AdapterInputError({
       statusCode: 400,
       message: `Transport "${transportName}" does not support inversion`,

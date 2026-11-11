@@ -237,11 +237,6 @@ export const metrics = new Metrics(() => ({
     help: 'The number of background execute errors per endpoint x transport',
     labelNames: ['adapter_endpoint', 'transport'] as const,
   }),
-  inversionTotal: new client.Counter({
-    name: 'inversion_total',
-    help: 'The number of provider results processed for inversion, by status',
-    labelNames: ['adapter_endpoint', 'policy', 'status', 'transport'] as const,
-  }),
   bgExecuteDurationSeconds: new client.Gauge({
     name: 'bg_execute_duration_seconds',
     help: 'A histogram bucket of the distribution of background execute durations',

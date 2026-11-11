@@ -1,6 +1,5 @@
 import { AdapterDependencies } from '../../adapter'
-import { ensureProviderResult, hasInversionEnabled, InversionPolicy } from '../../adapter/inverse'
-import { tryClone } from '../../util/clone'
+import { hasInversionEnabled, InversionPolicy } from '../../adapter/inverse'
 import { AdapterSettings } from '../../config'
 import {
   AdapterResponse,
@@ -20,9 +19,16 @@ import {
 import { Cache, calculateAdapterName, calculateCacheKey, calculateFeedId } from '../'
 import CensorList from '../../util/censor/censor-list'
 import { validator } from '../../validation/utils'
-import { metrics } from '../../metrics'
 
 const logger = makeLogger('ResponseCache')
+
+const cloneParams = <P>(params: P): P => {
+  try {
+    return JSON.parse(JSON.stringify(params)) as P
+  } catch {
+    return { ...params }
+  }
+}
 
 export abstract class ResponseCache<
   T extends { Parameters: InputParametersDefinition; Response: ResponseGenerics },
@@ -83,62 +89,20 @@ export abstract class ResponseCache<
           },
         }
       })
-      const validated = this.validateResults(failed)
-      this.recordInversionMetrics(results, validated, transportName)
-      return this._write(transportName, validated)
+      return this._write(transportName, this.validateResults(failed))
     }
 
     const transformed =
       inversionPolicy && hasInversion
         ? results.map((result) => {
-            if (!hasInversionEnabled(result.params) || Boolean(result.response.errorMessage)) {
+            if (!hasInversionEnabled(result.params) || result.response.errorMessage) {
               return result
             }
-
-            const params = tryClone(result.params) ?? { ...result.params }
-            const response = tryClone(result.response)
-            let inverted: TimestampedProviderResult<T>
-            if (!response) {
-              inverted = this.inversionFailure(
-                params,
-                result.response.timestamps,
-                'Inversion failed: response could not be cloned',
-              )
-            } else {
-              try {
-                inverted =
-                  ensureProviderResult(
-                    inversionPolicy.transform({
-                      params: tryClone(params) ?? { ...params },
-                      response,
-                    }),
-                    { params, response: result.response },
-                  ) ??
-                  this.inversionFailure(
-                    params,
-                    result.response.timestamps,
-                    'Inversion failed: policy returned an invalid result',
-                  )
-              } catch (error) {
-                const detail =
-                  error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-                const safeDetail = censor(detail, CensorList.getAll()) ?? detail
-                censorLogs(() => logger.warn(`Inversion policy threw: ${safeDetail}`))
-                inverted = this.inversionFailure(
-                  params,
-                  result.response.timestamps,
-                  `Inversion failed: policy transform threw: ${safeDetail}`,
-                )
-              }
-            }
-
-            return { params, response: inverted.response }
+            return inversionPolicy.transform(result)
           })
         : results
 
-    const validated = this.validateResults(transformed)
-    this.recordInversionMetrics(results, validated, transportName)
-    return this._write(transportName, validated)
+    return this._write(transportName, this.validateResults(transformed))
   }
 
   private inversionFailure(
@@ -153,35 +117,6 @@ export abstract class ResponseCache<
         errorMessage: message,
         timestamps,
       },
-    }
-  }
-
-  private recordInversionMetrics(
-    original: TimestampedProviderResult<T>[],
-    final: TimestampedProviderResult<T>[],
-    transportName: string,
-  ): void {
-    for (let index = 0; index < final.length; index++) {
-      const before = original[index]
-      if (!hasInversionEnabled(before.params)) {
-        continue
-      }
-      const after = final[index]
-      let status: 'applied' | 'rejected' | 'skipped' = 'applied'
-      if (before.response.errorMessage) {
-        status = 'skipped'
-      } else if (after.response.errorMessage) {
-        status = 'rejected'
-      }
-      metrics
-        .get('inversionTotal')
-        .labels({
-          adapter_endpoint: this.endpointName,
-          policy: this.inversionPolicy?.id ?? 'none',
-          status,
-          transport: transportName,
-        })
-        .inc()
     }
   }
 
@@ -200,19 +135,9 @@ export abstract class ResponseCache<
         return result
       }
 
-      const params = tryClone(result.params) ?? { ...result.params }
+      const params = cloneParams(result.params)
       try {
-        const validated = ensureProviderResult(
-          resultValidator({ ...result, params: tryClone(params) ?? { ...params } }),
-          result,
-        )
-        if (!validated) {
-          return this.inversionFailure(
-            params,
-            result.response.timestamps,
-            'Result validation failed: invalid result',
-          )
-        }
+        const validated = resultValidator({ ...result, params: cloneParams(params) })
         return { params, response: validated.response }
       } catch (error) {
         const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)

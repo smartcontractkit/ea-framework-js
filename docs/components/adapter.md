@@ -112,19 +112,16 @@ Inversion is atomic per response: all fields are validated and inverted together
 - Requests without `inversion`, and requests with `inversion: { "enabled": false }`, keep the existing cache key, feed ID, and `includes.json` behavior. `inversion: null` is rejected.
 - Enabled requests include the resolved policy id/version in request params, so raw and inverse variants use distinct cache keys and feed IDs.
 - Endpoints with a custom `cacheKeyGenerator` reject enabled inversion with a 400 until the generator is supported on the write path.
-- A policy version bump changes the inverse cache key and feed ID and uses a separate inversion subscription set.
+- A policy version bump changes the inverse feed identity. Disable inversion and drain old inverse entries during the bump.
 
 ### Transports and rollout
 
 - Background transports strip inversion config before provider requests; raw and inverse variants share one provider subscription.
 - Built-in HTTP, WS, and SSE transports support inversion. Custom background transports must set `supportsInversion = true` and write provider results through `SubscriptionTransport.writeResults` (not `responseCache.write`) so all active variants are populated; otherwise inversion requests are rejected with a 400 or time out with an empty inverse cache. Provider results must round-trip the params they were subscribed with so the resolver can match them to variants.
-- `foregroundExecute` receives provider-facing data without inversion config and must return the raw provider response.
-- With `includes.json`, explicit inversion composes with the includes transform. For an includes-inverse pair the two inversions cancel and the provider-direction value is returned. Provider error responses on includes-inverse pairs are returned unchanged instead of producing a `NaN` result.
-- Inversion subscriptions use a policy-versioned set. Upgrade all writers, then readers, and only then enable inversion. Do not enable inversion on existing feeds; it creates a new feed identity.
-- A policy bump is a feed-identity migration. In reader/writer mode, keep previous-version writers running until readers move, or disable inversion during the bump. On rollback, stop inversion jobspecs first and wait for inverse TTLs; old builds silently return raw values for inversion requests.
-- `writeTTL` updates only the params passed; callers refreshing raw and inverse entries must pass both variants.
-- `inversion` is reserved as an input param name and alias. Audit adapters, including JS and widened definitions, and jobspecs before upgrading; startup warns if a top-level param uses the reserved name or alias.
-- Metrics: `inversionTotal{adapter_endpoint, policy, status, transport}` — see the metrics reference table. Status is `applied`, `rejected`, or `skipped` (provider error). Inversion-capable endpoints check the versioned subscription set without reading it while no inverse subscriptions exist.
+- Inversion is supported on background subscription transports only. Transports with `foregroundExecute` reject inversion requests with a 400.
+- With `includes.json`, explicit inversion composes with the includes transform. For an includes-inverse pair the two inversions cancel and the provider-direction value is returned.
+- Inversion creates a new feed identity. Upgrade writers, then readers, and only then enable inversion.
+- `inversion` is reserved as an input param name and alias. Existing adapters that already declare it keep using it as a domain param; inversion is disabled for that endpoint and startup warns.
 
 ## Request Transforms
 

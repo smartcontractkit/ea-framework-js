@@ -5,25 +5,13 @@ import { CompositeTransport } from '../transports/composite'
 import {
   AdapterRequest,
   AdapterRequestData,
-  AdapterResponse,
   Overrides,
-  TimestampedAdapterResponse,
   TimestampedProviderResult,
-  censor,
-  censorLogs,
   makeLogger,
   getCanonicalAdapterName,
   canonicalizeAdapterNameKeys,
 } from '../util'
-import { metrics } from '../metrics'
-import CensorList from '../util/censor/censor-list'
-import {
-  ensureProviderResult,
-  hasInversionEnabled,
-  INVERSION_PARAM,
-  InversionPolicy,
-} from './inverse'
-import { tryClone } from '../util/clone'
+import { INVERSION_PARAM, InversionPolicy } from './inverse'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -100,7 +88,6 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.customInputValidation = params.customInputValidation
     this.customOutputValidation = params.customOutputValidation
     this.overrides = params.overrides
-    this.inversionPolicy = params.inversionPolicy
     this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
   }
 
@@ -192,145 +179,6 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     for (const transform of this.requestTransforms) {
       transform(req, settings)
     }
-  }
-
-  /**
-   * Applies the endpoint inversion policy to an immediate (foreground) response.
-   * Cache responses are inverted by ResponseCache before being written.
-   *
-   * @param response - the immediate response returned by a transport
-   * @param data - the validated request params
-   * @returns the response with inversion applied when requested
-   */
-  applyInversionToResponse(
-    response: AdapterResponse<T['Response']>,
-    data: TypeFromDefinition<T['Parameters']>,
-    transportName = DEFAULT_TRANSPORT_NAME,
-  ): AdapterResponse<T['Response']> {
-    const policy = this.inversionPolicy
-    if (!hasInversionEnabled(data)) {
-      return response
-    }
-
-    const timestamps = (response as TimestampedAdapterResponse<T['Response']>).timestamps
-    if (response.errorMessage) {
-      this.recordInversionMetric('skipped', policy?.id ?? 'none', transportName)
-      return response
-    }
-
-    if (!policy) {
-      this.recordInversionMetric('rejected', 'none', transportName)
-      return {
-        statusCode: 502,
-        errorMessage: 'Inversion failed: endpoint has no inversion policy',
-        timestamps,
-      }
-    }
-
-    const params = tryClone(data) ?? { ...data }
-    const clonedResponse = tryClone(response)
-    let result: TimestampedProviderResult<T>
-    if (!clonedResponse) {
-      result = this.inversionFailure(
-        params,
-        timestamps,
-        'Inversion failed: response could not be cloned',
-      )
-    } else {
-      try {
-        result =
-          ensureProviderResult(
-            policy.transform({
-              params: tryClone(params) ?? { ...params },
-              response: clonedResponse as TimestampedAdapterResponse<T['Response']>,
-            }),
-            { params, response: response as TimestampedAdapterResponse<T['Response']> },
-          ) ??
-          this.inversionFailure(
-            params,
-            timestamps,
-            'Inversion failed: policy returned an invalid result',
-          )
-      } catch (error) {
-        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-        const safeDetail = censor(detail, CensorList.getAll()) ?? detail
-        censorLogs(() => logger.warn(`Inversion policy threw: ${safeDetail}`))
-        result = this.inversionFailure(
-          params,
-          timestamps,
-          `Inversion failed: policy transform threw: ${safeDetail}`,
-        )
-      }
-    }
-
-    let finalResponse = result.response as AdapterResponse<T['Response']>
-    let status: 'applied' | 'rejected' = result.response.errorMessage ? 'rejected' : 'applied'
-    if (status === 'applied' && this.resultValidator) {
-      try {
-        const validated = ensureProviderResult(
-          this.resultValidator({
-            ...result,
-            params: tryClone(result.params) ?? { ...result.params },
-          }),
-          result,
-        )
-        if (!validated) {
-          finalResponse = {
-            statusCode: 502,
-            errorMessage: 'Inversion failed: result validator returned an invalid result',
-            timestamps,
-          }
-          status = 'rejected'
-        } else {
-          finalResponse = validated.response as AdapterResponse<T['Response']>
-          status = finalResponse.errorMessage ? 'rejected' : 'applied'
-        }
-      } catch (error) {
-        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-        const safeDetail = censor(detail, CensorList.getAll()) ?? detail
-        censorLogs(() => logger.warn(`Inversion result validator threw: ${safeDetail}`))
-        finalResponse = {
-          statusCode: 502,
-          errorMessage: `Inversion failed: result validator threw: ${safeDetail}`,
-          timestamps,
-        }
-        status = 'rejected'
-      }
-    }
-
-    this.recordInversionMetric(status, policy.id, transportName)
-    return finalResponse
-  }
-
-  private inversionFailure(
-    params: TypeFromDefinition<T['Parameters']>,
-    timestamps: TimestampedProviderResult<T>['response']['timestamps'],
-    message: string,
-  ): TimestampedProviderResult<T> {
-    return {
-      params,
-      response: {
-        statusCode: 502,
-        errorMessage: message,
-        timestamps,
-      },
-    }
-  }
-
-  private recordInversionMetric(
-    status: 'applied' | 'rejected' | 'skipped',
-    policyId: string,
-    transportName: string,
-  ): void {
-    metrics
-      .get('inversionTotal')
-      .labels({
-        adapter_endpoint: this.name,
-        policy: policyId,
-        status,
-        transport: transportName,
-      })
-      .inc()
   }
 
   getRequestOverrides(data: Record<string, string>, overrides?: Overrides) {

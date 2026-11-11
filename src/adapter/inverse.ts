@@ -1,4 +1,3 @@
-import { clone } from '../util/clone'
 import { AdapterInputError } from '../validation/error'
 import type {
   ProviderResultGenerics,
@@ -62,39 +61,7 @@ const errorResult = <T extends ProviderResultGenerics>(
   }
 }
 
-/**
- * Validate a custom policy return value and supply the original timestamps when omitted.
- * Returns undefined when the policy returned something that cannot be written.
- */
-export const ensureProviderResult = <T extends ProviderResultGenerics>(
-  result: unknown,
-  fallback: TimestampedProviderResult<T>,
-): TimestampedProviderResult<T> | undefined => {
-  if (!isRecord(result)) {
-    return undefined
-  }
-  const response = (result as { response?: unknown }).response
-  if (!isRecord(response)) {
-    return undefined
-  }
-
-  const errorMessage = response['errorMessage']
-  if (errorMessage !== undefined && errorMessage !== '') {
-    if (typeof errorMessage !== 'string') {
-      return undefined
-    }
-    if (typeof response['statusCode'] !== 'number') {
-      response['statusCode'] = 502
-    }
-  } else if (response['data'] === undefined && response['result'] === undefined) {
-    return undefined
-  }
-
-  if (!isRecord(response['timestamps'])) {
-    response['timestamps'] = fallback.response.timestamps
-  }
-  return result as TimestampedProviderResult<T>
-}
+const cloneResponse = <T>(response: T): T => JSON.parse(JSON.stringify(response)) as T
 
 const assertPolicyMatchesConfig = <T extends ProviderResultGenerics>(
   result: TimestampedProviderResult<T>,
@@ -201,7 +168,7 @@ export class SingleValueInversionPolicy<
 
     let response: TimestampedAdapterResponse<T['Response']>
     try {
-      response = clone(result.response)
+      response = cloneResponse(result.response)
     } catch {
       return errorResult(result, 'Inversion failed: response could not be cloned')
     }
@@ -275,7 +242,7 @@ export class QuoteInversionPolicy<
 
     let response: TimestampedAdapterResponse<T['Response']>
     try {
-      response = clone(result.response)
+      response = cloneResponse(result.response)
     } catch {
       return errorResult(result, 'Inversion failed: response could not be cloned')
     }

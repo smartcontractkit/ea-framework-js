@@ -1,6 +1,5 @@
 import { Transport, TransportDependencies, TransportGenerics } from '..'
 import { EndpointContext } from '../../adapter'
-import { hasInversionEnabled } from '../../adapter/inverse'
 import { ResponseCache } from '../../cache/response'
 import { metrics } from '../../metrics'
 import { SubscriptionSet, censorLogs, makeLogger } from '../../util'
@@ -9,9 +8,6 @@ import { TypeFromDefinition } from '../../validation/input-params'
 import { ProviderVariantResolver } from './provider-variants'
 
 const logger = makeLogger('SubscriptionTransport')
-
-// Avoid polling an empty versioned inversion set on every background cycle.
-const INACTIVE_INVERSION_SET_CHECK_MS = 1000
 
 /**
  * Abstract Transport that will take incoming requests and add them to a subscription set as part
@@ -22,14 +18,11 @@ const INACTIVE_INVERSION_SET_CHECK_MS = 1000
 export abstract class SubscriptionTransport<T extends TransportGenerics> implements Transport<T> {
   responseCache!: ResponseCache<T>
   subscriptionSet!: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
-  protected inversionSubscriptionSet?: SubscriptionSet<TypeFromDefinition<T['Parameters']>>
   subscriptionTtl!: number
   name!: string
   initialized = false
 
   protected variantResolver = new ProviderVariantResolver<T>()
-  private inversionSetActive = false
-  private lastInversionSetCheck = 0
 
   async initialize(
     dependencies: TransportDependencies<T>,
@@ -43,15 +36,6 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
     this.initialized = true
     this.responseCache = dependencies.responseCache
     this.subscriptionSet = dependencies.subscriptionSetFactory.buildSet(endpointName, name)
-    const inversionPolicy =
-      'inversionPolicy' in this.responseCache ? this.responseCache.inversionPolicy : undefined
-    if (inversionPolicy) {
-      this.inversionSubscriptionSet = dependencies.subscriptionSetFactory.buildSet(
-        endpointName,
-        name,
-        `inversion-${inversionPolicy.id}-v${inversionPolicy.version}`,
-      )
-    }
     this.subscriptionTtl = this.getSubscriptionTtlFromConfig(adapterSettings) // Will be implemented by subclasses
     this.name = name
   }
@@ -66,16 +50,8 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
       ),
     )
 
-    const inversionSet =
-      this.inversionSubscriptionSet && hasInversionEnabled(req.requestContext.data)
-        ? this.inversionSubscriptionSet
-        : undefined
-    if (inversionSet) {
-      this.inversionSetActive = true
-    }
-
     // This might need coalescing to avoid too frequent ttl updates
-    await (inversionSet ?? this.subscriptionSet).add(
+    await this.subscriptionSet.add(
       req.requestContext.data,
       this.subscriptionTtl,
       req.requestContext.cacheKey,
@@ -85,12 +61,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
   async backgroundExecute(context: EndpointContext<T>): Promise<void> {
     logger.debug('Starting background execute')
 
-    const [legacyEntries, inversionEntries] = await Promise.all([
-      this.subscriptionSet.getAll(),
-      this.getInversionEntries(),
-    ])
-    const entries =
-      inversionEntries.length > 0 ? [...legacyEntries, ...inversionEntries] : legacyEntries
+    const entries = await this.subscriptionSet.getAll()
 
     // Keep track of active subscriptions for background execute
     // Note: for those coming from reasonable OOP languages, don't fret; this is JS:
@@ -104,33 +75,7 @@ export abstract class SubscriptionTransport<T extends TransportGenerics> impleme
       })
       .set(entries.length)
 
-    const providerEntries = this.variantResolver.group(entries)
-    await this.backgroundHandler(context, providerEntries)
-  }
-
-  private async getInversionEntries(): Promise<TypeFromDefinition<T['Parameters']>[]> {
-    const inversionSet = this.inversionSubscriptionSet
-    if (!inversionSet) {
-      return []
-    }
-
-    if (!this.inversionSetActive) {
-      const now = Date.now()
-      if (
-        this.lastInversionSetCheck !== 0 &&
-        now - this.lastInversionSetCheck < INACTIVE_INVERSION_SET_CHECK_MS
-      ) {
-        return []
-      }
-      this.lastInversionSetCheck = now
-      if (inversionSet.hasEntries && !(await inversionSet.hasEntries())) {
-        return []
-      }
-    }
-
-    const entries = await inversionSet.getAll()
-    this.inversionSetActive = entries.length > 0
-    return entries
+    await this.backgroundHandler(context, this.variantResolver.group(entries))
   }
 
   /**

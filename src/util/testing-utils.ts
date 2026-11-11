@@ -131,10 +131,6 @@ export class RedisMock {
     return this.store.get(key)
   }
 
-  async exists(key: string) {
-    return (await this.store.get(key)) === undefined ? 0 : 1
-  }
-
   del(key: string) {
     return this.store.delete(key)
   }

@@ -55,29 +55,3 @@ test.serial('builds feed ID correctly from input params', async (t) => {
   const data = { base: 'ETH', quote: 'BTC' }
   t.is(calculateFeedId(t.context, data), '{"base":"eth","quote":"btc"}')
 })
-
-test.serial('resolved inversion config creates a distinct feed ID', async (t) => {
-  const raw = { base: 'ETH', quote: 'BTC' }
-  const inverse = {
-    ...raw,
-    inversion: {
-      enabled: true,
-      policyId: 'single-value',
-      policyVersion: 1,
-    },
-  }
-  const nextPolicyVersion = {
-    ...inverse,
-    inversion: { ...inverse.inversion, policyVersion: 2 },
-  }
-
-  t.is(calculateFeedId(t.context, raw), '{"base":"eth","quote":"btc"}')
-  t.is(
-    calculateFeedId(t.context, inverse),
-    '{"base":"eth","inversion":{"enabled":true,"policyId":"single-value","policyVersion":1},"quote":"btc"}',
-  )
-  t.is(
-    calculateFeedId(t.context, nextPolicyVersion),
-    '{"base":"eth","inversion":{"enabled":true,"policyId":"single-value","policyVersion":2},"quote":"btc"}',
-  )
-})

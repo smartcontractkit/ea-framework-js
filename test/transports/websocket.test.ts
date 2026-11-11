@@ -2237,13 +2237,15 @@ test.serial(
       undefined,
       undefined,
       undefined,
-      (transport) =>
-        new AdapterEndpoint<WebSocketTypes>({
+      (transport) => {
+        const endpoint = new AdapterEndpoint<WebSocketTypes>({
           name: 'test',
           inputParameters,
           transport,
-          inversionPolicy: new SingleValueInversionPolicy<WebSocketTypes>(),
-        }),
+        })
+        endpoint.inversionPolicy = new SingleValueInversionPolicy<WebSocketTypes>()
+        return endpoint
+      },
     )
     const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
 
