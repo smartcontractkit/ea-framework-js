@@ -122,7 +122,6 @@ type CommonAdapterRequestParams = {
   endpoint?: string
   transport?: string
   overrides?: Overrides
-  /** Enables response inversion for this request. The endpoint policy owns the semantics. */
   inversion?: InversionRequestConfig
 }
 export type ReservedInputParameterNames = keyof CommonAdapterRequestParams

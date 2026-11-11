@@ -57,7 +57,6 @@ export interface Transport<T extends TransportGenerics> {
   name: string
   responseCache: ResponseCache<T>
 
-  /** Whether this transport supports inversion-enabled requests. */
   supportsInversion?: boolean
 
   /**

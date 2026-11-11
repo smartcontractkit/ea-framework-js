@@ -1,5 +1,9 @@
+/**
+ * Keeps one provider subscription per provider-facing param set and fans each
+ * result out to the active raw and inverse cache variants.
+ */
 import type { TransportGenerics } from '..'
-import { hasInversionEnabled, stripInversionConfig } from '../../adapter/inverse'
+import { hasInversionEnabled, toProviderParams } from '../../adapter/inverse'
 import type { TimestampedProviderResult } from '../../util/types'
 import type { TypeFromDefinition } from '../../validation/input-params'
 
@@ -27,9 +31,8 @@ const stableStringify = (value: unknown): string => JSON.stringify(normalizePara
 
 /** Key for subscriptions sharing provider-facing params. */
 export const calculateProviderParamsKey = (params: Record<string, unknown>): string =>
-  stableStringify(stripInversionConfig(params))
+  stableStringify(toProviderParams(params))
 
-/** Groups raw and inverse subscriptions by provider params and fans results back out. */
 export class ProviderVariantResolver<T extends TransportGenerics> {
   private variants = new Map<string, TypeFromDefinition<T['Parameters']>[]>()
 
@@ -41,38 +44,30 @@ export class ProviderVariantResolver<T extends TransportGenerics> {
       return entries
     }
 
-    const groups = new Map<string, TypeFromDefinition<T['Parameters']>[]>()
-
-    for (const entry of entries) {
+    const groups = entries.reduce((grouped, entry) => {
       const key = calculateProviderParamsKey(entry as Record<string, unknown>)
-      const group = groups.get(key)
+      const group = grouped.get(key)
       if (group) {
         group.push(entry)
       } else {
-        groups.set(key, [entry])
+        grouped.set(key, [entry])
       }
-    }
+      return grouped
+    }, new Map<string, TypeFromDefinition<T['Parameters']>[]>())
 
     this.reset()
 
-    const providerEntries: TypeFromDefinition<T['Parameters']>[] = []
-    for (const [key, group] of groups) {
+    return Array.from(groups, ([key, group]) => {
       const hasInversionVariant = group.some((entry) => hasInversionEnabled(entry))
-
       if (!hasInversionVariant) {
-        // No inverse variant; one provider request covers the group.
-        providerEntries.push(group[0])
-        continue
+        return group[0]
       }
 
-      const providerParams = stripInversionConfig(
-        group[0] as Record<string, unknown>,
-      ) as TypeFromDefinition<T['Parameters']>
-      providerEntries.push(providerParams)
       this.variants.set(key, group)
-    }
-
-    return providerEntries
+      return toProviderParams(group[0] as Record<string, unknown>) as TypeFromDefinition<
+        T['Parameters']
+      >
+    })
   }
 
   resolve(results: TimestampedProviderResult<T>[]): TimestampedProviderResult<T>[] {

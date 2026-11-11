@@ -4,7 +4,7 @@ import type {
   TimestampedProviderResult,
 } from '../../util/types'
 import { isRecord } from './config'
-import { cloneResponse, errorResult, isErrorResponse, isPositiveFinite } from './shared'
+import { cloneResponse, errorResult, isErrorResponse, isPositiveFinite } from './transform'
 
 type LwbaData = {
   bid?: unknown
@@ -14,18 +14,12 @@ type LwbaData = {
   askSize?: unknown
 }
 
-const validateQuote = (bid: unknown, ask: unknown, mid: number): string | undefined => {
-  if (!isPositiveFinite(bid) || !isPositiveFinite(ask)) {
-    return 'Inversion failed: bid and ask must be finite positive numbers'
+const validateQuote = (bid: unknown, ask: unknown, mid: unknown): string | undefined => {
+  if (!isPositiveFinite(bid) || !isPositiveFinite(ask) || !isPositiveFinite(mid)) {
+    return 'Inversion failed: bid, ask and mid must be finite positive numbers'
   }
-  if (!isPositiveFinite(mid)) {
-    return 'Inversion failed: mid must be a finite positive number'
-  }
-  if (bid > ask) {
-    return 'Inversion failed: bid must be less than or equal to ask'
-  }
-  if (mid < bid || mid > ask) {
-    return 'Inversion failed: mid must be between bid and ask'
+  if (bid > ask || mid < bid || mid > ask) {
+    return 'Inversion failed: bid, ask and mid must satisfy bid <= mid <= ask'
   }
   return undefined
 }
@@ -49,36 +43,28 @@ export const invertQuote = <T extends ProviderResultGenerics>(
     return errorResult(result, 'Inversion failed: data must be an object')
   }
 
-  const quote = data as LwbaData
-  const providerMidPresent = quote.mid !== undefined && quote.mid !== null
-  const rawMid = providerMidPresent ? quote.mid : undefined
-
-  if (providerMidPresent) {
-    const error = validateQuote(quote.bid, quote.ask, rawMid as number)
-    if (error) {
-      return errorResult(result, error)
-    }
-  } else {
-    if (!isPositiveFinite(quote.bid) || !isPositiveFinite(quote.ask)) {
-      return errorResult(result, 'Inversion failed: bid and ask must be finite positive numbers')
-    }
-    if (quote.bid > quote.ask) {
-      return errorResult(result, 'Inversion failed: bid must be less than or equal to ask')
-    }
+  const { bid, ask, mid, bidSize, askSize } = data as LwbaData
+  if (!isPositiveFinite(bid) || !isPositiveFinite(ask)) {
+    return errorResult(result, 'Inversion failed: bid and ask must be finite positive numbers')
   }
 
-  const newBid = 1 / (quote.ask as number)
-  const newAsk = 1 / (quote.bid as number)
-  const newMid = providerMidPresent ? 1 / (rawMid as number) : (newBid + newAsk) / 2
+  const providerMid = mid === undefined || mid === null ? undefined : mid
+  if (providerMid !== undefined && !isPositiveFinite(providerMid)) {
+    return errorResult(result, 'Inversion failed: mid must be a finite positive number')
+  }
+
+  const newBid = 1 / ask
+  const newAsk = 1 / bid
+  const newMid = providerMid !== undefined ? 1 / providerMid : (newBid + newAsk) / 2
 
   const outputError = validateQuote(newBid, newAsk, newMid)
   if (outputError) {
     return errorResult(result, outputError)
   }
 
-  if (quote.bidSize !== undefined || quote.askSize !== undefined) {
-    const bidSize = quote.bidSize
-    quote.bidSize = quote.askSize
+  const quote = data as LwbaData
+  if (bidSize !== undefined || askSize !== undefined) {
+    quote.bidSize = askSize
     quote.askSize = bidSize
   }
   quote.bid = newBid

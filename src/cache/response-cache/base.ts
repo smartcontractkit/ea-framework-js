@@ -22,14 +22,6 @@ import { validator } from '../../validation/utils'
 
 const logger = makeLogger('ResponseCache')
 
-const cloneParams = <P>(params: P): P => {
-  try {
-    return JSON.parse(JSON.stringify(params)) as P
-  } catch {
-    return { ...params }
-  }
-}
-
 export abstract class ResponseCache<
   T extends { Parameters: InputParametersDefinition; Response: ResponseGenerics },
 > {
@@ -135,9 +127,10 @@ export abstract class ResponseCache<
         return result
       }
 
-      const params = cloneParams(result.params)
+      // Keep cache identity stable if the validator mutates params.
+      const params = structuredClone(result.params)
       try {
-        const validated = resultValidator({ ...result, params: cloneParams(params) })
+        const validated = resultValidator({ ...result, params: structuredClone(params) })
         return { params, response: validated.response }
       } catch (error) {
         const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)

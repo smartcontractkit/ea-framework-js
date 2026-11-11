@@ -42,25 +42,21 @@ export const validateInversionRequestConfig = (config: unknown): InversionReques
  * test doubles that throw on unknown access stay safe.
  */
 export const getInversionConfig = (params: unknown): InversionRequestConfig | undefined => {
-  if (!isRecord(params)) {
-    return undefined
-  }
-  if (!Object.prototype.hasOwnProperty.call(params, INVERSION_PARAM)) {
+  if (!isRecord(params) || !Object.prototype.hasOwnProperty.call(params, INVERSION_PARAM)) {
     return undefined
   }
   const config = params[INVERSION_PARAM]
-  if (!isRecord(config) || typeof config['enabled'] !== 'boolean') {
-    return undefined
-  }
-  return { enabled: config['enabled'] }
+  return isRecord(config) && typeof config['enabled'] === 'boolean'
+    ? { enabled: config['enabled'] }
+    : undefined
 }
 
 /** Whether params explicitly enable inversion. */
 export const hasInversionEnabled = (params: unknown): boolean =>
   getInversionConfig(params)?.enabled === true
 
-/** Remove the framework-only inversion config before provider calls. */
-export const stripInversionConfig = <T extends Record<string, unknown>>(params: T): T => {
+/** Remove the request-only inversion param before provider calls and grouping. */
+export const toProviderParams = <T extends Record<string, unknown>>(params: T): T => {
   if (!Object.prototype.hasOwnProperty.call(params, INVERSION_PARAM)) {
     return params
   }

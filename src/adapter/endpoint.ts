@@ -42,7 +42,6 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
   customOutputValidation?: CustomOutputValidator | undefined
-  /** Optional transform that inverts provider results for this endpoint. */
   inversionTransform?: InversionTransform<T>
 
   /**
@@ -103,12 +102,13 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     dependencies: AdapterDependencies,
     adapterSettings: T['Settings'],
   ): Promise<void> {
-    for (const param of this.inputParameters.params) {
-      if (param.aliases.includes(INVERSION_PARAM)) {
-        logger.warn(
-          `Endpoint "${this.name}" input param "${param.name}" uses reserved name/alias "${INVERSION_PARAM}". Inversion is disabled; rename the param to enable it.`,
-        )
-      }
+    const reservedParam = this.inputParameters.params.find((param) =>
+      param.aliases.includes(INVERSION_PARAM),
+    )
+    if (reservedParam) {
+      logger.warn(
+        `Endpoint "${this.name}" input param "${reservedParam.name}" uses reserved name/alias "${INVERSION_PARAM}". Inversion is disabled; rename the param to enable it.`,
+      )
     }
 
     this.adapterName = adapterName

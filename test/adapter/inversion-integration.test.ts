@@ -211,6 +211,44 @@ const buildCacheBackedAdapter = (
     config: new AdapterConfig({}, { envDefaultOverrides: options.envDefaultOverrides ?? {} }),
   })
 
+const btcUsd = { base: 'BTC', quote: 'USD' } as TestParams
+const inversionRequest = { ...btcUsd, inversion: inverseConfig }
+const cachePollingConfig = {
+  CACHE_POLLING_MAX_RETRIES: 20,
+  CACHE_POLLING_SLEEP_MS: 10,
+}
+const inverseOf = (params: TestParams): TestParams =>
+  ({ ...params, inversion: inverseConfig }) as TestParams
+
+const buildPriceEndpoint = async <T extends TestGenerics>(
+  transport: SubscriptionTransport<T>,
+  dependencies = buildDependencies(),
+  adapterSettings = buildAdapterSettings({}),
+) => {
+  const endpoint = new PriceEndpoint<T>({
+    name: 'test',
+    inputParameters: inputParameters as InputParameters<T['Parameters']>,
+    transport,
+  })
+  await endpoint.initialize('TEST', dependencies, adapterSettings)
+  return { endpoint, dependencies, adapterSettings }
+}
+
+const addSubscriptions = async <T extends TestGenerics>(
+  transport: SubscriptionTransport<T>,
+  entries: TypeFromDefinition<T['Parameters']>[],
+): Promise<void> => {
+  await Promise.all(
+    entries.map((entry) =>
+      transport.subscriptionSet.add(
+        entry,
+        1000,
+        transport.responseCache.getCacheKey(transport.name, entry),
+      ),
+    ),
+  )
+}
+
 test.before(() => {
   LoggerFactoryProvider.set()
   metrics.initialize()
@@ -224,14 +262,14 @@ test.serial('inversion config is rejected with 400 when unsupported', async (t) 
     expectedMessage: string
   }[] = [
     {
-      name: 'no policy',
+      name: 'no transform',
       makeEndpoint: () =>
         new AdapterEndpoint<TestGenerics>({
           name: 'test',
           inputParameters,
           transport: new CacheTestTransport(),
         }),
-      data: { base: 'BTC', quote: 'USD', inversion: { enabled: true } },
+      data: inversionRequest,
       expectedMessage: 'does not support inversion',
     },
     {
@@ -242,7 +280,7 @@ test.serial('inversion config is rejected with 400 when unsupported', async (t) 
           inputParameters,
           transport: new UnsupportedInversionTransport(),
         }),
-      data: { base: 'BTC', quote: 'USD', inversion: { enabled: true } },
+      data: inversionRequest,
       expectedMessage: 'does not support inversion',
     },
     {
@@ -253,7 +291,7 @@ test.serial('inversion config is rejected with 400 when unsupported', async (t) 
           inputParameters,
           transport: new ForegroundPriceTransport(),
         }),
-      data: { base: 'BTC', quote: 'USD', inversion: { enabled: true } },
+      data: inversionRequest,
       expectedMessage: 'does not support inversion',
     },
     {
@@ -265,7 +303,7 @@ test.serial('inversion config is rejected with 400 when unsupported', async (t) 
           transport: new CacheTestTransport(),
           cacheKeyGenerator: () => 'custom-key',
         }),
-      data: { base: 'BTC', quote: 'USD', inversion: { enabled: true } },
+      data: inversionRequest,
       expectedMessage: 'custom cacheKeyGenerator',
     },
     {
@@ -364,7 +402,6 @@ test.serial('absent or disabled inversion keeps the raw response and cache key',
 
 test.serial('HTTP raw and inverse variants share one provider request', async (t) => {
   const dependencies = buildDependencies()
-  const adapterSettings = buildAdapterSettings({})
   let requestCount = 0
   let seenParams: Record<string, unknown>[] = []
 
@@ -403,22 +440,11 @@ test.serial('HTTP raw and inverse variants share one provider request', async (t
       })),
   })
 
-  const endpoint = new PriceEndpoint<HttpTestGenerics>({
-    name: 'test',
-    inputParameters,
-    transport,
-  })
+  const { adapterSettings } = await buildPriceEndpoint(transport, dependencies)
 
-  await endpoint.initialize('TEST', dependencies, adapterSettings)
-
-  const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
-  const inverseParams = {
-    ...rawParams,
-    inversion: inverseConfig,
-  } as unknown as TestParams
-
-  await transport.subscriptionSet.add(rawParams, 1000, 'raw-test')
-  await transport.subscriptionSet.add(inverseParams, 1000, 'inverse-test')
+  const rawParams = btcUsd
+  const inverseParams = inverseOf(rawParams)
+  await addSubscriptions(transport, [rawParams, inverseParams])
 
   await transport.backgroundExecute({
     endpointName: 'test',
@@ -443,22 +469,11 @@ test.serial('HTTP raw and inverse variants share one provider request', async (t
 test.serial(
   'mixed provider groups preserve raw-only feeds while fanning out variants',
   async (t) => {
-    const dependencies = buildDependencies()
-    const adapterSettings = buildAdapterSettings({})
     const transport = new CacheTestTransport()
-    const endpoint = new PriceEndpoint<TestGenerics>({
-      name: 'test',
-      inputParameters,
-      transport,
-    })
+    const { dependencies, adapterSettings } = await buildPriceEndpoint(transport)
 
-    await endpoint.initialize('TEST', dependencies, adapterSettings)
-
-    const rawA = { base: 'BTC', quote: 'USD' } as TestParams
-    const inverseA = {
-      ...rawA,
-      inversion: inverseConfig,
-    } as unknown as TestParams
+    const rawA = btcUsd
+    const inverseA = inverseOf(rawA)
     const rawB = { base: 'ETH', quote: 'USD' } as TestParams
     const entries = [rawA, inverseA, rawB]
 
@@ -511,7 +526,6 @@ test.serial(
 
 test.serial('provider errors fan out unchanged to raw and inverse cache keys', async (t) => {
   const dependencies = buildDependencies()
-  const adapterSettings = buildAdapterSettings({})
 
   dependencies.requester = {
     request: async () => {
@@ -536,22 +550,11 @@ test.serial('provider errors fan out unchanged to raw and inverse cache keys', a
     },
   })
 
-  const endpoint = new PriceEndpoint<HttpTestGenerics>({
-    name: 'test',
-    inputParameters,
-    transport,
-  })
+  const { adapterSettings } = await buildPriceEndpoint(transport, dependencies)
 
-  await endpoint.initialize('TEST', dependencies, adapterSettings)
-
-  const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
-  const inverseParams = {
-    ...rawParams,
-    inversion: inverseConfig,
-  } as unknown as TestParams
-
-  await transport.subscriptionSet.add(rawParams, 1000, 'raw-test')
-  await transport.subscriptionSet.add(inverseParams, 1000, 'inverse-test')
+  const rawParams = btcUsd
+  const inverseParams = inverseOf(rawParams)
+  await addSubscriptions(transport, [rawParams, inverseParams])
 
   await transport.backgroundExecute({
     endpointName: 'test',
@@ -578,22 +581,11 @@ test.serial('provider errors fan out unchanged to raw and inverse cache keys', a
 test.serial(
   'provider variants resolve inverse-first, duplicates and normalized params',
   async (t) => {
-    const dependencies = buildDependencies()
-    const adapterSettings = buildAdapterSettings({})
     const transport = new CacheTestTransport()
-    const endpoint = new PriceEndpoint<TestGenerics>({
-      name: 'test',
-      inputParameters,
-      transport,
-    })
+    const { dependencies, adapterSettings } = await buildPriceEndpoint(transport)
 
-    await endpoint.initialize('TEST', dependencies, adapterSettings)
-
-    const raw = { base: 'BTC', quote: 'USD' } as TestParams
-    const inverse = {
-      ...raw,
-      inversion: inverseConfig,
-    } as unknown as TestParams
+    const raw = btcUsd
+    const inverse = inverseOf(raw)
 
     transport.subscriptionSet = {
       add: async () => {},
@@ -631,24 +623,8 @@ test.serial(
 
 test.serial('request-level inversion writes both the raw and inverse cache entries', async (t) => {
   const transport = new CacheBackedTransport()
-  const adapter = new Adapter({
-    name: 'TEST',
-    endpoints: [
-      new PriceEndpoint<TestGenerics>({
-        name: 'test',
-        inputParameters,
-        transport,
-      }),
-    ],
-    config: new AdapterConfig(
-      {},
-      {
-        envDefaultOverrides: {
-          CACHE_POLLING_MAX_RETRIES: 20,
-          CACHE_POLLING_SLEEP_MS: 10,
-        },
-      },
-    ),
+  const adapter = buildCacheBackedAdapter(transport, {
+    envDefaultOverrides: cachePollingConfig,
   })
 
   const context = t.context as TestContext
@@ -662,11 +638,8 @@ test.serial('request-level inversion writes both the raw and inverse cache entri
   t.is(rawResponse.statusCode, 200)
   t.is(rawResponse.json().result, 4)
 
-  const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
-  const inverseParams = {
-    ...rawParams,
-    inversion: inverseConfig,
-  } as unknown as TestParams
+  const rawParams = btcUsd
+  const inverseParams = inverseOf(rawParams)
   await testAdapter.mockCache?.delete(
     transport.responseCache.getCacheKey(transport.name, rawParams),
   )
@@ -675,7 +648,7 @@ test.serial('request-level inversion writes both the raw and inverse cache entri
     endpoint: 'test',
     base: 'BTC',
     quote: 'USD',
-    inversion: { enabled: true },
+    inversion: inverseConfig,
   })
   t.is(inverseResponse.statusCode, 200)
   t.is(inverseResponse.json().result, 0.25)
@@ -704,15 +677,7 @@ test.serial(
           transport,
         }),
       ],
-      config: new AdapterConfig(
-        {},
-        {
-          envDefaultOverrides: {
-            CACHE_POLLING_MAX_RETRIES: 20,
-            CACHE_POLLING_SLEEP_MS: 10,
-          },
-        },
-      ),
+      config: new AdapterConfig({}, { envDefaultOverrides: cachePollingConfig }),
     })
 
     const context = t.context as TestContext
@@ -741,7 +706,7 @@ test.serial(
       endpoint: 'test',
       base: 'BTC',
       quote: 'USD',
-      inversion: { enabled: true },
+      inversion: inverseConfig,
     })
     t.is(inverseResponse.statusCode, 200)
     const inverse = inverseResponse.json().data
@@ -790,10 +755,7 @@ test.serial(
           includes: [{ from: 'BTC', to: 'ETH', inverse: true }],
         },
       ],
-      envDefaultOverrides: {
-        CACHE_POLLING_MAX_RETRIES: 20,
-        CACHE_POLLING_SLEEP_MS: 10,
-      },
+      envDefaultOverrides: cachePollingConfig,
     })
 
     const context = t.context as TestContext
@@ -811,7 +773,7 @@ test.serial(
       endpoint: 'test',
       base: 'ETH',
       quote: 'BTC',
-      inversion: { enabled: true },
+      inversion: inverseConfig,
     })
 
     t.is(response.statusCode, 200)
@@ -821,10 +783,7 @@ test.serial(
     t.deepEqual(transport.providerEntries, [{ base: 'BTC', quote: 'ETH' }])
 
     const providerParams = { base: 'BTC', quote: 'ETH' } as TestParams
-    const inverseParams = {
-      ...providerParams,
-      inversion: inverseConfig,
-    } as unknown as TestParams
+    const inverseParams = inverseOf(providerParams)
 
     const providerCached = (await testAdapter.mockCache?.get(
       transport.responseCache.getCacheKey(transport.name, providerParams),

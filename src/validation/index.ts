@@ -33,21 +33,16 @@ const getRequestInversionConfig = (
   data: Record<string, unknown>,
 ): InversionRequestConfig | undefined => {
   // Keep adapters that already use `inversion` as a domain param; startup warns.
-  if (endpoint.inputParameters.params.some((param) => param.aliases.includes(INVERSION_PARAM))) {
+  const hasReservedDomainParam = endpoint.inputParameters.params.some((param) =>
+    param.aliases.includes(INVERSION_PARAM),
+  )
+  const rawConfig = data[INVERSION_PARAM]
+  if (hasReservedDomainParam || rawConfig === undefined) {
     return undefined
   }
-  if (!Object.prototype.hasOwnProperty.call(data, INVERSION_PARAM)) {
-    return undefined
-  }
-  const rawInversion = data[INVERSION_PARAM]
-  if (rawInversion === undefined) {
-    return undefined
-  }
-  const config = validateInversionRequestConfig(rawInversion)
-  if (!config.enabled) {
-    return config
-  }
-  if (!endpoint.inversionTransform) {
+
+  const config = validateInversionRequestConfig(rawConfig)
+  if (config.enabled && !endpoint.inversionTransform) {
     throw new AdapterInputError({
       statusCode: 400,
       message: `Endpoint "${endpoint.name}" does not support inversion`,

@@ -4,7 +4,7 @@ import type {
   TimestampedProviderResult,
 } from '../../util/types'
 import { isRecord } from './config'
-import { cloneResponse, errorResult, isErrorResponse, isPositiveFinite } from './shared'
+import { cloneResponse, errorResult, isErrorResponse, isPositiveFinite } from './transform'
 
 export const invertSingleValue = <T extends ProviderResultGenerics>(
   result: TimestampedProviderResult<T>,
