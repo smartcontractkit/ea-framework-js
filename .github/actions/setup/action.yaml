@@ -5,7 +5,7 @@ runs:
   steps:
     - uses: actions/setup-node@v7
       with:
-        node-version: 24.22
+        node-version: 26.13
         cache: yarn
     - run: corepack enable
       shell: bash
