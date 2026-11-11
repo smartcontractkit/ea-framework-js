@@ -1,5 +1,5 @@
 import { AdapterDependencies } from '../../adapter'
-import { hasInversionEnabled, InversionPolicy } from '../../adapter/inverse'
+import { hasInversionEnabled, InversionTransform } from '../../adapter/inverse'
 import { AdapterSettings } from '../../config'
 import {
   AdapterResponse,
@@ -40,7 +40,7 @@ export abstract class ResponseCache<
   adapterSettings: AdapterSettings
   dependencies: AdapterDependencies
   resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
-  inversionPolicy?: InversionPolicy<T>
+  inversionTransform?: InversionTransform<T>
 
   constructor({
     inputParameters,
@@ -72,10 +72,10 @@ export abstract class ResponseCache<
    * @param results - the entries to write to the cache
    */
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
-    const inversionPolicy = this.inversionPolicy
+    const inversionTransform = this.inversionTransform
     const hasInversion = results.some((result) => hasInversionEnabled(result.params))
 
-    if (hasInversion && !inversionPolicy) {
+    if (hasInversion && !inversionTransform) {
       const failed = results.map((result) => {
         if (!hasInversionEnabled(result.params) || Boolean(result.response.errorMessage)) {
           return result
@@ -84,7 +84,7 @@ export abstract class ResponseCache<
           params: result.params,
           response: {
             statusCode: 502,
-            errorMessage: `Inversion failed: endpoint "${this.endpointName}" transport "${transportName}" has no inversion policy`,
+            errorMessage: `Inversion failed: endpoint "${this.endpointName}" transport "${transportName}" has no inversion transform`,
             timestamps: result.response.timestamps,
           },
         }
@@ -93,12 +93,12 @@ export abstract class ResponseCache<
     }
 
     const transformed =
-      inversionPolicy && hasInversion
+      inversionTransform && hasInversion
         ? results.map((result) => {
             if (!hasInversionEnabled(result.params) || result.response.errorMessage) {
               return result
             }
-            return inversionPolicy.transform(result)
+            return inversionTransform(result)
           })
         : results
 

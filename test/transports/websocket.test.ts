@@ -3,12 +3,7 @@ import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
 import WebSocket from 'ws'
-import {
-  Adapter,
-  AdapterEndpoint,
-  EndpointContext,
-  SingleValueInversionPolicy,
-} from '../../src/adapter'
+import { Adapter, AdapterEndpoint, EndpointContext, invertSingleValue } from '../../src/adapter'
 import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import {
@@ -2243,7 +2238,7 @@ test.serial(
           inputParameters,
           transport,
         })
-        endpoint.inversionPolicy = new SingleValueInversionPolicy<WebSocketTypes>()
+        endpoint.inversionTransform = invertSingleValue<WebSocketTypes>
         return endpoint
       },
     )
@@ -2271,7 +2266,7 @@ test.serial(
     const cachePrefix = 'TEST-test-default_single_transport-'
     const rawCached = await testAdapter.mockCache.get(`${cachePrefix}{"base":"btc","quote":"usd"}`)
     const inverseCached = await testAdapter.mockCache.get(
-      `${cachePrefix}{"base":"btc","inversion":{"enabled":true,"policyId":"single-value","policyVersion":1},"quote":"usd"}`,
+      `${cachePrefix}{"base":"btc","inversion":{"enabled":true},"quote":"usd"}`,
     )
 
     t.is((rawCached as { result: number }).result, price)

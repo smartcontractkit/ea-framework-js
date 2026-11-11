@@ -103,7 +103,7 @@ Inversion is opt-in per request and applied on the cache-write path:
 | `PriceEndpoint` / single-value | `data.result` → `1 / data.result`; top-level `result` mirrored | `data.result` is canonical                                          |
 | `LwbaEndpoint` / quote         | `bid' = 1 / ask`, `ask' = 1 / bid`                             | `mid' = 1 / mid` when provided; otherwise `(1 / ask + 1 / bid) / 2` |
 
-The endpoint response type selects the policy; requests only enable or disable it. `PriceEndpoint` inverts only `data.result`; `LwbaEndpoint` inverts the full quote.
+The endpoint response type selects the inversion behavior; requests only enable or disable it. `PriceEndpoint` inverts only `data.result`; `LwbaEndpoint` inverts the full quote.
 
 Inversion is atomic: invalid `bid`/`ask` makes the whole response 502. Provider errors are never inverted. `bidSize`/`askSize` are swapped; size validity belongs to the asset-class policy (OPDATA-9200).
 
@@ -112,9 +112,8 @@ Inversion is atomic: invalid `bid`/`ask` makes the whole response 502. Provider 
 ### Cache keys and feed IDs
 
 - No `inversion`, or `enabled: false`: existing key, feed ID, and `includes.json` behavior. `inversion: null` is rejected.
-- Enabled: resolved policy id/version is part of params, so raw and inverse variants have distinct keys and feed IDs.
+- Enabled: `inversion.enabled` is part of params, so raw and inverse variants have distinct keys and feed IDs.
 - Custom `cacheKeyGenerator`: 400, because the custom key may not distinguish variants.
-- A policy version bump changes the inverse feed identity; disable inversion and drain old entries first.
 
 ### Transports and rollout
 

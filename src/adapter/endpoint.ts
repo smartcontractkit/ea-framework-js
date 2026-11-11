@@ -11,7 +11,7 @@ import {
   getCanonicalAdapterName,
   canonicalizeAdapterNameKeys,
 } from '../util'
-import { INVERSION_PARAM, InversionPolicy } from './inverse'
+import { INVERSION_PARAM, InversionTransform } from './inverse'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -42,7 +42,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
   customOutputValidation?: CustomOutputValidator | undefined
-  inversionPolicy?: InversionPolicy<T>
+  /** Optional transform that inverts provider results for this endpoint. */
+  inversionTransform?: InversionTransform<T>
 
   /**
    * Optional validator that can be overridden by endpoint subclasses to validate or transform
@@ -110,21 +111,6 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
       }
     }
 
-    if (this.inversionPolicy) {
-      const { id, version } = this.inversionPolicy
-      if (
-        typeof id !== 'string' ||
-        id.length === 0 ||
-        !Number.isInteger(version) ||
-        version <= 0 ||
-        typeof this.inversionPolicy.transform !== 'function'
-      ) {
-        throw new AdapterError({
-          statusCode: 500,
-          message: `Endpoint "${this.name}" has an invalid inversion policy id/version`,
-        })
-      }
-    }
     this.adapterName = adapterName
     const responseCache = new SimpleResponseCache({
       dependencies,
@@ -137,8 +123,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     if (this.resultValidator) {
       responseCache.resultValidator = this.resultValidator.bind(this)
     }
-    if (this.inversionPolicy) {
-      responseCache.inversionPolicy = this.inversionPolicy
+    if (this.inversionTransform) {
+      responseCache.inversionTransform = this.inversionTransform
     }
 
     const transportDependencies = {

@@ -13,7 +13,7 @@ import {
 } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams } from './index'
-import { SingleValueInversionPolicy } from './inverse'
+import { invertSingleValue } from './inverse'
 
 /**
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
@@ -84,7 +84,7 @@ export type PriceEndpointGenerics = TransportGenerics & {
 export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {
   constructor(params: AdapterEndpointParams<T>) {
     super(params)
-    this.inversionPolicy ??= new SingleValueInversionPolicy<T>()
+    this.inversionTransform ??= invertSingleValue<T>
   }
 }
 

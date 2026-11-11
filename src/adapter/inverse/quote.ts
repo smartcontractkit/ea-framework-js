@@ -4,14 +4,7 @@ import type {
   TimestampedProviderResult,
 } from '../../util/types'
 import { isRecord } from './config'
-import {
-  assertPolicyMatchesConfig,
-  cloneResponse,
-  errorResult,
-  InversionPolicy,
-  isErrorResponse,
-  isPositiveFinite,
-} from './policy'
+import { cloneResponse, errorResult, isErrorResponse, isPositiveFinite } from './shared'
 
 type LwbaData = {
   bid?: unknown
@@ -37,73 +30,63 @@ const validateQuote = (bid: unknown, ask: unknown, mid: number): string | undefi
   return undefined
 }
 
-export class QuoteInversionPolicy<
-  T extends ProviderResultGenerics = ProviderResultGenerics,
-> implements InversionPolicy<T> {
-  readonly id = 'lwba'
-  readonly version = 1
+export const invertQuote = <T extends ProviderResultGenerics>(
+  result: TimestampedProviderResult<T>,
+): TimestampedProviderResult<T> => {
+  if (isErrorResponse(result.response)) {
+    return result
+  }
 
-  transform(result: TimestampedProviderResult<T>): TimestampedProviderResult<T> {
-    if (isErrorResponse(result.response)) {
-      return result
+  let response: TimestampedAdapterResponse<T['Response']>
+  try {
+    response = cloneResponse(result.response)
+  } catch {
+    return errorResult(result, 'Inversion failed: response could not be cloned')
+  }
+
+  const data = (response as { data?: unknown }).data
+  if (!isRecord(data)) {
+    return errorResult(result, 'Inversion failed: data must be an object')
+  }
+
+  const quote = data as LwbaData
+  const providerMidPresent = quote.mid !== undefined && quote.mid !== null
+  const rawMid = providerMidPresent ? quote.mid : undefined
+
+  if (providerMidPresent) {
+    const error = validateQuote(quote.bid, quote.ask, rawMid as number)
+    if (error) {
+      return errorResult(result, error)
     }
-
-    const mismatch = assertPolicyMatchesConfig(result, this.id, this.version)
-    if (mismatch) {
-      return mismatch
+  } else {
+    if (!isPositiveFinite(quote.bid) || !isPositiveFinite(quote.ask)) {
+      return errorResult(result, 'Inversion failed: bid and ask must be finite positive numbers')
     }
-
-    let response: TimestampedAdapterResponse<T['Response']>
-    try {
-      response = cloneResponse(result.response)
-    } catch {
-      return errorResult(result, 'Inversion failed: response could not be cloned')
+    if (quote.bid > quote.ask) {
+      return errorResult(result, 'Inversion failed: bid must be less than or equal to ask')
     }
+  }
 
-    const data = (response as { data?: unknown }).data
-    if (!isRecord(data)) {
-      return errorResult(result, 'Inversion failed: data must be an object')
-    }
+  const newBid = 1 / (quote.ask as number)
+  const newAsk = 1 / (quote.bid as number)
+  const newMid = providerMidPresent ? 1 / (rawMid as number) : (newBid + newAsk) / 2
 
-    const quote = data as LwbaData
-    const providerMidPresent = quote.mid !== undefined && quote.mid !== null
-    const rawMid = providerMidPresent ? quote.mid : undefined
+  const outputError = validateQuote(newBid, newAsk, newMid)
+  if (outputError) {
+    return errorResult(result, outputError)
+  }
 
-    if (providerMidPresent) {
-      const error = validateQuote(quote.bid, quote.ask, rawMid as number)
-      if (error) {
-        return errorResult(result, error)
-      }
-    } else {
-      if (!isPositiveFinite(quote.bid) || !isPositiveFinite(quote.ask)) {
-        return errorResult(result, 'Inversion failed: bid and ask must be finite positive numbers')
-      }
-      if (quote.bid > quote.ask) {
-        return errorResult(result, 'Inversion failed: bid must be less than or equal to ask')
-      }
-    }
+  if (quote.bidSize !== undefined || quote.askSize !== undefined) {
+    const bidSize = quote.bidSize
+    quote.bidSize = quote.askSize
+    quote.askSize = bidSize
+  }
+  quote.bid = newBid
+  quote.ask = newAsk
+  quote.mid = newMid
 
-    const newBid = 1 / (quote.ask as number)
-    const newAsk = 1 / (quote.bid as number)
-    const newMid = providerMidPresent ? 1 / (rawMid as number) : (newBid + newAsk) / 2
-
-    const outputError = validateQuote(newBid, newAsk, newMid)
-    if (outputError) {
-      return errorResult(result, outputError)
-    }
-
-    if (quote.bidSize !== undefined || quote.askSize !== undefined) {
-      const bidSize = quote.bidSize
-      quote.bidSize = quote.askSize
-      quote.askSize = bidSize
-    }
-    quote.bid = newBid
-    quote.ask = newAsk
-    quote.mid = newMid
-
-    return {
-      params: result.params,
-      response,
-    }
+  return {
+    params: result.params,
+    response,
   }
 }

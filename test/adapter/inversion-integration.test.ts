@@ -58,17 +58,7 @@ const timestamps = {
   providerIndicatedTimeUnixMs: undefined,
 }
 
-const resolvedInversion = {
-  enabled: true,
-  policyId: 'single-value',
-  policyVersion: 1,
-}
-
-const resolvedQuoteInversion = {
-  enabled: true,
-  policyId: 'lwba',
-  policyVersion: 1,
-}
+const inverseConfig = { enabled: true }
 
 class ForegroundPriceTransport extends SubscriptionTransport<TestGenerics> {
   supportsInversion = true
@@ -424,7 +414,7 @@ test.serial('HTTP raw and inverse variants share one provider request', async (t
   const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
   const inverseParams = {
     ...rawParams,
-    inversion: resolvedInversion,
+    inversion: inverseConfig,
   } as unknown as TestParams
 
   await transport.subscriptionSet.add(rawParams, 1000, 'raw-test')
@@ -467,7 +457,7 @@ test.serial(
     const rawA = { base: 'BTC', quote: 'USD' } as TestParams
     const inverseA = {
       ...rawA,
-      inversion: resolvedInversion,
+      inversion: inverseConfig,
     } as unknown as TestParams
     const rawB = { base: 'ETH', quote: 'USD' } as TestParams
     const entries = [rawA, inverseA, rawB]
@@ -557,7 +547,7 @@ test.serial('provider errors fan out unchanged to raw and inverse cache keys', a
   const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
   const inverseParams = {
     ...rawParams,
-    inversion: resolvedInversion,
+    inversion: inverseConfig,
   } as unknown as TestParams
 
   await transport.subscriptionSet.add(rawParams, 1000, 'raw-test')
@@ -602,7 +592,7 @@ test.serial(
     const raw = { base: 'BTC', quote: 'USD' } as TestParams
     const inverse = {
       ...raw,
-      inversion: resolvedInversion,
+      inversion: inverseConfig,
     } as unknown as TestParams
 
     transport.subscriptionSet = {
@@ -675,7 +665,7 @@ test.serial('request-level inversion writes both the raw and inverse cache entri
   const rawParams = { base: 'BTC', quote: 'USD' } as TestParams
   const inverseParams = {
     ...rawParams,
-    inversion: resolvedInversion,
+    inversion: inverseConfig,
   } as unknown as TestParams
   await testAdapter.mockCache?.delete(
     transport.responseCache.getCacheKey(transport.name, rawParams),
@@ -741,7 +731,7 @@ test.serial(
     } as unknown as TypeFromDefinition<QuoteGenerics['Parameters']>
     const inverseParams = {
       ...rawParams,
-      inversion: resolvedQuoteInversion,
+      inversion: inverseConfig,
     } as unknown as TypeFromDefinition<QuoteGenerics['Parameters']>
     await testAdapter.mockCache?.delete(
       transport.responseCache.getCacheKey(transport.name, rawParams),
@@ -833,7 +823,7 @@ test.serial(
     const providerParams = { base: 'BTC', quote: 'ETH' } as TestParams
     const inverseParams = {
       ...providerParams,
-      inversion: resolvedInversion,
+      inversion: inverseConfig,
     } as unknown as TestParams
 
     const providerCached = (await testAdapter.mockCache?.get(

@@ -1,9 +1,9 @@
 import test from 'ava'
 import {
   hasInversionEnabled,
-  InversionPolicy,
-  QuoteInversionPolicy,
-  SingleValueInversionPolicy,
+  InversionTransform,
+  invertQuote,
+  invertSingleValue,
   validateInversionRequestConfig,
 } from '../../src/adapter/inverse'
 import {
@@ -41,9 +41,6 @@ type QuoteGenerics = {
   Response: LwbaResponseDataFields
 }
 
-const singleValuePolicy = new SingleValueInversionPolicy<SingleValueGenerics>()
-const quotePolicy = new QuoteInversionPolicy<QuoteGenerics>()
-
 const timestamps = {
   providerDataRequestedUnixMs: 0,
   providerDataReceivedUnixMs: 0,
@@ -57,7 +54,7 @@ const singleValueAttempt = (
   params: (params ?? {
     base: 'BTC',
     quote: 'USD',
-    inversion: { enabled: true, policyId: 'single-value', policyVersion: 1 },
+    inversion: { enabled: true },
   }) as unknown as TimestampedProviderResult<SingleValueGenerics>['params'],
   response: {
     data: { result: value },
@@ -75,7 +72,7 @@ const quoteAttempt = (
   params: {
     base: 'BTC',
     quote: 'USD',
-    inversion: { enabled: true, policyId: 'lwba', policyVersion: 1 },
+    inversion: { enabled: true },
   } as unknown as TimestampedProviderResult<QuoteGenerics>['params'],
   response: {
     result: null,
@@ -114,9 +111,9 @@ test('inversion request config accepts only an enabled boolean', (t) => {
   t.deepEqual(validateInversionRequestConfig({ enabled: false }), { enabled: false })
 })
 
-test('single-value policy inverts result and data.result without mutating input', (t) => {
+test('single-value inversion inverts result and data.result without mutating input', (t) => {
   const input = singleValueAttempt(4)
-  const output = singleValuePolicy.transform(input)
+  const output = invertSingleValue(input)
 
   t.is(isError(output), false)
   if (isError(output)) {
@@ -129,7 +126,7 @@ test('single-value policy inverts result and data.result without mutating input'
   t.is((input.response as { data: { result: number } }).data.result, 4)
 })
 
-test('single-value policy rejects invalid, overflow and malformed results with 502', (t) => {
+test('single-value inversion rejects invalid, overflow and malformed results with 502', (t) => {
   const attempts = [
     singleValueAttempt(0),
     singleValueAttempt(-1),
@@ -151,7 +148,7 @@ test('single-value policy rejects invalid, overflow and malformed results with 5
   attempts.push(stringResult)
 
   for (const attempt of attempts) {
-    const output = singleValuePolicy.transform(attempt)
+    const output = invertSingleValue(attempt)
     t.true(isError(output))
     if (isError(output)) {
       t.is(output.response.statusCode, 502)
@@ -159,7 +156,7 @@ test('single-value policy rejects invalid, overflow and malformed results with 5
   }
 })
 
-test('policies leave provider errors unchanged', (t) => {
+test('inversion transforms leave provider errors unchanged', (t) => {
   const singleInput: TimestampedProviderResult<SingleValueGenerics> = {
     params: singleValueAttempt(1).params,
     response: {
@@ -177,12 +174,12 @@ test('policies leave provider errors unchanged', (t) => {
     },
   }
 
-  t.is(singleValuePolicy.transform(singleInput), singleInput)
-  t.is(quotePolicy.transform(quoteInput), quoteInput)
+  t.is(invertSingleValue(singleInput), singleInput)
+  t.is(invertQuote(quoteInput), quoteInput)
 })
 
-test('quote policy inverts provider mid, synthesizes missing mid and swaps sizes', (t) => {
-  const withMid = quotePolicy.transform(quoteAttempt(1, 1.2, 1.1, { bidSize: 10, askSize: 20 }))
+test('quote inversion inverts provider mid, synthesizes missing mid and swaps sizes', (t) => {
+  const withMid = invertQuote(quoteAttempt(1, 1.2, 1.1, { bidSize: 10, askSize: 20 }))
   t.is(isError(withMid), false)
   if (isError(withMid)) {
     return
@@ -196,7 +193,7 @@ test('quote policy inverts provider mid, synthesizes missing mid and swaps sizes
   t.false('midSource' in data)
 
   for (const mid of [undefined, null]) {
-    const synthesized = quotePolicy.transform(quoteAttempt(1, 1.2, mid))
+    const synthesized = invertQuote(quoteAttempt(1, 1.2, mid))
     t.is(isError(synthesized), false)
     if (!isError(synthesized)) {
       const synthesizedData = (synthesized.response as { data: LwbaResponseDataFields['Data'] })
@@ -205,7 +202,7 @@ test('quote policy inverts provider mid, synthesizes missing mid and swaps sizes
     }
   }
 
-  const equalBidAsk = quotePolicy.transform(quoteAttempt(2, 2, 2))
+  const equalBidAsk = invertQuote(quoteAttempt(2, 2, 2))
   t.is(isError(equalBidAsk), false)
   if (!isError(equalBidAsk)) {
     const equalData = (equalBidAsk.response as { data: LwbaResponseDataFields['Data'] }).data
@@ -215,7 +212,7 @@ test('quote policy inverts provider mid, synthesizes missing mid and swaps sizes
   }
 
   // TP example: invert the quote, not just the mid.
-  const tp = quotePolicy.transform(quoteAttempt(1.36, 1.37, 1.365))
+  const tp = invertQuote(quoteAttempt(1.36, 1.37, 1.365))
   t.is(isError(tp), false)
   if (!isError(tp)) {
     const tpData = (tp.response as { data: LwbaResponseDataFields['Data'] }).data
@@ -225,7 +222,7 @@ test('quote policy inverts provider mid, synthesizes missing mid and swaps sizes
   }
 })
 
-test('quote policy rejects invalid quotes and overflow with 502', (t) => {
+test('quote inversion rejects invalid quotes and overflow with 502', (t) => {
   const missingAsk = quoteAttempt(1, 1.2, 1.1)
   delete (missingAsk.response as { data: Record<string, unknown> }).data['ask']
 
@@ -248,7 +245,7 @@ test('quote policy rejects invalid quotes and overflow with 502', (t) => {
   ]
 
   for (const [name, attempt] of cases) {
-    const output = quotePolicy.transform(attempt)
+    const output = invertQuote(attempt)
     t.true(isError(output), name)
     if (isError(output)) {
       t.is(output.response.statusCode, 502, name)
@@ -261,18 +258,8 @@ const adapterSettings = buildAdapterSettings({})
 
 type CacheParams = TypeFromDefinition<SingleValueGenerics['Parameters']>
 
-const resolvedConfig = {
-  enabled: true,
-  policyId: 'single-value',
-  policyVersion: 1,
-}
-
 const rawParams = { base: 'BTC', quote: 'USD' } as CacheParams
 const inverseParams = {
-  ...rawParams,
-  inversion: resolvedConfig,
-} as unknown as CacheParams
-const unresolvedParams = {
   ...rawParams,
   inversion: { enabled: true },
 } as unknown as CacheParams
@@ -290,10 +277,10 @@ const providerResult = (
 })
 
 const buildCache = ({
-  policy,
+  transform,
   resultValidator,
 }: {
-  policy?: InversionPolicy<SingleValueGenerics>
+  transform?: InversionTransform<SingleValueGenerics>
   resultValidator?: (
     result: TimestampedProviderResult<SingleValueGenerics>,
   ) => TimestampedProviderResult<SingleValueGenerics>
@@ -306,7 +293,7 @@ const buildCache = ({
     endpointName: 'test',
     inputParameters,
   })
-  responseCache.inversionPolicy = policy ?? new SingleValueInversionPolicy<SingleValueGenerics>()
+  responseCache.inversionTransform = transform ?? invertSingleValue<SingleValueGenerics>
   if (resultValidator) {
     responseCache.resultValidator = resultValidator
   }
@@ -349,28 +336,14 @@ test.serial('inversion failures reject only the inverse variant', async (t) => {
     name: string
     configure?: (responseCache: SimpleResponseCache<SingleValueGenerics>) => void
     makeInverse?: () => TimestampedProviderResult<SingleValueGenerics>
-    params?: CacheParams
     expectedMessage: string
   }[] = [
     {
-      name: 'no policy',
+      name: 'no transform',
       configure: (responseCache) => {
-        responseCache.inversionPolicy = undefined
+        responseCache.inversionTransform = undefined
       },
-      expectedMessage: 'no inversion policy',
-    },
-    {
-      name: 'unresolved policy metadata',
-      params: unresolvedParams,
-      expectedMessage: 'does not match',
-    },
-    {
-      name: 'resolved policy version mismatch',
-      params: {
-        ...rawParams,
-        inversion: { ...resolvedConfig, policyVersion: 2 },
-      } as CacheParams,
-      expectedMessage: 'does not match',
+      expectedMessage: 'no inversion transform',
     },
     {
       name: 'clone failure',
@@ -398,15 +371,12 @@ test.serial('inversion failures reject only the inverse variant', async (t) => {
   for (const scenario of scenarios) {
     const { cache, responseCache } = buildCache()
     scenario.configure?.(responseCache)
-    const inverseResult =
-      scenario.makeInverse?.() ?? providerResult(scenario.params ?? inverseParams, 4)
+    const inverseResult = scenario.makeInverse?.() ?? providerResult(inverseParams, 4)
 
     await responseCache.write('test', [providerResult(rawParams, 4), inverseResult])
 
     const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
-    const inverseCached = await cache.get(
-      responseCache.getCacheKey('test', scenario.params ?? inverseParams),
-    )
+    const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
 
     t.is((rawCached as { result: number }).result, 4, scenario.name)
     t.is((inverseCached as { statusCode: number }).statusCode, 502, scenario.name)

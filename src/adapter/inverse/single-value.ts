@@ -4,61 +4,41 @@ import type {
   TimestampedProviderResult,
 } from '../../util/types'
 import { isRecord } from './config'
-import {
-  assertPolicyMatchesConfig,
-  cloneResponse,
-  errorResult,
-  InversionPolicy,
-  isErrorResponse,
-  isPositiveFinite,
-} from './policy'
+import { cloneResponse, errorResult, isErrorResponse, isPositiveFinite } from './shared'
 
-export class SingleValueInversionPolicy<
-  T extends ProviderResultGenerics = ProviderResultGenerics,
-> implements InversionPolicy<T> {
-  readonly id = 'single-value'
-  readonly version = 1
+export const invertSingleValue = <T extends ProviderResultGenerics>(
+  result: TimestampedProviderResult<T>,
+): TimestampedProviderResult<T> => {
+  if (isErrorResponse(result.response)) {
+    return result
+  }
 
-  transform(result: TimestampedProviderResult<T>): TimestampedProviderResult<T> {
-    if (isErrorResponse(result.response)) {
-      return result
-    }
+  let response: TimestampedAdapterResponse<T['Response']>
+  try {
+    response = cloneResponse(result.response)
+  } catch {
+    return errorResult(result, 'Inversion failed: response could not be cloned')
+  }
 
-    const mismatch = assertPolicyMatchesConfig(result, this.id, this.version)
-    if (mismatch) {
-      return mismatch
-    }
+  const data = (response as { data?: unknown }).data
+  const rawResult = isRecord(data) ? data['result'] : undefined
+  if (!isPositiveFinite(rawResult)) {
+    return errorResult(result, 'Inversion failed: data.result must be a finite positive number')
+  }
 
-    let response: TimestampedAdapterResponse<T['Response']>
-    try {
-      response = cloneResponse(result.response)
-    } catch {
-      return errorResult(result, 'Inversion failed: response could not be cloned')
-    }
+  const invertedResult = 1 / rawResult
+  if (!isPositiveFinite(invertedResult)) {
+    return errorResult(result, 'Inversion failed: inverted result is not a finite positive number')
+  }
 
-    const data = (response as { data?: unknown }).data
-    const rawResult = isRecord(data) ? data['result'] : undefined
-    if (!isPositiveFinite(rawResult)) {
-      return errorResult(result, 'Inversion failed: data.result must be a finite positive number')
-    }
+  if (isRecord(data)) {
+    data['result'] = invertedResult
+  }
+  const responseWithResult = response as { result?: unknown }
+  responseWithResult.result = invertedResult
 
-    const invertedResult = 1 / rawResult
-    if (!isPositiveFinite(invertedResult)) {
-      return errorResult(
-        result,
-        'Inversion failed: inverted result is not a finite positive number',
-      )
-    }
-
-    if (isRecord(data)) {
-      data['result'] = invertedResult
-    }
-    const responseWithResult = response as { result?: unknown }
-    responseWithResult.result = invertedResult
-
-    return {
-      params: result.params,
-      response,
-    }
+  return {
+    params: result.params,
+    response,
   }
 }

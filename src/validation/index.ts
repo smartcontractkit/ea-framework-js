@@ -47,7 +47,7 @@ const getRequestInversionConfig = (
   if (!config.enabled) {
     return config
   }
-  if (!endpoint.inversionPolicy) {
+  if (!endpoint.inversionTransform) {
     throw new AdapterInputError({
       statusCode: 400,
       message: `Endpoint "${endpoint.name}" does not support inversion`,
@@ -79,19 +79,14 @@ const assertInversionCacheKeySupported = (endpoint: AdapterEndpoint<EndpointGene
   }
 }
 
-const attachResolvedInversion = (
-  endpoint: AdapterEndpoint<EndpointGenerics>,
+const attachInversion = (
   data: Record<string, unknown>,
   config: InversionRequestConfig | undefined,
 ): void => {
-  if (!config?.enabled || !endpoint.inversionPolicy) {
+  if (!config?.enabled) {
     return
   }
-  data[INVERSION_PARAM] = {
-    enabled: true,
-    policyId: endpoint.inversionPolicy.id,
-    policyVersion: endpoint.inversionPolicy.version,
-  }
+  data[INVERSION_PARAM] = { enabled: true }
 }
 
 export const validatorMiddleware: AdapterMiddlewareBuilder =
@@ -173,11 +168,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     endpoint.runRequestTransforms(req, adapter.config.settings)
 
     // Attach after transforms so adapter transforms cannot drop or forward it to the provider.
-    attachResolvedInversion(
-      endpoint,
-      req.requestContext.data as Record<string, unknown>,
-      inversionConfig,
-    )
+    attachInversion(req.requestContext.data as Record<string, unknown>, inversionConfig)
 
     if (
       adapter.config.settings.METRICS_ENABLED &&
