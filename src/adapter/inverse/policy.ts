@@ -5,7 +5,7 @@ import type {
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
 } from '../../util/types'
-import { getRawInversionConfig } from './config'
+import { getInversionConfig, INVERSION_PARAM, isRecord } from './config'
 
 /** Endpoint policy for response-shape-specific inversion. */
 export interface InversionPolicy<T extends ProviderResultGenerics> {
@@ -37,19 +37,34 @@ export const errorResult = <T extends ProviderResultGenerics>(
 
 export const cloneResponse = <T>(response: T): T => JSON.parse(JSON.stringify(response)) as T
 
+const getPolicyMetadata = (params: unknown): { policyId?: unknown; policyVersion?: unknown } => {
+  if (!isRecord(params)) {
+    return {}
+  }
+  const config = params[INVERSION_PARAM]
+  if (!isRecord(config)) {
+    return {}
+  }
+  return {
+    policyId: config['policyId'],
+    policyVersion: config['policyVersion'],
+  }
+}
+
 export const assertPolicyMatchesConfig = <T extends ProviderResultGenerics>(
   result: TimestampedProviderResult<T>,
   id: string,
   version: number,
 ): TimestampedProviderResult<T> | undefined => {
-  const config = getRawInversionConfig(result.params)
+  const config = getInversionConfig(result.params)
   if (!config?.enabled) {
     return result
   }
-  if (config.policyId !== id || config.policyVersion !== version) {
+  const { policyId, policyVersion } = getPolicyMetadata(result.params)
+  if (policyId !== id || policyVersion !== version) {
     const configuredPolicy =
-      typeof config.policyId === 'string' && typeof config.policyVersion === 'number'
-        ? `${config.policyId} v${config.policyVersion}`
+      typeof policyId === 'string' && typeof policyVersion === 'number'
+        ? `${policyId} v${policyVersion}`
         : 'missing or invalid policy metadata'
     return errorResult(
       result,
