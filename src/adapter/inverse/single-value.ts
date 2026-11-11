@@ -21,7 +21,11 @@ export const invertSingleValue = <T extends ProviderResultGenerics>(
   }
 
   const data = (response as { data?: unknown }).data
-  const rawResult = isRecord(data) ? data['result'] : undefined
+  if (!isRecord(data)) {
+    return errorResult(result, 'Inversion failed: data.result must be a finite positive number')
+  }
+
+  const rawResult = data['result']
   if (!isPositiveFinite(rawResult)) {
     return errorResult(result, 'Inversion failed: data.result must be a finite positive number')
   }
@@ -31,9 +35,7 @@ export const invertSingleValue = <T extends ProviderResultGenerics>(
     return errorResult(result, 'Inversion failed: inverted result is not a finite positive number')
   }
 
-  if (isRecord(data)) {
-    data['result'] = invertedResult
-  }
+  data['result'] = invertedResult
   const responseWithResult = response as { result?: unknown }
   responseWithResult.result = invertedResult
 

@@ -137,9 +137,11 @@ class CacheBackedTransport extends SubscriptionTransport<TestGenerics> {
     entries: TestParams[],
   ): Promise<void> {
     this.providerEntries = entries as Record<string, unknown>[]
-    for (const entry of entries) {
-      await this.writeResults([{ params: entry, response: this.providerResponse }])
-    }
+    await Promise.all(
+      entries.map((entry) =>
+        this.writeResults([{ params: entry, response: this.providerResponse }]),
+      ),
+    )
   }
 }
 
@@ -154,24 +156,26 @@ class CacheBackedQuoteTransport extends SubscriptionTransport<QuoteGenerics> {
     _context: EndpointContext<QuoteGenerics>,
     entries: TypeFromDefinition<QuoteGenerics['Parameters']>[],
   ): Promise<void> {
-    for (const entry of entries) {
-      await this.writeResults([
-        {
-          params: entry,
-          response: {
-            result: null,
-            data: {
-              bid: 1,
-              ask: 1.2,
-              mid: 1.1,
-              bidSize: 10,
-              askSize: 20,
-            } as unknown as LwbaResponseDataFields['Data'],
-            timestamps,
+    await Promise.all(
+      entries.map((entry) =>
+        this.writeResults([
+          {
+            params: entry,
+            response: {
+              result: null,
+              data: {
+                bid: 1,
+                ask: 1.2,
+                mid: 1.1,
+                bidSize: 10,
+                askSize: 20,
+              } as unknown as LwbaResponseDataFields['Data'],
+              timestamps,
+            },
           },
-        },
-      ])
-    }
+        ]),
+      ),
+    )
   }
 }
 

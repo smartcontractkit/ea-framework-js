@@ -64,35 +64,25 @@ export abstract class ResponseCache<
    * @param results - the entries to write to the cache
    */
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
-    const inversionTransform = this.inversionTransform
     const hasInversion = results.some((result) => hasInversionEnabled(result.params))
-
-    if (hasInversion && !inversionTransform) {
-      const failed = results.map((result) => {
-        if (!hasInversionEnabled(result.params) || Boolean(result.response.errorMessage)) {
-          return result
-        }
-        return {
-          params: result.params,
-          response: {
-            statusCode: 502,
-            errorMessage: `Inversion failed: endpoint "${this.endpointName}" transport "${transportName}" has no inversion transform`,
-            timestamps: result.response.timestamps,
-          },
-        }
-      })
-      return this._write(transportName, this.validateResults(failed))
+    if (!hasInversion) {
+      return this._write(transportName, this.validateResults(results))
     }
 
-    const transformed =
-      inversionTransform && hasInversion
-        ? results.map((result) => {
-            if (!hasInversionEnabled(result.params) || result.response.errorMessage) {
-              return result
-            }
-            return inversionTransform(result)
-          })
-        : results
+    const transform = this.inversionTransform
+    const transformed = results.map((result) => {
+      if (!hasInversionEnabled(result.params) || result.response.errorMessage) {
+        return result
+      }
+      if (!transform) {
+        return this.inversionFailure(
+          result.params,
+          result.response.timestamps,
+          `Inversion failed: endpoint "${this.endpointName}" transport "${transportName}" has no inversion transform`,
+        )
+      }
+      return transform(result)
+    })
 
     return this._write(transportName, this.validateResults(transformed))
   }
@@ -119,8 +109,7 @@ export abstract class ResponseCache<
     }
 
     return results.map((result) => {
-      const isInversion = hasInversionEnabled(result.params)
-      if (!isInversion) {
+      if (!hasInversionEnabled(result.params)) {
         return resultValidator(result)
       }
       if (result.response.errorMessage) {

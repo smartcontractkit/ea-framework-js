@@ -63,10 +63,8 @@ export const invertQuote = <T extends ProviderResultGenerics>(
   }
 
   const quote = data as LwbaData
-  if (bidSize !== undefined || askSize !== undefined) {
-    quote.bidSize = askSize
-    quote.askSize = bidSize
-  }
+  quote.bidSize = askSize
+  quote.askSize = bidSize
   quote.bid = newBid
   quote.ask = newAsk
   quote.mid = newMid
