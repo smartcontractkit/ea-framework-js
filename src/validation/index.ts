@@ -70,11 +70,16 @@ const assertInversionTransportSupported = (
   }
 }
 
+/**
+ * A custom generator can return the same key for raw and inverse requests, which
+ * would make an inverse request read raw cached data. Fail closed until custom
+ * keys are guaranteed to include the resolved inversion metadata.
+ */
 const assertInversionCacheKeySupported = (endpoint: AdapterEndpoint<EndpointGenerics>): void => {
   if (endpoint.cacheKeyGenerator) {
     throw new AdapterInputError({
       statusCode: 400,
-      message: `Endpoint "${endpoint.name}" does not support inversion with a custom cacheKeyGenerator`,
+      message: `Endpoint "${endpoint.name}" cannot use inversion with a custom cacheKeyGenerator because the generated key may not distinguish raw and inverse requests`,
     })
   }
 }

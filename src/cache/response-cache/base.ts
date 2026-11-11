@@ -84,7 +84,7 @@ export abstract class ResponseCache<
           params: result.params,
           response: {
             statusCode: 502,
-            errorMessage: 'Inversion failed: endpoint has no inversion policy',
+            errorMessage: `Inversion failed on endpoint "${this.endpointName}" transport "${transportName}": no inversion policy configured`,
             timestamps: result.response.timestamps,
           },
         }
