@@ -181,12 +181,14 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     ) {
       // Add metrics meta which includes feedId to the request
       // Perform after overrides to maintain consistent Feed IDs across the same adapter
+      // Only use the live request data when resolved inversion was attached; otherwise keep the
+      // historical feed-ID source for request transforms that replace requestContext.data.
       const metrics = getMetricsMeta(
         {
           inputParameters: endpoint.inputParameters,
           adapterSettings: adapter.config.settings,
         },
-        req.requestContext.data,
+        inversionConfig?.enabled ? req.requestContext.data : validatedData,
       )
       req.requestContext = { ...req.requestContext, meta: { metrics } }
     }
