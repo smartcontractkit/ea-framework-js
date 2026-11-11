@@ -303,10 +303,16 @@ const buildCache = ({
 test.serial('no inversion preserves the raw cache key, feed ID and value', async (t) => {
   const { responseCache, cache } = buildCache()
   const rawKey = responseCache.getCacheKey('test', rawParams)
+  const inverseKey = responseCache.getCacheKey('test', inverseParams)
 
   t.is(rawKey, 'TEST-test-test-{"base":"btc","quote":"usd"}')
+  t.is(inverseKey, 'TEST-test-test-{"base":"btc","inversion":{"enabled":true},"quote":"usd"}')
   t.is(calculateFeedId({ adapterSettings }, rawParams), '{"base":"btc","quote":"usd"}')
-  t.not(rawKey, responseCache.getCacheKey('test', inverseParams))
+  t.is(
+    calculateFeedId({ adapterSettings }, inverseParams),
+    '{"base":"btc","inversion":{"enabled":true},"quote":"usd"}',
+  )
+  t.not(rawKey, inverseKey)
   t.not(
     calculateFeedId({ adapterSettings }, rawParams),
     calculateFeedId({ adapterSettings }, inverseParams),
