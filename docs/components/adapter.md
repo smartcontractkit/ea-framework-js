@@ -61,7 +61,11 @@ To understand where the overrides are applied, please refer to the [Request Vali
 
 The includes list, defined in the `/config/includes.json` file, is a parameter only for the `PriceAdapter`. In the v3 framework's current implementation, it is only used for inverses. This feature allows data to be retrieved for the inverse of pairs that a data provider does not support.
 
-The most common example of this is for foreign exchange rates. Some data providers will only support pairs in one direction such as USD/JPY but not JPY/USD. To provide data for both directions, we can add an entry for this pair in the includes list like below. This will allow the adapter to retrieve data for USD/JPY instead and return (1 / result) when the request is for JPY/USD.
+The most common example of this is for foreign exchange rates. Some data providers will only support pairs in one direction such as USD/JPY but not JPY/USD. To provide data for both directions, we can add an entry for this pair in the includes list like below. A request for JPY/USD is then rewritten to USD/JPY, and the inverse of the result is served from an inverse cache entry (`<raw cache key>-inverse`) that the transport writes next to the raw one. Nothing is inverted when the response is read.
+
+The includes step only rewrites the pair. Whether the inverse is served is decided by the request middleware, in
+the same place as the `inversion` flag (see [Request-driven inversion](#request-driven-inversion)). The order is
+unchanged: symbol overrides, then the adapter's own request transforms, then the includes lookup and pair rewrite.
 
 ```json
 [
@@ -78,6 +82,10 @@ The most common example of this is for foreign exchange rates. Some data provide
   }
 ]
 ```
+
+An endpoint that has inverse pairs in `includes.json` must use a transport that extends
+`SubscriptionTransport` and has no `foregroundExecute`, and must not have a custom `cacheKeyGenerator`.
+Requests for those pairs return 400 otherwise.
 
 To understand where the inverses are applied, please refer to the [Request Validation & Transformation Diagram](#request-validation--transformation)
 
@@ -137,10 +145,23 @@ Raw values are validated too: `ForexPriceEndpoint` returns 502 for a result that
   changes: each transport owns a second subscription set for inverse requests, and results are written through the
   response cache as usual.
 - Transports with `foregroundExecute`, and the composite transport, return 400.
-- With `includes.json`, explicit inversion composes with the includes transform; includes-inverse pairs cancel.
+- `inversion: true` on a pair that includes already inverts is the same as not sending the flag: the inverse is
+  served.
 - Inversion creates a new feed identity. Upgrade writers, then readers, then enable inversion. Inverse requests are
   tracked in a separate subscription set, so writer pods on an older framework version never see them: inverse requests
   time out until the writers are upgraded.
+
+### Breaking changes
+
+- `PriceAdapter.handleRequest` no longer inverts, and `requestContext.priceMeta` is gone; nothing replaces it on the
+  request context. An adapter that needs its own "inverse without being asked" rule sets `endpoint.invertsByDefault`,
+  and `endpoint.pairRewrite` if it also rewrites the pair.
+- The includes rewrite is no longer an entry in `endpoint.requestTransforms`. It still runs after all of them.
+- Inverse pairs from includes get a new cache key and a new feed ID (computed from the rewritten params plus
+  `inversion: true`).
+- A plain `PriceEndpoint` has no result validation, so an inverse of `0` is cached as it is (`Infinity`), the same
+  value the read path used to return.
+- A plain `PriceEndpoint` in an adapter with includes still rejects `inversion: true`.
 
 ## Request Transforms
 

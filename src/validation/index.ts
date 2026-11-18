@@ -45,16 +45,10 @@ const parseInversion = (
       message: `[Param: ${INVERSION_PARAM}] must be a boolean`,
     })
   }
-  if (!endpoint.invertResponse) {
+  if (!endpoint.acceptsInversionRequests) {
     throw new AdapterInputError({
       statusCode: 400,
       message: `Endpoint "${endpoint.name}" does not support inversion`,
-    })
-  }
-  if (endpoint.cacheKeyGenerator) {
-    throw new AdapterInputError({
-      statusCode: 400,
-      message: `Endpoint "${endpoint.name}" cannot use inversion with a custom cacheKeyGenerator: keys may not distinguish variants`,
     })
   }
   return true
@@ -73,6 +67,26 @@ const assertTransportSupportsInversion = (
       message: `Transport "${transportName}" does not support inversion`,
     })
   }
+}
+
+/** Throws when the inverse variant cannot be served for this endpoint and transport. */
+const assertCanServeInverse = (
+  endpoint: AdapterEndpoint<EndpointGenerics>,
+  transportName: string,
+): void => {
+  if (!endpoint.invertResponse) {
+    throw new AdapterInputError({
+      statusCode: 400,
+      message: `Endpoint "${endpoint.name}" does not support inversion`,
+    })
+  }
+  if (endpoint.cacheKeyGenerator) {
+    throw new AdapterInputError({
+      statusCode: 400,
+      message: `Endpoint "${endpoint.name}" cannot use inversion with a custom cacheKeyGenerator: keys may not distinguish variants`,
+    })
+  }
+  assertTransportSupportsInversion(endpoint, transportName)
 }
 
 export const validatorMiddleware: AdapterMiddlewareBuilder =
@@ -114,7 +128,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       })
     }
 
-    const inverse = parseInversion(endpoint, requestBody.data as Record<string, unknown>)
+    const requested = parseInversion(endpoint, requestBody.data as Record<string, unknown>)
 
     // Validate the incoming data and normalize
     validateOverrides(requestBody.data)
@@ -133,10 +147,6 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       adapter.config.settings,
     )
 
-    if (inverse) {
-      assertTransportSupportsInversion(endpoint, req.requestContext.transportName)
-    }
-
     // Custom input validation defined in the EA
     const error =
       endpoint.customInputValidation && endpoint.customInputValidation(req, adapter.config.settings)
@@ -148,6 +158,14 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     // Run any request transforms that might have been defined in the adapter.
     // This is the last time modifications are supposed to happen to the request.
     endpoint.runRequestTransforms(req, adapter.config.settings)
+
+    // The one place inversion is decided: the caller asked for it, or the endpoint says this pair
+    // is served as the inverse (includes.json). Only then is the pair rewritten.
+    const inverse = requested || (endpoint.invertsByDefault?.(req.requestContext.data) ?? false)
+    if (inverse) {
+      assertCanServeInverse(endpoint, req.requestContext.transportName)
+    }
+    endpoint.pairRewrite?.(req, adapter.config.settings)
 
     if (
       adapter.config.settings.METRICS_ENABLED &&

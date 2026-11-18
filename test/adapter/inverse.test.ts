@@ -51,6 +51,26 @@ test('invertPrice inverts the result without mutating the input', (t) => {
   t.is(invertPrice({ data: { result: 0.25 }, result: 0.25 }).result, 4)
 })
 
+test('invertPrice keeps data unchanged when it has no result field', (t) => {
+  const data = { price: 4, extra: 'kept' }
+  const output = invertPrice({ data, result: 4 })
+
+  t.is(output.result, 0.25)
+  t.is(output.data, data)
+  t.deepEqual(output.data, { price: 4, extra: 'kept' })
+  t.false('result' in output.data)
+})
+
+test('invertPrice returns null and undefined data as they are', (t) => {
+  const nullOutput = invertPrice({ data: null, result: 4 })
+  t.is(nullOutput.data, null)
+  t.is(nullOutput.result, 0.25)
+
+  const undefinedOutput = invertPrice({ data: undefined, result: 4 })
+  t.is(undefinedOutput.data, undefined)
+  t.is(undefinedOutput.result, 0.25)
+})
+
 test('invertQuote inverts the quote, swaps sizes and leaves the input untouched', (t) => {
   const data = { bid: 1, ask: 1.2, mid: 1.1, bidSize: 10, askSize: 20 }
   const output = invertQuote({ data, result: null })

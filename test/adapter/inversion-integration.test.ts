@@ -598,6 +598,27 @@ test.serial(
   },
 )
 
+test.serial('an endpoint that inverts by default but has no inverter returns 400', async (t) => {
+  const transport = new CacheTestTransport()
+  const endpoint = new AdapterEndpoint<TestGenerics>({
+    name: 'test',
+    inputParameters,
+    transport,
+  })
+  endpoint.invertsByDefault = () => true
+
+  const adapter = new Adapter({ name: 'TEST', endpoints: [endpoint] })
+  const testAdapter = await TestAdapter.start(adapter, t.context as TestContext)
+
+  try {
+    const response = await testAdapter.request({ endpoint: 'test', ...btcUsd })
+    t.is(response.statusCode, 400)
+    t.true(response.body.includes('does not support inversion'))
+  } finally {
+    await testAdapter.api.close()
+  }
+})
+
 test.serial('an inverse request calculates exactly one cache key', async (t) => {
   const transport = new QuietTransport()
   const adapter = buildPriceAdapter(transport, { envDefaultOverrides: cachePollingConfig })
@@ -829,7 +850,7 @@ test.serial(
 )
 
 test.serial(
-  'includes inversion cancels explicit inversion through the cached response path',
+  'inversion: true on an includes-inverse pair serves the inverse through the cached response path',
   async (t) => {
     const transport = new CacheBackedTransport()
     const adapter = buildPriceAdapter(transport, {
@@ -843,21 +864,36 @@ test.serial(
       envDefaultOverrides: cachePollingConfig,
     })
     const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context as TestContext)
+    const mockCache = testAdapter.mockCache
 
     const requestParams = { base: 'ETH', quote: 'BTC' } as TestParams
     const providerParams = { base: 'BTC', quote: 'ETH' } as TestParams
-    const { rawResponse, inverseResponse, rawCached, inverseCached } =
-      await runRequestLevelInversion(testAdapter, transport, requestParams, providerParams)
 
+    const rawResponse = await testAdapter.request({ endpoint: 'test', ...requestParams })
     t.is(rawResponse.statusCode, 200)
     t.is(rawResponse.json().result, 0.25)
+
+    // Drop the inverse entry: the second response has to come from a fresh cache write.
+    await mockCache.delete(
+      toInverseCacheKey(transport.responseCache.getCacheKey(transport.name, providerParams)),
+    )
+
+    const inverseResponse = await testAdapter.request({
+      endpoint: 'test',
+      ...requestParams,
+      inversion: true,
+    })
+
+    // Sending the flag is the same as not sending it: includes already asks for the inverse.
     t.is(inverseResponse.statusCode, 200)
-    t.is(inverseResponse.json().result, 4)
-    t.is(inverseResponse.json().data.result, 4)
+    t.is(inverseResponse.json().result, 0.25)
+    t.is(inverseResponse.json().data.result, 0.25)
 
     t.deepEqual(transport.providerEntries, [providerParams])
-    t.is(rawCached?.result, 4)
-    t.is(inverseCached?.result, 0.25)
+    t.is((await getCached(mockCache, transport, providerParams))?.result, 4)
+    t.is((await getCachedInverse(mockCache, transport, providerParams))?.result, 0.25)
+
+    await testAdapter.api.close()
   },
 )
 
