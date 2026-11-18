@@ -399,7 +399,7 @@ test('explicitly disabled inversion is a no-op and preserves includes behavior',
     base: 'ETH',
     quote: 'BTC',
     endpoint: 'test',
-    inversion: { enabled: false },
+    inversion: false,
   })
 
   t.is(response.statusCode, 200)

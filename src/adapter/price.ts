@@ -5,6 +5,7 @@ import {
   AdapterRequestContext,
   AdapterResponse,
   SingleNumberResultResponse,
+  TimestampedProviderResult,
 } from '../util'
 import {
   EmptyInputParameters,
@@ -13,7 +14,6 @@ import {
 } from '../validation/input-params'
 import { AdapterEndpoint } from './endpoint'
 import { Adapter, AdapterEndpointParams, AdapterParams } from './index'
-import { invertSingleValue } from './inverse'
 
 /**
  * Type for the base input parameter config that any [[PriceEndpoint]] must extend
@@ -77,16 +77,23 @@ export type PriceEndpointGenerics = TransportGenerics & {
   Response: SingleNumberResultResponse
 }
 
+/** Inverts a single-value price response: result becomes 1 / result, mirrored into data.result. */
+export const invertPrice = <D extends { result: number }>({
+  data,
+  result,
+}: {
+  data: D
+  result: number
+}): { data: D; result: number } => {
+  const inverted = 1 / result
+  return { data: { ...data, result: inverted }, result: inverted }
+}
+
 /**
  * A PriceEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its InputParameters must extend the basic ones (base/quote).
  */
-export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {
-  constructor(params: AdapterEndpointParams<T>) {
-    super(params)
-    this.inversionTransform ??= invertSingleValue<T>
-  }
-}
+export class PriceEndpoint<T extends PriceEndpointGenerics> extends AdapterEndpoint<T> {}
 
 const buildIncludesMap = (includesFile: IncludesFile) => {
   const includesMap: IncludesMap = {}
@@ -184,6 +191,7 @@ export class PriceAdapter<
 
       // Deep clone the response, as it may contain objects which won't be cloned by simply destructuring
       const cloneResponse = JSON.parse(JSON.stringify(response))
+
       const inverseResult = 1 / (cloneResponse.result as number)
       cloneResponse.result = inverseResult
       // Check if response data has a result within it
@@ -223,4 +231,29 @@ export class CryptoPriceEndpoint<T extends PriceEndpointGenerics> extends PriceE
  * A ForexPriceEndpoint expands on the existing [[PriceEndpoint]] and provides more descriptive name for
  *  endpoints that provide forex prices.
  */
-export class ForexPriceEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {}
+export class ForexPriceEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {
+  constructor(params: AdapterEndpointParams<T>) {
+    params.invertResponse ??= invertPrice
+    super(params)
+  }
+
+  protected override resultValidator(
+    result: TimestampedProviderResult<T>,
+  ): TimestampedProviderResult<T> {
+    if ('errorMessage' in result.response) {
+      return result
+    }
+    const value = result.response.result
+    if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) {
+      return {
+        params: result.params,
+        response: {
+          statusCode: 502,
+          errorMessage: `Invariant violation. Price result must be a finite, non-zero number. Got: ${value}`,
+          timestamps: result.response.timestamps,
+        },
+      }
+    }
+    return result
+  }
+}

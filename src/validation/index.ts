@@ -3,13 +3,15 @@ import { FastifyError, FastifyReply, FastifyRequest, HookHandlerDoneFunction } f
 import { ReplyError as RedisError } from 'ioredis'
 import { Adapter, AdapterEndpoint, EndpointGenerics } from '../adapter'
 import {
+  calculateCacheKey,
   INVERSION_PARAM,
-  InversionRequestConfig,
-  validateInversionRequestConfig,
-} from '../adapter/inverse'
-import { calculateCacheKey } from '../cache'
+  inverseFeedIdParams,
+  toInverseCacheKey,
+} from '../cache'
 import { CMD_SENT_STATUS, recordRedisCommandMetric } from '../metrics'
 import { getMetricsMeta } from '../metrics/util'
+import { Transport } from '../transports'
+import { SubscriptionTransport } from '../transports/abstract/subscription'
 import { censorLogs, makeLogger } from '../util'
 import {
   AdapterMiddlewareBuilder,
@@ -28,60 +30,49 @@ export { InputParameters } from './input-params'
 
 const errorCatcherLogger = makeLogger('ErrorCatchingMiddleware')
 
-const getRequestInversionConfig = (
+/** Returns true when the request asks for inversion and the endpoint allows it. */
+const parseInversion = (
   endpoint: AdapterEndpoint<EndpointGenerics>,
   data: Record<string, unknown>,
-): InversionRequestConfig | undefined => {
-  // Keep adapters that already use `inversion` as a domain param; startup warns.
-  const hasReservedDomainParam = endpoint.inputParameters.params.some((param) =>
-    param.aliases.includes(INVERSION_PARAM),
-  )
-  const rawConfig = data[INVERSION_PARAM]
-  if (hasReservedDomainParam || rawConfig === undefined) {
-    return undefined
+): boolean => {
+  const raw = data[INVERSION_PARAM]
+  if (raw === undefined || raw === false) {
+    return false
   }
-
-  const config = validateInversionRequestConfig(rawConfig)
-  if (config.enabled && !endpoint.inversionTransform) {
+  if (raw !== true) {
+    throw new AdapterInputError({
+      statusCode: 400,
+      message: `[Param: ${INVERSION_PARAM}] must be a boolean`,
+    })
+  }
+  if (!endpoint.invertResponse) {
     throw new AdapterInputError({
       statusCode: 400,
       message: `Endpoint "${endpoint.name}" does not support inversion`,
     })
   }
-  return config
-}
-
-const assertInversionTransportSupported = (
-  endpoint: AdapterEndpoint<EndpointGenerics>,
-  transportName: string,
-): void => {
-  const transport = endpoint.transportRoutes.get(transportName)
-  if (!transport?.supportsInversion || transport.foregroundExecute) {
-    throw new AdapterInputError({
-      statusCode: 400,
-      message: `Transport "${transportName}" does not support inversion`,
-    })
-  }
-}
-
-/** Custom keys may not distinguish raw and inverse requests. Fail closed. */
-const assertInversionCacheKeySupported = (endpoint: AdapterEndpoint<EndpointGenerics>): void => {
   if (endpoint.cacheKeyGenerator) {
     throw new AdapterInputError({
       statusCode: 400,
       message: `Endpoint "${endpoint.name}" cannot use inversion with a custom cacheKeyGenerator: keys may not distinguish variants`,
     })
   }
+  return true
 }
 
-const attachInversion = (
-  data: Record<string, unknown>,
-  config: InversionRequestConfig | undefined,
+const assertTransportSupportsInversion = (
+  endpoint: AdapterEndpoint<EndpointGenerics>,
+  transportName: string,
 ): void => {
-  if (!config?.enabled) {
-    return
+  const transport = endpoint.transportRoutes.get(transportName)
+  const foregroundExecute = (transport as Transport<EndpointGenerics> | undefined)
+    ?.foregroundExecute
+  if (!(transport instanceof SubscriptionTransport) || foregroundExecute) {
+    throw new AdapterInputError({
+      statusCode: 400,
+      message: `Transport "${transportName}" does not support inversion`,
+    })
   }
-  data[INVERSION_PARAM] = { enabled: true }
 }
 
 export const validatorMiddleware: AdapterMiddlewareBuilder =
@@ -123,10 +114,7 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       })
     }
 
-    const inversionConfig = getRequestInversionConfig(
-      endpoint,
-      requestBody.data as Record<string, unknown>,
-    )
+    const inverse = parseInversion(endpoint, requestBody.data as Record<string, unknown>)
 
     // Validate the incoming data and normalize
     validateOverrides(requestBody.data)
@@ -145,9 +133,8 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       adapter.config.settings,
     )
 
-    if (inversionConfig?.enabled) {
-      assertInversionTransportSupported(endpoint, req.requestContext.transportName)
-      assertInversionCacheKeySupported(endpoint)
+    if (inverse) {
+      assertTransportSupportsInversion(endpoint, req.requestContext.transportName)
     }
 
     // Custom input validation defined in the EA
@@ -162,29 +149,26 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
     // This is the last time modifications are supposed to happen to the request.
     endpoint.runRequestTransforms(req, adapter.config.settings)
 
-    // Attach after transforms so adapter transforms cannot drop or forward it to the provider.
-    attachInversion(req.requestContext.data as Record<string, unknown>, inversionConfig)
-
     if (
       adapter.config.settings.METRICS_ENABLED &&
       adapter.config.settings.EXPERIMENTAL_METRICS_ENABLED
     ) {
       // Add metrics meta which includes feedId to the request
       // Perform after overrides to maintain consistent Feed IDs across the same adapter
-      // Use resolved data only when inversion was attached; otherwise keep the legacy source.
       const metrics = getMetricsMeta(
         {
           inputParameters: endpoint.inputParameters,
           adapterSettings: adapter.config.settings,
         },
-        inversionConfig?.enabled ? req.requestContext.data : validatedData,
+        inverse ? inverseFeedIdParams(validatedData) : validatedData,
       )
       req.requestContext = { ...req.requestContext, meta: { metrics } }
     }
 
     // Now that all the transformations have been applied, all that's left is calculating the cache key
     if (endpoint.cacheKeyGenerator) {
-      let cacheKey = endpoint.cacheKeyGenerator(req.requestContext.data)
+      let cacheKey
+      cacheKey = endpoint.cacheKeyGenerator(req.requestContext.data)
       if (cacheKey.length > adapter.config.settings.MAX_COMMON_KEY_SIZE) {
         errorCatcherLogger.warn(
           `Generated custom cache key for adapter request is bigger than the MAX_COMMON_KEY_SIZE and will be truncated`,
@@ -201,13 +185,19 @@ export const validatorMiddleware: AdapterMiddlewareBuilder =
       req.requestContext.cacheKey = `${cachePrefix}${cacheKey}`
     } else {
       const transportName = req.requestContext.transportName
-      req.requestContext.cacheKey = calculateCacheKey({
+      const rawKey = calculateCacheKey({
         data: req.requestContext.data,
         adapterName: adapter.name,
         endpointName: endpoint.name,
         transportName,
         adapterSettings: adapter.config.settings,
       })
+      if (inverse) {
+        req.requestContext.rawCacheKey = rawKey
+        req.requestContext.cacheKey = toInverseCacheKey(rawKey)
+      } else {
+        req.requestContext.cacheKey = rawKey
+      }
     }
 
     done()

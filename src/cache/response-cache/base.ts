@@ -1,10 +1,10 @@
 import { AdapterDependencies } from '../../adapter'
-import { hasInversionEnabled, inversionError, InversionTransform } from '../../adapter/inverse'
 import { AdapterSettings } from '../../config'
 import {
   AdapterResponse,
   makeLogger,
   ResponseGenerics,
+  ResponseInverter,
   TimestampedAdapterResponse,
   TimestampedProviderResult,
   censor,
@@ -16,7 +16,14 @@ import {
   InputParametersDefinition,
   TypeFromDefinition,
 } from '../../validation/input-params'
-import { Cache, calculateAdapterName, calculateCacheKey, calculateFeedId } from '../'
+import {
+  Cache,
+  calculateAdapterName,
+  calculateCacheKey,
+  calculateFeedId,
+  inverseFeedIdParams,
+  toInverseCacheKey,
+} from '../'
 import CensorList from '../../util/censor/censor-list'
 import { validator } from '../../validation/utils'
 
@@ -32,7 +39,13 @@ export abstract class ResponseCache<
   adapterSettings: AdapterSettings
   dependencies: AdapterDependencies
   resultValidator?: (result: TimestampedProviderResult<T>) => TimestampedProviderResult<T>
-  inversionTransform?: InversionTransform<T>
+  invertResponse?: ResponseInverter<T['Response']>
+
+  /** Per transport name: raw cache keys for which an inverse variant is currently requested. */
+  private inverseKeys = new Map<string, Set<string>>()
+
+  /** Raw cache keys whose inverse entry is waiting to be seeded. A regular write cancels the seed. */
+  protected pendingSeeds = new Set<string>()
 
   constructor({
     inputParameters,
@@ -64,59 +77,57 @@ export abstract class ResponseCache<
    * @param results - the entries to write to the cache
    */
   async write(transportName: string, results: TimestampedProviderResult<T>[]): Promise<void> {
-    const hasInversion = results.some((result) => hasInversionEnabled(result.params))
-    if (!hasInversion) {
-      return this._write(transportName, this.validateResults(results))
-    }
-
-    const transform = this.inversionTransform
-    const transformed = results.map((result) => {
-      if (!hasInversionEnabled(result.params) || result.response.errorMessage) {
-        return result
-      }
-      if (!transform) {
-        return inversionError(
-          result.params,
-          result.response.timestamps,
-          `Inversion failed: endpoint "${this.endpointName}" transport "${transportName}" has no inversion transform`,
-        )
-      }
-      return transform(result)
-    })
-
-    return this._write(transportName, this.validateResults(transformed))
+    const resultValidator = this.resultValidator
+    const validated = resultValidator ? results.map((r) => resultValidator(r)) : results
+    return this._write(transportName, validated)
   }
 
-  private validateResults(results: TimestampedProviderResult<T>[]): TimestampedProviderResult<T>[] {
-    const resultValidator = this.resultValidator
-    if (!resultValidator) {
-      return results
+  /** Raw cache keys that need an inverse entry for this transport, or undefined when there are none. */
+  protected inverseKeysFor(transportName: string): Set<string> | undefined {
+    const keys = this.inverseKeys.get(transportName)
+    return keys?.size ? keys : undefined
+  }
+
+  /**
+   * Called by the transport on every background cycle with the params that currently have an
+   * inverse variant requested. Seeds newly requested variants from the cached raw value.
+   */
+  async setInverseParams(
+    transportName: string,
+    params: TypeFromDefinition<T['Parameters']>[],
+  ): Promise<void> {
+    const previous = this.inverseKeys.get(transportName)
+    if (!params.length && !previous?.size) {
+      return
     }
+    const next = new Set<string>()
+    const added: { rawKey: string; params: TypeFromDefinition<T['Parameters']> }[] = []
+    for (const p of params) {
+      const rawKey = this.getCacheKey(transportName, p)
+      next.add(rawKey)
+      if (!previous?.has(rawKey)) {
+        added.push({ rawKey, params: p })
+        this.pendingSeeds.add(rawKey)
+      }
+    }
+    // Install the keys first: a write that lands while we seed must already fan out.
+    this.inverseKeys.set(transportName, next)
 
-    return results.map((result) => {
-      if (!hasInversionEnabled(result.params)) {
-        return resultValidator(result)
+    for (const { rawKey, params: p } of added) {
+      const cached = await this.cache.get(rawKey)
+      // If a write produced the inverse entry while we were reading, it already cancelled this seed.
+      if (!this.pendingSeeds.delete(rawKey) || !cached) {
+        continue
       }
-      if (result.response.errorMessage) {
-        return result
+      const seed = this.generateInverseEntry(
+        transportName,
+        { params: p, response: cached } as unknown as TimestampedProviderResult<T>,
+        rawKey,
+      )
+      if (seed) {
+        await this.writeEntries([seed])
       }
-
-      // Keep cache identity stable if the validator mutates params.
-      const params = structuredClone(result.params)
-      try {
-        const validated = resultValidator({ ...result, params: structuredClone(params) })
-        return { params, response: validated.response }
-      } catch (error) {
-        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-        const safeDetail = censor(detail, CensorList.getAll()) ?? detail
-        censorLogs(() => logger.warn(`Result validator threw: ${safeDetail}`))
-        return inversionError(
-          params,
-          result.response.timestamps,
-          `Result validation failed: ${safeDetail}`,
-        )
-      }
-    })
+    }
   }
 
   /**
@@ -155,9 +166,13 @@ export abstract class ResponseCache<
     params: TypeFromDefinition<T['Parameters']>[],
     ttl: number,
   ): Promise<void> {
+    const keys = this.inverseKeys.get(transportName)
     for (const param of params) {
       const key = this.getCacheKey(transportName, param)
       this.cache.setTTL(key, ttl)
+      if (keys?.has(key)) {
+        this.cache.setTTL(toInverseCacheKey(key), ttl)
+      }
     }
   }
 
@@ -169,6 +184,7 @@ export abstract class ResponseCache<
     transportNameForMeta: string,
     transportNameForCache: string,
     r: TimestampedProviderResult<T>,
+    inverseOfKey?: string,
   ) {
     const censorList = CensorList.getAll()
     const { data, result, errorMessage } = r.response
@@ -209,7 +225,7 @@ export abstract class ResponseCache<
             {
               adapterSettings: this.adapterSettings,
             },
-            r.params,
+            inverseOfKey ? inverseFeedIdParams(r.params) : r.params,
           ),
         },
       }
@@ -224,9 +240,57 @@ export abstract class ResponseCache<
     }
 
     return {
-      key: this.getCacheKey(transportNameForCache, r.params),
+      key: inverseOfKey
+        ? toInverseCacheKey(inverseOfKey)
+        : this.getCacheKey(transportNameForCache, r.params),
       value: response,
     } as const
+  }
+
+  /**
+   * Builds the inverse cache entry for an already validated raw result.
+   * Errors are copied as they are. Returns undefined when the endpoint has no inverter.
+   */
+  protected generateInverseEntry(
+    transportName: string,
+    r: TimestampedProviderResult<T>,
+    rawKey: string,
+  ) {
+    const invert = this.invertResponse
+    if (!invert) {
+      return undefined
+    }
+    let response = r.response
+    if (!response.errorMessage) {
+      try {
+        const { data, result } = response as {
+          data: T['Response']['Data']
+          result: T['Response']['Result']
+        }
+        const inverted: TimestampedProviderResult<T> = {
+          params: r.params,
+          response: {
+            ...response,
+            ...invert({ data, result }),
+          } as TimestampedAdapterResponse<T['Response']>,
+        }
+        response = (this.resultValidator ? this.resultValidator(inverted) : inverted).response
+      } catch (error) {
+        // A failure here must never stop the raw result from being written.
+        censorLogs(() => logger.warn(`Inversion failed: ${error}`))
+        response = {
+          statusCode: 502,
+          errorMessage: 'Inversion failed: inverting or validating the result threw',
+          timestamps: response.timestamps,
+        }
+      }
+    }
+    return this.generateCacheEntry(
+      transportName,
+      transportName,
+      { params: r.params, response },
+      rawKey,
+    )
   }
 
   getCacheKey(transportName: string, params: TypeFromDefinition<T['Parameters']>) {

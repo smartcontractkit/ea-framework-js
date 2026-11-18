@@ -1,44 +1,36 @@
 import test from 'ava'
 import {
-  hasInversionEnabled,
-  InversionTransform,
+  invertPrice,
   invertQuote,
-  invertSingleValue,
-  validateInversionRequestConfig,
-} from '../../src/adapter/inverse'
-import {
-  LwbaEndpointInputParametersDefinition,
   LwbaResponseDataFields,
-  PriceEndpointInputParametersDefinition,
   priceEndpointInputParametersDefinition,
+  PriceEndpointInputParametersDefinition,
 } from '../../src/adapter'
 import { AdapterDependencies } from '../../src/adapter/types'
-import { calculateFeedId } from '../../src/cache'
+import { calculateFeedId, inverseFeedIdParams, toInverseCacheKey } from '../../src/cache'
+import { LocalCache } from '../../src/cache/local'
 import { SimpleResponseCache } from '../../src/cache/response-cache/simple'
-import { buildAdapterSettings } from '../../src/config'
+import { AdapterConfig, AdapterSettings, buildAdapterSettings } from '../../src/config'
+import { metrics } from '../../src/metrics'
 import {
   SingleNumberResultResponse,
   TimestampedProviderErrorResponse,
   TimestampedProviderResult,
 } from '../../src/util'
-import { AdapterInputError } from '../../src/validation/error'
-import { MockCache } from '../../src/util/testing-utils'
 import { LoggerFactoryProvider } from '../../src/util/logger'
+import { MockCache } from '../../src/util/testing-utils'
 import { InputParameters } from '../../src/validation'
 import { TypeFromDefinition } from '../../src/validation/input-params'
+import { countCacheKeyCalculations } from '../helper'
 
 test.before(() => {
   LoggerFactoryProvider.set()
+  metrics.initialize()
 })
 
 type SingleValueGenerics = {
   Parameters: PriceEndpointInputParametersDefinition
   Response: SingleNumberResultResponse
-}
-
-type QuoteGenerics = {
-  Parameters: LwbaEndpointInputParametersDefinition
-  Response: LwbaResponseDataFields
 }
 
 const timestamps = {
@@ -47,205 +39,68 @@ const timestamps = {
   providerIndicatedTimeUnixMs: undefined,
 }
 
-const singleValueAttempt = (value: number): TimestampedProviderResult<SingleValueGenerics> => ({
-  params: {
-    base: 'BTC',
-    quote: 'USD',
-  } as unknown as TimestampedProviderResult<SingleValueGenerics>['params'],
-  response: {
-    data: { result: value },
-    result: value,
-    timestamps,
-  },
+test('invertPrice inverts the result without mutating the input', (t) => {
+  const data = { result: 4, extra: 'kept' }
+  const output = invertPrice({ data, result: 4 })
+
+  t.deepEqual(output, { data: { result: 0.25, extra: 'kept' }, result: 0.25 })
+  t.not(output.data, data)
+  t.deepEqual(data, { result: 4, extra: 'kept' })
+
+  t.is(invertPrice({ data: { result: 2 }, result: 2 }).result, 0.5)
+  t.is(invertPrice({ data: { result: 0.25 }, result: 0.25 }).result, 4)
 })
 
-const quoteAttempt = (
-  bid: number,
-  ask: number,
-  mid?: number | null,
-  sizes?: { bidSize?: number; askSize?: number },
-): TimestampedProviderResult<QuoteGenerics> => ({
-  params: {
-    base: 'BTC',
-    quote: 'USD',
-  } as unknown as TimestampedProviderResult<QuoteGenerics>['params'],
-  response: {
+test('invertQuote inverts the quote, swaps sizes and leaves the input untouched', (t) => {
+  const data = { bid: 1, ask: 1.2, mid: 1.1, bidSize: 10, askSize: 20 }
+  const output = invertQuote({ data, result: null })
+
+  t.is(output.result, null)
+  t.true(Math.abs(output.data.bid - 1 / 1.2) < 1e-12)
+  t.true(Math.abs(output.data.ask - 1) < 1e-12)
+  t.true(Math.abs(output.data.mid - 1 / 1.1) < 1e-12)
+  t.is(output.data.bidSize, 20)
+  t.is(output.data.askSize, 10)
+  t.deepEqual(data, { bid: 1, ask: 1.2, mid: 1.1, bidSize: 10, askSize: 20 })
+  t.not(output.data, data)
+
+  // Extra fields in data survive the inversion.
+  const withExtra = invertQuote({
+    data: { bid: 2, ask: 2, mid: 2, midSource: 'provider' },
     result: null,
-    data: {
-      bid,
-      ask,
-      ...(mid === undefined ? {} : { mid }),
-      ...sizes,
-    } as unknown as LwbaResponseDataFields['Data'],
-    timestamps,
-  },
-})
+  })
+  t.is((withExtra.data as { midSource?: string }).midSource, 'provider')
 
-const isError = (
-  result: TimestampedProviderResult<SingleValueGenerics> | TimestampedProviderResult<QuoteGenerics>,
-): result is TimestampedProviderResult<SingleValueGenerics> & {
-  response: TimestampedProviderErrorResponse
-} => Boolean(result.response.errorMessage)
+  // No sizes at all: no size keys in the output.
+  const noSizes = invertQuote({ data: { bid: 1, ask: 2, mid: 1.5 }, result: null })
+  t.false('bidSize' in noSizes.data)
+  t.false('askSize' in noSizes.data)
 
-test('inversion request config accepts only an enabled boolean', (t) => {
-  for (const config of [
-    undefined,
-    null,
-    true,
-    [],
-    {},
-    { enabled: 'true' },
-    { enabled: true, unexpected: true },
-  ]) {
-    t.throws(() => validateInversionRequestConfig(config), {
-      instanceOf: AdapterInputError,
-    })
-  }
-
-  t.deepEqual(validateInversionRequestConfig({ enabled: true }), { enabled: true })
-  t.deepEqual(validateInversionRequestConfig({ enabled: false }), { enabled: false })
-})
-
-test('single-value inversion inverts result and data.result without mutating input', (t) => {
-  const input = singleValueAttempt(4)
-  const output = invertSingleValue(input)
-
-  t.is(isError(output), false)
-  if (isError(output)) {
-    return
-  }
-
-  t.is((output.response as { result: number }).result, 0.25)
-  t.is((output.response as { data: { result: number } }).data.result, 0.25)
-  t.is((input.response as { result: number }).result, 4)
-  t.is((input.response as { data: { result: number } }).data.result, 4)
-})
-
-test('single-value inversion rejects invalid, overflow and malformed results with 502', (t) => {
-  const attempts = [
-    singleValueAttempt(0),
-    singleValueAttempt(-1),
-    singleValueAttempt(Number.NaN),
-    singleValueAttempt(Number.POSITIVE_INFINITY),
-    singleValueAttempt(Number.MIN_VALUE),
-  ]
-
-  const missingData = singleValueAttempt(4)
-  delete (missingData.response as { data?: unknown }).data
-  attempts.push(missingData)
-
-  const nullResult = singleValueAttempt(4)
-  ;(nullResult.response as { data: Record<string, unknown> }).data['result'] = null
-  attempts.push(nullResult)
-
-  const stringResult = singleValueAttempt(4)
-  ;(stringResult.response as { data: Record<string, unknown> }).data['result'] = '4'
-  attempts.push(stringResult)
-
-  for (const attempt of attempts) {
-    const output = invertSingleValue(attempt)
-    t.true(isError(output))
-    if (isError(output)) {
-      t.is(output.response.statusCode, 502)
-    }
-  }
-})
-
-test('inversion transforms leave provider errors unchanged', (t) => {
-  const singleInput: TimestampedProviderResult<SingleValueGenerics> = {
-    params: singleValueAttempt(1).params,
-    response: {
-      statusCode: 502,
-      errorMessage: 'provider error',
-      timestamps,
+  // A single size: the pair is swapped, so the missing one becomes undefined.
+  const onlyBidSize = invertQuote({
+    data: { bid: 1, ask: 2, mid: 1.5, bidSize: 3 } as LwbaResponseDataFields['Data'] & {
+      bidSize?: number
+      askSize?: number
     },
-  }
-  const quoteInput: TimestampedProviderResult<QuoteGenerics> = {
-    params: quoteAttempt(1, 1.2, 1.1).params,
-    response: {
-      statusCode: 502,
-      errorMessage: 'provider error',
-      timestamps,
-    },
-  }
+    result: null,
+  })
+  t.is(onlyBidSize.data.bidSize, undefined)
+  t.is(onlyBidSize.data.askSize, 3)
 
-  t.is(invertSingleValue(singleInput), singleInput)
-  t.is(invertQuote(quoteInput), quoteInput)
+  // Equal bid and ask produce a valid inverse of themselves.
+  const flat = invertQuote({ data: { bid: 2, ask: 2, mid: 2 }, result: null })
+  t.is(flat.data.bid, 0.5)
+  t.is(flat.data.ask, 0.5)
+  t.is(flat.data.mid, 0.5)
 })
 
-test('quote inversion inverts provider mid, synthesizes missing mid and swaps sizes', (t) => {
-  const withMid = invertQuote(quoteAttempt(1, 1.2, 1.1, { bidSize: 10, askSize: 20 }))
-  t.is(isError(withMid), false)
-  if (isError(withMid)) {
-    return
-  }
-  const data = (withMid.response as { data: Record<string, unknown> }).data
-  t.true(Math.abs((data['bid'] as number) - 1 / 1.2) < 1e-12)
-  t.true(Math.abs((data['ask'] as number) - 1) < 1e-12)
-  t.true(Math.abs((data['mid'] as number) - 1 / 1.1) < 1e-12)
-  t.is(data['bidSize'], 20)
-  t.is(data['askSize'], 10)
-  t.false('midSource' in data)
+test('invertQuote works with the LWBA response data type', (t) => {
+  const data: LwbaResponseDataFields['Data'] = { bid: 1.36, ask: 1.37, mid: 1.365 }
+  const output = invertQuote({ data, result: null })
 
-  for (const mid of [undefined, null]) {
-    const synthesized = invertQuote(quoteAttempt(1, 1.2, mid))
-    t.is(isError(synthesized), false)
-    if (!isError(synthesized)) {
-      const synthesizedData = (synthesized.response as { data: LwbaResponseDataFields['Data'] })
-        .data
-      t.true(Math.abs(synthesizedData.mid - (1 / 1.2 + 1) / 2) < 1e-12)
-    }
-  }
-
-  const equalBidAsk = invertQuote(quoteAttempt(2, 2, 2))
-  t.is(isError(equalBidAsk), false)
-  if (!isError(equalBidAsk)) {
-    const equalData = (equalBidAsk.response as { data: LwbaResponseDataFields['Data'] }).data
-    t.is(equalData.bid, 0.5)
-    t.is(equalData.ask, 0.5)
-    t.is(equalData.mid, 0.5)
-  }
-
-  // TP example: invert the quote, not just the mid.
-  const tp = invertQuote(quoteAttempt(1.36, 1.37, 1.365))
-  t.is(isError(tp), false)
-  if (!isError(tp)) {
-    const tpData = (tp.response as { data: LwbaResponseDataFields['Data'] }).data
-    t.true(Math.abs(tpData.bid - 1 / 1.37) < 1e-12)
-    t.true(Math.abs(tpData.ask - 1 / 1.36) < 1e-12)
-    t.true(Math.abs(tpData.mid - 1 / 1.365) < 1e-12)
-  }
-})
-
-test('quote inversion rejects invalid quotes and overflow with 502', (t) => {
-  const missingAsk = quoteAttempt(1, 1.2, 1.1)
-  delete (missingAsk.response as { data: Record<string, unknown> }).data['ask']
-
-  const malformedData = quoteAttempt(1, 1.2, 1.1)
-  ;(malformedData.response as { data: unknown }).data = 'quote'
-
-  const cases: [string, TimestampedProviderResult<QuoteGenerics>][] = [
-    ['zero bid', quoteAttempt(0, 1.2, 1.1)],
-    ['negative ask', quoteAttempt(1, -1.2, 1.1)],
-    ['crossed bid/ask', quoteAttempt(1.2, 1, 1.1)],
-    ['mid above ask', quoteAttempt(1, 1.2, 1.3)],
-    ['mid below bid', quoteAttempt(1, 1.2, 0.9)],
-    ['non-finite ask', quoteAttempt(1, Number.NaN, 1.1)],
-    ['infinite bid', quoteAttempt(Number.POSITIVE_INFINITY, 1.2, 1.1)],
-    ['overflowing inverse', quoteAttempt(Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE)],
-    ['missing ask', missingAsk],
-    ['non-object data', malformedData],
-    ['crossed without mid', quoteAttempt(1.2, 1)],
-    ['non-finite without mid', quoteAttempt(Number.NaN, 1.2)],
-  ]
-
-  for (const [name, attempt] of cases) {
-    const output = invertQuote(attempt)
-    t.true(isError(output), name)
-    if (isError(output)) {
-      t.is(output.response.statusCode, 502, name)
-    }
-  }
+  t.true(Math.abs(output.data.bid - 1 / 1.37) < 1e-12)
+  t.true(Math.abs(output.data.ask - 1 / 1.36) < 1e-12)
+  t.true(Math.abs(output.data.mid - 1 / 1.365) < 1e-12)
 })
 
 const inputParameters = new InputParameters(priceEndpointInputParametersDefinition)
@@ -254,10 +109,7 @@ const adapterSettings = buildAdapterSettings({})
 type CacheParams = TypeFromDefinition<SingleValueGenerics['Parameters']>
 
 const rawParams = { base: 'BTC', quote: 'USD' } as CacheParams
-const inverseParams = {
-  ...rawParams,
-  inversion: { enabled: true },
-} as unknown as CacheParams
+const otherParams = { base: 'ETH', quote: 'USD' } as CacheParams
 
 const providerResult = (
   params: CacheParams,
@@ -272,118 +124,327 @@ const providerResult = (
 })
 
 const buildCache = ({
-  transform,
   resultValidator,
+  settings = adapterSettings,
 }: {
-  transform?: InversionTransform<SingleValueGenerics>
   resultValidator?: (
     result: TimestampedProviderResult<SingleValueGenerics>,
   ) => TimestampedProviderResult<SingleValueGenerics>
+  settings?: AdapterSettings
 } = {}) => {
-  const cache = new MockCache(adapterSettings.CACHE_MAX_ITEMS)
+  const cache = new MockCache(settings.CACHE_MAX_ITEMS)
   const responseCache = new SimpleResponseCache<SingleValueGenerics>({
     dependencies: { cache } as unknown as AdapterDependencies,
-    adapterSettings,
+    adapterSettings: settings,
     adapterName: 'TEST',
     endpointName: 'test',
     inputParameters,
   })
-  responseCache.inversionTransform = transform ?? invertSingleValue<SingleValueGenerics>
+  responseCache.invertResponse = invertPrice
   if (resultValidator) {
     responseCache.resultValidator = resultValidator
   }
   return { cache, responseCache }
 }
 
-test.serial('no inversion preserves the raw cache key, feed ID and value', async (t) => {
-  const { responseCache, cache } = buildCache()
-  const rawKey = responseCache.getCacheKey('test', rawParams)
-  const inverseKey = responseCache.getCacheKey('test', inverseParams)
+const rawKeyOf = (responseCache: SimpleResponseCache<SingleValueGenerics>) =>
+  responseCache.getCacheKey('test', rawParams)
+const inverseKeyOf = (responseCache: SimpleResponseCache<SingleValueGenerics>) =>
+  toInverseCacheKey(rawKeyOf(responseCache))
 
-  t.is(rawKey, 'TEST-test-test-{"base":"btc","quote":"usd"}')
-  t.is(inverseKey, 'TEST-test-test-{"base":"btc","inversion":{"enabled":true},"quote":"usd"}')
+test.serial('the inverse key is the raw key plus -inverse', (t) => {
+  const { responseCache } = buildCache()
+
+  t.is(rawKeyOf(responseCache), 'TEST-test-test-{"base":"btc","quote":"usd"}')
+  t.is(inverseKeyOf(responseCache), 'TEST-test-test-{"base":"btc","quote":"usd"}-inverse')
+  t.not(rawKeyOf(responseCache), inverseKeyOf(responseCache))
+})
+
+test.serial('the inverse feed ID is computed from the params plus inversion: true', (t) => {
+  const config = new AdapterConfig({})
+  config.initialize()
+  config.settings.METRICS_ENABLED = true
+  config.settings.EXPERIMENTAL_METRICS_ENABLED = true
+  config.validate()
+
+  const { cache, responseCache } = buildCache({ settings: config.settings })
+
   t.is(calculateFeedId({ adapterSettings }, rawParams), '{"base":"btc","quote":"usd"}')
   t.is(
-    calculateFeedId({ adapterSettings }, inverseParams),
-    '{"base":"btc","inversion":{"enabled":true},"quote":"usd"}',
+    calculateFeedId({ adapterSettings }, inverseFeedIdParams(rawParams)),
+    '{"base":"btc","inversion":true,"quote":"usd"}',
   )
-  t.not(rawKey, inverseKey)
-  t.not(
-    calculateFeedId({ adapterSettings }, rawParams),
-    calculateFeedId({ adapterSettings }, inverseParams),
+
+  return responseCache.setInverseParams('test', [rawParams]).then(async () => {
+    await responseCache.write('test', [providerResult(rawParams, 4)])
+
+    const raw = await cache.get(rawKeyOf(responseCache))
+    const inverse = await cache.get(inverseKeyOf(responseCache))
+    const feedIdOf = (entry: unknown) =>
+      (entry as { meta?: { metrics?: { feedId?: string } } }).meta?.metrics?.feedId
+
+    t.is(feedIdOf(raw), '{"base":"btc","quote":"usd"}')
+    t.is(feedIdOf(inverse), '{"base":"btc","inversion":true,"quote":"usd"}')
+    t.not(feedIdOf(raw), feedIdOf(inverse))
+  })
+})
+
+test.serial('the inverse entry holds the inverted value next to the raw entry', async (t) => {
+  const { cache, responseCache } = buildCache()
+
+  await responseCache.setInverseParams('test', [rawParams])
+  await responseCache.write('test', [providerResult(rawParams, 4)])
+
+  t.is(((await cache.get(rawKeyOf(responseCache))) as { result: number }).result, 4)
+  t.is(((await cache.get(inverseKeyOf(responseCache))) as { result: number }).result, 0.25)
+  t.is(
+    ((await cache.get(inverseKeyOf(responseCache))) as { data: { result: number } }).data.result,
+    0.25,
   )
+})
+
+test.serial('with no inverse requested the entries are exactly the raw ones', async (t) => {
+  const { responseCache } = buildCache()
+  const written: { key: string; value: { result?: number; statusCode?: number } }[] = []
+  responseCache.writeEntries = async (entries) => {
+    written.push(...(entries as unknown as typeof written))
+  }
+
+  await responseCache.write('test', [providerResult(rawParams, 4), providerResult(otherParams, 8)])
+
+  t.is(written.length, 2)
+  t.deepEqual(
+    written.map((entry) => entry.key),
+    [rawKeyOf(responseCache), responseCache.getCacheKey('test', otherParams)],
+  )
+  t.deepEqual(
+    written.map((entry) => entry.value.result),
+    [4, 8],
+  )
+  t.true(written.every((entry) => entry.value.statusCode === 200))
+  t.false(written.some((entry) => entry.key.endsWith('-inverse')))
+})
+
+test.serial('no inverse variant is written when none is requested', async (t) => {
+  const { cache, responseCache } = buildCache()
 
   await responseCache.write('test', [providerResult(rawParams, 4)])
 
-  t.is(((await cache.get(rawKey)) as { result: number }).result, 4)
+  t.is(((await cache.get(rawKeyOf(responseCache))) as { result: number }).result, 4)
+  t.is(await cache.get(inverseKeyOf(responseCache)), undefined)
 })
 
-test.serial('mixed batches only invert configured results', async (t) => {
+test.serial('no inverse variant is written without an inverter', async (t) => {
   const { cache, responseCache } = buildCache()
 
-  await responseCache.write('test', [
-    providerResult(rawParams, 4),
-    providerResult(inverseParams, 4),
-  ])
+  await responseCache.setInverseParams('test', [rawParams])
+  responseCache.invertResponse = undefined
+  await responseCache.write('test', [providerResult(rawParams, 4)])
 
-  const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
-  const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
-  t.is((rawCached as { result: number }).result, 4)
-  t.is((inverseCached as { result: number }).result, 0.25)
+  t.is(await cache.get(inverseKeyOf(responseCache)), undefined)
 })
 
-test.serial('inversion failures reject only the inverse variant', async (t) => {
-  const scenarios: {
-    name: string
-    configure?: (responseCache: SimpleResponseCache<SingleValueGenerics>) => void
-    makeInverse?: () => TimestampedProviderResult<SingleValueGenerics>
-    expectedMessage: string
-  }[] = [
+test.serial('an inverse variant is no longer written once it is not requested', async (t) => {
+  const { cache, responseCache } = buildCache()
+
+  await responseCache.setInverseParams('test', [rawParams])
+  await responseCache.write('test', [providerResult(rawParams, 4)])
+
+  await responseCache.setInverseParams('test', [])
+  await responseCache.write('test', [providerResult(rawParams, 5)])
+
+  t.is(((await cache.get(rawKeyOf(responseCache))) as { result: number }).result, 5)
+  t.is(((await cache.get(inverseKeyOf(responseCache))) as { result: number }).result, 0.25)
+})
+
+test.serial(
+  'setInverseParams seeds a newly requested inverse variant from the cached raw value',
+  async (t) => {
+    const { cache, responseCache } = buildCache()
+
+    await responseCache.write('test', [providerResult(rawParams, 4)])
+    t.is(await cache.get(inverseKeyOf(responseCache)), undefined)
+
+    // No new provider result: the seed must come from the cache.
+    await responseCache.setInverseParams('test', [rawParams])
+
+    t.is(((await cache.get(inverseKeyOf(responseCache))) as { result: number }).result, 0.25)
+    t.is(((await cache.get(rawKeyOf(responseCache))) as { result: number }).result, 4)
+  },
+)
+
+test.serial('a raw write that lands while seeding wins over the seed', async (t) => {
+  const { cache, responseCache } = buildCache()
+  const rawKey = rawKeyOf(responseCache)
+  const inverseKey = inverseKeyOf(responseCache)
+
+  await responseCache.write('test', [providerResult(rawParams, 4)])
+
+  const originalGet = cache.get.bind(cache)
+  const staleCached = await originalGet(rawKey)
+
+  let releaseHeldGet: () => void = () => {}
+  let markGetCalled: () => void = () => {}
+  const getCalled = new Promise<void>((resolve) => {
+    markGetCalled = resolve
+  })
+
+  cache.get = (key: string) => {
+    if (key !== rawKey) {
+      return originalGet(key)
+    }
+    return new Promise((resolve) => {
+      releaseHeldGet = () => resolve(staleCached)
+      markGetCalled()
+    })
+  }
+
+  try {
+    const seeding = responseCache.setInverseParams('test', [rawParams])
+    // Wait until the seeding path is holding the read of the raw entry.
+    await getCalled
+
+    // A fresh raw value lands before the seed can be written.
+    await responseCache.write('test', [providerResult(rawParams, 8)])
+
+    // Now let the held read resolve with the stale value.
+    releaseHeldGet()
+    await seeding
+  } finally {
+    cache.get = originalGet
+  }
+
+  t.is(((await cache.get(rawKey)) as { result: number }).result, 8)
+  t.is(((await cache.get(inverseKey)) as { result: number }).result, 1 / 8)
+})
+
+test.serial('setInverseParams does not reseed already tracked params', async (t) => {
+  const { cache, responseCache } = buildCache()
+
+  await responseCache.setInverseParams('test', [rawParams])
+  await responseCache.write('test', [providerResult(rawParams, 4)])
+
+  // Simulate the inverse entry disappearing; a param that is already tracked is not reseeded.
+  await cache.delete(inverseKeyOf(responseCache))
+  await responseCache.setInverseParams('test', [rawParams])
+
+  t.is(await cache.get(inverseKeyOf(responseCache)), undefined)
+})
+
+test.serial('setInverseParams with no inverse requests is a no-op', async (t) => {
+  const { cache, responseCache } = buildCache()
+
+  await responseCache.write('test', [providerResult(rawParams, 4)])
+  await responseCache.setInverseParams('test', [])
+
+  t.is(await cache.get(inverseKeyOf(responseCache)), undefined)
+})
+
+test.serial('writeTTL called with raw params also extends the inverse entry TTL', async (t) => {
+  const { cache, responseCache } = buildCache()
+
+  await responseCache.setInverseParams('test', [rawParams])
+  await responseCache.write('test', [providerResult(rawParams, 4)])
+
+  const expirationOf = (key: string) =>
+    (cache as unknown as LocalCache).cache.get(key)?.data.expirationTimestamp as number
+
+  const rawBefore = expirationOf(rawKeyOf(responseCache))
+  const inverseBefore = expirationOf(inverseKeyOf(responseCache))
+  const newTtl = adapterSettings.CACHE_MAX_AGE + 100_000
+
+  await responseCache.writeTTL('test', [rawParams], newTtl)
+
+  t.true(expirationOf(rawKeyOf(responseCache)) > rawBefore)
+  t.true(expirationOf(inverseKeyOf(responseCache)) > inverseBefore)
+  t.true(expirationOf(inverseKeyOf(responseCache)) >= inverseBefore + 100_000)
+})
+
+test.serial('a provider error is copied to the inverse entry unchanged', async (t) => {
+  const { cache, responseCache } = buildCache()
+
+  await responseCache.setInverseParams('test', [rawParams])
+  await responseCache.write('test', [
     {
-      name: 'no transform',
-      configure: (responseCache) => {
-        responseCache.inversionTransform = undefined
-      },
-      expectedMessage: 'no inversion transform',
+      params: rawParams,
+      response: { statusCode: 429, errorMessage: 'rate limited', timestamps },
     },
-    {
-      name: 'clone failure',
-      makeInverse: () => {
-        const result = providerResult(inverseParams, 4)
-        ;(result.response as Record<string, unknown>)['self'] = result.response
+  ])
+
+  const raw = await cache.get(rawKeyOf(responseCache))
+  const inverse = await cache.get(inverseKeyOf(responseCache))
+
+  t.is((raw as { statusCode: number }).statusCode, 429)
+  t.is((inverse as { statusCode: number }).statusCode, 429)
+  t.is((inverse as { errorMessage: string }).errorMessage, 'rate limited')
+})
+
+test.serial(
+  'a resultValidator that throws only on the inverted value keeps the raw entry',
+  async (t) => {
+    const { cache, responseCache } = buildCache({
+      resultValidator: (result) => {
+        if ((result.response as { result?: number }).result === 0.25) {
+          throw new Error('validator boom')
+        }
         return result
       },
-      expectedMessage: 'could not be cloned',
-    },
-    {
-      name: 'validator throw',
-      configure: (responseCache) => {
-        responseCache.resultValidator = (result) => {
-          if (hasInversionEnabled(result.params)) {
-            throw new Error('validator boom')
-          }
-          return result
-        }
-      },
-      expectedMessage: 'validator boom',
-    },
-  ]
+    })
 
-  for (const scenario of scenarios) {
-    const { cache, responseCache } = buildCache()
-    scenario.configure?.(responseCache)
-    const inverseResult = scenario.makeInverse?.() ?? providerResult(inverseParams, 4)
+    await responseCache.setInverseParams('test', [rawParams])
+    await responseCache.write('test', [providerResult(rawParams, 4)])
 
-    await responseCache.write('test', [providerResult(rawParams, 4), inverseResult])
+    const raw = await cache.get(rawKeyOf(responseCache))
+    const inverse = (await cache.get(inverseKeyOf(responseCache))) as unknown as
+      TimestampedProviderErrorResponse | undefined
 
-    const rawCached = await cache.get(responseCache.getCacheKey('test', rawParams))
-    const inverseCached = await cache.get(responseCache.getCacheKey('test', inverseParams))
+    t.is((raw as { result: number }).result, 4)
+    t.truthy(inverse)
+    t.is(inverse?.statusCode, 502)
+    t.true(inverse?.errorMessage?.includes('inverting or validating the result threw'))
+  },
+)
 
-    t.is((rawCached as { result: number }).result, 4, scenario.name)
-    t.is((inverseCached as { statusCode: number }).statusCode, 502, scenario.name)
-    t.true(
-      (inverseCached as { errorMessage: string }).errorMessage.includes(scenario.expectedMessage),
-      scenario.name,
-    )
+test.serial('the raw entry is written when the inverter itself throws', async (t) => {
+  const { cache, responseCache } = buildCache()
+  responseCache.invertResponse = () => {
+    throw new Error('invert boom')
   }
+
+  await responseCache.setInverseParams('test', [rawParams])
+  await responseCache.write('test', [providerResult(rawParams, 4)])
+
+  const inverse = (await cache.get(inverseKeyOf(responseCache))) as unknown as
+    TimestampedProviderErrorResponse | undefined
+
+  t.is(((await cache.get(rawKeyOf(responseCache))) as { result: number }).result, 4)
+  t.is(inverse?.statusCode, 502)
+  t.true(inverse?.errorMessage?.includes('inverting or validating the result threw'))
+})
+
+test.serial('writing N results with an inverse requested calculates exactly N keys', async (t) => {
+  const { responseCache } = buildCache()
+  await responseCache.setInverseParams('test', [rawParams, otherParams])
+
+  const count = await countCacheKeyCalculations(async () => {
+    await responseCache.write('test', [
+      providerResult(rawParams, 4),
+      providerResult(otherParams, 8),
+    ])
+  })
+
+  t.is(count, 2)
+})
+
+test.serial('writing N results with no inverse requested calculates exactly N keys', async (t) => {
+  const { responseCache } = buildCache()
+
+  const count = await countCacheKeyCalculations(async () => {
+    await responseCache.write('test', [
+      providerResult(rawParams, 4),
+      providerResult(otherParams, 8),
+    ])
+  })
+
+  t.is(count, 2)
 })

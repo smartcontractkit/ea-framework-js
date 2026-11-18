@@ -83,7 +83,7 @@ To understand where the inverses are applied, please refer to the [Request Valid
 
 ## Request-driven inversion
 
-Inversion is opt-in per request and applied on the cache-write path:
+Inversion is opt-in per request with a boolean flag, and applied on the cache-write path:
 
 ```json
 {
@@ -91,38 +91,56 @@ Inversion is opt-in per request and applied on the cache-write path:
   "data": {
     "base": "USD",
     "quote": "JPY",
-    "inversion": {
-      "enabled": true
-    }
+    "inversion": true
   }
 }
 ```
 
-| Endpoint                       | Fields inverted                                                | Notes                                                               |
-| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `PriceEndpoint` / single-value | `data.result` → `1 / data.result`; top-level `result` mirrored | `data.result` is canonical                                          |
-| `LwbaEndpoint` / quote         | `bid' = 1 / ask`, `ask' = 1 / bid`                             | `mid' = 1 / mid` when provided; otherwise `(1 / ask + 1 / bid) / 2` |
+`false` or an absent field means no inversion. Any other value (`"true"`, `1`, `null`, an object) is a 400.
 
-The endpoint response type selects the inversion behavior; requests only enable or disable it. `PriceEndpoint` inverts only `data.result`; `LwbaEndpoint` inverts the full quote.
+| Endpoint                            | Fields inverted                                                 | Notes                            |
+| ----------------------------------- | --------------------------------------------------------------- | -------------------------------- |
+| `ForexPriceEndpoint` / single-value | `result` → `1 / result`; `data.result` is set to the same value | top-level `result` is the source |
+| `LwbaEndpoint` / quote              | `bid' = 1 / ask`, `ask' = 1 / bid`, `mid' = 1 / mid`            | `bidSize`/`askSize` swap         |
 
-Inversion is atomic: invalid `bid`/`ask` makes the whole response 502. Provider errors are never inverted. `bidSize`/`askSize` are swapped; size validity belongs to the asset-class policy (OPDATA-9200).
+Only `ForexPriceEndpoint` and `LwbaEndpoint` support inversion out of the box. A plain `PriceEndpoint` has no inverter,
+and any other endpoint opts in by passing `invertResponse` in its endpoint params. An inverter only does the math: it
+receives the `data` and `result` of a successful response and returns the inverted pair. Value checks do not belong in
+it — they belong in the endpoint's `resultValidator`.
 
-`resultValidator` runs after inversion and must accept inverted values. A thrown validator on an inverse result becomes a 502; non-inverse writes are unchanged.
+The order of operations on a write is:
+
+1. The raw result is validated with the endpoint's `resultValidator`.
+2. If it is an error, the same error is copied to the inverse entry unchanged.
+3. Otherwise the result is inverted and validated again with the same `resultValidator`.
+
+So an inverse value that fails validation becomes a 502 at the inverse key without affecting the raw value, and a
+`resultValidator` or inverter that throws also becomes a 502 there. `bidSize`/`askSize` are swapped; size validity
+belongs to the asset-class policy (OPDATA-9200).
+
+Raw values are validated too: `ForexPriceEndpoint` returns 502 for a result that is zero or not a finite number, and
+`LwbaEndpoint` returns 502 for non-finite prices. A negative price result is cached as it is.
 
 ### Cache keys and feed IDs
 
-- No `inversion`, or `enabled: false`: existing key, feed ID, and `includes.json` behavior. `inversion: null` is rejected.
-- Enabled: `inversion.enabled` is part of params, so raw and inverse variants have distinct keys and feed IDs.
+- No `inversion`, or `inversion: false`: the existing key, feed ID, and `includes.json` behavior.
+- Enabled: the inverse entry is stored under the raw cache key plus the `-inverse` suffix, so the key is derived from
+  the raw key and no request path computes a cache key twice. The inverse feed ID is computed from the request params
+  plus `inversion: true`, so raw and inverse variants have distinct feed IDs. Those params are only ever built to
+  compute a feed ID; they never reach a provider.
 - Custom `cacheKeyGenerator`: 400, because the custom key may not distinguish variants.
+- `inversion` is a reserved input parameter name, so an adapter cannot declare a param with that name.
 
 ### Transports and rollout
 
-- Subscription transports strip inversion config before provider calls, so raw and inverse variants share one provider subscription.
-- HTTP, WS, and SSE support inversion. Custom transports must set `supportsInversion = true` and write through `SubscriptionTransport.writeResults`; direct `responseCache.write` calls leave inverse requests timing out.
-- Transports with `foregroundExecute` return 400.
+- Any transport that extends `SubscriptionTransport` and has no `foregroundExecute` supports inversion with no code
+  changes: each transport owns a second subscription set for inverse requests, and results are written through the
+  response cache as usual.
+- Transports with `foregroundExecute`, and the composite transport, return 400.
 - With `includes.json`, explicit inversion composes with the includes transform; includes-inverse pairs cancel.
-- Inversion creates a new feed identity. Upgrade writers, then readers, then enable inversion. Older EA builds drop unknown params, so gate jobspec/RDD changes on the deployed version.
-- `inversion` is a reserved input param name/alias. Existing adapters keep it as a domain param; inversion is disabled and startup warns.
+- Inversion creates a new feed identity. Upgrade writers, then readers, then enable inversion. Inverse requests are
+  tracked in a separate subscription set, so writer pods on an older framework version never see them: inverse requests
+  time out until the writers are upgraded.
 
 ## Request Transforms
 
