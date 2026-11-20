@@ -6,6 +6,7 @@ import {
   AdapterRequest,
   AdapterRequestData,
   Overrides,
+  ResponseInverter,
   TimestampedProviderResult,
   makeLogger,
   getCanonicalAdapterName,
@@ -41,6 +42,21 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
   customOutputValidation?: CustomOutputValidator | undefined
+  invertResponse?: ResponseInverter<T['Response']>
+  /** True when requests may ask for the inverse with `inversion: true`. */
+  acceptsInversionRequests: boolean
+
+  /**
+   * Returns true when a request with this data must be served as the inverse even though the caller
+   * did not ask for it. Called after all request transforms. Set by PriceAdapter for includes.json.
+   */
+  invertsByDefault?: (data: TypeFromDefinition<T['Parameters']>) => boolean
+
+  /**
+   * Rewrites the pair of a request. Runs after all request transforms and after the inversion
+   * decision. Must not decide or record anything about inversion. Set by PriceAdapter for includes.json.
+   */
+  pairRewrite?: RequestTransform<T>
 
   /**
    * Optional validator that can be overridden by endpoint subclasses to validate or transform
@@ -86,6 +102,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.customInputValidation = params.customInputValidation
     this.customOutputValidation = params.customOutputValidation
     this.overrides = params.overrides
+    this.invertResponse = params.invertResponse
+    this.acceptsInversionRequests = params.invertResponse !== undefined
     this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
   }
 
@@ -111,6 +129,9 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
 
     if (this.resultValidator) {
       responseCache.resultValidator = this.resultValidator.bind(this)
+    }
+    if (this.invertResponse) {
+      responseCache.invertResponse = this.invertResponse
     }
 
     const transportDependencies = {

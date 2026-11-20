@@ -1,11 +1,6 @@
 import { SettingsDefinitionMap } from '../config'
 import { TransportGenerics } from '../transports'
-import {
-  AdapterRequest,
-  AdapterRequestContext,
-  AdapterResponse,
-  SingleNumberResultResponse,
-} from '../util'
+import { AdapterRequest, SingleNumberResultResponse, TimestampedProviderResult } from '../util'
 import {
   EmptyInputParameters,
   InputParametersDefinition,
@@ -77,6 +72,25 @@ export type PriceEndpointGenerics = TransportGenerics & {
 }
 
 /**
+ * Inverts a single-value price response: result becomes 1 / result, and data.result is set to the
+ * same value only when the data already has one.
+ */
+export const invertPrice = <D>({
+  data,
+  result,
+}: {
+  data: D
+  result: number
+}): { data: D; result: number } => {
+  const inverted = 1 / result
+  const dataWithResult =
+    typeof data === 'object' && data !== null && 'result' in data
+      ? { ...data, result: inverted }
+      : data
+  return { data: dataWithResult as D, result: inverted }
+}
+
+/**
  * A PriceEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
  * Data Feeds, its InputParameters must extend the basic ones (base/quote).
  */
@@ -93,14 +107,6 @@ const buildIncludesMap = (includesFile: IncludesFile) => {
   }
 
   return includesMap
-}
-
-type PriceAdapterRequest<T> = AdapterRequest<T> & {
-  requestContext: AdapterRequestContext<T> & {
-    priceMeta: {
-      inverse: boolean
-    }
-  }
 }
 
 /**
@@ -131,65 +137,48 @@ export class PriceAdapter<
       // Build includes map for constant lookups
       this.includesMap = buildIncludesMap(params.includes)
 
-      const requestTransform = (req: AdapterRequest<EmptyInputParameters>) => {
-        const priceRequest = req as PriceAdapterRequest<
-          TypeFromDefinition<PriceEndpointInputParametersDefinition>
-        >
-        const requestData = priceRequest.requestContext.data
+      // The includes entry for this pair, or undefined. `applies` is false when the entry is restricted
+      // to other endpoints.
+      const findInclude = (endpointName: string, base?: string, quote?: string) => {
+        const details = base && quote ? this.includesMap?.[base]?.[quote] : undefined
+        const applies = details?.endpoints === undefined || details.endpoints.includes(endpointName)
+        return { details, applies }
+      }
+
+      const pairRewrite = (req: AdapterRequest<EmptyInputParameters>) => {
+        const requestData = (
+          req as AdapterRequest<TypeFromDefinition<PriceEndpointInputParametersDefinition>>
+        ).requestContext.data
         if (!requestData.base || !requestData.quote) {
           return
         }
-        const includesDetails = this.includesMap?.[requestData.base]?.[requestData.quote]
-
-        if (
-          includesDetails?.endpoints === undefined ||
-          includesDetails?.endpoints?.includes(req.requestContext.endpointName)
-        ) {
-          if (includesDetails) {
-            requestData.base = includesDetails.from || requestData.base
-            requestData.quote = includesDetails.to || requestData.quote
-          }
-
-          const inverse = includesDetails?.inverse || false
-          priceRequest.requestContext.priceMeta = {
-            inverse,
-          }
-        } else {
+        const { details, applies } = findInclude(
+          req.requestContext.endpointName,
+          requestData.base,
+          requestData.quote,
+        )
+        if (!applies) {
           throw new Error(
             `Endpoint ${req.requestContext.endpointName} not supported for ${requestData.base}/${requestData.quote} in includes.json`,
           )
         }
+        if (details) {
+          requestData.base = details.from || requestData.base
+          requestData.quote = details.to || requestData.quote
+        }
       }
 
       for (const endpoint of priceEndpoints) {
-        endpoint.requestTransforms?.push(requestTransform)
+        endpoint.invertsByDefault = (data) => {
+          const { details, applies } = findInclude(endpoint.name, data.base, data.quote)
+          return applies && details?.inverse === true
+        }
+        endpoint.pairRewrite = pairRewrite
+        // Lets the cache serve inverse pairs from includes.json. This does not make the endpoint
+        // accept `inversion: true`.
+        endpoint.invertResponse ??= invertPrice
       }
     }
-  }
-
-  override async handleRequest(
-    req: PriceAdapterRequest<PriceEndpointInputParametersDefinition>,
-    replySent: Promise<unknown>,
-  ): Promise<AdapterResponse> {
-    const response = await super.handleRequest(req, replySent)
-
-    if (this.includesMap && req.requestContext.priceMeta?.inverse) {
-      // We need to search in the reverse order (quote -> base) because the request transform will have inverted the pair
-
-      // Deep clone the response, as it may contain objects which won't be cloned by simply destructuring
-      const cloneResponse = JSON.parse(JSON.stringify(response))
-
-      const inverseResult = 1 / (cloneResponse.result as number)
-      cloneResponse.result = inverseResult
-      // Check if response data has a result within it
-      const data = cloneResponse.data as { result: number } | null
-      if (data?.result) {
-        data.result = inverseResult
-      }
-      return cloneResponse
-    }
-
-    return response
   }
 }
 
@@ -218,4 +207,29 @@ export class CryptoPriceEndpoint<T extends PriceEndpointGenerics> extends PriceE
  * A ForexPriceEndpoint expands on the existing [[PriceEndpoint]] and provides more descriptive name for
  *  endpoints that provide forex prices.
  */
-export class ForexPriceEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {}
+export class ForexPriceEndpoint<T extends PriceEndpointGenerics> extends PriceEndpoint<T> {
+  constructor(params: AdapterEndpointParams<T>) {
+    params.invertResponse ??= invertPrice
+    super(params)
+  }
+
+  protected override resultValidator(
+    result: TimestampedProviderResult<T>,
+  ): TimestampedProviderResult<T> {
+    if ('errorMessage' in result.response) {
+      return result
+    }
+    const value = result.response.result
+    if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) {
+      return {
+        params: result.params,
+        response: {
+          statusCode: 502,
+          errorMessage: `Invariant violation. Price result must be a finite, non-zero number. Got: ${value}`,
+          timestamps: result.response.timestamps,
+        },
+      }
+    }
+    return result
+  }
+}

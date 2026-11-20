@@ -50,11 +50,36 @@ export const validateLwbaResponse = (bid?: number, mid?: number, ask?: number): 
   if (!mid || !bid || !ask) {
     return `Invariant violation. LWBA response must contain mid, bid and ask prices. Got: (bid: ${bid}, mid: ${mid}, ask: ${ask})`
   }
+  if (![bid, mid, ask].every((value) => Number.isFinite(value))) {
+    return `Invariant violation. LWBA prices must be finite numbers. Got: (bid: ${bid}, mid: ${mid}, ask: ${ask})`
+  }
   if (mid < bid || mid > ask) {
     return `Invariant violation. Mid price must be between bid and ask prices. Got: (bid: ${bid}, mid: ${mid}, ask: ${ask})`
   }
   return ''
 }
+
+/** Inverts a quote: the inverse bid comes from the ask and the inverse ask from the bid. */
+export const invertQuote = <
+  D extends LwbaResponseDataFields['Data'] & { bidSize?: number; askSize?: number },
+>({
+  data,
+  result,
+}: {
+  data: D
+  result: null
+}): { data: D; result: null } => ({
+  result,
+  data: {
+    ...data,
+    bid: 1 / data.ask,
+    ask: 1 / data.bid,
+    mid: 1 / data.mid,
+    ...(data.bidSize !== undefined || data.askSize !== undefined
+      ? { bidSize: data.askSize, askSize: data.bidSize }
+      : {}),
+  },
+})
 
 /**
  * An LwbaEndpoint is a specific type of AdapterEndpoint. Meant to comply with standard practices for
@@ -94,6 +119,8 @@ export class LwbaEndpoint<T extends LwbaEndpointGenerics> extends AdapterEndpoin
 
       return undefined
     }
+
+    params.invertResponse ??= invertQuote
 
     super(params)
   }
