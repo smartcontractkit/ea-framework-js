@@ -189,6 +189,35 @@ test('Invariant violation fails LWBA validation via resultValidator (bid <= mid 
   )
 })
 
+test('Invariant violation fails LWBA validation via resultValidator (non-finite prices)', (t) => {
+  const lwbaEndpoint = new LwbaEndpoint({
+    name: 'lwba_test',
+    inputParameters: new InputParameters(lwbaEndpointInputParametersDefinition),
+    transport: new NopTransport(),
+  }) as LwbaEndpoint<LwbaEndpointGenerics>
+
+  const result = getResultValidator(lwbaEndpoint)({
+    params: { base: 'BTC', quote: 'USD' },
+    response: {
+      result: null,
+      data: {
+        bid: Number.POSITIVE_INFINITY,
+        mid: 123.4,
+        ask: 123.3,
+      },
+      timestamps: {
+        providerDataRequestedUnixMs: 0,
+        providerDataReceivedUnixMs: 0,
+        providerIndicatedTimeUnixMs: undefined,
+      },
+    },
+  })
+
+  const written = result.response as TimestampedProviderErrorResponse
+  t.is(written.statusCode, 502)
+  t.true(written.errorMessage.includes('Invariant violation. LWBA prices must be finite numbers.'))
+})
+
 test('Invariant violation fails LWBA validation via resultValidator (bid, mid or ask not found)', (t) => {
   const lwbaEndpoint = new LwbaEndpoint({
     name: 'lwba_test',

@@ -38,7 +38,6 @@ type SSETransportGenerics = TransportGenerics & {
  * @typeParam T - Helper struct type that will be used to pass types to the generic parameters (check [[SSETransportGenerics]])
  */
 export class SseTransport<T extends SSETransportGenerics> extends StreamingTransport<T> {
-  supportsInversion = true
   EventSource: typeof EventSource = EventSource
   eventListeners!: {
     type: string
@@ -119,7 +118,7 @@ export class SseTransport<T extends SSETransportGenerics> extends StreamingTrans
             }
             return result
           })
-          this.writeResults(results).catch((error) => {
+          this.responseCache.write(this.name, results).catch((error) => {
             censorLogs(() => logger.error(`Error writing SSE results to cache: ${error}`))
           })
         }

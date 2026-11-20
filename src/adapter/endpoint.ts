@@ -6,12 +6,12 @@ import {
   AdapterRequest,
   AdapterRequestData,
   Overrides,
+  ResponseInverter,
   TimestampedProviderResult,
   makeLogger,
   getCanonicalAdapterName,
   canonicalizeAdapterNameKeys,
 } from '../util'
-import { INVERSION_PARAM, InversionTransform } from './inverse'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
 import { TypeFromDefinition } from '../validation/input-params'
@@ -42,7 +42,21 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
   customInputValidation?: CustomInputValidator<T>
   customOutputValidation?: CustomOutputValidator | undefined
-  inversionTransform?: InversionTransform<T>
+  invertResponse?: ResponseInverter<T['Response']>
+  /** True when requests may ask for the inverse with `inversion: true`. */
+  acceptsInversionRequests: boolean
+
+  /**
+   * Returns true when a request with this data must be served as the inverse even though the caller
+   * did not ask for it. Called after all request transforms. Set by PriceAdapter for includes.json.
+   */
+  invertsByDefault?: (data: TypeFromDefinition<T['Parameters']>) => boolean
+
+  /**
+   * Rewrites the pair of a request. Runs after all request transforms and after the inversion
+   * decision. Must not decide or record anything about inversion. Set by PriceAdapter for includes.json.
+   */
+  pairRewrite?: RequestTransform<T>
 
   /**
    * Optional validator that can be overridden by endpoint subclasses to validate or transform
@@ -88,6 +102,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     this.customInputValidation = params.customInputValidation
     this.customOutputValidation = params.customOutputValidation
     this.overrides = params.overrides
+    this.invertResponse = params.invertResponse
+    this.acceptsInversionRequests = params.invertResponse !== undefined
     this.requestTransforms = [this.symbolOverrider.bind(this), ...(params.requestTransforms || [])]
   }
 
@@ -102,15 +118,6 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     dependencies: AdapterDependencies,
     adapterSettings: T['Settings'],
   ): Promise<void> {
-    const reservedParam = this.inputParameters.params.find((param) =>
-      param.aliases.includes(INVERSION_PARAM),
-    )
-    if (reservedParam) {
-      logger.warn(
-        `Endpoint "${this.name}" input param "${reservedParam.name}" uses reserved name/alias "${INVERSION_PARAM}". Inversion is disabled; rename the param to enable it.`,
-      )
-    }
-
     this.adapterName = adapterName
     const responseCache = new SimpleResponseCache({
       dependencies,
@@ -123,8 +130,8 @@ export class AdapterEndpoint<T extends EndpointGenerics> implements AdapterEndpo
     if (this.resultValidator) {
       responseCache.resultValidator = this.resultValidator.bind(this)
     }
-    if (this.inversionTransform) {
-      responseCache.inversionTransform = this.inversionTransform
+    if (this.invertResponse) {
+      responseCache.invertResponse = this.invertResponse
     }
 
     const transportDependencies = {

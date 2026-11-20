@@ -3,7 +3,7 @@ import { installTimers } from '../helper'
 import untypedTest, { TestFn } from 'ava'
 import { Server } from 'mock-socket'
 import WebSocket from 'ws'
-import { Adapter, AdapterEndpoint, EndpointContext, invertSingleValue } from '../../src/adapter'
+import { Adapter, AdapterEndpoint, EndpointContext, invertPrice } from '../../src/adapter'
 import { AdapterConfig, EmptyCustomSettings } from '../../src/config'
 import { metrics as eaMetrics } from '../../src/metrics'
 import {
@@ -2209,17 +2209,21 @@ test.serial(
 )
 
 test.serial(
-  'websocket inversion writes raw and inverse cache entries from one provider push',
+  'websocket inversion writes raw and inverse cache entries and subscribes only once',
   async (t) => {
     const base = 'BTC'
     const quote = 'USD'
+    const subscribeMessages: string[] = []
 
     mockWebSocketProvider(WebSocketClassProvider)
     const mockWsServer = new Server(ENDPOINT_URL, { mock: false })
     mockWsServer.on('connection', (socket) => {
       const sendPrice = () =>
         socket.send(JSON.stringify({ pair: `${base}/${quote}`, value: price }))
-      socket.on('message', sendPrice)
+      socket.on('message', (data) => {
+        subscribeMessages.push(typeof data === 'string' ? data : data.toString())
+        sendPrice()
+      })
       const keepAliveInterval = setInterval(sendPrice, 1000)
       socket.on('close', () => clearInterval(keepAliveInterval))
     })
@@ -2233,13 +2237,12 @@ test.serial(
       undefined,
       undefined,
       (transport) => {
-        const endpoint = new AdapterEndpoint<WebSocketTypes>({
+        return new AdapterEndpoint<WebSocketTypes>({
           name: 'test',
           inputParameters,
           transport,
+          invertResponse: invertPrice,
         })
-        endpoint.inversionTransform = invertSingleValue<WebSocketTypes>
-        return endpoint
       },
     )
     const testAdapter = await TestAdapter.startWithMockedCache(adapter, t.context)
@@ -2254,7 +2257,7 @@ test.serial(
     })
 
     await testAdapter.startBackgroundExecuteThenGetResponse(t, {
-      requestData: { base, quote, inversion: { enabled: true } },
+      requestData: { base, quote, inversion: true },
       expectedCacheSize: 2,
       expectedResponse: {
         data: { result: 1 / price },
@@ -2266,11 +2269,14 @@ test.serial(
     const cachePrefix = 'TEST-test-default_single_transport-'
     const rawCached = await testAdapter.mockCache.get(`${cachePrefix}{"base":"btc","quote":"usd"}`)
     const inverseCached = await testAdapter.mockCache.get(
-      `${cachePrefix}{"base":"btc","inversion":{"enabled":true},"quote":"usd"}`,
+      `${cachePrefix}{"base":"btc","quote":"usd"}-inverse`,
     )
 
     t.is((rawCached as { result: number }).result, price)
     t.is((inverseCached as { result: number }).result, 1 / price)
+
+    // Raw and inverse requests share a single provider subscription.
+    t.deepEqual(subscribeMessages, ['S:BTC/USD'])
 
     testAdapter.api.close()
     mockWsServer.close()

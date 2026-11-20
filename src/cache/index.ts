@@ -115,6 +115,20 @@ export const calculateCacheKey = <T extends EndpointGenerics>({
   return cacheKey
 }
 
+/** Request field that asks for the inverse of the result. Reserved: not a valid input param name. */
+export const INVERSION_PARAM = 'inversion'
+
+const INVERSE_CACHE_KEY_SUFFIX = '-inverse'
+
+/** Cache key of the inverse entry for the given raw cache key. */
+export const toInverseCacheKey = (rawKey: string): string => `${rawKey}${INVERSE_CACHE_KEY_SUFFIX}`
+
+/** Params used only to compute the feed ID of an inverse entry. Never store or send these. */
+export const inverseFeedIdParams = <P extends Record<string, unknown>>(params: P): P => ({
+  ...params,
+  [INVERSION_PARAM]: true,
+})
+
 // Used to coalesce HTTP requests within the same endpoint
 export const calculateHttpRequestKey = <T extends EndpointGenerics>({
   data,

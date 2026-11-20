@@ -43,7 +43,26 @@ export class SimpleResponseCache<
     transportName: string,
     results: TimestampedProviderResult<T>[],
   ): Promise<void> {
-    const entries = results.map((r) => this.generateCacheEntry(transportName, transportName, r))
+    const keys = this.inverseKeysFor(transportName)
+    if (!keys) {
+      // No inverse requested: identical to the previous behaviour.
+      const entries = results.map((r) => this.generateCacheEntry(transportName, transportName, r))
+      await this.writeEntries(entries)
+      return
+    }
+
+    const entries: { key: string; value: AdapterResponse<T['Response']> }[] = []
+    for (const r of results) {
+      const entry = this.generateCacheEntry(transportName, transportName, r)
+      entries.push(entry)
+      if (keys.has(entry.key)) {
+        this.pendingSeeds.delete(entry.key)
+        const inverse = this.generateInverseEntry(transportName, r, entry.key)
+        if (inverse) {
+          entries.push(inverse)
+        }
+      }
+    }
     await this.writeEntries(entries)
   }
 }
