@@ -1931,17 +1931,17 @@ ethers@6.17.0:
     tslib "2.7.0"
     ws "8.21.0"
 
-eventsource-parser@^4.1.2:
+eventsource-parser@^4.1.3:
   version "4.1.3"
   resolved "https://registry.npmjs.org/eventsource-parser/-/eventsource-parser-4.1.3.tgz#365be753e773294b363516f01b2e26a12b834ec7"
   integrity sha512-jZVIVilXZfAx6H20ZKKEj5dabbpD9ETmMj3uHsjMmgBzBHB6tsHrmdWB4mAiy3amtN6MOoVkfXRQu4wf1n88Rw==
 
-eventsource@5.1.4:
-  version "5.1.4"
-  resolved "https://registry.npmjs.org/eventsource/-/eventsource-5.1.4.tgz#9a0d9790a9be28951fa95d9da5b7c843692e24d5"
-  integrity sha512-awkjURTcaMUKjtEqM/78nMtFSfGcgGST6EbXGV2/E7LJXzWwnNaByn1zACiX9VluWzokVeHpjRdzo3nZr9zhMg==
+eventsource@5.1.5:
+  version "5.1.5"
+  resolved "https://registry.npmjs.org/eventsource/-/eventsource-5.1.5.tgz#0c0d02f432fac409f87040154983d0742592bb60"
+  integrity sha512-Z41ZPzy7CM1NgAKgrG6pzPdOSimaly20ZY3+6opMQw/VEso+xhPWX4asJT2WAX8zPyFitV3C1+WJMWSLKSlAWg==
   dependencies:
-    eventsource-parser "^4.1.2"
+    eventsource-parser "^4.1.3"
 
 execa@^9.6.1:
   version "9.6.1"
