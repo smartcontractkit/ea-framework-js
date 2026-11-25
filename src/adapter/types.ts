@@ -4,7 +4,13 @@ import { Cache } from '../cache'
 import { AdapterConfig, BaseAdapterSettings, SettingsDefinitionMap } from '../config'
 import { AdapterRateLimitTier, RateLimiter } from '../rate-limiting'
 import { Transport, TransportGenerics, TransportRoutes } from '../transports'
-import { AdapterRequest, AdapterResponse, LoggerFactory, SubscriptionSetFactory } from '../util'
+import {
+  AdapterRequest,
+  AdapterResponse,
+  LoggerFactory,
+  ResponseInverter,
+  SubscriptionSetFactory,
+} from '../util'
 import { Requester } from '../util/requester'
 import { InputParameters } from '../validation'
 import { AdapterError } from '../validation/error'
@@ -148,6 +154,12 @@ export interface BaseAdapterEndpointParams<T extends EndpointGenerics> {
 
   /** Custom function that generates cache keys */
   cacheKeyGenerator?: (data: TypeFromDefinition<T['Parameters']>) => string
+
+  /**
+   * Optional inverter that produces the inverse variant of a provider result. Endpoints that
+   * define it accept requests with `inversion: true`.
+   */
+  invertResponse?: ResponseInverter<T['Response']>
 
   /**
    * Custom input validation. Void function that should throw AdapterInputError on validation errors.

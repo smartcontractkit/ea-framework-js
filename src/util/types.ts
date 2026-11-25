@@ -44,6 +44,9 @@ export type AdapterRequestContext<T> = {
   /** Normalized and validated data coming from the request body */
   data: T
 
+  /** Set only for inverse requests: the cache key of the raw entry this request is the inverse of */
+  rawCacheKey?: string
+
   /** Metadata relevant to this particular request */
   meta?: AdapterRequestMeta
 }
@@ -121,6 +124,7 @@ type CommonAdapterRequestParams = {
   endpoint?: string
   transport?: string
   overrides?: Overrides
+  inversion?: boolean
 }
 export type ReservedInputParameterNames = keyof CommonAdapterRequestParams
 
@@ -152,6 +156,12 @@ export type TimestampedProviderResult<T extends ProviderResultGenerics> = Pick<
   /** Value that will be included in the result property of the response, with timestamps applied */
   response: TimestampedAdapterResponse<T['Response']>
 }
+
+/** Inverts the data and result of a successful response. Must only do the math: no validation. */
+export type ResponseInverter<R extends ResponseGenerics> = (value: {
+  data: R['Data']
+  result: R['Result']
+}) => { data: R['Data']; result: R['Result'] }
 
 /**
  * Helper struct type that provides detail about the outgoing Adapter Response
